@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  {% if emulatestatic %}
+  {% load static %}
+    <link rel="shortcut icon" href="{% static 'camai/git/img/favicon.ico' type='image/x-icon' %}">
+  {% else %}
+    <link rel="shortcut icon" href="https://static.cam-ai.de/{{ version }}/camai/git/img/favicon.ico">
+  {% endif %}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Details for Fit #{{ fitnr }}</title>
+</head>
+<body>
+{% if emulatestatic %}
+{% load static %}
+<script src="{% static 'camai/git/js/wstools.js' %}"></script>
+<script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+<script src="{% static 'camai/nogit/js/chart.min.js' %}"></script>
+{% else %}
+<script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+<script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+<script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/chart.min.js"></script>
+{% endif %}
+<div class="container-fluid float-left">
+  <div class="h2 m-10">Details for Fit #{{ fitnr }}</div>
+</div>
+<div class="container-fluid float-left">
+  <canvas id="myChart"></canvas>
+</div>
+<div class="container-fluid float-left">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>H100</th>
+        <th>Cmet</th><th>val_Loss</th><th>val_H100</th><th>val_Cmet</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tbody id="tablebody">
+    </tbody>
+  </table>
+</div>
+<div class="container-fluid float-left">
+  <div class="h2 m-10">Training parameters</div>
+</div>
+<div class="container-fluid float-left">
+  <div class="m-10" id="params">123</div>
+</div>
+</body>
+</html>
+
+
+<script>
+
+let trainerutilSocket;
+let fit_length = -1;
+let graph_labels = [];
+let graph_data = {
+  labels: graph_labels,
+  datasets: [
+    {
+    label: 'val_Cmetrics',
+    backgroundColor: 'rgb(200, 0, 0)',
+    borderColor: 'rgb(200, 0, 0)',
+    yAxisID: 'A',
+    data: [],
+    },
+    {
+    label: 'val_Hit100',
+    backgroundColor: 'rgb(0, 155, 0)',
+    borderColor: 'rgb(0, 155, 0)',
+    yAxisID: 'B',
+    data: [],
+    },
+  ]
+};
+let graph_config = {
+  type: 'line',
+  data: graph_data,
+  options: {
+    scales: {
+      A: {
+        type: 'linear',
+        position: 'left',
+      },
+      B: {
+        type: 'linear',
+        position: 'right',
+      }
+    }
+  }
+};
+let mygraph = new Chart(
+        document.getElementById('myChart'),
+        graph_config);
+
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+
+function refresh_all() {
+  trainerutilSocket.sendandwait({
+    'command' : 'getepochsinfo',
+    'fitnr' : {{ fitnr }},
+  })
+  .then((result) => {
+    result = JSON.parse(result);
+    if (result.length != fit_length) {
+      graph_labels.length = 0;
+      graph_data.datasets[0].data.length = 0;
+      graph_data.datasets[1].data.length = 0;
+      newaddition = '';
+      result.forEach(function(item, index) {
+        graph_labels.push(item.pk);
+        graph_data.datasets[0].data.push(item.fields.val_cmetrics);
+        graph_data.datasets[1].data.push(item.fields.val_hit100);
+        newaddition += '<tr>';
+        newaddition += '<td>'+item.pk+'</td>';
+        newaddition += '<td>'+Math.round(item.fields.seconds)+'</td>';
+        newaddition += '<td>'+item.fields.learning_rate.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.fields.loss.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.fields.hit100.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.fields.cmetrics.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.fields.val_loss.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.fields.val_hit100.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.fields.val_cmetrics.toPrecision(4)+'</td>';
+        newaddition += '</tr>';
+        $('#tablebody').empty();
+        $('#tablebody').append(newaddition);
+      });
+      mygraph.destroy();
+      mygraph = new Chart(
+        document.getElementById('myChart'),
+        graph_config
+      );
+
+      fit_length = result.length;
+    };
+    setTimeout(refresh_all, 10000);
+  })
+  .catch(err => {console.log(err);});
+};
+
+$(document).ready(function() {
+  WSAsync(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/trainerutil/'
+  )
+  .then((result) => {
+    trainerutilSocket = result;
+    return(trainerutilSocket.sendandwait({
+      'command' : 'connecttrainer',
+      'school' : {{ schoolnr }},
+      'dorunout' : false,
+    }));
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      trainerutilSocket.sendandwait({
+        'command' : 'getparams',
+        'fitnr' : {{ fitnr }},
+      })
+      .then((result) => {
+        console.log(result);
+        $('#params').html(result);
+        refresh_all();
+      })
+      .catch(err => {console.log(err);});
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+</script>

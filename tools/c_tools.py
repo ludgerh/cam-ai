@@ -1,0 +1,127 @@
+from time import time
+import cv2 as cv
+import numpy as np
+from tools.l_tools import djconf
+if djconf.getconfigbool('local_trainer', True):
+  #from tensorflow.keras import backend as K
+  import tensorflow as tf
+
+def c_convert(inframe, typein=None, typeout=None, xout=None, yout=None):
+# Frame Types:
+# 1 : Jpeg Data
+# 2 : Pillow Data
+# 3 : opencv Data
+	if xout:
+		if typein == 3:
+			xin = inframe.shape[1]
+			yin = inframe.shape[0]
+		if xin != xout:
+			if not yout:
+				yout = round(yin / xin * xout)
+			inframe = cv.resize(inframe, (xout, yout))
+	if typein and typeout and (typein != typeout):
+		if typein == 1:
+			if typeout == 3:
+				inframe = cv.imdecode(np.fromstring(inframe, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+		elif typein == 3:
+			if typeout == 1:
+				inframe = cv.imencode('.jpg', inframe)[1].tostring()
+	return(inframe)
+
+
+class speedlimit:
+  def __init__(self):
+    self.ts2 = 0.0
+    self.rest = 0.0
+
+  def greenlight(self, time_span, frame_time):
+    if time_span == 0.0:
+      return(True)
+    else:
+      self.ts1 = self.ts2
+      self.ts2 = frame_time
+      self.rest = self.rest + time_span + self.ts1 - self.ts2
+      if self.rest < 0.0:
+        self.rest = 0.0
+      if self.rest >= time_span:
+        self.rest -= time_span
+        return(False)
+      else:
+        return(True)
+
+class speedometer:
+  def __init__(self):
+    self.ts1 = 0
+    self.ts2 = time()
+    self.counter = 0
+    self.timeadd = 0.0
+
+  def gettime(self):
+    if self.ts1 == 0:
+      result = 0.0
+    else:
+      self.counter += 1
+      self.timeadd += (self.ts2 - self.ts1)
+      if self.timeadd >= 10:
+        result = (self.counter / self.timeadd)
+        self.counter = 0
+        self.timeadd = 0.0
+      else:
+        result = None
+    self.ts1 = self.ts2
+    self.ts2 = time()
+    return(result)
+
+def rect_atob(rect):
+	# Rectangle notation B: (x1, x2, y1, y2)
+	return([rect[0], rect[0]+rect[2]-1, rect[1], rect[1]+rect[3]-1])
+
+def rect_btoa(rect):
+	# Rectangle notation A: (x1, y1, w, h)
+	return([rect[0], rect[2], rect[1]-rect[0]+1, rect[3]-rect[2]+1])
+
+def hasoverlap(rect1, rect2) : # Rectangles in notation B
+	if ((rect1[1] >= rect2[0]) and (rect2[1] >= rect1[0]) 
+    and (rect1[3] >= rect2[2]) and (rect2[3] >= rect1[2])):
+		return(True)
+	else :
+		return(False)
+
+def merge_rects(rect_list): # Rectangles in notation B
+  while True:
+    changed = False
+    for i in range(len(rect_list)):
+      if rect_list[i][0] > -1:
+        for j in range(i+1, len(rect_list)):
+          if ((rect_list[j][0] > -1) 
+              and hasoverlap(rect_list[i], rect_list[j])):
+            rect_list[i][0] = min(rect_list[i][0], rect_list[j][0])
+            rect_list[i][1] = max(rect_list[i][1], rect_list[j][1])
+            rect_list[i][2] = min(rect_list[i][2], rect_list[j][2])
+            rect_list[i][3] = max(rect_list[i][3], rect_list[j][3])
+            rect_list[j][0] = -1
+            changed = True
+    if not changed:
+      break
+  rect_list = [item for item in rect_list if item[0] > -1]
+  return(rect_list)
+
+def hasoverlap(rect1, rect2) : # Rectangles in notation B
+	if ((rect1[1] >= rect2[0]) and (rect2[1] >= rect1[0]) 
+    and (rect1[3] >= rect2[2]) and (rect2[3] >= rect1[2])):
+		return(True)
+	else :
+		return(False)
+
+def cmetrics(y_true, y_pred):
+  y_true = tf.round(y_true)
+  y_pred = tf.round(y_pred)
+  ones = tf.ones_like(y_true)
+  return tf.reduce_mean(tf.abs(y_pred + y_true - ones), axis=-1)
+
+def hit100(y_true, y_pred):
+  y_true = tf.round(y_true)
+  y_pred = tf.round(y_pred)
+  maxline = tf.reduce_max(tf.abs(y_true - y_pred), axis=-1)
+  ones = tf.ones_like(maxline)
+  return tf.abs(maxline - ones)

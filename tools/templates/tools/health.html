@@ -1,0 +1,468 @@
+{% extends 'main/basis.html' %}
+{% block content %}
+{% if emulatestatic %}
+  {% load static %}
+  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
+  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+{% else %}
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+{% endif %}
+<div class="accordion">
+  <div class="accordion-item" id="accordionitem1">
+    <h2 class="accordion-header" id="panels-headingOne">
+      <button class="accordion-button bg-primary collapsed text-white" type="button" data-bs-toggle="collapse" 
+          data-bs-target="#panels-collapseOne" 
+          aria-expanded="false" 
+          aria-controls="panels-collapseOne">
+        <h4>Checking trainers</h4>
+      </button>
+    </h2>
+    <div id="panels-collapseOne" class="accordion-collapse collapse" 
+        aria-labelledby="panels-headingOne">
+      <div class="accordion-body">
+{% for item in schoollist %}
+      <table class="table h4">
+        <thead>
+          <tr>
+            <th>{{ item.name }} <h5>({{ item.dir }})</h5></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Correct lines</td>
+            <td id="correct{{ item.id }}">?</td>
+          </tr>
+          <tr>
+            <td>Missing db lines</td>
+            <td id="missingdblines{{ item.id }}">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissingdb" idx="{{ item.id }}" 
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+          <tr>
+            <td>Missing files</td>
+            <td id="missingfiles{{ item.id }}">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissingfiles" idx="{{ item.id }}" 
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+        </tbody>
+      </table>
+{% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="accordion-item" id="accordionitem2">
+    <h2 class="accordion-header" id="panels-headingTwo">
+      <button class="accordion-button collapsed bg-primary text-white" type="button" data-bs-toggle="collapse" 
+          data-bs-target="#panels-collapseTwo" aria-expanded="false" 
+          aria-controls="panels-collapseTwo">
+        <h4>Checking video files</h4>
+      </button>
+    </h2>
+    <div id="panels-collapseTwo" class="accordion-collapse collapse" 
+        aria-labelledby="panels-headingTwo">
+      <div class="accordion-body">
+      <table class="table h4">
+        <thead>
+          <tr>
+            <th><h5>{{ recordingspath }}</h5></th>
+          </tr>
+        </thead>
+        <tbody>
+            <td>JPG files</td>
+            <td id="jpg_rec">?</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>MP4 files</td>
+            <td id="mp4_rec">?</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>Old temporary files</td>
+            <td id="temp_rec">?</td>
+            <td> <button class="btn btn-primary m-2 fixtemp_rec" 
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+          <tr>
+            <td>Correct lines</td>
+            <td id="correct_rec">?</td>
+            <td></td>
+          </tr>
+          <tr>
+          <tr>
+            <td>Missing db lines</td>
+            <td id="missingdb_rec">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissingdb_rec" 
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+          <tr>
+            <td>Missing files</td>
+            <td id="missingfiles_rec">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissingfiles_rec"  
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  <div class="accordion-item" id="accordionitem3">
+    <h2 class="accordion-header" id="panels-headingThree">
+      <button class="accordion-button collapsed bg-primary text-white" type="button" data-bs-toggle="collapse" 
+          data-bs-target="#panels-collapseThree" aria-expanded="false" 
+          aria-controls="panels-collapseThree">
+        <h4>Checking event frames against events</h4>
+      </button>
+    </h2>
+    <div id="panels-collapseThree" class="accordion-collapse collapse" 
+        aria-labelledby="panels-headingThree">
+      <div class="accordion-body">
+      <table class="table h4">
+        <thead>
+          <tr>
+            <th><h5>Database tables event and event_frame</h5></th>
+          </tr>
+        </thead>
+        <tbody>
+            <td>Correct events</td>
+            <td id="correct_events">?</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>Missing events</td>
+            <td id="missing_events">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissing_events" 
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+          <tr>
+            <td>Missing frames</td>
+            <td id="missing_frames">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissing_frames"  
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  <div class="accordion-item" id="accordionitem4">
+    <h2 class="accordion-header" id="panels-headingFour">
+      <button class="accordion-button collapsed bg-primary text-white" type="button" data-bs-toggle="collapse" 
+          data-bs-target="#panels-collapseFour" aria-expanded="false" 
+          aria-controls="panels-collapseFour">
+        <h4>Checking event frames against files</h4>
+      </button>
+    </h2>
+    <div id="panels-collapseFour" class="accordion-collapse collapse" 
+        aria-labelledby="panels-headingFour">
+      <div class="accordion-body">
+      <table class="table h4">
+        <thead>
+          <tr>
+            <th><h5>{{ schoolframespath }}</h5></th>
+          </tr>
+        </thead>
+        <tbody>
+            <td>Correct frames</td>
+            <td id="correct_frames">?</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>Missing db lines</td>
+            <td id="missing_frames_db">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissing_frames_db" 
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+          <tr>
+            <td>Missing files</td>
+            <td id="missing_frames_files">?</td>
+            <td> <button class="btn btn-primary m-2 fixmissing_frames_files"  
+              type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+let healthSocket;
+
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+
+function updateschool(schoolnr) {
+  healthSocket.sendandwait({
+    'command' : 'checkschool',
+    'school' : schoolnr,
+  })
+  .then((result) => {
+    selector = $('.fixmissingdb').filter('[idx='+schoolnr+']');
+    if (result.missingdb) {
+      selector.prop('disabled', false);
+    } else {
+      selector.prop('disabled', true);
+    };
+    selector = $('.fixmissingfiles').filter('[idx='+schoolnr+']');
+    if (result.missingfiles) {
+      selector.prop('disabled', false);
+    } else {
+      selector.prop('disabled', true);
+    };
+    $('#correct'+schoolnr).text(result.correct);
+    $('#missingdblines'+schoolnr).text(result.missingdb);
+    $('#missingfiles'+schoolnr).text(result.missingfiles);
+  })
+  .catch(err => {console.log(err);});
+};
+
+function updaterecfiles() {
+  healthSocket.sendandwait({
+    'command' : 'checkrecfiles',
+  })
+  .then((result) => {
+    if (result.temp) {
+      $('.fixtemp_rec').prop('disabled', false);
+    } else {
+      $('.fixtemp_rec').prop('disabled', true);
+    };
+    if (result.missingdb) {
+      $('.fixmissingdb_rec').prop('disabled', false);
+    } else {
+      $('.fixmissingdb_rec').prop('disabled', true);
+    };
+    if (result.missingfiles) {
+      $('.fixmissingfiles_rec').prop('disabled', false);
+    } else {
+      $('.fixmissingfiles_rec').prop('disabled', true);
+    };
+    $('#jpg_rec').text(result.jpg);
+    $('#mp4_rec').text(result.mp4);
+    $('#correct_rec').text(result.correct);
+    $('#temp_rec').text(result.temp);
+    $('#missingdb_rec').text(result.missingdb);
+    $('#missingfiles_rec').text(result.missingfiles);
+  })
+  .catch(err => {console.log(err);});
+};
+
+function updateevents() {
+  healthSocket.sendandwait({
+    'command' : 'checkevents',
+  })
+  .then((result) => {
+    if (result.missingevents) {
+      $('.fixmissing_events').prop('disabled', false);
+    } else {
+      $('.fixmissing_events').prop('disabled', true);
+    };
+    if (result.missingframes) {
+      $('.fixmissing_frames').prop('disabled', false);
+    } else {
+      $('.fixmissing_frames').prop('disabled', true);
+    };
+    $('#correct_events').text(result.correct);
+    $('#missing_events').text(result.missingevents);
+    $('#missing_frames').text(result.missingframes);
+  })
+  .catch(err => {console.log(err);});
+};
+
+function updateframes() {
+  healthSocket.sendandwait({
+    'command' : 'checkframes',
+  })
+  .then((result) => {
+    if (result.missingdblines) {
+      $('.fixmissing_frames_db').prop('disabled', false);
+    } else {
+      $('.fixmissing_frames_db').prop('disabled', true);
+    };
+    if (result.missingfiles) {
+      $('.fixmissing_frames_files').prop('disabled', false);
+    } else {
+      $('.fixmissing_frames_files').prop('disabled', true);
+    };
+    $('#correct_frames').text(result.correct);
+    $('#missing_frames_db').text(result.missingdblines);
+    $('#missing_frames_files').text(result.missingfiles);
+  })
+  .catch(err => {console.log(err);});
+};
+
+$('.fixmissingdb').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingdb',
+    'school' : parseInt(btn.attr('idx')),
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateschool(parseInt(btn.attr('idx')));
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixmissingfiles').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingfiles',
+    'school' : parseInt(btn.attr('idx')),
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateschool(parseInt(btn.attr('idx')));
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixtemp_rec').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixtemp_rec',
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updaterecfiles();
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixmissingdb_rec').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingdb_rec',
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updaterecfiles();
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixmissingfiles_rec').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingfiles_rec',
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updaterecfiles();
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixmissing_events').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingevents',
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateevents();
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixmissing_frames').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingframes',
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateevents();
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixmissing_frames_db').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingframesdb',
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateframes();
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$('.fixmissing_frames_files').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  healthSocket.sendandwait({
+    'command' : 'fixmissingframesfiles',
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateframes();
+      btn.removeClass('btn-warning');
+    };
+  })
+  .catch(err => {console.log(err);});
+});
+
+$(document).ready(function() {
+  WSAsync(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/health/'
+  )
+  .then((result) => {
+    healthSocket = result;
+    $('#accordionitem1').on('show.bs.collapse', function () {
+{% for item in schoollist %}
+     updateschool({{ item.id }});
+{% endfor %}
+    });
+    $('#accordionitem2').on('show.bs.collapse', function () {
+      updaterecfiles();
+    });
+    $('#accordionitem3').on('show.bs.collapse', function () {
+      updateevents();
+    });
+    $('#accordionitem4').on('show.bs.collapse', function () {
+      updateframes();
+    });
+  })
+  .catch(err => {console.log(err);});
+});
+</script>
+
+{% endblock %}

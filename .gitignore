@@ -1,0 +1,17 @@
+/data/
+static/
+__pycache__/
+migrations/
+*.py~
+*.md~
+*.bat~
+*.example~
+*.html~
+*.css~
+*.js~
+.gitignore~
+/camai/passwords.py
+/camai/changed_files.txt
+/camai/changed_files.txt~
+/env/
+

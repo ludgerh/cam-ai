@@ -1,0 +1,453 @@
+{% extends 'schools/basis.html' %}
+{% block content %}
+
+{% if emulatestatic %}
+{% load static %}
+<script src="{% static 'camai/git/js/wstools.js' %}"></script>
+<script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+<link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
+{% else %}
+<script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+<script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+{% endif %}
+<div class="h1">Images for training: {{ schoolname }}</div>
+<h2>
+<span style="white-space:nowrap;">
+  Tagged class:
+  <select id="selectclass" class="m-2">
+    <option value='-2'>All...</option>
+    <option value='-1'>None...</option>
+  </select>
+</span>
+<span style="white-space:nowrap;">
+  <input type="checkbox" id="cbnot" class="m-2" checked>Show not checked
+</span>
+<span style="white-space:nowrap;">
+  <input type="checkbox" id="cbchecked" class="m-2">Show checked
+</span>
+{% if may_write %}
+<span style="white-space:nowrap;" id="hide_if_no_write">
+  <button type="button" id="checkallbutton" class="btn btn-primary m-2" action="checkall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Check all!</button>
+</span>
+<span style="white-space:nowrap;">
+   <button type="button" id="delallbutton" class="btn btn-primary m-2" action="delall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Delete all!</button>
+</span>
+{% if user.is_superuser %}
+<span style="white-space:nowrap;">
+   <button type="button" id="copyallbutton" class="btn btn-primary m-2" action="copyall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Copy all!</button>
+</span>
+{% endif %}
+<span style="white-space:nowrap;">
+  <input type="checkbox" id="cbkiller" class="m-2">Killer mode
+</span>
+{% endif %}
+</h2>
+<h4>
+  <span style="white-space:nowrap; display: inline-block;">
+    <nav aria-label="Page navigation" style="display: inline-block;">
+      <ul id="pageselect" class="pagination m-2">
+      </ul>
+    </nav>
+    Page Size:
+    <select class=" m-2" id="pagesizeselect">
+      <option value='10'>10</option>
+      <option value='100' selected>100</option>
+      <option value='1000'>1000</option>
+      <option value='10000'>10000</option>
+      <option value='100000'>100000</option>
+    </select>
+  </span>
+</h4>
+<div class="container-fluid float-left">
+  <div class="row" id="gallery">
+    <div id="lastcol" class="col-sm-auto m-0 p-0">
+      <div class="card m-1 p-0" style="border: 1; width: 212px; height: auto;">
+        <div id="endtrigger">...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if may_write %}
+<!-- Modal -->
+<div class="modal fade" id="shureModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">???</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">No, close!</button>
+        <button type="button" class="btn btn-primary modalbutton" style="width: 120px;">Yes, go!</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script >
+
+{% if may_write %}
+$('#shureModal').on('shown.bs.modal', function (event) {
+  let button = event.relatedTarget;
+  let action = button.getAttribute('action');
+  if (action == 'checkall') {
+    $('.modal-title').text('Checking in all visible images...');
+  }
+  if (action == 'delall') {
+    $('.modal-title').text('Deleting all visible images...');
+  }
+{% if user.is_superuser %}
+  if (action == 'copyall') {
+    $('.modal-title').text('Copying all visible to standard model...');
+  }
+{% endif %}
+  if (action == 'checkone') {
+    $('.modal-title').text('Checking in the sected image...');
+    let img = button.getAttribute('img');
+    $('.modalbutton').attr('img', img);
+  }
+  if (action == 'delone') {
+    $('.modal-title').text('Deleting the sected image...');
+    let img = button.getAttribute('img');
+    $('.modalbutton').attr('img', img);
+  }
+  $('.modalbutton').attr('action', action);
+  if ($('#cbkiller').prop("checked")) {
+    $('.modalbutton').click();
+  };
+})
+{% endif %}
+
+let taglines;
+let frames;
+let frames_ready;
+let frames_count;
+let last_frame_visible;
+let page_nr = 1;
+let min_id = 0;
+let max_id = 0;
+
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+
+$.fn.isInViewport = function() {
+  var elementTop = $(this).offset().top;
+  var elementBottom = elementTop + $(this).outerHeight();
+  var viewportTop = $(window).scrollTop();
+  var viewportBottom = viewportTop + window.innerHeight;
+  return elementBottom > viewportTop && elementTop < viewportBottom;
+};
+
+$('#selectclass').change(function() {
+  page_nr = 1;
+  draw_all_cards();
+});
+
+$('#cbnot').change(function() {
+  page_nr = 1;
+  draw_all_cards();
+});
+
+$('#cbchecked').change(function() {
+  page_nr = 1;
+  draw_all_cards();
+});
+
+$('#pagesizeselect').change(function() {
+  page_nr = 1;
+  draw_all_cards();
+});
+
+function draw_all_cards() {
+  $('#gallery').children().slice(0,-1).remove();
+
+  SchoolDButilSocket.sendandwait({
+    'command' : 'settrainpag',
+    'model' : {{ schoolnr }},
+    'class' : parseInt($('#selectclass').val()),
+    'cbnot' : $('#cbnot').prop('checked'),
+    'cbchecked' : $('#cbchecked').prop('checked'),
+    'pagesize' : parseInt($('#pagesizeselect').val()),
+  })
+  .then(() => {
+    return(SchoolDButilSocket.sendandwait({
+      'command' : 'getshortlist',
+      'page_nr' : page_nr,
+    }));
+  })
+  .then((result) => {
+    $('#pageselect').empty();
+    result.forEach(function(item, index) {
+      if (item) {
+        if (parseInt(item) == page_nr) {
+          $('#pageselect').append('<li class="page-item m-2">'+item);
+        } else {
+          $('#pageselect').append('<li page="'+item+'" class="page-item"><a class="page-link">'+item+'</a></li>');
+        };
+      } else {
+        $('#pageselect').append('<li class="page-item">...</li>');
+      };
+    });
+    $('#pageselect').children().click(function() {
+      mypage = parseInt($(this).attr('page'));
+      if (mypage && (mypage != page_nr)) {
+        page_nr = mypage;
+        draw_all_cards();
+      };
+    });
+    return(SchoolDButilSocket.sendandwait({
+      'command' : 'gettrainimages',
+      'page_nr' : page_nr,
+    }));
+  })
+  .then((result) => {
+    frames = result;
+    if (frames.length) {
+      min_id = frames[0].id;
+      max_id = frames[frames.length-1].id;
+    };
+    frames_count = frames.length;
+    frames_ready = 0;
+    last_frame_visible = 0;
+    getimages();
+  })
+  .catch(err => {console.log(err);});
+};
+
+function getimages() {
+  while ((frames_ready < frames_count) 
+      && ((frames_ready - last_frame_visible) <= 32)
+      && $('#endtrigger').isInViewport()) {
+    let frame_processing = frames_ready; 
+    frames_ready += 1;
+    SchoolDButilSocket.sendandwait({
+      'command' : 'getpredictions',
+      'idxs' :  [frames[frame_processing].id],
+      'school' : {{ schoolnr }},
+      'is_school' : false,
+    })
+    .then((predictions) => {
+      newname = frames[frame_processing].name.replace('frames/', '');
+      newaddition = '<div id="col' + frames[frame_processing].id+'" class="col-sm-auto m-0 p-0">'
+        + '<div class="card m-1 p-0"'
+        + ' style="border: 1; width: 212px; height: auto;" done=0>' + frames[frame_processing].made
+          + '<a href="/schools/getbigbmp/{{ schoolnr }}/'+newname+'/" target="_blank">'
+          + '<img idx='+frames[frame_processing].id+' style="width: 210px; height: 210px; object-fit: contain" src="'
+          + window.location.protocol + '//' +  window.location.host
+          + '/schools/getbmp/{{ schoolnr }}/'
+          + newname+'/"></a><br>'
+          newaddition += '<div class="checklist h4">';
+          for (let i=0; i<taglines.length; i++) {
+{% if may_write %}
+		        newaddition += '<input type="checkbox" class="tc'+frames[frame_processing].id+'" img="'+frames[frame_processing].id+'" cnt="'+i+'"';
+		        if (frames[frame_processing].cs[i] >= 0.5) {
+			        newaddition += ' checked>';
+		        } else {
+			        newaddition += '>';
+		        };
+{% endif %}
+            if (predictions[0][i] >= 0.5) {
+              if (frames[frame_processing].cs[i] < 0.5) {
+                newaddition += '<span class="blue">';
+              } else {
+                newaddition += '<span>';
+              };
+            } else {
+              if (frames[frame_processing].cs[i] >= 0.5) {
+                newaddition += '<span class="blue">';
+              } else {
+                newaddition += '<span>';
+              };
+            };
+		        newaddition += taglines[i].substr(0,3)+': ';
+		        newaddition += Math.round(predictions[0][i]*10000)
+				        /10000+'</span><br>';
+	        };
+          newaddition += '<h6>'+frame_processing+': Tagged by '+frames[frame_processing].made_by+'</h6>';
+{% if may_write %}
+          newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="checkone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Check</button>';
+          newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="delone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Delete</button>';
+{% endif %}
+	        newaddition += '</div>';
+
+        + '</div>'
+      + '</div>';
+      $('#lastcol').before(newaddition);
+{% if may_write %}
+      $('.tc'+frames[frame_processing].id).change(function(event) {
+        tagcheck_changed(event);
+      });
+{% endif %}
+      last_frame_visible = frame_processing;
+    })
+    .catch(err => {console.log(err);});
+  };
+};
+
+{% if may_write %}
+function tagcheck_changed(event) {
+  checkbox = $(event.target)
+  let img = checkbox.attr('img');
+  let cnt = checkbox.attr('cnt');
+  SchoolDButilSocket.sendandwait({
+    'command' : 'setonetag',
+    'img' : img,
+    'cnt' : cnt,
+    'value' : checkbox.prop('checked'),
+  })
+  .then((result) => {
+    if (result === 'OK') {
+      mylabel = checkbox.next();
+      if (mylabel.attr('class')) {
+        mylabel.removeClass('blue');
+      } else {
+        mylabel.addClass('blue');
+      };
+    };
+  })
+  .catch(err => {console.log(err);});
+}
+{% endif %}
+
+$(document).ready(function() {
+  $('#cbkiller').prop("checked", false);
+  WSAsync(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/schooldbutil/'
+  )
+  .then((result) => {
+    SchoolDButilSocket = result;
+    return(SchoolDButilSocket.sendandwait({
+      'command' : 'register_ai',
+      'school' : 1,
+    }));
+  })
+  .then(() => {
+    return(SchoolDButilSocket.sendandwait({
+      'command' : 'gettags',
+      'school' : {{ schoolnr }},
+    }));
+  })
+  .then((result) => {
+    taglines = result;
+    for (let i=0; i<taglines.length; i++) {
+      if ($("#selectclass option[value='"+i+"']").length > 0) {
+        $("#selectclass option[value='"+i+"']").remove();  
+      };  
+      $("<option/>").val(i).text(taglines[i]).appendTo("#selectclass");
+    };
+  })
+  .then(() => {
+    $(window).on('resize scroll', function() {
+      getimages();
+    });
+{% if may_write %}
+    $('.modalbutton').click(function() {
+      let action = $(this).attr('action');
+      $('#shureModal').modal('hide');
+      if (action == 'checkall') {
+        if (frames.length) {
+          $('#checkallbutton').addClass('btn-warning');
+          SchoolDButilSocket.sendandwait({
+            'command' : 'checkall',
+            'school' : {{ schoolnr }},
+            'class' : parseInt($('#selectclass').val()),
+            'min_id' : min_id,
+            'max_id' : max_id,
+          })
+          .then((result) => {
+            if (result === 'OK') {
+              $('#checkallbutton').removeClass('btn-warning');
+              page_nr = 1;
+              draw_all_cards();
+            };
+          })
+          .catch(err => {console.log(err);});
+        };
+      };
+      if (action == 'delall') {
+        if (frames.length) {
+          $('#delallbutton').addClass('btn-warning');
+          SchoolDButilSocket.sendandwait({
+            'command' : 'deleteall',
+            'school' : {{ schoolnr }},
+            'class' : parseInt($('#selectclass').val()),
+            'cbnot' : $('#cbnot').prop('checked'),
+            'cbchecked' : $('#cbchecked').prop('checked'),
+            'min_id' : min_id,
+            'max_id' : max_id,
+          })
+          .then((result) => {
+            if (result === 'OK') {
+              $('#delallbutton').removeClass('btn-warning');
+              page_nr = 1;
+              draw_all_cards();
+            };
+          })
+          .catch(err => {console.log(err);});
+        };
+      };
+{% if user.is_superuser %}
+      if (action == 'copyall') {
+        if (frames.length) {
+          $('#copyallbutton').addClass('btn-warning');
+          SchoolDButilSocket.sendandwait({
+            'command' : 'copyall',
+            'school' : {{ schoolnr }},
+            'class' : parseInt($('#selectclass').val()),
+            'cbnot' : $('#cbnot').prop('checked'),
+            'cbchecked' : $('#cbchecked').prop('checked'),
+            'min_id' : min_id,
+            'max_id' : max_id,
+          })
+          .then((result) => {
+            if (result === 'OK') {
+              $('#copyallbutton').removeClass('btn-warning');
+            };
+          })
+          .catch(err => {console.log(err);});
+        };
+      };
+{% endif %}
+      if (action == 'checkone') {
+        SchoolDButilSocket.sendandwait({
+          'command' : 'checktrainframe',
+          'img' : $(this).attr('img'),
+        })
+        .then((result) => {
+          if (result === 'OK') {
+            if (! $('#cbchecked').prop('checked')) {
+              $('#col'+$(this).attr('img')).remove();
+            };
+          };
+        })
+        .catch(err => {console.log(err);});
+      };
+      if (action == 'delone') {
+        SchoolDButilSocket.sendandwait({
+          'command' : 'deltrainframe',
+          'img' : $(this).attr('img'),
+        })
+        .then((result) => {
+          if (result === 'OK') {
+            $('#col'+$(this).attr('img')).remove();
+          };
+        })
+        .catch(err => {console.log(err);});
+      };
+    });
+{% endif %}
+    draw_all_cards();
+  })
+  .catch(err => {console.log(err);});
+});
+
+</script>
+
+{% endblock %}

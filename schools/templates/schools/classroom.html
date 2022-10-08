@@ -1,0 +1,311 @@
+{% extends 'eventers/basis.html' %}
+{% block content %}
+
+{% if emulatestatic %}
+{% load static %}
+<script src="{% static 'camai/git/js/wstools.js' %}"></script>
+<script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+<link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
+{% else %}
+<script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+<script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+{% endif %}
+
+
+{% if may_write %}
+<!-- Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Removing event from school</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">Close</button>
+        <button type="button" class="btn btn-primary delbutton" style="width: 120px;">Yes, remove!</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<h2 class="m-2">Classroom: {{ school.name }}</h2>
+<div class="container-fluid float-left">
+{% for item in events %}
+  <br><br><div done=0 class="row eventrow" id={{ item.id }}>
+	  <h4>
+    {{ item.id }}
+    {{ item.p_string }}
+		S:{{ item.start|date:'d.m.Y-H:i' }}
+	  E:{{ item.end|date:'d.m.Y-H:i' }}
+		XMIN:{{ item.xmin }}
+		XMAX:{{ item.xmax }}
+		YMIN:{{ item.ymin }}
+		YMAX:{{ item.ymax }}
+		N:{{ item.numframes }}
+	  </h4>
+  </div>
+{% endfor %}
+</div>
+
+<script>
+
+{% if may_write %}
+$('#deleteModal').on('shown.bs.modal', function (event) {
+  const button = event.relatedTarget;
+  const nr_todel = button.getAttribute('id');
+  $('.delbutton').attr('id', nr_todel);
+})
+{% endif %}
+
+let taglines;
+let SchoolDBUtilSocket;
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let indices = {};
+let framelines = {};
+
+$.fn.isInViewport = function() {
+  const elementTop = $(this).offset().top;
+  const elementBottom = elementTop + $(this).outerHeight();
+  const viewportTop = $(window).scrollTop();
+  const viewportBottom = viewportTop + $(window).height();
+  return elementBottom > viewportTop && elementTop < viewportBottom;
+};
+
+getimages = function() {
+  $('.eventrow').each(function() {
+    if ($(this).attr('done') == 0) {
+      if ($(this).isInViewport()) {
+        $(this).attr('done', 1);
+        indices[$(this).attr('id')] = [];
+	      SchoolDBUtilSocket.sendandwait({
+		      'command' : 'getschoolframes',
+		      'event' : $(this).attr('id'),
+	      })
+	      .then((result) => {
+          framelines[$(this).attr('id')] = result;
+		      for (let j=0; j<framelines[$(this).attr('id')].length; j++) {
+			      indices[$(this).attr('id')].push(framelines[$(this).attr('id')][j].id);
+            mycard = $('<div id="card'+framelines[$(this).attr('id')][j].id+'" class="card m-1 p-0" style="width: 212px; height: auto;">'
+              + '<a href="/schools/getbigbmp/0/'
+			        + framelines[$(this).attr('id')][j].name.replace(/\//g,'$')+'/'
+			        + '" target="_blank">'
+			        + '<img src="/schools/getbmp/0/'
+			        + framelines[$(this).attr('id')][j].name.replace(/\//g,'$')+'/'
+              +'" style="width: 210px; height: 210px; object-fit: contain"</a>'
+            + '</div>');
+            mycard.appendTo($(this));
+          };
+	        SchoolDBUtilSocket.sendandwait({
+		        'command' : 'getpredictions',
+		        'idxs' : indices[$(this).attr('id')],
+		        'school' : {{ school.id }},
+            'is_school' : true,
+	        })
+          .then((predictions) => {
+		        for (let j=0; j<framelines[$(this).attr('id')].length; j++) {
+		          cblines = '<div class="checklist h4">';
+		          for (let k=0; k<taglines.length; k++) {
+{% if may_write %}
+				        cblines += '<input type="checkbox" data-k="'+k+'"';
+				        if (predictions[j][k] >= 0.5) {
+					        cblines += ' checked>';
+				        } else {
+					        cblines += '>';
+				        };
+{% endif %}
+				        cblines += '<span> '+taglines[k].substr(0,3)+': ';
+				        cblines += Math.round(predictions[j][k]*10000)
+						        /10000+'</span><br>';
+			        };
+			        cblines += '</div>';
+              cblines = $(cblines)
+              cblines.appendTo($('#card'+framelines[$(this).attr('id')][j].id));
+{% if may_write %}
+			        cblines.children('input:checkbox').change(function(evt) {
+                let k = $(evt.target).data('k');
+                if ($(evt.target).prop('checked')) {
+                  if (predictions[j][k] >= 0.5) {
+                    $(evt.target).next().removeClass('blue');
+                  } else {
+                    $(evt.target).next().addClass('blue');
+                  };
+                } else {
+                  if (predictions[j][k] >= 0.5) {
+                    $(evt.target).next().addClass('blue');
+                  } else {
+                    $(evt.target).next().removeClass('blue');
+                  };
+                };
+              });
+            };
+{% endif %}
+          })
+          .catch(err => {console.log(err);});
+{% if may_write %}
+          buttonline = '<h4>Who / what is this?<br>';
+		      buttonline += '<select id="myselect'+$(this).attr('id')+'" class="btn btn-primary">';
+		      buttonline += '<option value="0">Choose...</option>';
+		      for (let j=1; j<taglines.length; j++) {
+			      buttonline += '<option value="'+(j)+'">'
+				      +taglines[j]+'</option>';
+		      };
+		      buttonline += '</select>&nbsp;&nbsp;&nbsp;';
+		      buttonline += '<input type="button" class="btn btn-primary my-1" id="d_button'
+            +$(this).attr('id')+'" value="Day" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
+		      buttonline += '<input type="button" class="btn btn-primary my-1" id="n_button'
+            +$(this).attr('id')+'" value="Night" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
+		      buttonline += '<input type="button" class="btn btn-primary my-1" id="dc_button'
+            +$(this).attr('id')+'" value="Day Clean" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
+		      buttonline += '<input type="button" class="btn btn-primary my-1" id="nc_button'
+            +$(this).attr('id')+'" value="Night Clean" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
+		      buttonline += '<input type="button" class="btn btn-primary my-1" id="s_button'
+            +$(this).attr('id')+'" idnr="'+$(this).attr('id')+'" value="Submit" style="width: 110px;"></input><br>';
+		      buttonline += '<input type="button" class="btn btn-primary my-1" id="'
+            +$(this).attr('id')+'" data-bs-toggle="modal" data-bs-target="#deleteModal" value="Remove from school"></input>';
+          buttonline += '</h4>';
+          $(buttonline).appendTo($(this));
+		      $('#myselect'+$(this).attr('id')).change(function(evt) {
+            targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      if ($(evt.target).val() > 0) {
+				      targets.children('input:checkbox:not([data-k=0])')
+                .prop('checked', false);
+				      targets.children('[data-k="'+(parseInt($(evt.target).val()))+'"]')
+                .prop('checked', true);
+              targets.children().trigger("change");
+			      }
+		      });
+		      $('#d_button'+$(this).attr('id')).click(function(evt) {
+            targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).addClass('btn-success');
+			      setTimeout(function() {
+			      $(evt.target).removeClass('btn-success');
+			      }, 1000);
+			      targets.children('[data-k=0]').prop("checked", false);
+            targets.children().trigger("change");
+		      });
+		      $('#n_button'+$(this).attr('id')).click(function(evt) {
+            targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).addClass('btn-success');
+			      setTimeout(function() {
+				      $(evt.target).removeClass('btn-success');
+			      }, 1000);
+			      targets.children('[data-k=0]').prop("checked", true);
+            targets.children().trigger("change");
+		      });
+		      $('#dc_button'+$(this).attr('id')).click(function(evt) {
+            targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).addClass('btn-success');
+			      setTimeout(function() {
+				      $(evt.target).removeClass('btn-success');
+			      }, 1000);
+			      targets.children('input:checkbox').prop('checked', false);
+            targets.children().trigger("change");
+          $('#crd'+nr_todel).filter('[dtype="'+dtype+'"]').remove(); 
+		      });
+		      $('#nc_button'+$(this).attr('id')).click(function(evt) {
+            targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).addClass('btn-success');
+			      setTimeout(function() {
+				      $(evt.target).removeClass('btn-success');
+			      }, 1000);
+			      targets.children('input:checkbox').prop('checked', false);
+			      targets.children('[data-k=0]').prop("checked", true);
+            targets.children().trigger("change");
+		      });
+		      $('#s_button'+$(this).attr('id')).click(function(evt) {
+			      cblist = [];
+            targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      targets.each( function (i, v) {
+				      let checkboxes = [];
+				      $(v).children('input:checkbox').each( function (ii, vv) {
+					      if ($(vv).prop('checked')) {
+						      checkboxes.push(1);
+					      } else {
+						      checkboxes.push(0);
+					      };
+				      });
+				      cblist.push(checkboxes);
+			      });
+			      SchoolDBUtilSocket.sendandwait({
+				      'command' : 'settags',
+				      'event' : $(this).attr('idnr'),
+				      'cblist' : cblist,
+			      })
+			      .then((result) => {
+				      if (result === 'OK') {
+					      if($(evt.target).hasClass('btneventrow-success')) {
+						      $(evt.target).removeClass('btn-success');
+						      setTimeout(function() {
+							      $(evt.target).addClass('btn-success');
+						      }, 1000);
+					      } else {
+						      $(evt.target).addClass('btn-success');
+					      };
+				      }
+			      })
+			      .catch(err => {console.log(err);});
+		      });
+{% endif %}
+        })
+	      .catch(err => {console.log(err);});
+      };
+    };
+  });
+};
+
+$(document).ready(function () {
+{% if may_write %}
+  $('.delbutton').click(function(evt) {
+    SchoolDBUtilSocket.sendandwait({
+      'command' : 'remfrschool',
+      'event' : $(this).attr('id'),
+    })
+    .then((result) => {
+      if (result === 'OK') {
+        $('#deleteModal').modal('hide');
+        console.log('#'+$(this).attr('id')+'.eventrow')
+        $('#'+$(this).attr('id')+'.eventrow').remove(); 
+      }
+    })
+    .catch(err => {console.log(err);});
+  });
+{% endif %}
+	WSAsync(
+		  ws_scheme + '//'
+		  + window.location.host
+		  + '/ws/schooldbutil/'
+	)
+	.then((result) => {
+		SchoolDBUtilSocket = result;
+    $(window).on('resize scroll', function() {
+      getimages();
+    });
+    $(window).on('resize scroll', getimages);
+		return(SchoolDBUtilSocket.sendandwait({
+			'command' : 'register_ai',
+			'school' : {{ school.id }},
+		}));
+  })
+	.then(() => {
+		return (SchoolDBUtilSocket.sendandwait({
+			'command' : 'gettags',
+			'school' : {{ school.id }},
+		}));
+	})
+	.then((result) => {
+		taglines = result;
+    getimages();
+	})
+	.catch(err => {console.log(err);});
+	
+});
+
+</script>
+
+{% endblock %}

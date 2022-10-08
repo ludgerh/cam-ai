@@ -1,0 +1,238 @@
+{% extends 'main/basis.html' %}
+{% block content %}
+{% if emulatestatic %}
+  {% load static %}
+  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
+  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+	<link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
+{% else %}
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+{% endif %}
+
+<script>
+
+//let displaywidth = 667; // Screen height IPhone 7
+let displaywidth = Math.round($(window).width() * 0.97);
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let r_array = {};
+let c_view_Socket;
+let trigger_Socket;
+{% if may_write %}
+let oneitemSocket;
+let SchoolDBUtilSocket;
+{% endif %}
+let taglines;
+let c_dict;
+let all_initialized = false;
+
+$(document).ready(function() {
+{% if may_write %}
+	$('#oneform').children(':first').children(':first').children('.col-auto')
+			.children(
+        '#id_eve_fpslimit, '
+        +'#id_eve_margin, '
+        +'#id_eve_event_time_gap, '
+        +'#id_eve_event_time_gap, '
+        +'#id_alarm_email'
+      ).change(function(evt) {
+		oneitemSocket.sendandwait({
+			'command' : 'setonefield',
+			'pname' : $(evt.target).attr('name'),
+			'value' : $(evt.target).val(),
+		})
+		.then((result) => {
+			if (result === 'OK') {
+				$(evt.target).addClass('blue');
+			};
+		})
+		.catch(err => {console.log(err);});
+	});
+
+	$('#conditions').children(':even').click((evt) => {
+		let bstr_row = $(evt.target).closest('.row').next();
+		let myreaction = $(evt.target).attr("rea");
+		if (myreaction > 0) {
+			if (bstr_row.hasClass('d-none')) {
+				oneitemSocket.sendandwait({
+					'command' : 'cond_open',
+					'reaction' : myreaction,
+				})
+				.then((result) => {
+					if (result === 'OK') {
+						bstr_row.removeClass('d-none');
+					};
+				})
+				.catch(err => {console.log(err);});
+			} else {
+				oneitemSocket.sendandwait({
+					'command' : 'cond_close',
+					'reaction' : myreaction,
+				})
+				.then((result) => {
+					if (result === 'OK') {
+						bstr_row.addClass('d-none');
+					};
+				})
+				.catch(err => {console.log(err);});
+			};
+		} else {
+			bstr_row.toggleClass('d-none');
+			};
+		$('html, body').animate({scrollTop:$(document).height()}, 'slow');
+	})
+	WSAsync(
+		  ws_scheme + '//' + window.location.host + '/ws/schooldbutil/'
+	)
+  .then((result) => {
+    SchoolDBUtilSocket = result;
+    return (SchoolDBUtilSocket.sendandwait({
+      'command' : 'gettags',
+      'school' : {{ dbline.eve_school }},
+    }));
+  })
+	.then((result) => {
+		taglines = result;
+	  return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/'));
+	})
+{% else %}
+	WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
+{% endif %}
+	.then((result) => {
+		c_view_Socket = result;
+    return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/trigger/'));
+  })
+	.then((result) => {
+    trigger_Socket = result;
+		trigger_Socket.socket.onclose = function(e) {
+			console.log('Trigger-Socket closed');
+		};
+		trigger_Socket.socket.onmessage = function(e) {
+      if ((typeof(e.data) === 'object')	&& (typeof timedRefreshE{{ dbline.id|stringformat:"09d" }} === "function")) {
+        e.data.arrayBuffer()
+        .then((bytebuffer) => {
+				  timedRefreshE{{ dbline.id|stringformat:"09d" }}(bytebuffer);
+          trigger_Socket.socket.send('E{{ dbline.id|stringformat:"09d" }}');
+        })
+        .catch(err => {console.log(err);});
+			};
+		};
+{% if may_write %}
+		return(WSAsync(ws_scheme + '//' + window.location.host + '/ws/oneitem/'));
+	})
+	.then((result) => {
+		oneitemSocket = result;
+		oneitemSocket.sendandwait({
+			'command' : 'setmyitem',
+			'mode' : 'E',
+			'itemid' : {{ dbline.id }},
+      'scaling' : displaywidth / {{ dbline.cam_xres }}
+		})
+	})
+	.then(() => {
+		return(oneitemSocket.sendandwait({
+			'command' : 'get_all_conditions',
+		}));
+{% endif %}
+	})
+	.then((result) => {
+		c_dict = result;
+    ratio = ({{ dbline.cam_yres }} / {{ dbline.cam_xres }});
+		$.get('/viewers/c_canvas/L/E/{{ dbline.id }}/'+displaywidth+'/'+Math.round(displaywidth * ratio)+'/', ((data ) => {
+			$('#spaceforcanvas').html(data);
+		}));
+		docready_1();
+		docready_2();
+		docready_3();
+		docready_4();
+		docready_5();
+	})
+	.catch(err => {console.log(err);});
+});
+	
+</script>
+
+
+<div class="container-fluid float-left">
+	<div class="row">
+		<div class="col-auto">
+			<div id="spaceforcanvas"></div>
+		</div>
+	</div>
+</div>
+
+{% if may_write %}
+  <div class="container-fluid float-left" id="conditions">
+	  <div class="row my-1 blue">
+		  <div class="col-auto my-2">General settings</div>
+	  </div>
+	  <div class="row my-1 d-none">
+		  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
+				  method="post" id="oneform">
+			  <div class="container-fluid float-left">
+				  <div class="row my-2">
+					  {% csrf_token %}
+					  {% spaceless %}
+					  {% for field in form %}
+					  <div class="col-auto my-2">
+						  {{ field.errors }}
+						  {{ field.label_tag }} {{ field }}
+						  {% if field.help_text %}
+						  <p class="help">{{ field.help_text|safe }}</p>
+						  {% endif %}
+					  </div>
+					  {% endfor %}
+					  {% endspaceless %}
+				  </div>
+			  </div>
+			  <div class="container-fluid float-left">
+				  <div class="row my-1">
+					  <div class="col-auto my-2">
+						  <input type="submit" value="Submit">
+					  </div>
+				  </div>
+			  </div>
+		  </form>
+	  </div>
+	  <div class="row my-1 blue" rea="1">
+		  <div class="col-auto my-2" rea="1">Conditions for showing event frame...</div>
+	  </div>
+	  <div class="row my-1 d-none">
+		  <div class="col-auto my-2">
+			  {% include "oneitem/conditions.html" with reaction=1 %}
+		  </div>
+	  </div>
+	  <div class="row my-1 blue" rea="2">
+		  <div class="col-auto my-2" rea="2">Conditions for sending to school...</div></div>
+	  <div class="row my-1 d-none">
+		  <div class="col-auto my-2">
+			  {% include "oneitem/conditions.html" with reaction=2 %}
+		  </div>
+	  </div>
+	  <div class="row my-1 blue" rea="3">
+		  <div class="col-auto my-2" rea="3">Conditions for recording video...</div></div>
+	  <div class="row my-1 d-none">
+		  <div class="col-auto my-2">
+			  {% include "oneitem/conditions.html" with reaction=3 %}
+		  </div>
+	  </div>
+	  <div class="row my-1 blue" rea="4">
+		  <div class="col-auto my-2" rea="4">Conditions for sending email...</div></div>
+	  <div class="row my-1 d-none">
+		  <div class="col-auto my-2">
+			  {% include "oneitem/conditions.html" with reaction=4 %}
+		  </div>
+	  </div>
+	  <div class="row my-1 blue" rea="5">
+		  <div class="col-auto my-2" rea="5">Conditions for alarm...</div></div>
+	  <div class="row my-1 d-none">
+		  <div class="col-auto my-2">
+			  {% include "oneitem/conditions.html" with reaction=5 %}
+		  </div>
+	  </div>
+  </div>
+{% endif %}
+
+{% endblock %}
+
