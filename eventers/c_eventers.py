@@ -1,4 +1,18 @@
+# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 3
+# of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+# See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 import cv2 as cv
+import json
 from os import remove, path
 from math import inf
 from shutil import copyfile
@@ -137,6 +151,8 @@ class c_eventer(c_device):
 	          item['y'] = received[5]
 	          break
         self.set_cam_counts()
+      elif (received[0] == 'save_conditions'):
+        self.cond_dict[received[1]] = json.loads(received[2])
       else:
         return(False)
       return(True)

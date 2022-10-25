@@ -1,3 +1,16 @@
+# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 3
+# of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+# See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 from django.db import models
 from django.utils import timezone
 from datetime import datetime
@@ -40,25 +53,26 @@ class event_frame(models.Model):
     return('event_frames model (TBD ...)')
 
 class evt_condition(models.Model):
-	eventer = models.ForeignKey(stream, on_delete=models.CASCADE)
-	reaction = models.IntegerField("reaction", choices=(
-		(1, 'show frame'),
-		(2, 'send school'),
-		(3, 'record video'),
-		(4, 'send email'),
-		(5, 'alarm'),
-	), default=0)
-	and_or = models.IntegerField("and_or", choices=((0, 'and'), (1, 'or')), default=0)
-	c_type = models.IntegerField("c_type", choices=(
-		(1, 'any movement detection'),
-		(2, 'x values above or equal y'),
-		(3, 'x values below or equal y'),
-		(4, 'tag x is above or equal y'),
-		(5, 'tag x is below or equal y'),
-		(6, 'tag x is in top y'),
-	), default=1)
-	x = models.IntegerField("x", default=1)
-	y = models.FloatField("y", default=0.5)
+  eventer = models.ForeignKey(stream, on_delete=models.CASCADE)
+  reaction = models.IntegerField("reaction", choices=(
+    (1, 'show frame'),
+    (2, 'send school'),
+    (3, 'record video'),
+    (4, 'send email'),
+    (5, 'alarm'),
+  ), default=0)
+  and_or = models.IntegerField("and_or", choices=((1, 'and'), (2, 'or')), default=2)
+  c_type = models.IntegerField("c_type", choices=(
+    (1, 'any movement detection'),
+    (2, 'x values above or equal y'),
+    (3, 'x values below or equal y'),
+    (4, 'tag x is above or equal y'),
+    (5, 'tag x is below or equal y'),
+    (6, 'tag x is in top y'),
+  ), default=1)
+  x = models.IntegerField("x", default=1)
+  y = models.FloatField("y", default=0.5)
+  bracket = models.IntegerField("bracket", default=0)
 
-	def __str__(self):
-		return('evt_conditions model (TBD ...)')
+  def __str__(self):
+    return('evt_conditions model (TBD ...)')

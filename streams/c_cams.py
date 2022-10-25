@@ -1,3 +1,16 @@
+# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 3
+# of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+# See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 import sys
 import cv2 as cv
 import numpy as np
@@ -275,8 +288,7 @@ class c_cam(c_device):
       else:
         self.video_codec = self.dbline.cam_video_codec
       self.video_codec_name = probe['streams'][self.video_codec]['codec_name']
-      self.cam_fps = probe['streams'][self.video_codec]['avg_frame_rate'].split(
-        '/')
+      self.cam_fps = probe['streams'][self.video_codec]['r_frame_rate'].split('/')
       self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
       self.logger.info('Video codec: ' + self.video_codec_name + ' / ' 
         + str(self.cam_fps) + 'fps')

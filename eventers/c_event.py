@@ -1,4 +1,4 @@
-# Copyright (C) 2021 Ludger Hellerhoff, ludger@booker-hellerhoff.de
+# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -39,67 +39,62 @@ if not path.exists(schoolpath):
 def resolve_rules(conditions, predictions):
   if predictions is None:
     return(False)
-  else:
-    total_and = None
-    total_or = None
+  if len(conditions) > 0:
+    cond_str = '' 
     for item in conditions:
-      if (total_and is not None) and (not total_and) and total_or:
-        break
-      else:
-        if item['c_type'] == 1:
-          item_result = True
-        elif item['c_type'] == 2:
-          count = 0
-          item_result = False
-          for prediction in predictions:
-            if prediction >= item['y']:
-              count += 1
-              if count >= item['x']:
-                item_result = True
-                break
-        elif item['c_type'] == 3:
-          count = 0
-          item_result = False
-          for prediction in predictions:
-            if prediction <= item['y']:
-              count += 1
-              if count >= item['x']:
-                item_result = True
-                break
-        elif item['c_type'] == 4:
-          item_result = (predictions[item['x']] >= item['y'])
-        elif item['c_type'] == 5:
-          item_result = (predictions[item['x']] <= item['y'])
-        elif item['c_type'] == 6:
-          myprediction = predictions[item['x']]
-          count = 0
-          item_result = True
-          for prediction in predictions:
-            if prediction > myprediction:
-              count += 1
-              if count >= item['y']:
-                item_result = False
-                break
-        if item['and_or'] == 0:
-          if total_and is None:
-            total_and = item_result
-          else:
-            total_and = (total_and and item_result)
+      if cond_str:
+        if item['and_or'] == 1:
+          cond_str += ' and '
         else:
-          if total_or is None:
-            total_or = item_result
-          else:
-            total_or = (total_or or item_result)
-    if total_and is None:
-      if total_or is None:
-        return(False)
-      else:
-        return(total_or)
-    else:
-      if total_or is None:
-        return(total_and)
-      else:  
-        return(total_and and total_or)
+          cond_str += ' or '
+      if item['bracket'] > 0:
+        cond_str += '(' * item['bracket']
+
+
+      if item['c_type'] == 1:
+        item_result = True
+      elif item['c_type'] == 2:
+        count = 0
+        item_result = False
+        for prediction in predictions:
+          if prediction >= item['y']:
+            count += 1
+            if count >= item['x']:
+              item_result = True
+              break
+      elif item['c_type'] == 3:
+        count = 0
+        item_result = False
+        for prediction in predictions:
+          if prediction <= item['y']:
+            count += 1
+            if count >= item['x']:
+              item_result = True
+              break
+      elif item['c_type'] == 4:
+        item_result = (predictions[item['x']] >= item['y'])
+      elif item['c_type'] == 5:
+        item_result = (predictions[item['x']] <= item['y'])
+      elif item['c_type'] == 6:
+        myprediction = predictions[item['x']]
+        count = 0
+        item_result = True
+        for prediction in predictions:
+          if prediction > myprediction:
+            count += 1
+            if count >= item['y']:
+              item_result = False
+              break
+      cond_str += str(item_result)
+
+
+      if item['bracket'] < 0: 
+        cond_str += ')' * (-1 * item['bracket'])
+    #print(cond_str)
+    return(eval(cond_str))
+  else:
+    return(False)
+
 
 class c_event(list):
 

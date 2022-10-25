@@ -1,3 +1,16 @@
+{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# This program is free software; you can redistribute it and/or #}
+{# modify it under the terms of the GNU General Public License #}
+{# as published by the Free Software Foundation; either version 3 #}
+{# of the License, or (at your option) any later version. #}
+{# This program is distributed in the hope that it will be useful, #}
+{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
+{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
+{# See the GNU General Public License for more details. #}
+{# You should have received a copy of the GNU General Public License #}
+{# along with this program; if not, write to the Free Software #}
+{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
+
 {% extends 'main/basis.html' %}
 {% block content %}
 {% if emulatestatic %}
@@ -9,6 +22,7 @@
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
 {% endif %}
 
 <script>
@@ -24,8 +38,253 @@ let oneitemSocket;
 let SchoolDBUtilSocket;
 {% endif %}
 let taglines;
+let tagselect;
 let c_dict;
 let all_initialized = false;
+let bracketlevel = 0;
+
+function make_list_line(condition, reaction, count) {
+  if (count) {
+    newline = '<li react="'+reaction+'" nr="'+count+'" class="list-group-item border-0 a_o_line" nr="'+count+'" react="'+reaction+'">';
+    if (bracketlevel) {
+      newline += '<p style="text-indent:'+bracketlevel*2+'em; padding-bottom:0em; padding-top:0em; margin-bottom:0em">';
+    } else {
+      newline += '<p style="padding-bottom:0em; padding-top:0em; margin-bottom:0em">';
+    };
+    newline += '<select react="'+reaction+'" nr="'+count+'" class="a_o_select">';
+    if (condition.and_or == 1) {
+      newline += '<option value=1 selected>and</option>';
+      newline += '<option value=2>or</option>';
+    } else {
+      newline += '<option value=1>and</option>';
+      newline += '<option value=2 selected>or</option>';
+    };
+    newline += '</select></p></li>';
+  } else {
+    newline = '';
+  };
+  if (condition.bracket > 0) {bracketlevel += condition.bracket;};
+  newline += '<li react="'+reaction+'" nr="'+count+'" class="list-group-item border-0 list_line">';
+  if (bracketlevel) {
+    newline += '<p style="text-indent:'+bracketlevel*2+'em; margin:0em">';
+  } else {
+    newline += '<p style="margin:0">';
+  };
+  if (condition.bracket > 0) {
+    for (i=0; i<condition.bracket; i++) {
+      newline += '<span class="h3">(</span>';
+    };
+  };
+  newline += '<button type="button" title="Move 1 up" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 up-bt"'
+  if (count == 0) {newline += ' disabled';};
+  newline += '><i class="bi bi-caret-up-fill"></i></button>';
+  newline += '<button type="button" title="Move 1 down" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 down-bt"';
+  if (count == (c_dict[reaction].length - 1)) {newline += ' disabled';};
+  newline += '><i class="bi bi-caret-down-fill"></i></button>';
+  newline += '<button type="button" title="Bracket in" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 in-bt"';
+  if (bracketlevel == 0) {newline +=' disabled';};
+  newline += '><i class="bi bi-caret-left-fill"></i></button>';
+  newline += '<button type="button" title="Bracket out" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 out-bt">';
+  newline += '<i class="bi bi-caret-right-fill"></i></button>';
+  newline += '<button type="button" title="Change type" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 next-bt">';
+  newline += '<i class="bi bi-skip-forward-fill"></i></button>';
+  newline += '<button type="button" title="Delete" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 del-bt">';
+  newline += '<i class="bi bi-trash"></i></button>';
+  if (condition.c_type == 1) {
+    newline += 'Any movement detected';
+  };
+  if ([2, 3].includes(condition.c_type)) {
+    newline += '<input react="'+reaction+'" nr="'+count+'" class="xnumber" type="number" size="2" min="0" max="10" value="'+condition.x+'">'
+      + ' predictions are ';
+  };
+  if ([4, 5].includes(condition.c_type)) {
+    newline +=  'Tag <select react="'+reaction+'" nr="'+count+'" class="xstring">';
+    for (i=0; i<taglines.length; i++) {
+		  if (i == condition.x) {
+        newline += '<option value='+i+' selected>'+taglines[i]+'</option>';
+		  } else {
+        newline += '<option value='+i+'>'+taglines[i]+'</option>';
+		  };
+    };
+    newline += '</select> is ';
+  };
+  if ([2, 4].includes(condition.c_type)) {
+    newline += 'above or equal ';
+    newline += '<input react="'+reaction+'" nr="'+count+'" class="ynumber" type="number" size="4" min="0" max="1" step="0.01" '
+      + 'value="'+condition.y+'">';
+  };
+  if ([3, 5].includes(condition.c_type)) {
+    newline += 'below or equal ';
+    newline += '<input react="'+reaction+'" nr="'+count+'" class="ynumber" type="number" size="4" min="0" max="1" step="0.01" '
+      + 'value="'+condition.y+'">';
+  };
+  if (condition.c_type == 6) {
+    newline +=  'Tag <select react="'+reaction+'" nr="'+count+'" class="xstring">';
+    for (let i=0; i<taglines.length; i++) {
+		  if (i == condition.x) {
+        newline += '<option value='+i+' selected>'+taglines[i]+'</option>';
+		  } else {
+        newline += '<option value='+i+'>'+taglines[i]+'</option>';
+		  };
+    };
+    newline += '</select> is in top ';
+    newline += '<input react="'+reaction+'" nr="'+count+'" class="ynumber" type="number" size="2" min="1" max="9" value="'+condition.y+'">'
+  };
+  if (condition.bracket < 0) {
+    for (i=0; i<(condition.bracket * -1); i++) {
+      newline += '<span class="h3">)</span>';
+    };
+    bracketlevel += condition.bracket;
+  };
+  newline += '</p></li>'
+  return(newline);
+};
+
+function refresh_one(reaction) {
+  $('#li_gr_'+reaction).empty();
+  bracketlevel = 0;
+  for (j=0; j<c_dict[reaction].length; j++) {
+    if ((bracketlevel + c_dict[reaction][j].bracket) < 0) {
+      c_dict[reaction][j].bracket -= (bracketlevel + c_dict[reaction][j].bracket);
+    };
+    if (j == (c_dict[reaction].length - 1)) {
+      c_dict[reaction][j].bracket = (bracketlevel * -1);
+    };
+    newline = make_list_line(c_dict[reaction][j], reaction, j)
+    $('#li_gr_'+reaction).append(newline);
+  };
+};
+
+function reset_triggers(first = false) {
+  $('.a_o_select').change(function(evt) {
+    c_dict[$(this).attr('react')][$(this).attr('nr')].and_or = Number($(this).val());
+  });
+  $('.xnumber, .xstring').change(function(evt) {
+    c_dict[$(this).attr('react')][$(this).attr('nr')].x = Number($(this).val());
+  });
+  $('.ynumber').change(function(evt) {
+    c_dict[$(this).attr('react')][$(this).attr('nr')].y = Number($(this).val());
+  });
+  $('.up-bt').click(function(evt) {
+    thisreaction = $(this).attr('react');
+    thisnr = parseInt(thisnr = $(this).attr('nr'));
+    nrbefore = thisnr - 1;
+    temp = c_dict[thisreaction].splice(thisnr, 1)[0];
+    c_dict[thisreaction].splice(nrbefore, 0, temp);
+    temp = c_dict[thisreaction][nrbefore].and_or;
+    c_dict[thisreaction][nrbefore].and_or = c_dict[thisreaction][thisnr].and_or;
+    c_dict[thisreaction][thisnr].and_or = temp;
+    temp = c_dict[thisreaction][nrbefore].bracket;
+    c_dict[thisreaction][nrbefore].bracket = c_dict[thisreaction][thisnr].bracket;
+    c_dict[thisreaction][thisnr].bracket = temp;
+    refresh_one(thisreaction);
+    reset_triggers();
+  });
+  $('.down-bt').click(function(evt) {
+    thisreaction = $(this).attr('react');
+    thisnr = parseInt($(this).attr('nr'));
+    nrafter = thisnr + 1;
+    temp = c_dict[thisreaction].splice(nrafter, 1)[0];
+    c_dict[thisreaction].splice(thisnr, 0, temp);
+    temp = c_dict[thisreaction][nrafter].and_or;
+    c_dict[thisreaction][nrafter].and_or = c_dict[thisreaction][thisnr].and_or;
+    c_dict[thisreaction][thisnr].and_or = temp;
+    temp = c_dict[thisreaction][nrafter].bracket;
+    c_dict[thisreaction][nrafter].bracket = c_dict[thisreaction][thisnr].bracket;
+    c_dict[thisreaction][thisnr].bracket = temp;
+    refresh_one(thisreaction);
+    reset_triggers();
+  });
+  $('.in-bt').click(function(evt) {
+    thisreaction = $(this).attr('react');
+    thisnr = parseInt($(this).attr('nr'));
+    nrbefore = thisnr - 1;
+    if (c_dict[thisreaction][thisnr].bracket > 0) {
+      c_dict[thisreaction][thisnr].bracket -= 1;
+    } else {
+      c_dict[thisreaction][nrbefore].bracket -= 1;
+    };
+    refresh_one(thisreaction);
+    reset_triggers();
+  });
+  $('.out-bt').click(function(evt) {
+    thisreaction = $(this).attr('react');
+    thisnr = parseInt($(this).attr('nr'));
+    nrbefore = thisnr - 1;
+    if (c_dict[thisreaction][nrbefore].bracket < 0) {
+      c_dict[thisreaction][nrbefore].bracket += 1;
+    } else {
+      c_dict[thisreaction][thisnr].bracket += 1;
+    };
+    refresh_one(thisreaction);
+    reset_triggers();
+  });
+  $('.next-bt').click(function(evt) {
+    thisreaction = $(this).attr('react');
+    thisnr = parseInt($(this).attr('nr'));
+    c_dict[thisreaction][thisnr].c_type += 1;
+    if (c_dict[thisreaction][thisnr].c_type == 7) {
+      c_dict[thisreaction][thisnr].c_type = 1;
+    };
+    if ((c_dict[thisreaction][thisnr].c_type in [2, 3, 4, 5]) && (c_dict[thisreaction][thisnr].y > 1.0)) {
+      c_dict[thisreaction][thisnr].y = 1.0;
+    };
+    if (c_dict[thisreaction][thisnr].c_type == 6) {
+      c_dict[thisreaction][thisnr].y = Math.round(c_dict[thisreaction][thisnr].y);
+      if (c_dict[thisreaction][thisnr].y <= 1) {
+        c_dict[thisreaction][thisnr].y = 1;
+      };
+    };
+    refresh_one(thisreaction);
+    reset_triggers();
+  });
+  $('.del-bt').click(function(evt) {
+    thisreaction = $(this).attr('react');
+    thisnr = parseInt($(this).attr('nr'));
+    nrbefore = thisnr - 1;
+    mybrackets = c_dict[thisreaction][thisnr].bracket;
+    c_dict[thisreaction].splice(thisnr, 1);
+    if ((mybrackets > 0) && (thisnr < c_dict[thisreaction].length)){
+      c_dict[thisreaction][thisnr].bracket += mybrackets;
+    };
+    if (mybrackets < 0) {
+      c_dict[thisreaction][nrbefore].bracket += mybrackets;
+    };
+    refresh_one(thisreaction);
+    reset_triggers();
+  });
+  if (first) {
+    $('.add-bt').click(function(evt) {
+      console.log('Add...');
+      thisreaction = $(this).attr('react');
+      newitem = {
+        'id' : 0,
+        'and_or' : 2,
+        'c_type' : 4,
+        'x' : 1,
+        'y' : 0.5,
+        'bracket' : 0,};
+      c_dict[thisreaction].push(newitem);
+      refresh_one(thisreaction);
+      reset_triggers();
+    });
+    $('.save-bt').click(function(evt) {
+      $(this).addClass('btn-warning');
+      thisreaction = parseInt($(this).attr('react'));
+		  oneitemSocket.sendandwait({
+			  'command' : 'save_conditions',
+			  'reaction' : thisreaction,
+        'conditions' : JSON.stringify(c_dict[thisreaction]),
+		  })
+		  .then((result) => {
+			  if (result === 'OK') {
+          $(this).removeClass('btn-warning');
+			  };
+		  })
+		  .catch(err => {console.log(err);});
+    });
+  };
+};
 
 $(document).ready(function() {
 {% if may_write %}
@@ -142,11 +401,10 @@ $(document).ready(function() {
 		$.get('/viewers/c_canvas/L/E/{{ dbline.id }}/'+displaywidth+'/'+Math.round(displaywidth * ratio)+'/', ((data ) => {
 			$('#spaceforcanvas').html(data);
 		}));
-		docready_1();
-		docready_2();
-		docready_3();
-		docready_4();
-		docready_5();
+    for (k=1; k<=5; k++) {
+      refresh_one(k);
+    };
+    reset_triggers(true);
 	})
 	.catch(err => {console.log(err);});
 });
@@ -195,42 +453,34 @@ $(document).ready(function() {
 			  </div>
 		  </form>
 	  </div>
-	  <div class="row my-1 blue" rea="1">
-		  <div class="col-auto my-2" rea="1">Conditions for showing event frame...</div>
-	  </div>
+    {% for i in '12345'|make_list %}
+	  <div class="row my-1 blue" rea="{{ i }}">
+		  <div class="col-auto my-2" rea="{{ i }}">
+    {% if i == '1' %}
+      Conditions for showing event frame..
+    {% endif %}
+    {% if i == '2' %}
+      Conditions for sending to school...
+    {% endif %}
+    {% if i == '3' %}
+      Conditions for recording video...
+    {% endif %}
+    {% if i == '4' %}
+      Conditions for sending email...
+    {% endif %}
+    {% if i == '5' %}
+      Conditions for alarm...
+    {% endif %}
+	  </div></div>
 	  <div class="row my-1 d-none">
-		  <div class="col-auto my-2">
-			  {% include "oneitem/conditions.html" with reaction=1 %}
+		  <div class="col-auto my-2"><h4>If...</h4>
+        <ul id="li_gr_{{ i }}" class="list-group">
+        </ul>
+        <button type="button" react="{{ i }}" class="btn btn-primary add-bt">Add</button>
+        <button type="button" react="{{ i }}" class="btn btn-primary save-bt">Save</button>
 		  </div>
 	  </div>
-	  <div class="row my-1 blue" rea="2">
-		  <div class="col-auto my-2" rea="2">Conditions for sending to school...</div></div>
-	  <div class="row my-1 d-none">
-		  <div class="col-auto my-2">
-			  {% include "oneitem/conditions.html" with reaction=2 %}
-		  </div>
-	  </div>
-	  <div class="row my-1 blue" rea="3">
-		  <div class="col-auto my-2" rea="3">Conditions for recording video...</div></div>
-	  <div class="row my-1 d-none">
-		  <div class="col-auto my-2">
-			  {% include "oneitem/conditions.html" with reaction=3 %}
-		  </div>
-	  </div>
-	  <div class="row my-1 blue" rea="4">
-		  <div class="col-auto my-2" rea="4">Conditions for sending email...</div></div>
-	  <div class="row my-1 d-none">
-		  <div class="col-auto my-2">
-			  {% include "oneitem/conditions.html" with reaction=4 %}
-		  </div>
-	  </div>
-	  <div class="row my-1 blue" rea="5">
-		  <div class="col-auto my-2" rea="5">Conditions for alarm...</div></div>
-	  <div class="row my-1 d-none">
-		  <div class="col-auto my-2">
-			  {% include "oneitem/conditions.html" with reaction=5 %}
-		  </div>
-	  </div>
+    {% endfor %}
   </div>
 {% endif %}
 

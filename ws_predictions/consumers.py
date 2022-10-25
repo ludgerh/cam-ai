@@ -1,10 +1,25 @@
+# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 3
+# of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+# See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 import json
 import numpy as np
 import cv2 as cv
 from logging import getLogger
+from time import sleep
 from django.contrib.auth.models import User
 from channels.generic.websocket import WebsocketConsumer
 from tools.c_logger import log_ini
+from tools.l_tools import djconf
 from access.c_access import access
 from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school
@@ -68,6 +83,9 @@ class predictionsConsumer(WebsocketConsumer):
           self.close()
       self.numberofframes = indict['nrf']
       self.school = indict['scho']
+      while not(self.school in self.schooldatacache):
+        logger.warning('Schooldatacache not ready')
+        sleep(djconf.getconfigfloat('long_brake', 1.0))
       self.imglist = np.empty((
         0, self.schooldatacache[self.school]['xdim'], 
         self.schooldatacache[self.school]['ydim'], 3), np.uint8)

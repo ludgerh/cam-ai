@@ -1,3 +1,16 @@
+# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 3
+# of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+# See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 import json
 import numpy as np
 import cv2 as cv
@@ -144,9 +157,29 @@ class tf_worker():
           self.ws.send('Ping', opcode=1)
           self.ws_ts = time()
           break
-        except BrokenPipeError:
-          self.logger.warning('Socket error while pinging prediction server')
-          sleep(djconf.getconfigfloat('medium_brake', 0.1))
+        except (ConnectionResetError, OSError, BrokenPipeError):
+          sleep(djconf.getconfigfloat('long_brake', 1.0))
+          self.reset_websocket()
+
+  def reset_websocket(self):
+    from websocket import WebSocket #, enableTrace
+    #enableTrace(True)
+    while True:
+      try:
+        self.ws_ts = time()
+        self.ws = WebSocket()
+        self.ws.connect(self.dbline.wsserver+'ws/predictions/')
+        outdict = {
+          'code' : 'auth',
+          'name' : self.dbline.wsname,
+          'pass' : self.dbline.wspass,
+        }
+        self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+        break
+      except BrokenPipeError:
+        self.logger.warning('Broken Pipe while  initializating prediction server')
+        sleep(djconf.getconfigfloat('long_brake', 1.0))
+    
 
 #***************************************************************************
 #
@@ -217,24 +250,7 @@ class tf_worker():
       if self.dbline.gpu_sim >= 0:
         self.cachedict = {}
       elif self.dbline.use_websocket:
-        from websocket import WebSocket #, enableTrace
-        #enableTrace(True)
-        self.ws_ts = time()
-        self.ws = WebSocket()
-        self.ws.connect(self.dbline.wsserver+'ws/predictions/')
-        outdict = {
-          'code' : 'auth',
-          'name' : self.dbline.wsname,
-          'pass' : self.dbline.wspass,
-        }
-        while True:
-          try:
-            self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-            break
-          except BrokenPipeError:
-            logger.warning('Socket error while pushing initialization data '
-              + 'to prediction server')
-            sleep(djconf.getconfigfloat('medium_brake', 0.1))
+        self.reset_websocket()
       else: #Local GPU
         environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
         environ["CUDA_VISIBLE_DEVICES"]=str(self.dbline.gpu_nr)
@@ -443,22 +459,30 @@ class tf_worker():
         except BrokenPipeError:
           logger.warning('Socket error while pushing image data to prediction '
             + 'server')
-          sleep(djconf.getconfigfloat('medium_brake', 0.1))
-      for i in range(framelist.shape[0]):
-        jpgdata = cv.imencode('.jpg', framelist[i])[1]
-        outdict = {
-          'code' : 'imag',
-          'data' : jpgdata,
-        }
-        while True:
-          try:
-            self.ws.send_binary(jpgdata)
-            break 
-          except BrokenPipeError:
-            logger.warning('Socket error while pushing jpeg data to '
-              + 'prediction server')
-            sleep(djconf.getconfigfloat('medium_brake', 0.1))
-      predictions = np.array(json.loads(self.ws.recv()), dtype=np.float32)
+          sleep(djconf.getconfigfloat('long_brake', 1.0))
+          self.reset_websocket()
+      while True:
+        try:
+          for i in range(framelist.shape[0]):
+            jpgdata = cv.imencode('.jpg', framelist[i])[1]
+            outdict = {
+              'code' : 'imag',
+              'data' : jpgdata,
+            }
+            while True:
+              try:
+                self.ws.send_binary(jpgdata)
+                break 
+              except BrokenPipeError:
+                logger.warning('Socket error while pushing jpeg data to '
+                  + 'prediction server')
+                sleep(djconf.getconfigfloat('long_brake', 1.0))
+                self.reset_websocket()
+          predictions = np.array(json.loads(self.ws.recv()), dtype=np.float32)
+          break
+        except (ConnectionResetError, OSError):
+          sleep(djconf.getconfigfloat('long_brake', 1.0))
+          self.reset_websocket()
     else: #local GPU
       if framelist.shape[0] < self.dbline.maxblock:
         patch = np.zeros((self.dbline.maxblock - framelist.shape[0], 

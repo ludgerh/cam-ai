@@ -193,3 +193,5 @@ This is an installation tutorial for a development system of the CAM-AI Server o
     The initial login information is user=admin password=cam-ai-123
 
     
+
+ToDo: Switch off Redis writing to DB.  Edit sudo nano /etc/dhcp/dhclient.conf (timeout)

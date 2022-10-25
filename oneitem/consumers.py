@@ -1,4 +1,4 @@
-# Copyright (C) 2021 Ludger Hellerhoff, ludger@booker-hellerhoff.de
+# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -191,7 +191,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
-    elif params['command'] == 'delcondition':
+    elif params['command'] == 'delcondition': #xxx
       if self.may_write:
         await deletefilter(evt_condition, {'id' : params['c_nr']})
         self.myitem.inqueue.put(('del_condition', int(params['reaction']), int(params['c_nr'])))
@@ -199,7 +199,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
-    elif params['command'] == 'getcondition':
+    elif params['command'] == 'getcondition': #xxx
       if self.may_write:
         mydata = await getoneline(evt_condition, {'id' : params['c_nr'], })
       outlist['data'] = model_to_dict(mydata, exclude=[])
@@ -226,12 +226,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
-    elif params['command'] == 'cond_to_str':
+    elif params['command'] == 'cond_to_str': #xxx
       outlist['data'] = self.myitem.build_string(params['condition'])
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
-    elif params['command'] == 'savecondition':
+    elif params['command'] == 'savecondition': #xxx
       if self.may_write:
         self.myitem.inqueue.put((
           'save_condition', 
@@ -251,16 +251,36 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
-    elif params['command'] == 'newcondition':
+    elif params['command'] == 'newcondition': #xxx
       if self.may_write:
-
         dbline = evt_condition(and_or=int(params['and_or']), reaction=int(params['reaction']), 
         eventer_id=self.myitem.dbline.id)
         await savedbline(dbline)
         newitem = model_to_dict(dbline)
-
         self.myitem.inqueue.put(('new_condition', int(params['reaction']), newitem))
         outlist['data'] = newitem
+      else:
+        outlist['data'] = 'No Access'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'save_conditions':
+      if self.may_write:
+        self.myitem.inqueue.put(('save_conditions', params['reaction'], params['conditions']))
+        cond_dict = json.loads(params['conditions'])
+        await deletefilter(evt_condition, {'eventer_id' : self.myitem.dbline.id, 'reaction' : params['reaction'], }, )
+        for item in cond_dict:
+          db_line = evt_condition(
+            eventer_id = self.myitem.dbline.id,
+            reaction = params['reaction'],
+            and_or = item['and_or'],
+            c_type = item['c_type'],
+            x = item['x'],
+            y = item['y'],
+            bracket = item['bracket'],
+          )
+          await savedbline(db_line)
+        outlist['data'] = 'OK'
       else:
         outlist['data'] = 'No Access'
       logger.debug('--> ' + str(outlist))
