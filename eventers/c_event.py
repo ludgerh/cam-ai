@@ -66,7 +66,7 @@ def resolve_rules(conditions, predictions):
         count = 0
         item_result = False
         for prediction in predictions:
-          if prediction <= item['y']:
+          if prediction < item['y']:
             count += 1
             if count >= item['x']:
               item_result = True
@@ -74,7 +74,7 @@ def resolve_rules(conditions, predictions):
       elif item['c_type'] == 4:
         item_result = (predictions[item['x']] >= item['y'])
       elif item['c_type'] == 5:
-        item_result = (predictions[item['x']] <= item['y'])
+        item_result = (predictions[item['x']] < item['y'])
       elif item['c_type'] == 6:
         myprediction = predictions[item['x']]
         count = 0
@@ -179,7 +179,6 @@ class c_event(list):
             frame_idxs,
             self.dbline.id,
           )
-          #self.set_pred(frames_to_process, predictions)
       else:       
         break
 

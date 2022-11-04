@@ -16,7 +16,7 @@ import cv2 as cv
 import numpy as np
 import json
 from psutil import Process
-from signal import SIGINT, SIGKILL
+from signal import SIGINT, SIGKILL, SIGTERM
 from os import remove, path, makedirs, mkfifo, kill as oskill
 from shutil import move
 from time import sleep, time
@@ -297,6 +297,7 @@ class c_cam(c_device):
         probe['streams'][self.video_codec]['height'])
       self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
       self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
+      self.dbline.save(update_fields=['cam_xres', 'cam_yres'])
       if self.dbline.cam_audio_codec == -1:
         self.audio_codec = 0
         try:
@@ -308,6 +309,7 @@ class c_cam(c_device):
           self.audio_codec_name = 'none'
       else:
         self.audio_codec = self.dbline.cam_audio_codec
+      self.audio_codec_name = probe['streams'][self.audio_codec]['codec_name']
       self.logger.info('Audio codec: ' + self.audio_codec_name)
       while True:
         try:
@@ -452,7 +454,7 @@ class c_cam(c_device):
   def reset_cam(self):
     self.logger.info('Cam #'+str(self.dbline.id)+' is off')
     if self.ff_proc is not None:
-      self.ff_proc.send_signal(signal.CTRL_C_EVENT)
+      self.ff_proc.send_signal(SIGTERM)
       self.ff_proc.wait()
       self.ff_proc = None
     self.dbline.refresh_from_db()

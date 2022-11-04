@@ -53,7 +53,7 @@ class c_eventer(c_device):
       self.viewer = c_viewer(self, self.logger)
     else:
       self.viewer = None
-    self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school).tf_worker.id]
+    self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
     self.dataqueue = l_buffer(envi='D', bget=True)
     self.detectorqueue = l_buffer(envi='D', bget=True, bput=True)
@@ -65,17 +65,17 @@ class c_eventer(c_device):
     self.clean_up_ts = time()
     self.nr_of_cond_ed = 0
     self.read_conditions()
-    self.tag_list = get_taglist(self.dbline.eve_school)
+    self.tag_list = get_taglist(self.dbline.eve_school.id)
     self.recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
     self.last_display = 0
 
   def runner(self):
+    super().runner()
+    self.logname = 'eventer #'+str(self.dbline.id)
+    self.logger = getLogger(self.logname)
+    log_ini(self.logger, self.logname)
+    setproctitle('CAM-AI-Eventer #'+str(self.dbline.id))
     try:
-      super().runner()
-      self.logname = 'eventer #'+str(self.dbline.id)
-      self.logger = getLogger(self.logname)
-      log_ini(self.logger, self.logname)
-      setproctitle('CAM-AI-Eventer #'+str(self.dbline.id))
 
       self.vid_deque = deque()
       self.vid_str_dict = {}
@@ -208,79 +208,83 @@ class c_eventer(c_device):
         break
 
   def display_events(self):
-    while len(self.frameslist) > 0:
-      myframeplusevents = self.frameslist.popleft()
-      all_done = True
-      for item in myframeplusevents['events']:
-        if ((item[0] in self.eventdict) 
-            and (self.eventdict[item[0]].status >= -2)):
-          myevent = self.eventdict[item[0]]
-          if (not myevent.pred_is_done(ts=item[1])):
-            all_done = False
-            break
-      if all_done:
-        frame = myframeplusevents['frame']
-        newimage = frame[1].copy()
-        buffer_diff = min(1.0, frame[2] - self.buffer_ts)
-        while (time() - self.display_ts) < (buffer_diff * 0.9):
-          sleep(djconf.getconfigfloat('short_brake', 0.01))
-        self.buffer_ts = frame[2]
-        self.display_ts = time()
-        for i in myframeplusevents['events']:
-          if i[0] in self.eventdict:
-            item = self.eventdict[i[0]]
-            if self.eventdict[i[0]].status >= -2:
-              itemold = i[2]
-              predictions = item.pred_read(max=1.0)
-              if self.dbline.eve_all_predictions or (self.nr_of_cond_ed > 0):
-                if self.nr_of_cond_ed <= 0:
-                  self.last_cond_ed = 1
-                if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
-                  colorcode= (0, 255, 0)
+    try:
+      while len(self.frameslist) > 0:
+        myframeplusevents = self.frameslist.popleft()
+        all_done = True
+        for item in myframeplusevents['events']:
+          if ((item[0] in self.eventdict) 
+              and (self.eventdict[item[0]].status >= -2)):
+            myevent = self.eventdict[item[0]]
+            if (not myevent.pred_is_done(ts=item[1])):
+              all_done = False
+              break
+        if all_done:
+          frame = myframeplusevents['frame']
+          newimage = frame[1].copy()
+          buffer_diff = min(1.0, frame[2] - self.buffer_ts)
+          while (time() - self.display_ts) < (buffer_diff * 0.9):
+            sleep(djconf.getconfigfloat('short_brake', 0.01))
+          self.buffer_ts = frame[2]
+          self.display_ts = time()
+          for i in myframeplusevents['events']:
+            if i[0] in self.eventdict:
+              item = self.eventdict[i[0]]
+              if self.eventdict[i[0]].status >= -2:
+                itemold = i[2]
+                predictions = item.pred_read(max=1.0)
+                if self.dbline.eve_all_predictions or (self.nr_of_cond_ed > 0):
+                  if self.nr_of_cond_ed <= 0:
+                    self.last_cond_ed = 1
+                  if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
+                    colorcode= (0, 255, 0)
+                  else:
+                    colorcode= (0, 0, 255)
+                  displaylist = [(j, predictions[j]) for j in range(10)]
+                  displaylist.sort(key=lambda x: -x[1])
+                  cv.rectangle(newimage, rect_btoa(itemold), colorcode, 5)
+                  if itemold[2] < (self.dbline.cam_yres - itemold[3]):
+                    y0 = itemold[3]+20
+                  else:
+                    y0 = itemold[2]-190
+                  for j in range(10):
+                    cv.putText(newimage, 
+                      self.tag_list[displaylist[j][0]].name[:3]
+                      +' - '+str(round(displaylist[j][1],2)), 
+                      (itemold[0]+2, y0 + j * 20), 
+                      cv.FONT_HERSHEY_SIMPLEX, 0.5, colorcode, 2, cv.LINE_AA)
                 else:
-                  colorcode= (0, 0, 255)
-                displaylist = [(j, predictions[j]) for j in range(10)]
-                displaylist.sort(key=lambda x: -x[1])
-                cv.rectangle(newimage, rect_btoa(itemold), colorcode, 5)
-                if itemold[2] < (self.dbline.cam_yres - itemold[3]):
-                  y0 = itemold[3]+20
-                else:
-                  y0 = itemold[2]-190
-                for j in range(10):
-                  cv.putText(newimage, 
-                    self.tag_list[displaylist[j][0]].name[:3]
-                    +' - '+str(round(displaylist[j][1],2)), 
-                    (itemold[0]+2, y0 + j * 20), 
-                    cv.FONT_HERSHEY_SIMPLEX, 0.5, colorcode, 2, cv.LINE_AA)
-              else:
-                imax = -1
-                pmax = -1
-                for j in range(1,len(predictions)):
-                  if predictions[j] >= 0.0:
-                    if predictions[j] > pmax:
-                      pmax = predictions[j]
-                      imax = j
-                if resolve_rules(self.cond_dict[1], predictions):
-                  cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), 5)
-                  cv.putText(newimage, self.tag_list[imax].name[:3], 
-                    (itemold[0]+10, itemold[2]+30), 
-                    cv.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv.LINE_AA)
-            self.last_display = frame[2]
-        if self.dbline.eve_view:
-          fps = self.som.gettime()
-          if fps:
-            self.dbline.eve_fpsactual = fps
-            while True:
-              try:
-                stream.objects.filter(id = self.dbline.id).update(eve_fpsactual = fps)
-                break
-              except OperationalError:
-                connection.close()
-            self.redis.fps_to_dev('E', self.dbline.id, fps)
-          self.viewer.inqueue.put((3, newimage, frame[2]))
-      else:
-        self.frameslist.appendleft(myframeplusevents)
-        break
+                  imax = -1
+                  pmax = -1
+                  for j in range(1,len(predictions)):
+                    if predictions[j] >= 0.0:
+                      if predictions[j] > pmax:
+                        pmax = predictions[j]
+                        imax = j
+                  if resolve_rules(self.cond_dict[1], predictions):
+                    cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), 5)
+                    cv.putText(newimage, self.tag_list[imax].name[:3], 
+                      (itemold[0]+10, itemold[2]+30), 
+                      cv.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv.LINE_AA)
+              self.last_display = frame[2]
+          if self.dbline.eve_view:
+            fps = self.som.gettime()
+            if fps:
+              self.dbline.eve_fpsactual = fps
+              while True:
+                try:
+                  stream.objects.filter(id = self.dbline.id).update(eve_fpsactual = fps)
+                  break
+                except OperationalError:
+                  connection.close()
+              self.redis.fps_to_dev('E', self.dbline.id, fps)
+            self.viewer.inqueue.put((3, newimage, frame[2]))
+        else:
+          self.frameslist.appendleft(myframeplusevents)
+          break
+    except:
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def check_events(self, idict):
     try:
@@ -293,7 +297,6 @@ class c_eventer(c_device):
         myevent.ts = myevent.end
       if (myevent.ts 
           and myevent.pred_is_done(ts = myevent.ts)):
-        #print('Predictions:', myevent)
         predictions = myevent.pred_read(max=1.0)
         myevent.goes_to_school = resolve_rules(self.cond_dict[2], 
           predictions)
@@ -306,7 +309,7 @@ class c_eventer(c_device):
           myevent.to_email = ''
         if resolve_rules(self.cond_dict[5], predictions):
           alarm(self.dbline.id, self.dbline.name, predictions, 
-            self.dbline.eve_school, self.logger)
+            self.dbline.eve_school.id, self.logger)
         if (myevent.goes_to_school 
             or myevent.isrecording
             or myevent.to_email):
@@ -391,72 +394,78 @@ class c_eventer(c_device):
       self.vid_deque.popleft()
 
   def inserter(self):
-    while (not self.tf_worker.check_ready(self.tf_w_index)):
-      sleep(djconf.getconfigfloat('long_brake', 1.0))
-    local_ts = time()
-    while self.do_run:
-      if (time() - local_ts) > 1.0:
-        local_ts = time()
-        for idict in self.eventdict.copy():
-          myevent = self.eventdict[idict]
-          if myevent.status <= -2:
-            if (myevent.end <= self.last_display) or (not self.redis.view_from_dev('E', self.dbline.id)): 
-              if not (myevent.isrecording 
-                  or myevent.goes_to_school): 
-                while True:
-                  try:
-                    event.objects.get(id=myevent.dbline.id).delete()
-                    break
-                  except OperationalError:
-                    connection.close()
-              del self.eventdict[idict]
-          else:
-            self.check_events(idict)
-      if not self.redis.check_if_counts_zero('E', self.dbline.id):
-        margin = self.dbline.eve_margin
-        frame = self.detectorqueue.get()
-        if frame:
-          found = None
+    try:
+      while (not self.tf_worker.check_ready(self.tf_w_index)):
+        sleep(djconf.getconfigfloat('long_brake', 1.0))
+      local_ts = time()
+      while self.do_run:
+        if (time() - local_ts) > 1.0:
+          local_ts = time()
           for idict in self.eventdict.copy():
             myevent = self.eventdict[idict]
-            if ((myevent.end > (frame[2] - 
-                self.dbline.eve_event_time_gap))
-              and hasoverlap((frame[3]-margin, frame[4]+margin, 
-                frame[5]-margin, frame[6]+margin), myevent)
-              and (myevent.status == 0)):
-              found = myevent
-              break
-          if found is None:
-            myevent = c_event(self.tf_worker, self.tf_w_index, frame, 
-              self.dbline.eve_margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
-              self.dbline.eve_school, self.id, self.dbline.name, self.logger)
-            self.eventdict[myevent.dbline.id] = myevent
-          else: 
-            s_factor = 0.1 # user changeable later: 0.0 -> No Shrinking 1.0 50%
-            if (frame[3] - margin) <= found[0]:
-              found[0] = max(0, frame[3] - margin)
+            if myevent.status <= -2:
+              if (myevent.end <= self.last_display) or (not self.redis.view_from_dev('E', self.dbline.id)): 
+                if not (myevent.isrecording 
+                    or myevent.goes_to_school): 
+                  while True:
+                    try:
+                      event.objects.get(id=myevent.dbline.id).delete()
+                      break
+                    except OperationalError:
+                      connection.close()
+                del self.eventdict[idict]
             else:
-              found[0] = round(((frame[3] - margin) * s_factor + found[0]) 
-                / (s_factor+1.0))
-            if (frame[4] + margin) >= found[1]:
-              found[1] = min(self.dbline.cam_xres-1, frame[4] + margin)
-            else:
-              found[1] = round(((frame[4] + margin) * s_factor + found[1]) 
-                / (s_factor+1.0))
-            if (frame[5] - margin) <= found[2]:
-              found[2] = max(0, frame[5] - margin)
-            else:
-              found[2] = round(((frame[5] - margin) * s_factor + found[2]) 
-                / (s_factor+1.0))
-            if (frame[6] + margin) >= found[3]:
-              found[3] = min(self.dbline.cam_yres-1, frame[6] + margin)
-            else:
-              found[3] = round(((frame[6] + margin) * s_factor + found[3]) 
-                / (s_factor+1.0))
-            found.end = frame[2]
-            found.add_frame(frame)
-          self.merge_events()
-          self.inserter_ts = frame[2]
+              self.check_events(idict)
+        if not self.redis.check_if_counts_zero('E', self.dbline.id):
+          margin = self.dbline.eve_margin
+          frame = self.detectorqueue.get()
+          if frame:
+            if not self.dbline.cam_xres:
+              self.dbline.refresh_from_db(fields=['cam_xres', 'cam_yres', ])
+            found = None
+            for idict in self.eventdict.copy():
+              myevent = self.eventdict[idict]
+              if ((myevent.end > (frame[2] - 
+                  self.dbline.eve_event_time_gap))
+                and hasoverlap((frame[3]-margin, frame[4]+margin, 
+                  frame[5]-margin, frame[6]+margin), myevent)
+                and (myevent.status == 0)):
+                found = myevent
+                break
+            if found is None:
+              myevent = c_event(self.tf_worker, self.tf_w_index, frame, 
+                self.dbline.eve_margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
+                self.dbline.eve_school.id, self.id, self.dbline.name, self.logger)
+              self.eventdict[myevent.dbline.id] = myevent
+            else: 
+              s_factor = 0.1 # user changeable later: 0.0 -> No Shrinking 1.0 50%
+              if (frame[3] - margin) <= found[0]:
+                found[0] = max(0, frame[3] - margin)
+              else:
+                found[0] = round(((frame[3] - margin) * s_factor + found[0]) 
+                  / (s_factor+1.0))
+              if (frame[4] + margin) >= found[1]:
+                found[1] = min(self.dbline.cam_xres-1, frame[4] + margin)
+              else:
+                found[1] = round(((frame[4] + margin) * s_factor + found[1]) 
+                  / (s_factor+1.0))
+              if (frame[5] - margin) <= found[2]:
+                found[2] = max(0, frame[5] - margin)
+              else:
+                found[2] = round(((frame[5] - margin) * s_factor + found[2]) 
+                  / (s_factor+1.0))
+              if (frame[6] + margin) >= found[3]:
+                found[3] = min(self.dbline.cam_yres-1, frame[6] + margin)
+              else:
+                found[3] = round(((frame[6] + margin) * s_factor + found[3]) 
+                  / (s_factor+1.0))
+              found.end = frame[2]
+              found.add_frame(frame)
+            self.merge_events()
+            self.inserter_ts = frame[2]
+    except:
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def set_cam_counts(self):
     if any([len(self.cond_dict[x]) for x in range(2,6)]):

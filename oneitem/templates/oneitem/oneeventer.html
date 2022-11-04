@@ -63,7 +63,7 @@ function make_list_line(condition, reaction, count) {
   } else {
     newline = '';
   };
-  if (condition.bracket > 0) {bracketlevel += condition.bracket;};
+  if (count && (condition.bracket > 0)) {bracketlevel += condition.bracket;};
   newline += '<li react="'+reaction+'" nr="'+count+'" class="list-group-item border-0 list_line">';
   if (bracketlevel) {
     newline += '<p style="text-indent:'+bracketlevel*2+'em; margin:0em">';
@@ -114,7 +114,7 @@ function make_list_line(condition, reaction, count) {
       + 'value="'+condition.y+'">';
   };
   if ([3, 5].includes(condition.c_type)) {
-    newline += 'below or equal ';
+    newline += 'below ';
     newline += '<input react="'+reaction+'" nr="'+count+'" class="ynumber" type="number" size="4" min="0" max="1" step="0.01" '
       + 'value="'+condition.y+'">';
   };
@@ -142,7 +142,11 @@ function make_list_line(condition, reaction, count) {
 
 function refresh_one(reaction) {
   $('#li_gr_'+reaction).empty();
-  bracketlevel = 0;
+  if (c_dict[reaction].length) {
+    bracketlevel = c_dict[reaction][0].bracket;
+  } else {
+    bracketlevel = 0;
+  };
   for (j=0; j<c_dict[reaction].length; j++) {
     if ((bracketlevel + c_dict[reaction][j].bracket) < 0) {
       c_dict[reaction][j].bracket -= (bracketlevel + c_dict[reaction][j].bracket);
@@ -198,11 +202,10 @@ function reset_triggers(first = false) {
   $('.in-bt').click(function(evt) {
     thisreaction = $(this).attr('react');
     thisnr = parseInt($(this).attr('nr'));
-    nrbefore = thisnr - 1;
     if (c_dict[thisreaction][thisnr].bracket > 0) {
       c_dict[thisreaction][thisnr].bracket -= 1;
     } else {
-      c_dict[thisreaction][nrbefore].bracket -= 1;
+      c_dict[thisreaction][thisnr - 1].bracket -= 1;
     };
     refresh_one(thisreaction);
     reset_triggers();
@@ -210,12 +213,7 @@ function reset_triggers(first = false) {
   $('.out-bt').click(function(evt) {
     thisreaction = $(this).attr('react');
     thisnr = parseInt($(this).attr('nr'));
-    nrbefore = thisnr - 1;
-    if (c_dict[thisreaction][nrbefore].bracket < 0) {
-      c_dict[thisreaction][nrbefore].bracket += 1;
-    } else {
-      c_dict[thisreaction][thisnr].bracket += 1;
-    };
+    c_dict[thisreaction][thisnr].bracket += 1;
     refresh_one(thisreaction);
     reset_triggers();
   });
@@ -348,7 +346,7 @@ $(document).ready(function() {
     SchoolDBUtilSocket = result;
     return (SchoolDBUtilSocket.sendandwait({
       'command' : 'gettags',
-      'school' : {{ dbline.eve_school }},
+      'school' : {{ dbline.eve_school.id }},
     }));
   })
 	.then((result) => {

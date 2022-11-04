@@ -12,22 +12,41 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from pathlib import Path
-from time import time
+from time import time, sleep
 from json import loads, dumps
+from subprocess import Popen, PIPE
 from logging import getLogger
+from ipaddress import ip_network, ip_address
+from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, gaierror
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
 from tools.c_logger import log_ini
-from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter
+from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter, savedbline
 from tools.l_tools import djconf
 from tf_workers.models import school
 from trainers.models import trainframe
 from eventers.models import event, event_frame
+from streams.c_streams import streams, c_stream
+from streams.models import stream as dbstream
+from streams.startup import start_stream_list
 
 logname = 'ws_toolsconsumers'
 logger = getLogger(logname)
 log_ini(logger, logname)
 recordingspath = Path(djconf.getconfig('recordingspath', 'data/recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', 'data/schoolframes/'))
+
+s = socket(AF_INET, SOCK_DGRAM)
+subnetmask = '255.255.255.0'
+try:
+  s.connect(('10.255.255.255', 1))
+  my_ip = s.getsockname()[0]
+except Exception:
+  my_ip = '127.0.0.1'
+finally:
+  s.close()
+my_net = ip_network(my_ip+'/'+subnetmask, strict=False)
+my_ip = ip_address(my_ip)
 
 #*****************************************************************************
 # health
@@ -211,3 +230,86 @@ class health(AsyncWebsocketConsumer):
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
+
+#*****************************************************************************
+# admintools
+#*****************************************************************************
+
+def scanoneip(ipstring, myports):
+  portlist = []
+  for port in myports:
+    s = socket(AF_INET, SOCK_STREAM)
+    s.settimeout(0.2)
+    try:
+      result = s.connect_ex((ipstring, port))
+    except gaierror:
+      return(None)
+    s.close()
+    if result == 0:
+      portlist.append(port)
+  if portlist:
+    result = {}
+    result['ip'] = ipstring
+    try:
+      result['name'] = gethostbyaddr(ipstring)[0]
+    except herror:
+      result['name'] = 'name unknown'
+    result['ports'] = portlist
+    return(result)
+  else:
+    return(None)  
+
+class admintools(AsyncWebsocketConsumer):
+
+  async def connect(self):
+    if self.scope['user'].is_superuser:
+      await self.accept()
+    else:
+      await self.close()
+
+  async def receive(self, text_data):
+    logger.debug('<-- ' + text_data)
+    params = loads(text_data)['data']	
+    outlist = {'tracker' : loads(text_data)['tracker']}	
+
+    if params['command'] == 'scanoneip':
+      if params['portaddr'] == 554:
+        cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
+          '-rtsp_transport', 'tcp', '-show_streams', params['camurl']]
+      else:
+        cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
+          '-show_streams', params['camurl']]
+      p = Popen(cmds, stdout=PIPE)
+      output, _ = p.communicate()
+      outlist['data'] = loads(output)
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
+
+    elif params['command'] == 'scanips':
+      if params['portaddr']:
+        portlist = [params['portaddr'], ]
+      else:
+        portlist = [80, 443, 554, 1935, ]
+      contactlist = []
+      for item in my_net.hosts():        
+        if item != my_ip:
+          if (checkresult := scanoneip(str(item), portlist)):
+            contactlist.append(checkresult)
+      outlist['data'] = contactlist
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
+
+    elif params['command'] == 'installcam':
+      newstream = dbstream()
+      newstream.cam_url = params['camurl']
+      newstream.cam_video_codec = params['videocodec']
+      newstream.cam_audio_codec = params['audiocodec']
+      await savedbline(newstream)
+      while start_stream_list:
+        sleep(djconf.getconfigfloat('long_brake', 1.0))
+      start_stream_list.add(newstream.id)
+
+      outlist['data'] = {'id' : newstream.id, }
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
+

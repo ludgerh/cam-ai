@@ -118,7 +118,7 @@ $(document).ready(function() {
       };
 		};
 {% if may_write %}
-		$('#ch_show').prop('checked', true);
+		$('#ch_show').prop('checked', false);
 		$('#ch_apply').prop('checked', ('{{ dbline.cam_apply_mask }}' == 'True'));
 		$('#ch_edit').prop('checked', false);
 		$('#ch_white').prop('checked', false);

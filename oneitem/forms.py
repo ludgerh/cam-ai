@@ -19,10 +19,10 @@ class CamForm(forms.ModelForm):
 	class Meta:
 		model = stream
 		fields = (
+      'name',
       'cam_fpslimit', 
       'cam_feed_type', 
       'cam_url', 
-      'cam_repeater',
     )
 		widgets = { 
 			'cam_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
@@ -67,6 +67,6 @@ class EventerForm(forms.ModelForm):
 			'eve_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
 			'eve_margin' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
 			'eve_event_time_gap' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 3600}), 
-			'eve_school' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
+			#'eve_school' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
 			'eve_alarm_email' : forms.TextInput(attrs={'size': 70}),
 		}

@@ -166,6 +166,8 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `pip install setproctitle`
 
+   `pip install websocket-client`
+
    `sudo apt install redis`
 
    `pip install redis`

@@ -12,7 +12,7 @@
 {# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
 
 <div>
-    <h1>{{ name }}{{ myurl }}</h1>
+    <h1>{{ mode }}{{ idx }}: {{ name }}{{ myurl }}</h1>
 		<h5>{{ xres }}x{{ yres }}, fps = <span id="fpstag{{ mode }}{{ idx }}">?</span>, views = <span id="vnrtag{{ mode }}{{ idx }}">?</span></h5>
 		{% if mode == "C" %}
       {% if dmode ==  "L" %} 

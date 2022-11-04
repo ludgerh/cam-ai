@@ -30,24 +30,24 @@ def onecam(request, camnr):
     if request.method == 'POST':
       form = CamForm(request.POST)
       if form.is_valid():
+        streams[camnr].dbline.name = form.cleaned_data['name']
         streams[camnr].dbline.cam_fpslimit = form.cleaned_data['cam_fpslimit']
         streams[camnr].dbline.cam_feed_type = form.cleaned_data['cam_feed_type']
         streams[camnr].dbline.cam_url = form.cleaned_data['cam_url']
-        streams[camnr].dbline.cam_repeater = form.cleaned_data['cam_repeater']
         streams[camnr].dbline.save(update_fields=[
+          'name',
           'cam_fpslimit', 
           'cam_feed_type',
           'cam_url',
-          'cam_repeater',
         ])
         mycam.inqueue.put(('reset_cam',))
         return HttpResponseRedirect(myurl+str(camnr)+'/')
     else:
       form = CamForm(initial={
+        'name' : dbline.name,
         'cam_fpslimit' : dbline.cam_fpslimit,
         'cam_feed_type' : dbline.cam_feed_type,
         'cam_url' : dbline.cam_url,
-        'cam_repeater' : dbline.cam_repeater,
       })
       camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', request.user, 'R')
       detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', request.user, 'R')

@@ -20,3 +20,10 @@ class setting(models.Model):
 
 	def __str__(self):
 		return('Setting: ' + self.setting+' = ' + self.value)
+
+class camurl(models.Model):
+	type =  models.CharField(max_length=100)
+	url =  models.CharField(max_length=255)
+
+	def __str__(self):
+		return('CamUrl model: ' + self.type+' - ' + self.url)

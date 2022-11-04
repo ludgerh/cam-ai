@@ -15,6 +15,7 @@ import sys
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
 from redis import Redis
+from multitimer import MultiTimer
 from tools.l_tools import djconf
 from camai.version import version as software_version
 print('***** Software-Version: ', software_version, '*****')
@@ -27,7 +28,22 @@ from .models import stream
 from .c_streams import streams, c_stream
 #from threading import enumerate
 
+check_timer = None
+start_stream_list = set()
+
+def restartcheck_proc():
+  global start_stream_list
+  if start_stream_list:
+    print(start_stream_list, 'something')
+    for i in start_stream_list:
+      dbline = stream.objects.get(id=i)
+      streams[i] = c_stream(dbline)
+      streams[i].start()
+    start_stream_list = set()
+    
+
 def newexit(eins, zwei):
+  check_timer.stop()
   print ('Caught KeyboardInterrupt...')
   for i in streams:
     print('Closing stream #', i)
@@ -44,6 +60,7 @@ def newexit(eins, zwei):
 
 
 def run():
+  global check_timer
   signal(SIGINT, newexit)
   signal(SIGTERM, newexit)
   signal(SIGHUP, newexit)
@@ -64,4 +81,7 @@ def run():
   for dbline in stream.objects.filter(active=True):
     streams[dbline.id] = c_stream(dbline)
     streams[dbline.id].start()
+
+  check_timer = MultiTimer(interval=10, function=restartcheck_proc, runonstart=False)
+  check_timer.start()
 

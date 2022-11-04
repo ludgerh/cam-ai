@@ -28,18 +28,24 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from sys import argv
 
-urlpatterns = [
-  path('admin/', admin.site.urls),
-  path('accounts/', include('accounts.urls')),
-  path('accounts/', include('django.contrib.auth.urls')),
-  path('viewers/', include('viewers.urls')),
-  path('index/', include('index.urls')),
-  path('oneitem/', include('oneitem.urls')),
-  path('schools/', include('schools.urls')),
-  path('trainers/', include('trainers.urls')),
-  path('eventers/', include('eventers.urls')),
-  path('users/', include('users.urls')),
-  path('tools/', include('tools.urls')),
-  path('', include('index.urls')),
-]
+if (argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith('gunicorn')):
+  urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('accounts/', include('accounts.urls')),
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('viewers/', include('viewers.urls')),
+    path('index/', include('index.urls')),
+    path('oneitem/', include('oneitem.urls')),
+    path('schools/', include('schools.urls')),
+    path('trainers/', include('trainers.urls')),
+    path('eventers/', include('eventers.urls')),
+    path('users/', include('users.urls')),
+    path('tools/', include('tools.urls')),
+    path('', include('index.urls')),
+  ]
+else:
+  urlpatterns = []
+  print('camai/urls.py: No further Imports.')
+

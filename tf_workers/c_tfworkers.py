@@ -24,6 +24,8 @@ from traceback import format_exc
 from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
+from inspect import currentframe, getframeinfo
+from websocket._exceptions import WebSocketTimeoutException
 from django.db.utils import OperationalError
 from django.db import connections, connection
 from tools.l_tools import QueueUnknownKeyword, djconf, get_proc_name
@@ -173,12 +175,41 @@ class tf_worker():
           'code' : 'auth',
           'name' : self.dbline.wsname,
           'pass' : self.dbline.wspass,
+          'server_nr' : djconf.getconfigint('system_number'),
+          'worker_nr' : self.id,
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
         break
       except BrokenPipeError:
-        self.logger.warning('Broken Pipe while  initializating prediction server')
+        self.logger.warning('Broken Pipe while resetting prediction websocket server')
         sleep(djconf.getconfigfloat('long_brake', 1.0))
+
+  def continue_sending(self, payload, opcode=1, logger=None, get_answer=False):
+    while True:
+      while True:
+        try:
+          if opcode:
+            self.ws.send(payload, opcode=1) # 1 = Text
+            frameinfo = getframeinfo(currentframe())
+          else:
+            self.ws.send_binary(payload) # 0 = Bytes
+            frameinfo = getframeinfo(currentframe())
+          break
+        except BrokenPipeError:
+          if logger:
+            logger.warning('Broken Pipe in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
+          sleep(djconf.getconfigfloat('long_brake', 1.0))
+          self.reset_websocket()
+      if get_answer:
+        try:
+          return(self.ws.recv())
+        except WebSocketTimeoutException:
+          if logger:
+            logger.warning('TimeOut in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
+          sleep(djconf.getconfigfloat('long_brake', 1.0))
+          self.reset_websocket()
+      else:
+        return(None)
     
 
 #***************************************************************************
@@ -348,15 +379,7 @@ class tf_worker():
             'code' : 'get_xy',
             'scho' : schoolnr,
           }
-          while True:
-            try:
-              self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-              break
-            except BrokenPipeError:
-              logger.warning('Socket error while pushing initialization '
-                + 'data to prediction server')
-              sleep(djconf.getconfigfloat('medium_brake', 0.1))
-          xytemp = json.loads(self.ws.recv())
+          xytemp = json.loads(self.continue_sending(json.dumps(outdict), opcode=1, logger=logger, get_answer=True))
           self.allmodels[schoolnr]['xdim'] = xytemp[0]
           self.allmodels[schoolnr]['ydim'] = xytemp[1]
           sleep(self.dbline.gpu_sim_loading) 
@@ -417,112 +440,100 @@ class tf_worker():
         sleep(self.dbline.gpu_sim_loading / 3)
 
   def process_buffer(self, schoolnr, logger, had_timeout=False):
-    mybuffer = self.model_buffers[schoolnr]
-    if schoolnr in self.myschool_cache:
-      myschool= self.myschool_cache[schoolnr][0]
-    else:
-      myschool = school.objects.get(id=schoolnr)
-      self.myschool_cache[schoolnr] = (myschool, time())
-
-    ts_one = time()
-    mybuffer.ts = time()
-    slice_to_process = mybuffer.get(self.dbline.maxblock)
-    framelist = slice_to_process[0]
-    framesinfo = slice_to_process[1:]
-    self.check_model(schoolnr, logger)
-    if self.dbline.gpu_sim >= 0: #GPU Simulation with random
-      if self.dbline.gpu_sim > 0:
-        sleep(self.dbline.gpu_sim)
-      predictions = np.empty((0, len(taglist)), np.float32)
-      for i in framelist:
-        myindex = round(np.sum(i).item())
-        if myindex in self.cachedict:
-          line = self.cachedict[myindex]
-        else:
-          line = []
-          for j in range(len(taglist)):
-            line.append(random())
-          line = np.array([np.float32(line)])
-          self.cachedict[myindex] = line
-        predictions = np.vstack((predictions, line))
-    elif self.dbline.use_websocket: #Predictions from Server
-      self.ws_ts = time()
-      outdict = {
-        'code' : 'imgl',
-        'scho' : myschool.e_school,
-        'nrf' : framelist.shape[0],
-      }
-      while True:
-        try:
-          self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-          break
-        except BrokenPipeError:
-          logger.warning('Socket error while pushing image data to prediction '
-            + 'server')
-          sleep(djconf.getconfigfloat('long_brake', 1.0))
-          self.reset_websocket()
-      while True:
-        try:
-          for i in range(framelist.shape[0]):
-            jpgdata = cv.imencode('.jpg', framelist[i])[1]
-            outdict = {
-              'code' : 'imag',
-              'data' : jpgdata,
-            }
-            while True:
-              try:
-                self.ws.send_binary(jpgdata)
-                break 
-              except BrokenPipeError:
-                logger.warning('Socket error while pushing jpeg data to '
-                  + 'prediction server')
-                sleep(djconf.getconfigfloat('long_brake', 1.0))
-                self.reset_websocket()
-          predictions = np.array(json.loads(self.ws.recv()), dtype=np.float32)
-          break
-        except (ConnectionResetError, OSError):
-          sleep(djconf.getconfigfloat('long_brake', 1.0))
-          self.reset_websocket()
-    else: #local GPU
-      if framelist.shape[0] < self.dbline.maxblock:
-        patch = np.zeros((self.dbline.maxblock - framelist.shape[0], 
-          framelist.shape[1], 
-          framelist.shape[2], 
-          framelist.shape[3]), 
-          np.uint8)
-        portion = np.vstack((framelist, patch))
-        predictions = (
-          self.activemodels[schoolnr].predict_on_batch(portion))
-        predictions = predictions[:framelist.shape[0]]
+    try:
+      mybuffer = self.model_buffers[schoolnr]
+      if schoolnr in self.myschool_cache:
+        myschool= self.myschool_cache[schoolnr][0]
       else:
-        predictions = (
-          self.activemodels[schoolnr].predict_on_batch(framelist))
-    starting = 0
-    for i in range(framelist.shape[0]):
-      if ((i == framelist.shape[0] - 1) 
-          or (framesinfo[0][i] != framesinfo[0][i+1])):
-        if ((framesinfo[0][starting] in self.users) 
-            and (framesinfo[0][starting] in self.outqueues)):
-          self.outqueues[framesinfo[0][starting]].put((
-            'pred_to_send', 
-            predictions[starting:i+1], 
-            framesinfo[0][starting:i+1],
-            framesinfo[1][starting:i+1],
-            framesinfo[2][starting:i+1],
-          ))
-        starting = i + 1
-    if self.dbline.savestats > 0: #Later to be written in DB
-      newtime = time()
-      logtext = 'School: ' + str(schoolnr).zfill(3)
-      logtext += ('  Buffer Size: ' 
-        + str(len(mybuffer)).zfill(5))
-      logtext += ('  Block Size: ' 
-        + str(framelist.shape[0]).zfill(5))
-      logtext += ('  Proc Time: ' 
-        + str(round(newtime - ts_one, 3)).ljust(5, '0'))
-      if had_timeout:
-        logtext += ' T'
-      logger.info(logtext)
+        myschool = school.objects.get(id=schoolnr)
+        self.myschool_cache[schoolnr] = (myschool, time())
+
+      ts_one = time()
+      mybuffer.ts = time()
+      slice_to_process = mybuffer.get(self.dbline.maxblock)
+      framelist = slice_to_process[0]
+      framesinfo = slice_to_process[1:]
+      self.check_model(schoolnr, logger)
+      if self.dbline.gpu_sim >= 0: #GPU Simulation with random
+        if self.dbline.gpu_sim > 0:
+          sleep(self.dbline.gpu_sim)
+        predictions = np.empty((0, len(taglist)), np.float32)
+        for i in framelist:
+          myindex = round(np.sum(i).item())
+          if myindex in self.cachedict:
+            line = self.cachedict[myindex]
+          else:
+            line = []
+            for j in range(len(taglist)):
+              line.append(random())
+            line = np.array([np.float32(line)])
+            self.cachedict[myindex] = line
+          predictions = np.vstack((predictions, line))
+      elif self.dbline.use_websocket: #Predictions from Server
+        self.ws_ts = time()
+        outdict = {
+          'code' : 'imgl',
+          'scho' : myschool.e_school,
+          'nrf' : framelist.shape[0],
+        }
+        self.continue_sending(json.dumps(outdict), opcode=1, logger=logger)
+        while True:
+          try:
+            for i in range(framelist.shape[0]):
+              jpgdata = cv.imencode('.jpg', framelist[i])[1].tobytes()
+              schoolbytes = myschool.e_school.to_bytes(8, 'big')
+              if (i < (framelist.shape[0] - 1)):
+                self.continue_sending(schoolbytes+jpgdata, opcode=0, logger=logger, get_answer=False)
+              else:
+                predictions = self.continue_sending(schoolbytes+jpgdata, opcode=0, logger=logger, get_answer=True)
+            predictions = np.array(json.loads(predictions), dtype=np.float32)
+            break
+          except (ConnectionResetError, OSError):
+            sleep(djconf.getconfigfloat('long_brake', 1.0))
+            self.reset_websocket()
+      else: #local GPU
+        if framelist.shape[0] < self.dbline.maxblock:
+          patch = np.zeros((self.dbline.maxblock - framelist.shape[0], 
+            framelist.shape[1], 
+            framelist.shape[2], 
+            framelist.shape[3]), 
+            np.uint8)
+          portion = np.vstack((framelist, patch))
+          predictions = (
+            self.activemodels[schoolnr].predict_on_batch(portion))
+          predictions = predictions[:framelist.shape[0]]
+        else:
+          predictions = (
+            self.activemodels[schoolnr].predict_on_batch(framelist))
+      starting = 0
+      for i in range(framelist.shape[0]):
+        if ((i == framelist.shape[0] - 1) 
+            or (framesinfo[0][i] != framesinfo[0][i+1])):
+          if ((framesinfo[0][starting] in self.users) 
+              and (framesinfo[0][starting] in self.outqueues)):
+            self.outqueues[framesinfo[0][starting]].put((
+              'pred_to_send', 
+              predictions[starting:i+1], 
+              framesinfo[0][starting:i+1],
+              framesinfo[1][starting:i+1],
+              framesinfo[2][starting:i+1],
+            ))
+          starting = i + 1
+      if self.dbline.savestats > 0: #Later to be written in DB
+        newtime = time()
+        logtext = 'School: ' + str(schoolnr).zfill(3)
+        logtext += ('  Buffer Size: ' 
+          + str(len(mybuffer)).zfill(5))
+        logtext += ('  Block Size: ' 
+          + str(framelist.shape[0]).zfill(5))
+        logtext += ('  Proc Time: ' 
+          + str(round(newtime - ts_one, 3)).ljust(5, '0'))
+        if had_timeout:
+          logtext += ' T'
+        logger.info(logtext)
+    except:
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
 
 #***************************************************************************

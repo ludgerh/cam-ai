@@ -1,7 +1,6 @@
 /data/
 static/
 __pycache__/
-migrations/
 *.py~
 *.md~
 *.bat~
@@ -13,5 +12,6 @@ migrations/
 /camai/passwords.py
 /camai/changed_files.txt
 /camai/changed_files.txt~
+/camai/systemlist.ods
 /env/
 

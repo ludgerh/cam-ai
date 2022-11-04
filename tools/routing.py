@@ -17,4 +17,5 @@ from . import consumers
 
 websocket_urlpatterns = [
   re_path(r'ws/health/$', consumers.health.as_asgi()),
+  re_path(r'ws/admintools/$', consumers.admintools.as_asgi()),
 ]

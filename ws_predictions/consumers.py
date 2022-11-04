@@ -15,7 +15,7 @@ import json
 import numpy as np
 import cv2 as cv
 from logging import getLogger
-from time import sleep
+from traceback import format_exc
 from django.contrib.auth.models import User
 from channels.generic.websocket import WebsocketConsumer
 from tools.c_logger import log_ini
@@ -35,88 +35,105 @@ taglist = get_taglist(1)
 #*****************************************************************************
 
 class predictionsConsumer(WebsocketConsumer):
+  datacache = {}
 
   def connect(self):
     self.accept()
     self.authed = False
     self.permitted_schools = set()
     self.user = None
-    self.numberofframes = 0
-    self.schooldatacache = {}
-    self.eventdict = {}
 
   def receive(self, text_data=None, bytes_data=None):
-    if bytes_data:
-      myitem = self.schooldatacache[self.school]
-      logger.debug('<-- Length = ' + str(len(bytes_data)))
-      frame = cv.imdecode(np.frombuffer(bytes_data, dtype=np.uint8), cv.IMREAD_UNCHANGED)
-      frame = np.expand_dims(frame, axis=0)
-      self.imglist = np.vstack((self.imglist, frame))
-      self.numberofframes -= 1
-      if self.numberofframes == 0:
-        tf_workers[myitem['workernr']].ask_pred(
-          self.school, 
-          self.imglist, 
-          myitem['tf_w_index'],
-          [],
-          -1,
-        )
-        predictions = np.empty((0, len(taglist)), np.float32)
-        while predictions.shape[0] < self.imglist.shape[0]:
-          predictions = np.vstack((predictions, tf_workers[myitem['workernr']].get_from_outqueue(myitem['tf_w_index'])))
-        logger.debug('--> ' + str(predictions))
-        self.send(json.dumps(predictions.tolist()))
-      return()
-    if text_data == 'Ping':
-      logger.debug('Received Ping')
-      return()
-    intext = text_data
-    logger.debug('<-- ' + str(intext))
-    indict=json.loads(intext)
-    if indict['code'] == 'imgl':
-      if not self.authed:
-        self.close()
-      if not (indict['scho'] in self.permitted_schools):
-        if access.check('S', indict['scho'], self.user, 'R'):
-          self.permitted_schools.add(indict['scho'])
+    try:
+      if text_data:
+        if text_data == 'Ping':
+          logger.debug('Received Ping')
         else:
-          self.close()
-      self.numberofframes = indict['nrf']
-      self.school = indict['scho']
-      while not(self.school in self.schooldatacache):
-        logger.warning('Schooldatacache not ready')
-        sleep(djconf.getconfigfloat('long_brake', 1.0))
-      self.imglist = np.empty((
-        0, self.schooldatacache[self.school]['xdim'], 
-        self.schooldatacache[self.school]['ydim'], 3), np.uint8)
-    elif indict['code'] == 'auth':
-      self.user = User.objects.get(username=indict['name'])
-      if self.user.check_password(indict['pass']):
-        logger.debug('Success!')
-        self.authed = True
-      if not self.authed:
-        logger.info('Failure!')
-        self.close() 
-    elif indict['code'] == 'get_xy':
-      myschool = indict['scho']
-      if myschool in self.schooldatacache:
-        myitem = self.schooldatacache[myschool]
-      else:
-        myitem = {}
-        myitem['workernr'] = school.objects.get(id=myschool).tf_worker.id
-        myitem['tf_w_index'] = tf_workers[myitem['workernr']].register()
-        tf_workers[myitem['workernr']].run_out(myitem['tf_w_index'])
-        xytemp = tf_workers[myitem['workernr']].get_xy(
-          myschool, myitem['tf_w_index'])
-        myitem['xdim'] = xytemp[0]
-        myitem['ydim'] = xytemp[1]
-        self.schooldatacache[myschool] = myitem
-      outtuple = (myitem['xdim'], myitem['ydim'])
-      logger.debug('--> ' + str(outtuple))
-      self.send(json.dumps(outtuple))
-
-  def disconnect(self, close_code):
-    for item in self.schooldatacache.values():
-      tf_workers[item['workernr']].unregister(item['tf_w_index'])
-
-
+          intext = text_data
+          logger.debug('<-- ' + str(intext))
+          indict=json.loads(intext)
+          if indict['code'] == 'auth':
+            self.user = User.objects.get(username=indict['name'])
+            if self.user.check_password(indict['pass']):
+              logger.debug('Success!')
+              if not (indict['server_nr'] in self.datacache):
+                self.datacache[indict['server_nr']] = {}
+              if not (indict['worker_nr'] 
+                  in self.datacache[indict['server_nr']]):
+                self.datacache[indict['server_nr']][indict['worker_nr']]=(
+                  {})
+              self.mydatacache = (
+                self.datacache[indict['server_nr']][indict['worker_nr']])
+              if 'tf_w_index' in self.mydatacache:
+                tf_workers[self.mydatacache['workernr']].stop_out(self.mydatacache['tf_w_index'])
+                tf_workers[self.mydatacache['workernr']].unregister(self.mydatacache['tf_w_index'])
+                del self.mydatacache['tf_w_index']
+              logger.info('Successful websocket-login: ' 
+                + str(indict['server_nr'])  + '-' + str(indict['worker_nr']))
+              self.authed = True
+            else:
+              logger.warning('Failure of websocket-login: ' 
+                + str(indict['server_nr']) + '-' + str(indict['worker_nr']))
+              self.close() 
+          elif indict['code'] == 'get_xy':
+            if not('schooldata' in self.mydatacache):
+              self.mydatacache['schooldata'] = {}
+            myschool = indict['scho']
+            if not (myschool in self.mydatacache['schooldata']):
+              self.mydatacache['schooldata'][myschool] = {}
+              self.mydatacache['workernr'] = school.objects.get(id=myschool).tf_worker.id
+              self.mydatacache['tf_w_index'] = tf_workers[self.mydatacache['workernr']].register()
+              tf_workers[self.mydatacache['workernr']].run_out(self.mydatacache['tf_w_index'])
+              xytemp = tf_workers[self.mydatacache['workernr']].get_xy(
+                myschool, self.mydatacache['tf_w_index'])
+              self.mydatacache['schooldata'][myschool]['xdim'] = xytemp[0]
+              self.mydatacache['schooldata'][myschool]['ydim'] = xytemp[1]
+            else:
+              xytemp = (self.mydatacache['schooldata'][myschool]['xdim'],
+                self.mydatacache['schooldata'][myschool]['ydim'])
+            logger.debug('--> ' + str(xytemp))
+            self.send(json.dumps(xytemp))
+          elif indict['code'] == 'imgl':
+            if not self.authed:
+              self.close()
+            myschool = indict['scho']
+            if not (myschool in self.permitted_schools):
+              if access.check('S', myschool, self.user, 'R'):
+                self.permitted_schools.add(myschool)
+              else:
+                self.close()
+            self.mydatacache['schooldata'][myschool]['numberofframes'] = indict['nrf']
+            self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
+              0, self.mydatacache['schooldata'][myschool]['xdim'], 
+              self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
+      else: #bytes_data
+        myschool = int.from_bytes(bytes_data[:8], 'big')
+        logger.debug('<-- Length = ' + str(len(bytes_data)))
+        frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
+          dtype=np.uint8), cv.IMREAD_UNCHANGED)
+        frame = np.expand_dims(frame, axis=0)
+        self.mydatacache['schooldata'][myschool]['imglist'] = np.vstack((
+          self.mydatacache['schooldata'][myschool]['imglist'], frame))
+        self.mydatacache['schooldata'][myschool]['numberofframes'] -= 1
+        if self.mydatacache['schooldata'][myschool]['numberofframes'] == 0:
+          if not('tf_w_index' in self.mydatacache):
+            self.mydatacache['tf_w_index'] = tf_workers[self.mydatacache['workernr']].register()
+            tf_workers[self.mydatacache['workernr']].run_out(self.mydatacache['tf_w_index'])
+          tf_workers[self.mydatacache['workernr']].ask_pred(
+            myschool, 
+            self.mydatacache['schooldata'][myschool]['imglist'], 
+            self.mydatacache['tf_w_index'],
+            [],
+            -1,
+          )
+          predictions = np.empty((0, len(taglist)), np.float32)
+          while predictions.shape[0]<self.mydatacache['schooldata'][myschool]['imglist'].shape[0]:
+            predictions = np.vstack((predictions, 
+              tf_workers[self.mydatacache['workernr']].get_from_outqueue(
+                self.mydatacache['tf_w_index'])))
+          logger.debug('--> ' + str(predictions))
+          self.send(json.dumps(predictions.tolist()))
+          #self.school = None
+    except:
+      logger.error(format_exc())
+      logger.handlers.clear()

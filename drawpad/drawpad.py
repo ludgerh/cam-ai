@@ -26,7 +26,7 @@ class drawpad():
     self.parent = parent
     self.myid = self.parent.parent.dbline.id
     self.edit_active = False
-    self.show_mask = True
+    self.show_mask = False
     self.edit_mask = False
     if self.parent.parent.type == 'C':
       self.whitemarks = False
