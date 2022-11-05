@@ -30,13 +30,24 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `adduser cam_ai`
 
-   `usermod -aG sudo cam_ai`
-
    You will be asked for all kind of information for the new user. The only thing you need to provide is a valid password (2 times), you can skip the rest by hitting return a couple of times. 
+
+   `usermod -aG sudo cam_ai`
 
    `exit`
 
-   Then you login on a new console with the new users credential, either local or remote.
+   **Then you login on a new console with the new users credential, either local or remote.**
+
+   There is one setting in the DHCP-configuration that causes proplems. We need to fix that:
+
+   `sudo nano /etc/dhcp/dhclient.conf`
+
+   Next you find the line 
+   `#timeout 60;`
+
+   and replace it with
+
+   `timeout 180;`
 
    
 
@@ -96,7 +107,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    Import the initial data:
 
-   `mysql -u CAM-AI -p "CAM-AI" < ~/cam-ai/sql/new.sql`
+   `mysql -u CAM-AI -p "CAM-AI" < ~/cam-ai/sql/new.sql` !!!!
 
    
 
@@ -136,15 +147,36 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    
 
+8. #### **Install the needed software components**
+
+   `sudo apt install default-libmysqlclient-dev`
+
+   `sudo apt install build-essential`
+
+   `sudo apt install ffmpeg` 
+
+   `sudo apt-get install libgeos-dev`
+
+   `sudo apt install redis`
+
+   In default Redis saves all database contents to disk. We do not want this. So we switch it off:
+   `sudo nano /etc/redis/redis.conf`
+   Find the lines
+   `save 900 1`
+   `save 300 10`
+   `save 60 10000`
+   and change them to 
+   `#save 900 1`
+   `#save 300 10`
+   `#save 60 10000`
+
+   
+
 8. #### Fill the environment with all needed libraries
 
    `pip install django`
 
    `pip install channels`
-
-   `sudo apt install default-libmysqlclient-dev`
-
-   `sudo apt install build-essential`
 
    `pip install mysqlclient` 
 
@@ -153,10 +185,6 @@ This is an installation tutorial for a development system of the CAM-AI Server o
    `pip install opencv-contrib-python`
 
    `pip install requests`
-
-   `sudo apt install ffmpeg` 
-
-   `pip install ffmpeg-python`
 
    `pip install multitimer`
 
@@ -167,8 +195,6 @@ This is an installation tutorial for a development system of the CAM-AI Server o
    `pip install setproctitle`
 
    `pip install websocket-client`
-
-   `sudo apt install redis`
 
    `pip install redis`
 
@@ -195,5 +221,3 @@ This is an installation tutorial for a development system of the CAM-AI Server o
     The initial login information is user=admin password=cam-ai-123
 
     
-
-ToDo: Switch off Redis writing to DB.  Edit sudo nano /etc/dhcp/dhclient.conf (timeout)
