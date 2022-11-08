@@ -52,18 +52,20 @@ class predictionsConsumer(WebsocketConsumer):
   def checkschooldata(self, myschool):
     if not('schooldata' in self.mydatacache):
       self.mydatacache['schooldata'] = {}
-    if not (myschool in self.mydatacache['schooldata']):
-      self.mydatacache['schooldata'][myschool] = {}
-      self.mydatacache['workernr'] = school.objects.get(id=myschool).tf_worker.id
-      self.mydatacache['tf_w_index'] = tf_workers[self.mydatacache['workernr']].register()
-      tf_workers[self.mydatacache['workernr']].run_out(self.mydatacache['tf_w_index'])
-      xytemp = tf_workers[self.mydatacache['workernr']].get_xy(
-        myschool, self.mydatacache['tf_w_index'])
-      self.mydatacache['schooldata'][myschool]['xdim'] = xytemp[0]
-      self.mydatacache['schooldata'][myschool]['ydim'] = xytemp[1]
-    else:
-      xytemp = (self.mydatacache['schooldata'][myschool]['xdim'],
-        self.mydatacache['schooldata'][myschool]['ydim'])
+    if myschool in self.mydatacache['schooldata']:
+      if (('xdim' in self.mydatacache['schooldata'][myschool])
+          and ('ydim' in self.mydatacache['schooldata'][myschool])):
+        xytemp = (self.mydatacache['schooldata'][myschool]['xdim'],
+          self.mydatacache['schooldata'][myschool]['ydim'])
+        return(xytemp)
+    self.mydatacache['schooldata'][myschool] = {}
+    self.mydatacache['workernr'] = school.objects.get(id=myschool).tf_worker.id
+    self.mydatacache['tf_w_index'] = tf_workers[self.mydatacache['workernr']].register()
+    tf_workers[self.mydatacache['workernr']].run_out(self.mydatacache['tf_w_index'])
+    xytemp = tf_workers[self.mydatacache['workernr']].get_xy(
+      myschool, self.mydatacache['tf_w_index'])
+    self.mydatacache['schooldata'][myschool]['xdim'] = xytemp[0]
+    self.mydatacache['schooldata'][myschool]['ydim'] = xytemp[1]
     return(xytemp)
 
   def receive(self, text_data=None, bytes_data=None):
@@ -119,9 +121,12 @@ class predictionsConsumer(WebsocketConsumer):
               else:
                 self.close()
             self.mydatacache['schooldata'][myschool]['numberofframes'] = indict['nrf']
-            self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
-              0, self.mydatacache['schooldata'][myschool]['xdim'], 
-              self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
+            try:
+              self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
+                0, self.mydatacache['schooldata'][myschool]['xdim'], 
+                self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
+            except KeyError:
+              logger.warning('KeyError while initializing ImgList')
           elif indict['code'] == 'done':
             myschool = indict['scho']
             self.checkschooldata(myschool)
@@ -149,8 +154,11 @@ class predictionsConsumer(WebsocketConsumer):
         frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
           dtype=np.uint8), cv.IMREAD_UNCHANGED)
         frame = np.expand_dims(frame, axis=0)
-        self.mydatacache['schooldata'][myschool]['imglist'] = np.vstack((
-          self.mydatacache['schooldata'][myschool]['imglist'], frame))
+        try:
+          self.mydatacache['schooldata'][myschool]['imglist'] = np.vstack((
+            self.mydatacache['schooldata'][myschool]['imglist'], frame))
+        except KeyError:
+          logger.warning('KeyError while adding image data')
         self.mydatacache['schooldata'][myschool]['numberofframes'] -= 1
     except:
       logger.error(format_exc())
