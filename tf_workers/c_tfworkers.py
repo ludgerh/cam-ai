@@ -25,7 +25,10 @@ from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
 from inspect import currentframe, getframeinfo
-from websocket._exceptions import WebSocketTimeoutException
+from websocket._exceptions import (WebSocketTimeoutException, 
+  WebSocketConnectionClosedException,
+  WebSocketBadStatusException, 
+)
 from django.db.utils import OperationalError
 from django.db import connections, connection
 from tools.l_tools import QueueUnknownKeyword, djconf, get_proc_name
@@ -136,12 +139,31 @@ class tf_worker():
     #*** Common Vars
     self.id = idx
     self.dbline = worker.objects.get(id=self.id)
+    if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
+      environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+      environ["CUDA_VISIBLE_DEVICES"]=str(self.dbline.gpu_nr)
+      import tensorflow as tf
+      gpus = tf.config.list_physical_devices('GPU')
+      if gpus:
+        for gpu in gpus:
+          tf.config.experimental.set_memory_growth(gpu, True)
+        #tf.config.experimental.set_visible_devices(gpus[self.dbline.gpu_nr], 'GPU')
+      from tensorflow.keras.models import load_model
+      self.load_model = load_model
+      self.tf = tf
+
     self.inqueue = Queue()
     self.registerqueue = Queue()
     self.outqueues = {}
     for i in range(self.dbline.max_nr_clients):
       self.outqueues[i] = Queue()
     self.is_ready = False
+
+    #*** Server Var
+    self.myschool_cache = {}
+    self.allmodels = {}
+    self.activemodels = {}
+    self.modelschecked = set()
 
     #*** Client Var
     self.run_out_procs = {}
@@ -166,7 +188,7 @@ class tf_worker():
   def reset_websocket(self):
     from websocket import WebSocket #, enableTrace
     #enableTrace(True)
-    while True:
+    while self.do_run:
       try:
         self.ws_ts = time()
         self.ws = WebSocket()
@@ -180,13 +202,18 @@ class tf_worker():
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
         break
-      except BrokenPipeError:
-        self.logger.warning('Broken Pipe while resetting prediction websocket server')
+      except (BrokenPipeError, 
+            TimeoutError,
+            WebSocketBadStatusException, 
+            ConnectionRefusedError,
+            OSError,
+          ):
+        self.logger.warning('BrokenPipe or Timeout while resetting prediction websocket server')
         sleep(djconf.getconfigfloat('long_brake', 1.0))
 
   def continue_sending(self, payload, opcode=1, logger=None, get_answer=False):
-    while True:
-      while True:
+    while self.do_run:
+      while self.do_run:
         try:
           if opcode:
             self.ws.send(payload, opcode=1) # 1 = Text
@@ -195,17 +222,22 @@ class tf_worker():
             self.ws.send_binary(payload) # 0 = Bytes
             frameinfo = getframeinfo(currentframe())
           break
-        except BrokenPipeError:
+        except (BrokenPipeError,
+              WebSocketBadStatusException,
+            ):
           if logger:
-            logger.warning('Broken Pipe in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
+            logger.warning('Pipe error while sending in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
           sleep(djconf.getconfigfloat('long_brake', 1.0))
           self.reset_websocket()
       if get_answer:
         try:
           return(self.ws.recv())
-        except WebSocketTimeoutException:
+        except (WebSocketTimeoutException, 
+              WebSocketConnectionClosedException, 
+              ConnectionRefusedError,
+            ):
           if logger:
-            logger.warning('TimeOut in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
+            logger.warning('Pipe error while reading in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
           sleep(djconf.getconfigfloat('long_brake', 1.0))
           self.reset_websocket()
       else:
@@ -235,6 +267,7 @@ class tf_worker():
           self.outqueues[received[1]].put(('put_is_ready', self.is_ready))
         elif (received[0] == 'get_xy'):
           if self.dbline.use_websocket:
+            self.check_model(received[1], self.logger)
             xdim = self.allmodels[received[1]]['xdim']
             ydim = self.allmodels[received[1]]['ydim']
           else:
@@ -257,6 +290,8 @@ class tf_worker():
           myuser = tf_user(self.clientset, self.clientlock)
           self.users[myuser.id] = myuser
           self.registerqueue.put(myuser.id)
+        elif (received[0] == 'checkmod'):
+          self.check_model(received[1], self.logger, received[2])
         else:
           raise QueueUnknownKeyword(received[0])
     except:
@@ -282,30 +317,6 @@ class tf_worker():
         self.cachedict = {}
       elif self.dbline.use_websocket:
         self.reset_websocket()
-      else: #Local GPU
-        environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        environ["CUDA_VISIBLE_DEVICES"]=str(self.dbline.gpu_nr)
-        import tensorflow as tf
-        gpus = tf.config.list_physical_devices('GPU')
-        if gpus:
-          for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-          #tf.config.experimental.set_visible_devices(gpus[self.dbline.gpu_nr], 'GPU')
-        from tensorflow.keras.models import load_model
-        self.load_model = load_model
-        self.tf = tf
-      self.allmodels = {}
-      self.activemodels = {}
-      self.myschool_cache = {}
-      modelcheck = set()
-      for item in school.objects.filter(active=True):
-        if (item.tf_worker.id == self.dbline.id):
-          modelcheck |= {item.e_school}  
-      for schoolnr in modelcheck:
-        if self.dbline.use_websocket:
-          self.send_ping()
-        self.check_model(schoolnr, self.logger, test_pred = True)
-      self.logger.info('***** All Models are ready.')
       self.is_ready = True
       schoolnr = -1
       while (len(self.model_buffers) == 0) and self.do_run:
@@ -345,6 +356,9 @@ class tf_worker():
     self.run_process.start()
 
   def check_model(self, schoolnr, logger, test_pred = False):
+    if schoolnr in self.modelschecked:
+      return()
+    self.modelschecked.add(schoolnr)
     if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
       if ((schoolnr in self.myschool_cache) 
           and (self.myschool_cache[schoolnr][1] > (time() - 3600))):
@@ -364,6 +378,7 @@ class tf_worker():
           del self.allmodels[schoolnr]
           del self.activemodels[schoolnr]
     if not (schoolnr in self.activemodels):
+      tempmodel = None
       if not (schoolnr in self.allmodels):
         self.allmodels[schoolnr] = {}
         if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket:
@@ -405,7 +420,7 @@ class tf_worker():
       else:
         if len(self.activemodels) < self.dbline.max_nr_models:
           if tempmodel is None:
-            self.activemodels[schoolnr] = load_model(myschool.dir 
+            self.activemodels[schoolnr] = self.load_model(myschool.dir 
               + 'model/'+myschool.model_type+'.h5', 
               custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
           else:
@@ -482,11 +497,16 @@ class tf_worker():
             for i in range(framelist.shape[0]):
               jpgdata = cv.imencode('.jpg', framelist[i])[1].tobytes()
               schoolbytes = myschool.e_school.to_bytes(8, 'big')
-              if (i < (framelist.shape[0] - 1)):
-                self.continue_sending(schoolbytes+jpgdata, opcode=0, logger=logger, get_answer=False)
-              else:
-                predictions = self.continue_sending(schoolbytes+jpgdata, opcode=0, logger=logger, get_answer=True)
-            predictions = np.array(json.loads(predictions), dtype=np.float32)
+              self.continue_sending(schoolbytes+jpgdata, opcode=0, logger=logger, get_answer=False)
+            outdict = {
+              'code' : 'done',
+              'scho' : myschool.e_school,
+            }
+            predictions = self.continue_sending(json.dumps(outdict), opcode=1, logger=logger, get_answer=True)
+            if predictions == 'incomplete':
+              predictions = np.zeros((framelist.shape[0], len(taglist)), np.float32)
+            else:
+              predictions = np.array(json.loads(predictions), dtype=np.float32)
             break
           except (ConnectionResetError, OSError):
             sleep(djconf.getconfigfloat('long_brake', 1.0))
@@ -603,6 +623,14 @@ class tf_worker():
       frame_idxs,
       eventnr,
     ))
+
+  def client_check_model(self, school, test_pred = False):
+    self.inqueue.put((
+      'checkmod', 
+      school, 
+      test_pred,
+    ))
+
 
   def get_from_outqueue(self, userindex):
     while ((userindex not in self.pred_out_dict) 
