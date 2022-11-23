@@ -11,7 +11,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+import json
 from pathlib import Path
+from os import makedirs
 from time import time, sleep
 from json import loads, dumps
 from subprocess import Popen, PIPE
@@ -23,18 +25,21 @@ from channels.db import database_sync_to_async
 from tools.c_logger import log_ini
 from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter, savedbline
 from tools.l_tools import djconf
-from tf_workers.models import school
+from tf_workers.models import school, worker
 from trainers.models import trainframe
 from eventers.models import event, event_frame
 from streams.c_streams import streams, c_stream
 from streams.models import stream as dbstream
-from streams.startup import start_stream_list
+from streams.startup import start_stream_list, start_worker_list
 
 logname = 'ws_toolsconsumers'
 logger = getLogger(logname)
 log_ini(logger, logname)
 recordingspath = Path(djconf.getconfig('recordingspath', 'data/recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', 'data/schoolframes/'))
+schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
+system_number = djconf.getconfigint('system_number')
+long_brake = djconf.getconfigfloat('long_brake', 1.0)
 
 s = socket(AF_INET, SOCK_DGRAM)
 subnetmask = '255.255.255.0'
@@ -306,10 +311,73 @@ class admintools(AsyncWebsocketConsumer):
       newstream.cam_audio_codec = params['audiocodec']
       await savedbline(newstream)
       while start_stream_list:
-        sleep(djconf.getconfigfloat('long_brake', 1.0))
+        sleep(long_brake)
       start_stream_list.add(newstream.id)
 
       outlist['data'] = {'id' : newstream.id, }
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
+
+    elif params['command'] == 'makeschool':
+      from websocket import WebSocket
+      newschool = school()
+      newschool.name = params['name']
+      await savedbline(newschool)
+      school_dict = await getonelinedict(school, 
+        {'id': newschool.id, }, 
+        ['tf_worker', 'e_school'])
+      worker_dict = await getonelinedict(worker, 
+        {'id': school_dict['tf_worker'], }, 
+        ['wsserver', 'wsid', 'wsadminpass', 'active'])
+      if not worker_dict['active']:
+        ws = WebSocket()
+        ws.connect(worker_dict['wsserver'] + 'ws/usradmin/')
+        outdict = {
+          'code' : 'make_usr',
+          'client_nr' : system_number,
+          'pass' : worker_dict['wsadminpass'],
+        }
+        ws.send(json.dumps(outdict), opcode=1) #1 = Text
+        resultdict = json.loads(ws.recv())
+        ws.close()
+        await updatefilter(worker, 
+          {'id': school_dict['tf_worker'], }, 
+          {
+            'wsname' : resultdict['name'], 
+            'wspass' : resultdict['pass'], 
+            'wsid' : resultdict['usrid'],
+            'active' : True, 
+          }, )
+        while start_worker_list:
+          sleep(long_brake)
+        start_worker_list.add(school_dict['tf_worker'])
+      if params['own_ai']:
+        schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
+        try:
+          makedirs(schooldir+'frames')
+        except FileExistsError:
+          logger.warning('Dir already exists: '+schooldir+'frames')
+        ws = WebSocket()
+        ws.connect(worker_dict['wsserver'] + 'ws/schoolutil/')
+        outdict = {
+          'code' : 'makeschool',
+          'client_nr' : system_number,
+          'pass' : worker_dict['wsadminpass'],
+          'name' : 'Cl' + str(system_number)+': ' + params['name'],
+          'pass' : worker_dict['wsadminpass'],
+          'user' : worker_dict['wsid'],
+        }
+        ws.send(json.dumps(outdict), opcode=1) #1 = Text
+        resultdict = json.loads(ws.recv())
+        ws.close()
+        await updatefilter(school, 
+          {'id' : newschool.id, }, 
+          {'dir' : schooldir, 'e_school' : resultdict['school'], })
+      else:
+        await updatefilter(school, 
+          {'id' : newschool.id, }, 
+          {'dir' : 'no local dir', 'e_school' : 1, })
+      outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 

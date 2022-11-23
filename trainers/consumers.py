@@ -22,7 +22,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import WebsocketConsumer, AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from tools.l_tools import djconf
+from tools.l_tools import djconf, seq_to_int
 from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, updatefilter, getoneline, 
   filterlinesdict, savedbline, deletefilter)
@@ -60,7 +60,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           c2 = self.frameinfo['tags'][2], c3 = self.frameinfo['tags'][3],
           c4 = self.frameinfo['tags'][4], c5 = self.frameinfo['tags'][5],
           c6 = self.frameinfo['tags'][6], c7 = self.frameinfo['tags'][7],
-          c8 = self.frameinfo['tags'][8], c9 = self.frameinfo['tags'][8],
+          c8 = self.frameinfo['tags'][8], c9 = self.frameinfo['tags'][9],
           checked = 1,
           train_status = 1,
         )
@@ -70,34 +70,37 @@ class remotetrainer(AsyncWebsocketConsumer):
         return()
       logger.debug('<-- ' + text_data)
       indict = json.loads(text_data)	
-      if 'code' in indict:
-        if indict['code'] == 'auth':
-          self.user = await getoneline(User, {'username' : indict['name'], })
-          if self.user.check_password(indict['pass']):
-            logger.debug('Success!')
-            self.authed = True
-          if not self.authed:
-            logger.debug('Failure!')
-            self.close() 
-        elif indict['code'] == 'namecheck':
-          self.myschooldict = await getonelinedict(school, 
-            {'id' : indict['school'], }, 
-            ['id', 'dir', ], )
-          myframes = await filterlinesdict(trainframe, 
-            {'school' : indict['school'], }, 
-            ['name', ], )
-          await self.send(json.dumps([item['name'] for item in myframes]))
-        elif indict['code'] == 'send':
-          self.frameinfo['name'] = indict['name']
-          self.frameinfo['tags'] = indict['tags']
-        elif indict['code'] == 'delete':
-          await deletefilter(trainframe, {'name' : indict['name'], }, )
-          remove(self.myschooldict['dir'] + indict['name'])
-        elif indict['code'] == 'trainnow':
-          await updatefilter(school, 
-            {'id' : self.myschooldict['id'], }, 
-            {'extra_runs' : 1, })
-        return()
+      if indict['code'] == 'auth':
+        self.user = await getoneline(User, {'username' : indict['name'], })
+        if self.user.check_password(indict['pass']):
+          logger.debug('Success!')
+          self.authed = True
+        if not self.authed:
+          logger.debug('Failure!')
+          self.close() 
+      elif indict['code'] == 'namecheck':
+        self.myschooldict = await getonelinedict(school, 
+          {'id' : indict['school'], }, 
+          ['id', 'dir',], )
+        myframes = await filterlinesdict(trainframe, 
+          {'school' : indict['school'], }, 
+          ['name', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 
+            'c8', 'c9',], )
+        result = [(item['name'], seq_to_int((item['c0'], item['c1'], 
+            item['c2'], item['c3'], item['c4'], item['c5'], item['c6'], 
+            item['c7'], item['c8'], item['c9'])))
+          for item in myframes]
+        await self.send(json.dumps(result))
+      elif indict['code'] == 'send':
+        self.frameinfo['name'] = indict['name']
+        self.frameinfo['tags'] = indict['tags']
+      elif indict['code'] == 'delete':
+        await deletefilter(trainframe, {'name' : indict['name'], }, )
+        remove(self.myschooldict['dir'] + indict['name'])
+      elif indict['code'] == 'trainnow':
+        await updatefilter(school, 
+          {'id' : self.myschooldict['id'], }, 
+          {'extra_runs' : 1, })
     except:
       logger.error(format_exc())
       logger.handlers.clear()
@@ -548,4 +551,4 @@ class trainerutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))		
       else:
-        self.close()		
+        self.close()	

@@ -57,7 +57,8 @@ class predictionsConsumer(WebsocketConsumer):
           and ('ydim' in self.mydatacache['schooldata'][myschool])):
         xytemp = (self.mydatacache['schooldata'][myschool]['xdim'],
           self.mydatacache['schooldata'][myschool]['ydim'])
-        return(xytemp)
+        if 'tf_w_index' in self.mydatacache:
+          return(xytemp)
     self.mydatacache['schooldata'][myschool] = {}
     self.mydatacache['workernr'] = school.objects.get(id=myschool).tf_worker.id
     self.mydatacache['tf_w_index'] = tf_workers[self.mydatacache['workernr']].register()
@@ -94,13 +95,14 @@ class predictionsConsumer(WebsocketConsumer):
                 tf_workers[self.mydatacache['workernr']].unregister(self.mydatacache['tf_w_index'])
                 del self.mydatacache['tf_w_index']
               logger.info('Successful websocket-login: System-Nr.: ' 
-                + str(indict['server_nr'])  + ' - Worker-Number: ' + str(indict['worker_nr']))
+                + str(indict['server_nr']) + ' - Worker-Number: ' + str(indict['worker_nr'])
+                + ' - Software-Version: ' + indict['soft_ver'])
               self.server_nr = indict['server_nr']
               self.worker_nr = indict['worker_nr']
               self.authed = True
             else:
               logger.warning('Failure of websocket-login: ' 
-                + str(indict['server_nr']) + '-' + str(indict['worker_nr']))
+                + str(indict['server_nr']) + '-' + str(indict['worker_nr']) + ' - Software-Version: ' + indict['soft_ver'])
               self.close() 
           elif indict['code'] == 'get_xy':
             myschool = indict['scho']
@@ -121,12 +123,12 @@ class predictionsConsumer(WebsocketConsumer):
               else:
                 self.close()
             self.mydatacache['schooldata'][myschool]['numberofframes'] = indict['nrf']
-            try:
-              self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
-                0, self.mydatacache['schooldata'][myschool]['xdim'], 
-                self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
-            except KeyError:
-              logger.warning('KeyError while initializing ImgList')
+            #try:
+            self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
+              0, self.mydatacache['schooldata'][myschool]['xdim'], 
+              self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
+            #except KeyError:
+            #  logger.warning('KeyError while initializing ImgList')
           elif indict['code'] == 'done':
             myschool = indict['scho']
             self.checkschooldata(myschool)

@@ -15,16 +15,18 @@ import json
 from time import sleep, time
 from multitimer import MultiTimer
 from traceback import format_exc
-from tools.l_tools import djconf
+from tools.l_tools import djconf, seq_to_int
 from .models import trainframe
 
 class train_once_remote():
 
-  def __init__(self, myschool, myfit, wsserver, logger):
+  def __init__(self, myschool, myfit, wsserver, wsname, wspass, logger):
     self.myschool = myschool
     self.myfit = myfit
     self.logger = logger
     self.wsurl = wsserver+'ws/remotetrainer/'
+    self.wsname = wsname
+    self.wspass = wspass
     self.ws_ts = None
 
   def send_ping(self):
@@ -39,18 +41,18 @@ class train_once_remote():
 
   def run(self):
     try:
-      self.logger.info('*******************************************************');
+      self.logger.info('****************************************************');
       self.logger.info('*** Working on School #'
         +str(self.myschool.id)+', '+self.myschool.name+'...');
-      self.logger.info('*******************************************************');
+      self.logger.info('****************************************************');
       from websocket import WebSocket #, enableTrace
       #enableTrace(True)
       self.ws = WebSocket()
       self.ws.connect(self.wsurl)
       outdict = {
         'code' : 'auth',
-        'name' : self.myschool.tf_worker.wsname,
-        'pass' : self.myschool.tf_worker.wspass,
+        'name' : self.wsname,
+        'pass' : self.wspass,
       }
       while True:
         try:
@@ -67,10 +69,17 @@ class train_once_remote():
         'school' : self.myschool.e_school,
       } 
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      remoteset = set(json.loads(self.ws.recv()))
+      remotesearch = json.loads(self.ws.recv())
       self.ws_ts = time()
-      pingproc = MultiTimer(interval=2, function=self.send_ping, runonstart=False)
+      pingproc = MultiTimer(interval=2, 
+        function=self.send_ping, 
+        runonstart=False)
       pingproc.start()
+      remoteset = set()
+      remotedict = {}
+      for item in remotesearch:
+        remotedict[item[0]] = item[1]
+        remoteset.add(item[0])
       filterdict = {'school' : self.myschool.id, }
       if not self.myschool.ignore_checked:
         filterdict['checked'] = True
@@ -78,9 +87,20 @@ class train_once_remote():
       localset = set()
       localdict = {}
       for item in localsearch:
-        localdict[item.name] = (item.c0, item.c1, item.c2, item.c3, item.c4, item.c5, item.c6, item.c7, item.c8, item.c9, )
+        localdict[item.name] = [item.c0, item.c1, item.c2, item.c3, item.c4, 
+          item.c5, item.c6, item.c7, item.c8, item.c9, ]
+        localdict[item.name] += [seq_to_int(localdict[item.name])]
         localset.add(item.name)
       pingproc.stop()
+      for item in (remoteset & localset):
+        if remotedict[item] != localdict[item][10]:
+          outdict = {
+            'code' : 'delete',
+            'name' : item,
+          }
+          self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+          self.logger.info('Changed, deleting: ' + item)
+          remoteset.remove(item)
       for item in (remoteset - localset):
         outdict = {
           'code' : 'delete',
@@ -92,7 +112,7 @@ class train_once_remote():
         outdict = {
           'code' : 'send',
           'name' : item,
-          'tags' : localdict[item]
+          'tags' : localdict[item][:10]
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
         self.logger.info('Sending: ' + item)

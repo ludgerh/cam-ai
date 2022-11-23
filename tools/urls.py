@@ -12,12 +12,13 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.urls import path
-from .views import health, addstream
+from .views import health, addstream, addschool
 
 app_name = 'tools'
 
 urlpatterns = [
 	path('health/', health.as_view(), name='health'),
 	path('addstream/', addstream.as_view(), name='addstream'),
+	path('addschool/', addschool.as_view(), name='addschool'),
 ]
 

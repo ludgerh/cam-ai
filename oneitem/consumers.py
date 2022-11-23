@@ -21,6 +21,7 @@ from channels.db import database_sync_to_async
 from access.c_access import access
 from tools.djangodbasync import getoneline, savedbline, deletefilter
 from tools.c_logger import log_ini
+from tf_workers.models import school
 from streams.models import stream
 from eventers.models import evt_condition
 from streams.startup import streams
@@ -119,12 +120,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.myitem.inqueue.put(('set_event_time_gap', value))
         elif params['pname'] == 'eve_school':
           value = int(params['value'])
-          self.myitem.dbline.eve_school = value
+          myschool = await getoneline(school, {'id' : value, })
+          self.myitem.dbline.eve_school = myschool 
           self.myitem.inqueue.put(('set_school', value))
         elif params['pname'] == 'eve_alarm_email':
-          value = int(params['value'])
-          self.myitem.dbline.eve_alarm_email = params['pname']
-          self.myitem.inqueue.put(('set_alarm_email', params['pname']))
+          self.myitem.dbline.eve_alarm_email = params['value']
+          self.myitem.inqueue.put(('set_alarm_email', params['value']))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	

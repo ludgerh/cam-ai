@@ -189,7 +189,12 @@ class trainer():
               trainresult = train_once_gpu(myschool, myfit, self.logger)
             elif (self.dbline.t_type == 3):
               trainresult = train_once_remote(
-                myschool, myfit, self.dbline.wsserver, self.logger).run()
+                myschool, 
+                myfit, 
+                self.dbline.wsserver, 
+                self.dbline.wsname, 
+                self.dbline.wspass, 
+                self.logger).run()
             if trainresult:
               filterdict = {
                 'school' : myschool.id,

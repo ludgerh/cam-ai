@@ -16,11 +16,11 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from tf_workers.models import school
+from ws_predictions.models import client
 
 class userinfo(models.Model):
   user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-  school = models.ForeignKey(school, on_delete=models.SET_NULL, null=True)
-  counter = models.IntegerField(default=0)
+  client_nr = models.ForeignKey(client, on_delete=models.SET_NULL, null=True, default=None)
 
   def __str__(self):
     return('userinfo model (TBD ...)')

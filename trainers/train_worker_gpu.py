@@ -206,14 +206,14 @@ class MyCallback(Callback):
 
   def on_epoch_end(self, myepoch, logs=None):
     secondstime = time() - self.starttime
-    logstring = 'E'+str(myepoch)+' : '
+    logstring = 'E'+str(myepoch)+': '
     logstring += str(round(secondstime)).rjust(4)+'s  '
-    logstring += 'loss = '+str(round(logs['loss'],4)).ljust(6,'0')+'  '
-    logstring += 'hit100 = '+str(round(logs['hit100'],4)).ljust(6,'0')+'  '
-    logstring += 'cmetrics = '+str(round(logs['cmetrics'],4)).ljust(6,'0')+'  '
-    logstring += 'val_loss = '+str(round(logs['val_loss'],4)).ljust(6,'0')+'  '
-    logstring += 'val_hit100 = '+str(round(logs['val_hit100'],4)).ljust(6,'0')+'  '
-    logstring += 'val_cmetrics = '+str(round(logs['val_cmetrics'],4)).ljust(6,'0')+'  '
+    logstring += 'loss = '+str(round(logs['loss'],5)).ljust(7,'0')+'  '
+    logstring += 'hit100 = '+str(round(logs['hit100'],5)).ljust(7,'0')+'  '
+    logstring += 'cmetrics = '+str(round(logs['cmetrics'],5)).ljust(7,'0')+'  '
+    logstring += 'val_loss = '+str(round(logs['val_loss'],5)).ljust(7,'0')+'  '
+    logstring += 'val_hit100 = '+str(round(logs['val_hit100'],5)).ljust(7,'0')+'  '
+    logstring += 'val_cmetrics = '+str(round(logs['val_cmetrics'],5)).ljust(7,'0')+'  '
     logstring += 'lr = '+str(logs['lr'])
     self.logger.info(logstring)
     myepoch = epoch(fit=self.myfit, 

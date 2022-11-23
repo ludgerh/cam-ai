@@ -33,6 +33,7 @@ from tools.l_tools import ts2filename, uniquename, randomfilter, np_mov_avg, djc
 from schools.c_schools import get_taglist
 
 schoolpath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
+clienturl = djconf.getconfig('client_url', 'http://localhost:8000/')
 if not path.exists(schoolpath):
   makedirs(schoolpath)
 
@@ -121,7 +122,7 @@ class c_event(list):
         break
       except OperationalError:
         connection.close()
-    xytemp = self.tf_worker.get_xy(self.dbline.school.e_school, self.tf_w_index)
+    xytemp = self.tf_worker.get_xy(self.dbline.school.id, self.tf_w_index)
     self.xdim = xytemp[0]
     self.ydim = xytemp[1]
     self.tag_list = get_taglist(self.schoolnr)
@@ -133,6 +134,7 @@ class c_event(list):
     self.append(min(ymax, frame[6] + margin))
     self.append(False)
     self.logger = logger
+    #self.logger.info('***** Client-Url:' + clienturl)
     index = self.get_new_frame_index(frame[2], True)
     with self.frames_lock:
       self.frames = OrderedDict([(index, [frame, None, 0.0])])
@@ -300,7 +302,6 @@ class c_event(list):
       self.send_emails()
 
   def send_emails(self):
-    clienturl = djconf.getconfig('client_url', 'http://localhost:8000/')
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
       mylist = self.pred_read(max=1.0)[1:].tolist()
@@ -335,9 +336,12 @@ class c_event(list):
       with smtplib.SMTP_SSL(djconf.getconfig('smtp_server'), 
           djconf.getconfigint('smtp_port', 465), 
           context=context) as server:
-        server.login(djconf.getconfig('smtp_account'), 
-          djconf.getconfig('smtp_password'))
-        server.sendmail(djconf.getconfig('smtp_email'), 
-          receiver, message.as_string())
+        try: #temporary, room for improvement
+          server.login(djconf.getconfig('smtp_account'), 
+            djconf.getconfig('smtp_password'))
+          server.sendmail(djconf.getconfig('smtp_email'), 
+            receiver, message.as_string())
+        except:
+          self.logger.warning('*** Email sending failed')
       self.logger.info('*** Sent email to: '+receiver)
 

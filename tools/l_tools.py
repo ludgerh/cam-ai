@@ -247,3 +247,10 @@ class NonBlockingStreamReader:
 
   def stop(self):
     self._dorun = False
+
+def seq_to_int(in_seq):
+  result = 0
+  for i in range(len(in_seq)):
+    if in_seq[i]:
+      result += 1 << i
+  return(result) 

@@ -17,4 +17,5 @@ from . import consumers
 
 websocket_urlpatterns = [
   re_path(r'ws/schooldbutil/$', consumers.schooldbutil.as_asgi()),
+  re_path(r'ws/schoolutil/$', consumers.schoolutil.as_asgi()),
 ]

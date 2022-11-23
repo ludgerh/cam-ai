@@ -17,13 +17,17 @@ from django.conf import settings
 class trainer(models.Model):
   active = models.BooleanField(default=True)
   name = models.CharField(max_length=256, default='New Trainer')
-  t_type = models.IntegerField("trainer type", choices=((1, 'GPU'), (2, 'CPU'), (3, 'Remote'), (4, 'other')), default=1)
+  t_type = models.IntegerField("trainer type", choices=((1, 'GPU'), (2, 'CPU'), 
+    (3, 'Remote'), (4, 'other')), default=3)
   gpu_nr = models.IntegerField("gpu number", default=1)
   gpu_mem_limit = models.IntegerField("gpu mem limit", default=0)
   startworking = models.CharField(max_length=8, default='00:00:00')
   stopworking = models.CharField(max_length=8, default='24:00:00')
   running  = models.BooleanField(default=False)
-  wsserver = models.CharField(max_length=255, default='')
+  wsserver = models.CharField(max_length=255, default='wss://django.cam-ai.de/')
+  wsname = models.CharField(max_length=50, default='')
+  wspass = models.CharField(max_length=50, default='')
+  wsadminpass = models.CharField(max_length=50, default='')
 
   def __str__(self):
     return('Trainer, Name = '+self.name)
@@ -45,7 +49,8 @@ class trainframe(models.Model):
   c8 = models.SmallIntegerField()
   c9 = models.SmallIntegerField()
   checked = models.SmallIntegerField()
-  made_by = models.ForeignKey(settings.AUTH_USER_MODEL, default=None, on_delete=models.SET_NULL, null=True)
+  made_by = models.ForeignKey(settings.AUTH_USER_MODEL, default=None, 
+    on_delete=models.SET_NULL, null=True)
   train_status = models.SmallIntegerField(default=0)
 
   def __str__(self):
@@ -88,3 +93,11 @@ class epoch(models.Model):
 
   def __str__(self):
     return('epoch model (TBD ...)')
+
+class client(models.Model):
+	name =  models.CharField(max_length=100)
+	hash =  models.CharField(max_length=100)
+	comment =  models.CharField(max_length=100, default='')
+
+	def __str__(self):
+		return('WS-Trainers-Client: ' + self.id + ': ' + self.name)

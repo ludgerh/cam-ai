@@ -29,12 +29,19 @@ from .c_streams import streams, c_stream
 #from threading import enumerate
 
 check_timer = None
+start_worker_list = set()
 start_stream_list = set()
 
 def restartcheck_proc():
+  global start_worker_list
   global start_stream_list
+  if start_worker_list:
+    for i in start_worker_list:
+      dbline = worker.objects.get(id=i)
+      tf_workers[dbline.id] = tf_worker(dbline.id)
+      tf_workers[dbline.id].run()
+    start_worker_list = set()
   if start_stream_list:
-    print(start_stream_list, 'something')
     for i in start_stream_list:
       dbline = stream.objects.get(id=i)
       streams[i] = c_stream(dbline)

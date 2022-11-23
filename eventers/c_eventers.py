@@ -117,19 +117,19 @@ class c_eventer(c_device):
       if (received[0] == 'new_video'):
         self.vid_deque.append(received[1:])
       elif (received[0] == 'set_fpslimit'):
-        self.dbline.det_fpslimit = received[1]
+        self.dbline.eve_fpslimit = received[1]
         if received[1] == 0:
           self.period = 0.0
         else:
           self.period = 1.0 / received[1]
       elif (received[0] == 'set_margin'):
-        self.dbline.det_margin = received[1]
+        self.dbline.eve_margin = received[1]
       elif (received[0] == 'set_event_time_gap'):
-        self.dbline.det_event_time_gap = received[1]
+        self.dbline.eve_event_time_gap = received[1]
       elif (received[0] == 'set_school'):
-        self.dbline.det_school = received[1]
+        self.dbline.eve_school = school.objects.get(id=received[1])
       elif (received[0] == 'set_alarm_email'):
-        self.dbline.det_alarm_email = received[1]
+        self.dbline.eve_alarm_email = received[1]
       elif (received[0] == 'cond_open'):
         self.nr_of_cond_ed += 1
         self.last_cond_ed = received[1]

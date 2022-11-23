@@ -1,0 +1,64 @@
+v 0.6.6: Hardened the ws-connection between AI-Server and Raspi
+camai/version.py
+tf_workers/c_tfworkers.py
+ws_predictions/consumers.py
+
+v 0.7.0: Added more tables to administration
+camai/version.py
+access/admin.py
+drawpad/admin.py
+eventers/admin.py
+schools/admin.py
+streams/admin.py
+tf_workers/admin.py
+tf_workers/c_tfworkers.py
+tools/admin.py
+trainers/admin.py
+users/admin.py
+ws_predictions/consumers.py
+
+v 0.7.1: Added school installation tool
+camai/version.py
+camai/basis.html
+schools/consumers.py
+eventers/c_event.py
+tools/urls.py
+tools/views.py
+tools/addschool.html
+tools/l_tools.py
+tools/consumers.py
+tf_workers/models.py
+trainers/models.py
+trainers/c_trainers.py
+trainers/train_worker_remote.py
+trainers/consumers.py
+
+v 0.7.1a: Bugfixing
+trainers/train_worker_remote.py
+trainers/consumers.py
+schools/consumers.py
+tf_workers/c_tfworkers.py
+eventers/c_event.py
+
+v 0.7.2: Finished school installation tool
+camai/version.py
+camai/asgi.py
+ws_predictions/models.py
+ws_predictions/consumers.py
+trainers/models.py
+trainers/train_worker_gpu.py
+tf_workers/c_tfworkers.py
+tf_workers/models.py
+tools/addschool.html
+tools/consumers.py
+users/routing.py
+users/consumers.py
+streams/startup.py
+schools/consumers.py
+schools/routing.py
+eventers/c_event.py
+eventers/c_eventers.py
+oneitem/consumers.py
+oneitem/oneventer.html
+
+

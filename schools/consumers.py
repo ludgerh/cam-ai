@@ -25,17 +25,20 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.contrib.auth.hashers import check_password
 from tools.l_tools import djconf, uniquename
 from tools.djangodbasync import (filterlines, getoneline, savedbline, 
   deldbline, updatefilter, deletefilter, getonelinedict, filterlinesdict,
   countfilter)
 from tools.c_logger import log_ini
 from access.c_access import access
+from access.models import access_control
 from schools.c_schools import get_taglist, check_extratags_async
 from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school
 from eventers.models import event, event_frame
 from trainers.models import trainframe
+from ws_predictions.models import client
 from users.models import userinfo, archive
 
 logname = 'ws_schoolsconsumers'
@@ -44,6 +47,7 @@ log_ini(logger, logname)
 classes_list = get_taglist(1)
 schoolframespath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
 recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
+schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
 
 #*****************************************************************************
 # SchoolDBUtil
@@ -94,6 +98,7 @@ class schooldbutil(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']
+
     if ((params['command'] == 'gettags') 
         or self.scope['user'].is_authenticated):
       outlist = {'tracker' : json.loads(text_data)['tracker']}
@@ -154,19 +159,13 @@ class schooldbutil(AsyncWebsocketConsumer):
               if self.schoolinfo is None:
                 eventdict = await getonelinedict(event, {'id' : framedict['event'], }, ['school'])
                 schooldict = await getonelinedict(school, {'id' : eventdict['school'], }, ['id', 'e_school', 'dir'])
-                if self.tf_worker.dbline.use_websocket:
-                  xytemp = self.tf_worker.get_xy(schooldict['e_school'], self.tf_w_index)
-                else:
-                  xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
+                xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], }
             else:
               framedict = await getonelinedict(trainframe, {'id' : item, }, ['name', 'school'])
               if self.schoolinfo is None:
                 schooldict = await getonelinedict(school, {'id' : framedict['school'], }, ['id', 'e_school', 'dir'])
-                if self.tf_worker.dbline.use_websocket:
-                  xytemp = self.tf_worker.get_xy(schooldict['e_school'], self.tf_w_index)
-                else:
-                  xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
+                xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schooldict, }
               imagepath = self.schoolinfo['schooldict']['dir']+framedict['name']
             if imglist is None:
@@ -382,35 +381,37 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))		
 
     elif params['command'] == 'delevent':
-      eventdict = await getonelinedict(event, {'id' : params['event'], }, ['id', 'school', 'videoclip'])
-      schoolnr = eventdict['school']
-      schooldict = await getonelinedict(school, {'id' : schoolnr, }, ['dir'])
-      modelpath = schooldict['dir']
-      if access.check('S', schoolnr, self.scope['user'], 'W'):
-        framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', ])
-        for item in framelines:
-          framefile = schoolframespath + item['name']
-          if path.exists(framefile):
-            remove(framefile)
-          else:
-            logger.warning('delevent - Delete did not find: ' + framefile)
-          await deletefilter(event_frame, {'id' : item['id'], })
-        if eventdict['videoclip']:
-          if (await countfilter(event, {'videoclip' : eventdict['videoclip'], })) <= 1:
-            videofile = recordingspath + eventdict['videoclip']
-            if path.exists(videofile + '.mp4'):
-              remove(videofile + '.mp4')
+      try:
+        eventdict = await getonelinedict(event, {'id' : params['event'], }, ['id', 'school', 'videoclip'])
+        schoolnr = eventdict['school']
+        schooldict = await getonelinedict(school, {'id' : schoolnr, }, ['dir'])
+        modelpath = schooldict['dir']
+        if access.check('S', schoolnr, self.scope['user'], 'W'):
+          framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', ])
+          for item in framelines:
+            framefile = schoolframespath + item['name']
+            if path.exists(framefile):
+              remove(framefile)
             else:
-              logger.warning('delevent - Delete did not find: ' + videofile + '.mp4')
-            if path.exists(videofile + '.jpg'):
-              remove(videofile + '.jpg')
-            else:
-              logger.warning('delevent - Delete did not find: ' + videofile + '.jpg')
-        await deletefilter(event, {'id' : eventdict['id'], })
-    
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))			
+              logger.warning('delevent - Delete did not find: ' + framefile)
+            await deletefilter(event_frame, {'id' : item['id'], })
+          if eventdict['videoclip']:
+            if (await countfilter(event, {'videoclip' : eventdict['videoclip'], })) <= 1:
+              videofile = recordingspath + eventdict['videoclip']
+              if path.exists(videofile + '.mp4'):
+                remove(videofile + '.mp4')
+              else:
+                logger.warning('delevent - Delete did not find: ' + videofile + '.mp4')
+              if path.exists(videofile + '.jpg'):
+                remove(videofile + '.jpg')
+              else:
+                logger.warning('delevent - Delete did not find: ' + videofile + '.jpg')
+          await deletefilter(event, {'id' : eventdict['id'], })
+      except event.DoesNotExist:
+        logger.warning('delevent - Did not find DB line: ' + params['event'])
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))			
 
     elif params['command'] == 'delitem':
       if params['dtype'] == '0':
@@ -460,5 +461,46 @@ class schooldbutil(AsyncWebsocketConsumer):
         await updatefilter(trainframe, {'id' : int(params['img']), }, {fieldtochange : params['value'], 'made_by_id' : self.user.id, })
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))				
+        await self.send(json.dumps(outlist))		
+
+#*****************************************************************************
+# SchoolUtil
+#*****************************************************************************
+
+class schoolutil(AsyncWebsocketConsumer):		
+
+  async def receive(self, text_data=None, bytes_data=None):
+    logger.debug('<-- ' + str(text_data))
+    indict=json.loads(text_data)
+    if indict['code'] == 'makeschool':
+      myclient = await getoneline(client, {'id' : indict['client_nr'], })
+      if not check_password(indict['pass'], myclient.hash):
+        await self.send(json.dumps(None))
+        return()
+      newschool = school()
+      newschool.name = indict['name']
+      await savedbline(newschool)
+      result = {'school' : newschool.id, }
+      newaccess = access_control()
+      newaccess.vtype = 'S'
+      newaccess.vid = newschool.id
+      newaccess.u_g = 'U'
+      newaccess.u_g_nr = indict['user']
+      newaccess.r_w = 'R'
+      await savedbline(newaccess)
+      schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
+      try:
+        makedirs(schooldir+'frames')
+      except FileExistsError:
+        logger.warning('Dir already exists: '+schooldir+'frames')
+      try:
+        makedirs(schooldir+'model')
+      except FileExistsError:
+        logger.warning('Dir already exists: '+schooldir+'model')
+      copy(schoolsdir + 'model1/model/' + newschool.model_type + '.h5',
+        schooldir + 'model/' + newschool.model_type + '.h5')
+      await updatefilter(school, 
+        {'id' : newschool.id, }, 
+        {'dir' : schooldir, })
+      await self.send(json.dumps(result))				
 

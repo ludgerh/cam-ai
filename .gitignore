@@ -10,7 +10,6 @@ __pycache__/
 *.js~
 .gitignore~
 /camai/passwords.py
-/camai/changed_files.txt
 /camai/changed_files.txt~
 /camai/systemlist.ods
 /env/

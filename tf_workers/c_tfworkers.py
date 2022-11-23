@@ -24,7 +24,7 @@ from traceback import format_exc
 from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
-from inspect import currentframe, getframeinfo
+from inspect import currentframe, getframeinfo, stack
 from websocket._exceptions import (WebSocketTimeoutException, 
   WebSocketConnectionClosedException,
   WebSocketBadStatusException, 
@@ -199,6 +199,7 @@ class tf_worker():
           'pass' : self.dbline.wspass,
           'server_nr' : djconf.getconfigint('system_number'),
           'worker_nr' : self.id,
+          'soft_ver' : djconf.getconfig('version', 'not set'),
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
         break
@@ -226,6 +227,7 @@ class tf_worker():
               WebSocketBadStatusException,
             ):
           if logger:
+            frameinfo = getframeinfo(currentframe())
             logger.warning('Pipe error while sending in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
           sleep(djconf.getconfigfloat('long_brake', 1.0))
           self.reset_websocket()
@@ -361,7 +363,7 @@ class tf_worker():
     self.modelschecked.add(schoolnr)
     if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
       if ((schoolnr in self.myschool_cache) 
-          and (self.myschool_cache[schoolnr][1] > (time() - 3600))):
+          and (self.myschool_cache[schoolnr][1] > (time() - 60))):
         myschool = self.myschool_cache[schoolnr][0]
       else:
         while True:
@@ -390,9 +392,11 @@ class tf_worker():
           self.allmodels[schoolnr]['ydim'] = 50
           sleep(self.dbline.gpu_sim_loading)
         elif self.dbline.use_websocket:
+          myschool = school.objects.get(id=schoolnr)
           outdict = {
             'code' : 'get_xy',
-            'scho' : schoolnr,
+            #'scho' : schoolnr,
+            'scho' : myschool.e_school,
           }
           xytemp = json.loads(self.continue_sending(json.dumps(outdict), opcode=1, logger=logger, get_answer=True))
           self.allmodels[schoolnr]['xdim'] = xytemp[0]
@@ -453,6 +457,7 @@ class tf_worker():
           + myschool.model_type)
       else:
         sleep(self.dbline.gpu_sim_loading / 3)
+    self.modelschecked.remove(schoolnr)
 
   def process_buffer(self, schoolnr, logger, had_timeout=False):
     try:
@@ -624,10 +629,10 @@ class tf_worker():
       eventnr,
     ))
 
-  def client_check_model(self, school, test_pred = False):
+  def client_check_model(self, schoolnr, test_pred = False):
     self.inqueue.put((
       'checkmod', 
-      school, 
+      schoolnr, 
       test_pred,
     ))
 

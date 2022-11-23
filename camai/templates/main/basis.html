@@ -114,6 +114,10 @@
                 {% for item in schoollist %}
                   <li><a class="dropdown-item" href="/schools/images/{{ item.id }}/">{{ item.name }}</a></li>
                 {% endfor %}
+                {% if user.is_superuser %}
+                  <div class="dropdown-divider"></div>
+                  <a class="dropdown-item" href="/tools/addschool/">Add School</a>
+                {% endif %}
               {% endspaceless %}
             </ul>
           </div>
