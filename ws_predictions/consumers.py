@@ -123,12 +123,12 @@ class predictionsConsumer(WebsocketConsumer):
               else:
                 self.close()
             self.mydatacache['schooldata'][myschool]['numberofframes'] = indict['nrf']
-            #try:
-            self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
-              0, self.mydatacache['schooldata'][myschool]['xdim'], 
-              self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
-            #except KeyError:
-            #  logger.warning('KeyError while initializing ImgList')
+            try:
+              self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
+                0, self.mydatacache['schooldata'][myschool]['xdim'], 
+                self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
+            except KeyError:
+              logger.warning('KeyError while initializing ImgList')
           elif indict['code'] == 'done':
             myschool = indict['scho']
             self.checkschooldata(myschool)
@@ -159,9 +159,9 @@ class predictionsConsumer(WebsocketConsumer):
         try:
           self.mydatacache['schooldata'][myschool]['imglist'] = np.vstack((
             self.mydatacache['schooldata'][myschool]['imglist'], frame))
+          self.mydatacache['schooldata'][myschool]['numberofframes'] -= 1
         except KeyError:
           logger.warning('KeyError while adding image data')
-        self.mydatacache['schooldata'][myschool]['numberofframes'] -= 1
     except:
       logger.error(format_exc())
       logger.handlers.clear()

@@ -33,6 +33,7 @@ def events(request, schoolnr):
       'debug' : settings.DEBUG,
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
       'school' : school.objects.get(id=schoolnr),
+      'user' : request.user,
     }
     return(HttpResponse(template.render(context)))
   else:
@@ -62,6 +63,7 @@ def oneevent(request, schoolnr, eventnr):
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
       'school' : school.objects.get(id=schoolnr),
       'length' : length,
+      'user' : request.user,
     }
     return(HttpResponse(template.render(context)))
   else:

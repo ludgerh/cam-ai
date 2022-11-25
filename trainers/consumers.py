@@ -306,9 +306,11 @@ class trainerutil(AsyncWebsocketConsumer):
         temp['data']['school']=self.schoollinedict['e_school']
         self.ws.send(json.dumps(temp), opcode=1) #1 = Text
         outlist['data'] = json.loads(self.ws.recv())['data']
-        #await self.send_ping()  
       else:
-        joblist = trainers[self.trainernr].getqueueinfo(self.schoolnr)
+        if 'school' in params:
+          joblist = trainers[self.trainernr].getqueueinfo(params['school'])
+        else:
+          joblist = trainers[self.trainernr].getqueueinfo(self.schoolnr)
         try:
           outlist['data'] = {'pos' : joblist.index(self.schoolnr) + 1, 
             'len' : len(joblist), }
@@ -319,6 +321,7 @@ class trainerutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'trainnow': 
       if self.maywrite:
+        print('***** You may')
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'extra_runs' : 1, })
@@ -326,6 +329,7 @@ class trainerutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
       else:
+        print('***** You may not')
         self.close()			
 
     elif params['command'] == 'gettrigger':

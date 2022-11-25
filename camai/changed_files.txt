@@ -61,4 +61,21 @@ eventers/c_eventers.py
 oneitem/consumers.py
 oneitem/oneventer.html
 
+v 0.7.3: Finetuning and bugfixing
+camai/version.py
+camai/basis.html
+ws_predictions/consumers.py
+trainers/models.py
+trainers/views.py
+trainers/c_trainers.py
+trainers/consumers.py
+eventers/views.py
+eventers/basis.html
+users/views.py
+schools/views.py
+schools/basis.html
+tools/consumers.py
+streams/startup.py
+tf_workers/c_tfworkers.py
 
+v 0.7.4: Finetuning and bugfixing

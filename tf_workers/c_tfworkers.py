@@ -207,6 +207,7 @@ class tf_worker():
             TimeoutError,
             WebSocketBadStatusException, 
             ConnectionRefusedError,
+            WebSocketConnectionClosedException,
             OSError,
           ):
         self.logger.warning('BrokenPipe or Timeout while resetting prediction websocket server')

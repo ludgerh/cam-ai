@@ -34,6 +34,7 @@ def trainer(request, schoolnr):
       'schoolnr' : schoolnr,
       'schoolname' : myschool.name,
       'taglist' : get_taglist(schoolnr),
+      'user' : request.user,
     }
     return(HttpResponse(template.render(context)))
   else:
@@ -44,6 +45,7 @@ def epochs(request, schoolnr, fitnr):
     template = loader.get_template('trainers/epochs.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'user' : request.user,
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
       'fitnr' : fitnr,
       'schoolnr' : schoolnr,
@@ -58,6 +60,7 @@ def dashboard(request, schoolnr):
     template = loader.get_template('trainers/dashboard.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'user' : request.user,
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
       'debug' : settings.DEBUG,
       'school' : myschool,

@@ -29,6 +29,7 @@ class archive(SingleTableView):
   template_name = 'users/archive.html'
   
   def get(self, request, *args, **kwargs):
+    self.request = request
     self.schoolnr = kwargs['schoolnr']
     if access.check('S', self.schoolnr, request.user, 'R'):
       return(super().get(request, *args, **kwargs))
@@ -43,5 +44,6 @@ class archive(SingleTableView):
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
       'debug' : settings.DEBUG,
       'school' : school.objects.get(id=self.schoolnr),
+      'user' : self.request.user,
     })
     return context

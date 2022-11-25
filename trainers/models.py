@@ -27,7 +27,6 @@ class trainer(models.Model):
   wsserver = models.CharField(max_length=255, default='wss://django.cam-ai.de/')
   wsname = models.CharField(max_length=50, default='')
   wspass = models.CharField(max_length=50, default='')
-  wsadminpass = models.CharField(max_length=50, default='')
 
   def __str__(self):
     return('Trainer, Name = '+self.name)
@@ -93,11 +92,3 @@ class epoch(models.Model):
 
   def __str__(self):
     return('epoch model (TBD ...)')
-
-class client(models.Model):
-	name =  models.CharField(max_length=100)
-	hash =  models.CharField(max_length=100)
-	comment =  models.CharField(max_length=100, default='')
-
-	def __str__(self):
-		return('WS-Trainers-Client: ' + self.id + ': ' + self.name)

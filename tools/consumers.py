@@ -26,11 +26,11 @@ from tools.c_logger import log_ini
 from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter, savedbline
 from tools.l_tools import djconf
 from tf_workers.models import school, worker
-from trainers.models import trainframe
+from trainers.models import trainframe, trainer
 from eventers.models import event, event_frame
 from streams.c_streams import streams, c_stream
 from streams.models import stream as dbstream
-from streams.startup import start_stream_list, start_worker_list
+from streams.startup import start_stream_list, start_worker_list, start_trainer_list
 
 logname = 'ws_toolsconsumers'
 logger = getLogger(logname)
@@ -325,7 +325,7 @@ class admintools(AsyncWebsocketConsumer):
       await savedbline(newschool)
       school_dict = await getonelinedict(school, 
         {'id': newschool.id, }, 
-        ['tf_worker', 'e_school'])
+        ['tf_worker', 'e_school', 'trainer'])
       worker_dict = await getonelinedict(worker, 
         {'id': school_dict['tf_worker'], }, 
         ['wsserver', 'wsid', 'wsadminpass', 'active'])
@@ -351,6 +351,16 @@ class admintools(AsyncWebsocketConsumer):
         while start_worker_list:
           sleep(long_brake)
         start_worker_list.add(school_dict['tf_worker'])
+        await updatefilter(trainer, 
+          {'id': school_dict['trainer'], }, 
+          {
+            'wsname' : resultdict['name'], 
+            'wspass' : resultdict['pass'], 
+            'active' : True, 
+          }, )
+        while start_trainer_list:
+          sleep(long_brake)
+        start_trainer_list.add(school_dict['trainer'])
       if params['own_ai']:
         schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
         try:
@@ -362,7 +372,6 @@ class admintools(AsyncWebsocketConsumer):
         outdict = {
           'code' : 'makeschool',
           'client_nr' : system_number,
-          'pass' : worker_dict['wsadminpass'],
           'name' : 'Cl' + str(system_number)+': ' + params['name'],
           'pass' : worker_dict['wsadminpass'],
           'user' : worker_dict['wsid'],

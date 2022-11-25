@@ -58,6 +58,7 @@ def classroom(request, schoolnr):
       'events' : event.objects.filter(school_id=schoolnr, done=False, xmax__gt=0),
       'debug' : settings.DEBUG,
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
+      'user' : request.user,
     }
     return(HttpResponse(template.render(context)))
   else:

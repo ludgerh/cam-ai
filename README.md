@@ -225,3 +225,25 @@ This is an installation tutorial for a development system of the CAM-AI Server o
     The initial login information is user=admin password=cam-ai-123
 
     
+
+sudo vi /etc/sysctl.conf
+
+# Add at the bottom of file
+vm.overcommit_memory = 1
+net.core.somaxconn=1024
+
+Transparent Huge Pages
+
+1565:M 16 Sep 22:48:00.993 # WARNING you have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis. To fix this issue run the command 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' as root, and add it to your /etc/rc.local in order to retain the setting after a reboot. Redis must be restarted after THP is disabled.
+
+To permanently solve this, follow the log's suggestion, and modify rc.local
+
+sudo vi /etc/rc.local
+
+if test -f /sys/kernel/mm/transparent_hugepage/enabled; then
+    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+fi
+
+This require you to reboot, backup your data or do anything you need before you actually do it!!
+
+sudo reboot
