@@ -116,7 +116,7 @@ class c_cam(c_device):
         thistime = time()
         try:
           frame = requests.get(self.dbline.url_img, timeout=60).content
-          frame = c_convert(frame, typein=1, typeout=3)
+          frame = c_convert(frame, typein=3, typeout=1)
         except requests.exceptions.ReadTimeout:
           self.logger.warning('Cam #' + str(self.id)
             + ' had timeout while getting JPG')

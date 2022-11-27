@@ -108,7 +108,7 @@ class triggerConsumer(WebsocketConsumer):
                   else:
                     frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
               dimtemp = self.dimdict[onf_viewer.parent.id]
-              frame = c_convert(frame, typein=3, xout=dimtemp[0], yout=dimtemp[1])
+              frame = c_convert(frame, typein=1, xout=dimtemp[0], yout=dimtemp[1])
               frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
               dims3 = (dimtemp[1], dimtemp[0], 1)
               alpha = np.full(dims3, 255, dtype=np.uint8)

@@ -12,7 +12,6 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import numpy as np
-#from threading import Lock
 from multiprocessing import Lock
 import cv2 as cv
 from datetime import datetime
@@ -20,6 +19,7 @@ from random import choice, randint
 from os import path, makedirs
 from concurrent import futures
 from time import sleep, time
+from threading import Thread
 from collections import OrderedDict
 from traceback import format_exc
 from email.mime.multipart import MIMEMultipart
@@ -301,6 +301,24 @@ class c_event(list):
     if len(self.to_email) > 0:
       self.send_emails()
 
+  def smt_send_mail(self, message, context, receiver):
+    count = 0
+    with smtplib.SMTP_SSL(djconf.getconfig('smtp_server'), 
+        djconf.getconfigint('smtp_port', 465), 
+        context=context) as server:
+      while True:
+        count += 1
+        try: 
+          server.login(djconf.getconfig('smtp_account'), 
+            djconf.getconfig('smtp_password'))
+          server.sendmail(djconf.getconfig('smtp_email'), 
+            receiver, message.as_string())
+          break
+        except:
+          self.logger.warning('*** ['+str(count)+'] Email sending to: '+receiver+' failed')
+          sleep(300)
+    self.logger.info('*** ['+str(count)+'] Sent email to: '+receiver)
+
   def send_emails(self):
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
@@ -333,15 +351,5 @@ class c_event(list):
       message.attach(MIMEText(text, 'plain'))
       message.attach(MIMEText(html, 'html'))
       context = ssl.create_default_context()
-      with smtplib.SMTP_SSL(djconf.getconfig('smtp_server'), 
-          djconf.getconfigint('smtp_port', 465), 
-          context=context) as server:
-        try: #temporary, room for improvement
-          server.login(djconf.getconfig('smtp_account'), 
-            djconf.getconfig('smtp_password'))
-          server.sendmail(djconf.getconfig('smtp_email'), 
-            receiver, message.as_string())
-        except:
-          self.logger.warning('*** Email sending failed')
-      self.logger.info('*** Sent email to: '+receiver)
+      Thread(target=self.smt_send_mail, name='SMTPSendThread', args=(message, context, receiver, )).start()
 

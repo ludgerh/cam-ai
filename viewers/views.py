@@ -53,8 +53,8 @@ def getjpg(request, mode, idx, xdim, ydim, counter):
         else:
           frame = cv.addWeighted(frame, 1, (255-myview.drawpad.screen), -1.0, 0)
     if (xdim > 0) or (ydim > 0):
-      frame = c_convert(frame, typein=3, xout=xdim, yout=ydim)
-    frame = c_convert(frame, typein=3, typeout=1)
+      frame = c_convert(frame, typein=1, xout=xdim, yout=ydim)
+    frame = c_convert(frame, typein=1, typeout=3)
     return HttpResponse(frame, content_type="image/jpeg")
   else:
     return(HttpResponse('No Access'))

@@ -78,4 +78,10 @@ tools/consumers.py
 streams/startup.py
 tf_workers/c_tfworkers.py
 
-v 0.7.4: Finetuning and bugfixing
+v 0.7.4: Finetuning and Issue #8
+tools/c_redis.py
+tools/c_tools.py
+streams/c_cams.py
+viewers/views.py
+viewers/consumers.py
+eventers/c_event.py

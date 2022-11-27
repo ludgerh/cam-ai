@@ -21,11 +21,12 @@ if djconf.getconfigbool('local_trainer', True):
 
 def c_convert(inframe, typein=None, typeout=None, xout=None, yout=None):
 # Frame Types:
-# 1 : Jpeg Data
-# 2 : Pillow Data
-# 3 : opencv Data
+# 1 : opencv Data
+# 2 : BMP Data
+# 3 : Jpeg Data
+
 	if xout:
-		if typein == 3:
+		if typein == 1:
 			xin = inframe.shape[1]
 			yin = inframe.shape[0]
 		if xin != xout:
@@ -33,11 +34,11 @@ def c_convert(inframe, typein=None, typeout=None, xout=None, yout=None):
 				yout = round(yin / xin * xout)
 			inframe = cv.resize(inframe, (xout, yout))
 	if typein and typeout and (typein != typeout):
-		if typein == 1:
-			if typeout == 3:
-				inframe = cv.imdecode(np.fromstring(inframe, dtype=np.uint8), cv.IMREAD_UNCHANGED)
-		elif typein == 3:
+		if typein == 3:
 			if typeout == 1:
+				inframe = cv.imdecode(np.fromstring(inframe, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+		elif typein == 1:
+			if typeout == 3:
 				inframe = cv.imencode('.jpg', inframe)[1].tostring()
 	return(inframe)
 

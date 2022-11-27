@@ -22,12 +22,14 @@ from django.db import connection
 from django.db.utils import OperationalError
 from .models import setting
 
-logdict = {'NOTSET' : 0,
+logdict = {
+  'NOTSET' : 0,
   'DEBUG' : 10,
   'INFO' : 20,
   'WARNING' : 30,
   'ERROR' : 40,
-  'CRITICAL' : 50}
+  'CRITICAL' : 50,
+}
 
 def str_to_bool(instring):
   if instring in ('1', 'true', 'True', 'yes', 'Yes', 'ja', 'Ja'):

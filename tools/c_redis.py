@@ -11,6 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+from datetime import datetime
 from redis import Redis
 from redis.exceptions import ConnectionError
 from time import sleep
@@ -25,7 +26,8 @@ class saferedis(Redis):
         return(super().exists(*args, *kwargs))
         break
       except (ConnectionResetError, ConnectionError):
-        print('Redis connection error from call of exists()') 
+        now = datetime.now()
+        print (now.strftime("%Y-%m-%d %H:%M:%S")+': Redis connection error from call of exists()') 
         sleep(0.1)       
 
 class myredis(saferedis):

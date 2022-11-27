@@ -234,16 +234,36 @@ net.core.somaxconn=1024
 
 Transparent Huge Pages
 
-1565:M 16 Sep 22:48:00.993 # WARNING you have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis. To fix this issue run the command 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' as root, and add it to your /etc/rc.local in order to retain the setting after a reboot. Redis must be restarted after THP is disabled.
+Thanks to [github](https://gist.githubusercontent.com/PyYoshi/a7ca64b6c92b5ef1834b/raw/d49c0a4333f25fb6c58c60536ebba809e24d0076/disable-transparent-huge-pages.service) & [PyYoshi](https://gist.github.com/PyYoshi)
+ I found this example for systemd
 
-To permanently solve this, follow the log's suggestion, and modify rc.local
+Create the file  
 
-sudo vi /etc/rc.local
+```
+sudo vim /etc/systemd/system/disable-transparent-huge-pages.service
+```
 
-if test -f /sys/kernel/mm/transparent_hugepage/enabled; then
-    echo never > /sys/kernel/mm/transparent_hugepage/enabled
-fi
+Put this into the service file
 
-This require you to reboot, backup your data or do anything you need before you actually do it!!
+For debian/ubuntu users
 
-sudo reboot
+```
+[Unit]
+Description=Disable Transparent Huge Pages
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/enabled"
+ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/defrag"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable the service  
+
+```
+systemctl enable disable-transparent-huge-pages
+systemctl start disable-transparent-huge-pages
+systemctl status disable-transparent-huge-pages
+```
