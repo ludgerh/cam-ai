@@ -19,6 +19,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from access.c_access import access
 from tools.l_tools import djconf
+from tools.c_tools import c_convert
 from streams.models import stream
 from tf_workers.models import school
 from users.models import userinfo
@@ -67,21 +68,16 @@ def classroom(request, schoolnr):
 #@login_required
 #no login when called from email
 #schoolnr = 0 --> from school directory
-def getbmp(request, schoolnr, name): 
+def getbmp(request, schoolnr, name, outtype, xycontained, x, y): 
   if schoolnr == 0:
     name = name.replace('$', '/', 2)
     filepath = djconf.getconfig('schoolframespath', 'data/schoolframes/') + name
   else:
     line = school.objects.get(id=schoolnr)
     filepath = line.dir + 'frames/' + name
-  try:
-    with open(filepath, "rb") as f:
-      return HttpResponse(f.read(), content_type="image/jpeg")
-  except IOError:
-    red = Image.new('RGB', (1, 1), (255,0,0))
-    response = HttpResponse(content_type="image/jpeg")
-    red.save(response, "JPEG")
-    return response
+  with open(filepath, "rb") as f:
+    myframe = c_convert(f.read(), 2, outtype, xycontained, x, y)
+  return HttpResponse(myframe, content_type="image/jpeg")
 
 @login_required
 #schoolnr = 0 --> from school directory

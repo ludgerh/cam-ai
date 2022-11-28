@@ -11,36 +11,55 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-from time import time
+from time import time, sleep
 import cv2 as cv
 import numpy as np
 from tools.l_tools import djconf
 if djconf.getconfigbool('local_trainer', True):
   #from tensorflow.keras import backend as K
   import tensorflow as tf
+test = False
 
-def c_convert(inframe, typein=None, typeout=None, xout=None, yout=None):
+def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0):
 # Frame Types:
 # 1 : opencv Data
 # 2 : BMP Data
 # 3 : Jpeg Data
-
-	if xout:
-		if typein == 1:
-			xin = inframe.shape[1]
-			yin = inframe.shape[0]
-		if xin != xout:
-			if not yout:
-				yout = round(yin / xin * xout)
-			inframe = cv.resize(inframe, (xout, yout))
-	if typein and typeout and (typein != typeout):
-		if typein == 3:
-			if typeout == 1:
-				inframe = cv.imdecode(np.fromstring(inframe, dtype=np.uint8), cv.IMREAD_UNCHANGED)
-		elif typein == 1:
-			if typeout == 3:
-				inframe = cv.imencode('.jpg', inframe)[1].tostring()
-	return(inframe)
+  global test
+  while test:
+    sleep(0.1)
+  test = True
+  if not typeout:
+    typeout = typein
+  if typein != 1:
+    frame = cv.imdecode(np.fromstring(frame, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  xin = frame.shape[1]
+  yin = frame.shape[0]
+  forcescale = False
+  if xycontained:
+    xscaling = xout / xin
+    yscaling = yout / yin
+    if xscaling < yscaling:
+      xout = round(xin * xscaling)
+      yout = round(yin * xscaling)
+    else:
+      xout = round(xin * yscaling)
+      yout = round(yin * yscaling)
+  else:
+    if not xout:
+      xout = xin
+    if yout:
+      forcescale = True
+    else:
+      yout = round(yin / xin * xout)
+  if (xout < xin) or (yout < yin) or forcescale:
+    frame = cv.resize(frame, (xout, yout))
+  if typeout == 2:
+    frame = cv.imencode('.bmp', frame)[1].tostring()
+  elif typeout == 3:
+    frame = cv.imencode('.jpg', frame)[1].tostring()
+  test = False
+  return(frame)
 
 
 class speedlimit:

@@ -334,7 +334,7 @@ class c_event(list):
         + 'We had some movement.\n'  
         + 'Here are the images: \n')  
       for item in self.mailimages:
-        text += clienturl + 'schools/getbmp/0/' + item + '/ <br> \n' 
+        text += clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/ <br> \n' 
       if self.savename:
         text += ('...and here is the movie: \n' 
           + clienturl + 'eventers/eventmp4/video.mp4' 
@@ -343,7 +343,7 @@ class c_event(list):
         + 'We had some movement. <br> \n' 
         + 'Here are the images: <br> \n')
       for item in self.mailimages:
-        html += ('<img src="' + clienturl + 'schools/getbmp/0/' + item + '">\n') 
+        html += ('<img src="' + clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/">\n') 
       if self.savename:
         html += ('<br>...and here is the movie: <br> \n' 
           + clienturl + 'eventers/eventmp4/' + str(self.dbline.id) + '/video.mp4 <br>\n')

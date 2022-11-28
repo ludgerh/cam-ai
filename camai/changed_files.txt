@@ -79,9 +79,23 @@ streams/startup.py
 tf_workers/c_tfworkers.py
 
 v 0.7.4: Finetuning and Issue #8
+camai/version.py
 tools/c_redis.py
 tools/c_tools.py
+tools/l_tools.py
 streams/c_cams.py
 viewers/views.py
 viewers/consumers.py
 eventers/c_event.py
+
+v 0.7.5: Issue #2
+camai/version.py
+tools/c_tools.py
+schools/views.py
+schools/urls.py
+schools/images.html
+schools/bigbmp.html
+schools/classroom.html
+eventers/c_event.py
+eventers/oneevent.html
+eventers/events.html

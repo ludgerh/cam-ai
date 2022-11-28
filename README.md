@@ -226,7 +226,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
     
 
-sudo vi /etc/sysctl.conf
+sudo nano /etc/sysctl.conf
 
 # Add at the bottom of file
 vm.overcommit_memory = 1
@@ -240,7 +240,7 @@ Thanks to [github](https://gist.githubusercontent.com/PyYoshi/a7ca64b6c92b5ef183
 Create the file  
 
 ```
-sudo vim /etc/systemd/system/disable-transparent-huge-pages.service
+sudo nano /etc/systemd/system/disable-transparent-huge-pages.service
 ```
 
 Put this into the service file
@@ -263,7 +263,6 @@ WantedBy=multi-user.target
 Then enable the service  
 
 ```
-systemctl enable disable-transparent-huge-pages
-systemctl start disable-transparent-huge-pages
-systemctl status disable-transparent-huge-pages
+sudo systemctl enable disable-transparent-huge-pages
+sudo systemctl start disable-transparent-huge-pages
 ```
