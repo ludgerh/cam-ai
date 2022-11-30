@@ -35,7 +35,6 @@ if (argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith(
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('accounts/', include('django.contrib.auth.urls')),
-    path('viewers/', include('viewers.urls')),
     path('index/', include('index.urls')),
     path('oneitem/', include('oneitem.urls')),
     path('schools/', include('schools.urls')),

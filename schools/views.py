@@ -76,7 +76,7 @@ def getbmp(request, schoolnr, name, outtype, xycontained, x, y):
     line = school.objects.get(id=schoolnr)
     filepath = line.dir + 'frames/' + name
   with open(filepath, "rb") as f:
-    myframe = c_convert(f.read(), 2, outtype, xycontained, x, y)
+    myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, xout=x, yout=y)
   return HttpResponse(myframe, content_type="image/jpeg")
 
 @login_required

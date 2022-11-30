@@ -49,7 +49,7 @@ class triggerConsumer(WebsocketConsumer):
     self.indexdict = {}
     self.loglist = []
     self.queuedict = {}
-    self.dimdict = {}
+    self.outxdict = {}
     self.busydict = {}
     self.accept()
 
@@ -80,46 +80,65 @@ class triggerConsumer(WebsocketConsumer):
 
       if params['command'] == 'starttrigger':
         if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
+          outx = params['width']
           if params['mode'] == 'C':
+            if outx > streams[params['idx']].dbline.cam_min_x_view:
+              outx *= streams[params['idx']].dbline.cam_scale_x_view
+              outx = max(streams[params['idx']].dbline.cam_min_x_view, outx)
+              if streams[params['idx']].dbline.cam_max_x_view:
+                outx = min(streams[params['idx']].dbline.cam_max_x_view, outx)
             myviewer = streams[params['idx']].mycam.viewer
           elif params['mode'] == 'D':
+            if outx > streams[params['idx']].dbline.det_min_x_view:
+              outx *= streams[params['idx']].dbline.det_scale_x_view
+              outx = max(streams[params['idx']].dbline.det_min_x_view, outx)
+              if streams[params['idx']].dbline.det_max_x_view:
+                outx = min(streams[params['idx']].dbline.det_max_x_view, outx)
             myviewer = streams[params['idx']].mydetector.viewer
           elif params['mode'] == 'E':
+            if outx > streams[params['idx']].dbline.eve_min_x_view:
+              outx *= streams[params['idx']].dbline.eve_scale_x_view
+              outx = max(streams[params['idx']].dbline.eve_min_x_view, outx)
+              if streams[params['idx']].dbline.eve_max_x_view:
+                outx = min(streams[params['idx']].dbline.eve_max_x_view, outx)
             myviewer = streams[params['idx']].myeventer.viewer
+          self.outxdict[params['idx']] = round(outx)
           self.queuedict[params['idx']] = myviewer.inqueue
-          self.dimdict[params['idx']] = (params['width'], params['height'])
+
           self.busydict[params['mode']+str(params['idx']).zfill(9)] = False
+
           def onf(onf_viewer):
-            indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
-            if not self.busydict[indicator]:
-              self.busydict[indicator] = True
-              #ts = time()
-              frame = onf_viewer.inqueue.get()[1]
-              if params['mode'] == 'D':
-                if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                  frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
-              elif params['mode'] == 'C':
-                if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                  frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
-              if params['mode'] in {'C', 'D'}:
-                if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
-                  if onf_viewer.drawpad.whitemarks:
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
-                  else:
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
-              dimtemp = self.dimdict[onf_viewer.parent.id]
-              frame = c_convert(frame, typein=1, xout=dimtemp[0], yout=dimtemp[1])
-              frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-              dims3 = (dimtemp[1], dimtemp[0], 1)
-              alpha = np.full(dims3, 255, dtype=np.uint8)
-              frame = np.concatenate((frame, alpha), axis=2)
-              #print('*** Preparation:', time() - ts)
-              #ts = time()
-              try:
-                self.send(bytes_data=indicator.encode()+frame.tobytes()) 
-              except Disconnected:
-                logger.error('*** Could not send Trigger, socket closed...')
-              #print('*** Sending:', time() - ts)
+            try:
+              indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
+              if not self.busydict[indicator]:
+                self.busydict[indicator] = True
+                ts = time()
+                frame = onf_viewer.inqueue.get()[1]
+                if params['mode'] == 'D':
+                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
+                elif params['mode'] == 'C':
+                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
+                if params['mode'] in {'C', 'D'}:
+                  if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
+                    if onf_viewer.drawpad.whitemarks:
+                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
+                    else:
+                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
+                frame = c_convert(frame, typein=1, xout=self.outxdict[onf_viewer.parent.id])
+                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+                dims3 = (frame.shape[0], frame.shape[1], 1)
+                alpha = np.full(dims3, 255, dtype=np.uint8)
+                frame = np.concatenate((frame, alpha), axis=2)
+                try:
+                  self.send(bytes_data=indicator.encode()+frame.tobytes())
+                except Disconnected:
+                  logger.error('*** Could not send Trigger, socket closed...')
+            except:
+              logger.error(format_exc())
+              logger.handlers.clear()
+
           myviewer.parent.add_view_count()
           self.indexdict[params['idx']] = myviewer.push_to_onf(onf)
           myviewer.inqueue.register_callback()
@@ -137,8 +156,7 @@ class triggerConsumer(WebsocketConsumer):
           )
           my_log_line.save()
           self.loglist.append(my_log_line)
-          outlist['data'] = 'OK'
-          outlist = ('C', outlist)
+          outlist['data'] = {'outx' : self.outxdict[params['idx']], }
           logger.debug('--> ' + str(outlist))
           self.send(json.dumps(outlist))
         else:

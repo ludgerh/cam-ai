@@ -99,3 +99,20 @@ schools/classroom.html
 eventers/c_event.py
 eventers/oneevent.html
 eventers/events.html
+
+v 0.8.0:
+camai/version.py
+camai/urls.py
+viewers/views.py
+viewers/consumers.py
+del viewers/canvas.html
+del viewers/urls.py
+schools/views.py
+oneitem/views.py
+oneitem/onecam.html
+oneitem/onedetector.html
+oneitem/oneeventer.html
+index/index.html
+streams/models.py
+
+

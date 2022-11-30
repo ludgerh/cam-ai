@@ -19,29 +19,129 @@
   <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
 	<link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
 {% else %}
-  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
-  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
+    </script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+    </script>
 	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+{% endif %}
+
+<div class="container-fluid float-left">
+	<div class="row">
+		<div class="col-auto">
+      <div>
+          <h1>E{{ dbline.id }}: {{ dbline.name }}</h1>
+          <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+            fps = <span id="fpstag">?</span>, 
+            views = <span id="vnrtag">?</span></h5>
+          <canvas id="canvas" width="50px" height="50px"></canvas>
+      </div>
+		</div>
+	</div>
+</div>
+
+{% if may_write %}
+  <div class="container-fluid float-left" id="conditions">
+	  <div class="row my-1 blue">
+		  <div class="col-auto my-2">General settings</div>
+	  </div>
+	  <div class="row my-1 d-none">
+		  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
+				  method="post" id="oneform">
+			  <div class="container-fluid float-left">
+				  <div class="row my-2">
+					  {% csrf_token %}
+					  {% spaceless %}
+					  {% for field in form %}
+					  <div class="col-auto my-2">
+						  {{ field.errors }}
+						  {{ field.label_tag }} {{ field }}
+						  {% if field.help_text %}
+						  <p class="help">{{ field.help_text|safe }}</p>
+						  {% endif %}
+					  </div>
+					  {% endfor %}
+					  {% endspaceless %}
+				  </div>
+			  </div>
+			  <div class="container-fluid float-left">
+				  <div class="row my-1">
+					  <div class="col-auto my-2">
+						  <input type="submit" value="Submit">
+					  </div>
+				  </div>
+			  </div>
+		  </form>
+	  </div>
+    {% for i in '12345'|make_list %}
+	  <div class="row my-1 blue" rea="{{ i }}">
+		  <div class="col-auto my-2" rea="{{ i }}">
+    {% if i == '1' %}
+      Conditions for showing event frame..
+    {% endif %}
+    {% if i == '2' %}
+      Conditions for sending to school...
+    {% endif %}
+    {% if i == '3' %}
+      Conditions for recording video...
+    {% endif %}
+    {% if i == '4' %}
+      Conditions for sending email...
+    {% endif %}
+    {% if i == '5' %}
+      Conditions for alarm...
+    {% endif %}
+	  </div></div>
+	  <div class="row my-1 d-none">
+		  <div class="col-auto my-2"><h4>If...</h4>
+        <ul id="li_gr_{{ i }}" class="list-group">
+        </ul>
+        <button type="button" react="{{ i }}" class="btn btn-primary add-bt">Add</button>
+        <button type="button" react="{{ i }}" class="btn btn-primary save-bt">Save</button>
+		  </div>
+	  </div>
+    {% endfor %}
+  </div>
 {% endif %}
 
 <script>
 
 //let displaywidth = 667; // Screen height IPhone 7
 let displaywidth = Math.round($(window).width() * 0.97);
+let displayheight = 
+  Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
+let xinput
+let yinput
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-let r_array = {};
 let c_view_Socket;
 let trigger_Socket;
 {% if may_write %}
 let oneitemSocket;
 let SchoolDBUtilSocket;
 {% endif %}
+let wait = 0;
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
 let taglines;
 let tagselect;
 let c_dict;
 let all_initialized = false;
 let bracketlevel = 0;
+
+function timedRefresh(bytebuffer) {
+  if (wait == 0) {
+    wait = 1;
+    UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
+    imgsource = new ImageData(UI8Carray, xinput, yinput);
+    createImageBitmap(imgsource)
+		.then((result) => { 
+      ctx.drawImage(result, 0,0, displaywidth, displayheight)
+      wait = 0;
+    })
+		.catch(err => {console.log(err);});
+  };
+};
 
 function make_list_line(condition, reaction, count) {
   if (count) {
@@ -285,6 +385,8 @@ function reset_triggers(first = false) {
 };
 
 $(document).ready(function() {
+  $('#canvas').attr('width', displaywidth+'px');
+  $('#canvas').attr('height', displayheight+'px');
 {% if may_write %}
 	$('#oneform').children(':first').children(':first').children('.col-auto')
 			.children(
@@ -362,14 +464,25 @@ $(document).ready(function() {
   })
 	.then((result) => {
     trigger_Socket = result;
+    return(trigger_Socket.sendandwait({
+	    'command' : 'starttrigger',
+	    'mode' : 'E',
+      'idx' : {{ dbline.id }},
+      'width' : displaywidth,
+    }));
+  })
+  .then((result) => {
+    xinput = result.outx;
+    yinput = 
+      Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
 		trigger_Socket.socket.onclose = function(e) {
 			console.log('Trigger-Socket closed');
 		};
 		trigger_Socket.socket.onmessage = function(e) {
-      if ((typeof(e.data) === 'object')	&& (typeof timedRefreshE{{ dbline.id|stringformat:"09d" }} === "function")) {
+      if (typeof(e.data) === 'object') {
         e.data.arrayBuffer()
         .then((bytebuffer) => {
-				  timedRefreshE{{ dbline.id|stringformat:"09d" }}(bytebuffer);
+				  timedRefresh(bytebuffer);
           trigger_Socket.socket.send('E{{ dbline.id|stringformat:"09d" }}');
         })
         .catch(err => {console.log(err);});
@@ -395,10 +508,6 @@ $(document).ready(function() {
 	})
 	.then((result) => {
 		c_dict = result;
-    ratio = ({{ dbline.cam_yres }} / {{ dbline.cam_xres }});
-		$.get('/viewers/c_canvas/L/E/{{ dbline.id }}/'+displaywidth+'/'+Math.round(displaywidth * ratio)+'/', ((data ) => {
-			$('#spaceforcanvas').html(data);
-		}));
     for (k=1; k<=5; k++) {
       refresh_one(k);
     };
@@ -408,79 +517,6 @@ $(document).ready(function() {
 });
 	
 </script>
-
-
-<div class="container-fluid float-left">
-	<div class="row">
-		<div class="col-auto">
-			<div id="spaceforcanvas"></div>
-		</div>
-	</div>
-</div>
-
-{% if may_write %}
-  <div class="container-fluid float-left" id="conditions">
-	  <div class="row my-1 blue">
-		  <div class="col-auto my-2">General settings</div>
-	  </div>
-	  <div class="row my-1 d-none">
-		  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
-				  method="post" id="oneform">
-			  <div class="container-fluid float-left">
-				  <div class="row my-2">
-					  {% csrf_token %}
-					  {% spaceless %}
-					  {% for field in form %}
-					  <div class="col-auto my-2">
-						  {{ field.errors }}
-						  {{ field.label_tag }} {{ field }}
-						  {% if field.help_text %}
-						  <p class="help">{{ field.help_text|safe }}</p>
-						  {% endif %}
-					  </div>
-					  {% endfor %}
-					  {% endspaceless %}
-				  </div>
-			  </div>
-			  <div class="container-fluid float-left">
-				  <div class="row my-1">
-					  <div class="col-auto my-2">
-						  <input type="submit" value="Submit">
-					  </div>
-				  </div>
-			  </div>
-		  </form>
-	  </div>
-    {% for i in '12345'|make_list %}
-	  <div class="row my-1 blue" rea="{{ i }}">
-		  <div class="col-auto my-2" rea="{{ i }}">
-    {% if i == '1' %}
-      Conditions for showing event frame..
-    {% endif %}
-    {% if i == '2' %}
-      Conditions for sending to school...
-    {% endif %}
-    {% if i == '3' %}
-      Conditions for recording video...
-    {% endif %}
-    {% if i == '4' %}
-      Conditions for sending email...
-    {% endif %}
-    {% if i == '5' %}
-      Conditions for alarm...
-    {% endif %}
-	  </div></div>
-	  <div class="row my-1 d-none">
-		  <div class="col-auto my-2"><h4>If...</h4>
-        <ul id="li_gr_{{ i }}" class="list-group">
-        </ul>
-        <button type="button" react="{{ i }}" class="btn btn-primary add-bt">Add</button>
-        <button type="button" react="{{ i }}" class="btn btn-primary save-bt">Save</button>
-		  </div>
-	  </div>
-    {% endfor %}
-  </div>
-{% endif %}
 
 {% endblock %}
 

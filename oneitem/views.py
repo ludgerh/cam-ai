@@ -57,6 +57,8 @@ def onecam(request, camnr):
         'version' : djconf.getconfig('version', 'X.Y.Z'),
         'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
         'debug' : settings.DEBUG,
+        'may_write' : access.check('C', camnr, request.user, 'W'),
+        'user' : request.user,
         'dbline' : dbline,
         'camlist' : camlist,
         'detectorlist' : detectorlist,
@@ -64,8 +66,6 @@ def onecam(request, camnr):
         'schoollist' : schoollist,
         'myurl' : myurl,
         'form' : form,
-        'may_write' : access.check('C', camnr, request.user, 'W'),
-        'user' : request.user,
       }
     return(render(request, 'oneitem/onecam.html', context))
   else:
@@ -114,6 +114,8 @@ def onedetector(request, detectornr):
         'version' : djconf.getconfig('version', 'X.Y.Z'),
         'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
         'debug' : settings.DEBUG,
+        'may_write' : access.check('D', detectornr, request.user, 'W'),
+        'user' : request.user,
         'dbline' : dbline,
         'camlist' : camlist,
         'detectorlist' : detectorlist,
@@ -121,8 +123,6 @@ def onedetector(request, detectornr):
         'schoollist' : schoollist,
         'myurl' : myurl,
         'form' : form,
-        'may_write' : access.check('D', detectornr, request.user, 'W'),
-        'user' : request.user,
       }
     return(render(request, 'oneitem/onedetector.html', context))
   else:
@@ -165,6 +165,8 @@ def oneeventer(request, eventernr):
         'version' : djconf.getconfig('version', 'X.Y.Z'),
         'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
         'debug' : settings.DEBUG,
+        'may_write' : access.check('E', eventernr, request.user, 'W'),
+        'user' : request.user,
         'dbline' : dbline,
         'camlist' : camlist,
         'detectorlist' : detectorlist,
@@ -172,8 +174,6 @@ def oneeventer(request, eventernr):
         'schoollist' : schoollist,
         'myurl' : myurl,
         'form' : form,
-        'may_write' : access.check('E', eventernr, request.user, 'W'),
-        'user' : request.user,
       }
     return(render(request, 'oneitem/oneeventer.html', context))
   else:

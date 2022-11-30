@@ -19,15 +19,92 @@
   <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
 	<link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
 {% else %}
-  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
-  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
+  </script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+  </script>
 	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+{% endif %}
+
+<div class="container-fluid float-left">
+	<div class="row">
+		<div class="col-auto">
+      <div>
+          <h1>D{{ dbline.id }}: {{ dbline.name }}</h1>
+		      <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+            fps = <span id="fpstag">?</span>, 
+            views = <span id="vnrtag">?</span></h5>
+          <canvas id="canvas" width="50px" height="50px"></canvas>
+      </div>
+		</div>
+	</div>
+</div>
+
+{% if may_write %}
+<div class="container-fluid float-left" id="conditions">
+  <div class="row my-1 blue">
+	  <div class="col-auto my-2">General settings</div>
+  </div>
+  <div class="row my-1 d-none">
+	  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
+			  method="post" id="oneform">
+		  <div class="container-fluid float-left">
+			  <div class="row my-2">
+				  {% csrf_token %}
+				  {% spaceless %}
+				  {% for field in form %}
+				  <div class="col-auto my-2">
+					  {{ field.errors }}
+					  {{ field.label_tag }} {{ field }}
+					  {% if field.help_text %}
+					  <p class="help">{{ field.help_text|safe }}</p>
+					  {% endif %}
+				  </div>
+				  {% endfor %}
+				  {% endspaceless %}
+			  </div>
+		  </div>
+		  <div class="container-fluid float-left">
+			  <div class="row my-1">
+				  <div class="col-auto my-2">
+					  <input type="submit" value="Submit">
+				  </div>
+			  </div>
+		  </div>
+	  </form>
+  </div>
+  <div class="row my-1 blue" rea="0">
+	  <div class="col-auto my-2" rea="0">Mask settings</div>
+  </div>
+  <div class="row my-1 d-none" id="det_c_boxes">
+	  <div class="col-auto my-2">
+		  <label for="ch_show">Show</label>
+		  <input type="checkbox" id="ch_show" name="ch_show">
+	  </div>
+	  <div class="col-auto my-2">
+		  <label for="ch_apply">Apply</label>
+		  <input type="checkbox" id="ch_apply" name="ch_apply">
+	  </div>
+	  <div class="col-auto my-2">
+		  <label for="ch_edit">Edit</label>
+		  <input type="checkbox" id="ch_edit" name="ch_edit">
+	  </div>
+	  <div class="col-auto my-2">
+		  <label for="ch_white">White Marks</label>
+		  <input type="checkbox" id="ch_white" name="ch_white">
+	  </div>
+	  <div class="col-auto my-2">
+		  <button type="button" id="bt_new">New Masked Area</button>
+	  </div>
+  </div>
+</div>
 {% endif %}
 
 <script>
 
-//let displaywidth = 667; // Screen height IPhone 7
 let displaywidth = Math.round($(window).width() * 0.97);
+let displayheight = 
+  Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let r_array = {};
 let c_view_Socket;
@@ -35,8 +112,27 @@ let trigger_Socket;
 {% if may_write %}
 let oneitemSocket;
 {% endif %}
+let wait = 0;
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
+
+function timedRefresh(bytebuffer) {
+  if (wait == 0) {
+    wait = 1;
+    UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
+    imgsource = new ImageData(UI8Carray, xinput, yinput);
+    createImageBitmap(imgsource)
+		.then((result) => { 
+      ctx.drawImage(result, 0,0, displaywidth, displayheight)
+      wait = 0;
+    })
+		.catch(err => {console.log(err);});
+  };
+};
 
 $(document).ready(function() {
+  $('#canvas').attr('width', displaywidth+'px');
+  $('#canvas').attr('height', displayheight+'px');
 {% if may_write %}
 	$('#ch_show').change((evt) => {
 		oneitemSocket.sendandwait({
@@ -112,14 +208,25 @@ $(document).ready(function() {
   })
 	.then((result) => {
     trigger_Socket = result;
+    return(trigger_Socket.sendandwait({
+	    'command' : 'starttrigger',
+	    'mode' : 'D',
+      'idx' : {{ dbline.id }},
+      'width' : displaywidth,
+    }));
+  })
+  .then((result) => {
+    xinput = result.outx;
+    yinput = 
+      Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
 		trigger_Socket.socket.onclose = function(e) {
 			console.log('Trigger-Socket closed');
 		};
 		trigger_Socket.socket.onmessage = function(e) {
-      if ((typeof(e.data) === 'object')	&& (typeof timedRefreshD{{ dbline.id|stringformat:"09d" }} === "function")) {
+      if (typeof(e.data) === 'object') {
         e.data.arrayBuffer()
         .then((bytebuffer) => {
-				  timedRefreshD{{ dbline.id|stringformat:"09d" }}(bytebuffer);
+				  timedRefresh(bytebuffer);
           trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
         })
         .catch(err => {console.log(err);});
@@ -151,136 +258,75 @@ $(document).ready(function() {
 {% endif %}
 	})
 	.then(() => {
-    ratio = ({{ dbline.cam_yres }} / {{ dbline.cam_xres }});
-		$.get('/viewers/c_canvas/L/D/{{ dbline.id }}/'+displaywidth+'/'+Math.round(displaywidth * ratio)+'/', ((data ) => {
-			$('#spaceforcanvas').html(data);
-			mycanvas = $('#canvasD{{ dbline.id }}');
 {% if may_write %}
-			let overcanvas = false;
-			mycanvas.mousedown((evt) => {
-				if($('#ch_edit').prop('checked')) {
-					let x = evt.originalEvent.pageX - mycanvas.offset().left;
-					let y = evt.originalEvent.pageY - mycanvas.offset().top;
-					oneitemSocket.sendandwait({
-						'command' : 'mousedown',
-						'x' : x,
-						'y' : y,
-					})
-					.catch(err => {console.log(err);});
-					overcanvas = true;
-				};
-			});
-			$( document.body ).mouseup((evt) => {
-				if (overcanvas) {
-					let x = evt.originalEvent.pageX - mycanvas.offset().left;
-					let y = evt.originalEvent.pageY - mycanvas.offset().top;
-					oneitemSocket.sendandwait({
-						'command' : 'mouseup',
-						'x' : x,
-						'y' : y,
-					})
-					.catch(err => {console.log(err);});
-					overcanvas = false;
-				};
-			});
-			$( document.body ).mousemove((evt) => {
-				if (overcanvas) {
-					let x = evt.originalEvent.pageX - mycanvas.offset().left;
-					let y = evt.originalEvent.pageY - mycanvas.offset().top;
-					oneitemSocket.sendandwait({
-						'command' : 'mousemove',
-						'x' : x,
-						'y' : y,
-					})
-					.catch(err => {console.log(err);});
-				};
-			});
-			mycanvas.dblclick((evt) => {
+		mycanvas = $('#canvas');
+		let overcanvas = false;
+		mycanvas.mousedown((evt) => {
+			if($('#ch_edit').prop('checked')) {
 				let x = evt.originalEvent.pageX - mycanvas.offset().left;
 				let y = evt.originalEvent.pageY - mycanvas.offset().top;
 				oneitemSocket.sendandwait({
-					'command' : 'dblclick',
+					'command' : 'mousedown',
 					'x' : x,
 					'y' : y,
 				})
 				.catch(err => {console.log(err);});
-			});
+				overcanvas = true;
+			};
+		});
+		$( document.body ).mouseup((evt) => {
+			if (overcanvas) {
+				let x = evt.originalEvent.pageX - mycanvas.offset().left;
+				let y = evt.originalEvent.pageY - mycanvas.offset().top;
+				oneitemSocket.sendandwait({
+					'command' : 'mouseup',
+					'x' : x,
+					'y' : y,
+				})
+				.catch(err => {console.log(err);});
+				overcanvas = false;
+			};
+		});
+		$( document.body ).mousemove((evt) => {
+			if (overcanvas) {
+				let x = evt.originalEvent.pageX - mycanvas.offset().left;
+				let y = evt.originalEvent.pageY - mycanvas.offset().top;
+				oneitemSocket.sendandwait({
+					'command' : 'mousemove',
+					'x' : x,
+					'y' : y,
+				})
+				.catch(err => {console.log(err);});
+			};
+		});
+		mycanvas.dblclick((evt) => {
+			let x = evt.originalEvent.pageX - mycanvas.offset().left;
+			let y = evt.originalEvent.pageY - mycanvas.offset().top;
+			oneitemSocket.sendandwait({
+				'command' : 'dblclick',
+				'x' : x,
+				'y' : y,
+			})
+			.catch(err => {console.log(err);});
+		});
 {% endif %}
-		}));
+    setInterval(() => {
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'mode' : 'D',
+        'idx' : {{ dbline.id }},
+      })
+      .then((result) => {
+        $('#fpstag').text(result.fps);
+        $('#vnrtag').text(result.viewers);
+      })
+      .catch(err => {console.log(err);});
+    }, 5000);
 	})
 	.catch(err => {console.log(err);});
 });
 	
 </script>
-
-
-<div class="container-fluid float-left">
-	<div class="row">
-		<div class="col-auto">
-			<div id="spaceforcanvas"></div>
-		</div>
-	</div>
-</div>
-
-{% if may_write %}
-  <div class="container-fluid float-left" id="conditions">
-	  <div class="row my-1 blue">
-		  <div class="col-auto my-2">General settings</div>
-	  </div>
-	  <div class="row my-1 d-none">
-		  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
-				  method="post" id="oneform">
-			  <div class="container-fluid float-left">
-				  <div class="row my-2">
-					  {% csrf_token %}
-					  {% spaceless %}
-					  {% for field in form %}
-					  <div class="col-auto my-2">
-						  {{ field.errors }}
-						  {{ field.label_tag }} {{ field }}
-						  {% if field.help_text %}
-						  <p class="help">{{ field.help_text|safe }}</p>
-						  {% endif %}
-					  </div>
-					  {% endfor %}
-					  {% endspaceless %}
-				  </div>
-			  </div>
-			  <div class="container-fluid float-left">
-				  <div class="row my-1">
-					  <div class="col-auto my-2">
-						  <input type="submit" value="Submit">
-					  </div>
-				  </div>
-			  </div>
-		  </form>
-	  </div>
-	  <div class="row my-1 blue" rea="0">
-		  <div class="col-auto my-2" rea="0">Mask settings</div>
-	  </div>
-	  <div class="row my-1 d-none" id="det_c_boxes">
-		  <div class="col-auto my-2">
-			  <label for="ch_show">Show</label>
-			  <input type="checkbox" id="ch_show" name="ch_show">
-		  </div>
-		  <div class="col-auto my-2">
-			  <label for="ch_apply">Apply</label>
-			  <input type="checkbox" id="ch_apply" name="ch_apply">
-		  </div>
-		  <div class="col-auto my-2">
-			  <label for="ch_edit">Edit</label>
-			  <input type="checkbox" id="ch_edit" name="ch_edit">
-		  </div>
-		  <div class="col-auto my-2">
-			  <label for="ch_white">White Marks</label>
-			  <input type="checkbox" id="ch_white" name="ch_white">
-		  </div>
-		  <div class="col-auto my-2">
-			  <button type="button" id="bt_new">New Masked Area</button>
-		  </div>
-	  </div>
-  </div>
-{% endif %}
 
 {% endblock %}
 

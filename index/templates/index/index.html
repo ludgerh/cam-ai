@@ -13,41 +13,46 @@
 
 {% extends 'main/basis.html' %}
 {% block content %}
-    {% if emulatestatic %}
-    {% load static %}
-    <script src="{% static 'camai/git/js/wstools.js' %}"></script>
-    <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
-    {% else %}
-    <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
-    <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+{% if emulatestatic %}
+{% load static %}
+  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
+  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+{% else %}
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
+    </script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+    </script>
+{% endif %}
+<div class="container-fluid float-left">
+  <div class="row">
+  {% spaceless %}
+  {% for item in camlist %} 
+    <div class="col-sm-auto">
+    <h1>{{ mode }}{{ item.id }}: {{ item.name }}</h1>
+    <h5>{{ item.cam_xres }}x{{ item.cam_yres }}, 
+      fps = <span id="fpstag{{ item.id }}">?</span>, 
+      views = <span id="vnrtag{{ item.id }}">?</span></h5>
+    {% if mode == 'C' %}
+      <div>
+        <a href="/oneitem/cam/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
+      </div>
     {% endif %}
-		<div class="container-fluid float-left">
-			<div class="row">
-			{% spaceless %}
-        {% if mode == 'C' %}
-				  {% for item in camlist %} 
-						<div class="col-sm-auto">
-							<div id="spaceforcanvas{{ mode }}{{ item.id }}"></div>
-						</div>
-				  {% endfor %}
-				{% endif %}
-        {% if mode == 'D' %}
-				  {% for item in detectorlist %} 
-						<div class="col-sm-auto">
-							<div id="spaceforcanvas{{ mode }}{{ item.id }}"></div>
-						</div>
-				  {% endfor %}
-				{% endif %}
-        {% if mode == 'E' %}
-				  {% for item in eventerlist %} 
-						<div class="col-sm-auto">
-							<div id="spaceforcanvas{{ mode }}{{ item.id }}"></div>
-						</div>
-				  {% endfor %}
-				{% endif %}
-			{% endspaceless %}
-			</div>
-		</div>
+    {% if mode == 'D' %}
+      <div>
+        <a href="/oneitem/detector/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
+      </div>
+    {% endif %}
+    {% if mode == 'E' %}
+      <div>
+        <a href="/oneitem/eventerr/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
+      </div>
+    {% endif %}
+    </div>
+  {% endfor %}
+  {% endspaceless %}
+  </div>
+</div>
+
 <script >
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
@@ -56,60 +61,88 @@ let trigger_Socket;
 let r_array = {};
 let displaywidth = 375 // Screen width IPhone 7
 
+{% for item in camlist %} 
+  let displayheight{{ item.id }} = 
+    Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
+  let xinput{{ item.id }}
+  let yinput{{ item.id }}
+  let wait{{ item.id }} = 0;
+  let canvas{{ item.id }} = document.getElementById("canvas{{ item.id }}");
+  let ctx{{ item.id }} = canvas{{ item.id }}.getContext("2d");
+
+  function timedRefresh{{ item.id|stringformat:"09d" }}(bytebuffer) {
+    if (wait{{ item.id }} == 0) {
+      wait{{ item.id }} = 1;
+      UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
+      imgsource = new ImageData(UI8Carray, xinput{{ item.id }}, yinput{{ item.id }});
+      createImageBitmap(imgsource)
+      .then((result) => { 
+        ctx{{ item.id }}.drawImage(result, 0,0, displaywidth, displayheight{{ item.id }})
+        wait{{ item.id }} = 0;
+      })
+    };
+  };
+  r_array['{{ mode }}{{ item.id|stringformat:"09d" }}'] = timedRefresh{{ item.id|stringformat:"09d" }};
+{% endfor %}
+
 $(document).ready(function() {
-	WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
-	.then((result) => {
-		c_view_Socket = result;
+{% for item in camlist %} 
+    $('#canvas{{ item.id }}').attr('width', displaywidth+'px');
+    $('#canvas{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
+{% endfor %}
+  WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
+  .then((result) => {
+    c_view_Socket = result;
     return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/trigger/'));
   })
-	.then((result) => {
+  .then((result) => {
     trigger_Socket = result;
-		trigger_Socket.socket.onclose = function(e) {
-			console.log('Trigger-Socket closed');
-		};
-		trigger_Socket.socket.onmessage = function(e) {
+{% for item in camlist %} 
+    return(trigger_Socket.sendandwait({
+      'command' : 'starttrigger',
+      'mode' : '{{ mode }}',
+      'idx' : {{ item.id }},
+      'width' : displaywidth,
+    }));
+  })
+  .then((result) => {
+    xinput{{ item.id }} = result.outx;
+    yinput{{ item.id }} = 
+      Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
+{% endfor %}
+    trigger_Socket.socket.onclose = function(e) {
+      console.log('Trigger-Socket closed');
+    };
+    trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
         e.data.arrayBuffer()
         .then((bytebuffer) => {
           miniarray = new Uint8Array(bytebuffer, 0, 10);
-				  vnr = String.fromCharCode.apply(null, miniarray);
-				  if (vnr in r_array) {
-					  r_array[vnr](bytebuffer);
-				  };
+          vnr = String.fromCharCode.apply(null, miniarray);
+          if (vnr in r_array) {
+            r_array[vnr](bytebuffer);
+          };
           trigger_Socket.socket.send(vnr);
         })
         .catch(err => {console.log(err);});
-			};
-		};
-		{% spaceless %}
-    {% if mode == 'C' %}
-		  {% for item in camlist %} 
-        ratio = ({{ item.cam_yres }} / {{ item.cam_xres }});
-        $.get('/viewers/c_canvas/S/C/{{ item.id }}/'+displaywidth+'/'+Math.round(displaywidth * ratio), function(data) {
-					$('#spaceforcanvasC{{ item.id }}').html(data);
-				});
-		  {% endfor %}
-		{% endif %}
-    {% if mode == 'D' %}
-		  {% for item in detectorlist %} 
-        ratio = ({{ item.cam_yres }} / {{ item.cam_xres }});
-        $.get('/viewers/c_canvas/S/D/{{ item.id }}/'+displaywidth+'/'+Math.round(displaywidth * ratio), function(data) {
-					$('#spaceforcanvasD{{ item.id }}').html(data);
-				});
-		  {% endfor %}
-		{% endif %}
-    {% if mode == 'E' %}
-		  {% for item in eventerlist %} 
-        ratio = ({{ item.cam_yres }} / {{ item.cam_xres }});
-        $.get('/viewers/c_canvas/S/E/{{ item.id }}/'+displaywidth+'/'+Math.round(displaywidth * ratio), function(data) {
-					$('#spaceforcanvasE{{ item.id }}').html(data);
-				});
-		  {% endfor %}
-		{% endif %}
-		{% endspaceless %}
+      };
+    };
 	})
 	.catch(err => {console.log(err);});
-
+{% for item in camlist %} 
+  setInterval(() => {
+    c_view_Socket.sendandwait({
+      'command' : 'getcaminfo',
+      'mode' : '{{ mode }}',
+      'idx' : {{ item.id }},
+    })
+    .then((result) => {
+      $('#fpstag{{ item.id }}').text(result.fps);
+      $('#vnrtag{{ item.id }}').text(result.viewers);
+    })
+    .catch(err => {console.log(err);});
+  }, 5000);
+{% endfor %}
 });
 	
 </script>
