@@ -116,13 +116,14 @@ class train_once_remote():
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
         self.logger.info('Sending: ' + item)
-        filepath = self.myschool.dir + item
+        filepath = self.myschool.dir + 'frames/' + item
         with open(filepath, "rb") as f:
           self.ws.send_binary(f.read())
       outdict = {
         'code' : 'trainnow',
       } 
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      self.logger.info('Sent trigger for train_now... ' + item)
       self.ws.close()
     except:
       self.logger.error(format_exc())

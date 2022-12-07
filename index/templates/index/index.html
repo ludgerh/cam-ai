@@ -44,7 +44,7 @@
     {% endif %}
     {% if mode == 'E' %}
       <div>
-        <a href="/oneitem/eventerr/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
+        <a href="/oneitem/eventer/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
       </div>
     {% endif %}
     </div>
@@ -109,6 +109,10 @@ $(document).ready(function() {
     xinput{{ item.id }} = result.outx;
     yinput{{ item.id }} = 
       Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
+{% endfor %}
+{% for item in camlist %} 
+    vnr = '{{ mode }}' + String({{ item.id }}).padStart(9,'0');
+    trigger_Socket.socket.send(vnr);
 {% endfor %}
     trigger_Socket.socket.onclose = function(e) {
       console.log('Trigger-Socket closed');

@@ -100,7 +100,7 @@ eventers/c_event.py
 eventers/oneevent.html
 eventers/events.html
 
-v 0.8.0:
+v 0.8.0: Issue #3 & #13
 camai/version.py
 camai/urls.py
 viewers/views.py
@@ -114,5 +114,17 @@ oneitem/onedetector.html
 oneitem/oneeventer.html
 index/index.html
 streams/models.py
+
+v 0.8.1
+camai/version.py
+schools/images.html
+schools/consumers.py
+schools/views.py
+trainers/train_worker_remote.py
+trainers/train_worker_gpu.py
+trainers/consumers.py
+index/index.html
+index/urls.py
+viewers/consumers.py
 
 

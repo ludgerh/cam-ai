@@ -12,7 +12,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
-from os import remove
+from os import remove, path, makedirs
 from time import time
 from datetime import datetime
 from logging import getLogger
@@ -48,7 +48,10 @@ class remotetrainer(AsyncWebsocketConsumer):
   async def receive(self, text_data =None, bytes_data=None):
     try:
       if bytes_data:
-        filepath = self.myschooldict['dir'] + self.frameinfo['name']
+        filepath = self.myschooldict['dir'] + 'frames/' + self.frameinfo['name']
+        mydir = path.split(filepath)[0]
+        if not path.exists(mydir):
+          makedirs(mydir)
         with open(filepath, 'wb') as f:
           f.write(bytes_data)
         frameline = trainframe(
@@ -96,7 +99,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         self.frameinfo['tags'] = indict['tags']
       elif indict['code'] == 'delete':
         await deletefilter(trainframe, {'name' : indict['name'], }, )
-        remove(self.myschooldict['dir'] + indict['name'])
+        remove(self.myschooldict['dir'] + 'frames/' + indict['name'])
       elif indict['code'] == 'trainnow':
         await updatefilter(school, 
           {'id' : self.myschooldict['id'], }, 
@@ -321,7 +324,6 @@ class trainerutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'trainnow': 
       if self.maywrite:
-        print('***** You may')
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'extra_runs' : 1, })
@@ -329,7 +331,6 @@ class trainerutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
       else:
-        print('***** You may not')
         self.close()			
 
     elif params['command'] == 'gettrigger':

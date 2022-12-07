@@ -284,7 +284,7 @@ def getlines(myschool, logger):
     filterdict['code'] = code
     result[code] = []
     for item in trainframe.objects.filter(**filterdict):
-      resultitem = [item.id, myschool.dir + item.name, item.c0, item.c1, 
+      resultitem = [item.id, myschool.dir + 'frames/' + item.name, item.c0, item.c1, 
         item.c2, item.c3, item.c4, item.c5, item.c6, item.c7,
         item.c8, item.c9, item.code,
       ]

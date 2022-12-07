@@ -105,7 +105,7 @@ class triggerConsumer(WebsocketConsumer):
           self.outxdict[params['idx']] = round(outx)
           self.queuedict[params['idx']] = myviewer.inqueue
 
-          self.busydict[params['mode']+str(params['idx']).zfill(9)] = False
+          self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
 
           def onf(onf_viewer):
             try:

@@ -17,7 +17,9 @@ import cv2 as cv
 from os import path, makedirs, remove
 from shutil import copy
 from PIL import Image
+from random import randint
 from logging import getLogger
+from datetime import datetime
 from django.db import transaction
 from django.utils import timezone
 from django.core import serializers
@@ -26,7 +28,7 @@ from django.core.paginator import Paginator
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.hashers import check_password
-from tools.l_tools import djconf, uniquename
+from tools.l_tools import ts2filename, djconf, uniquename
 from tools.djangodbasync import (filterlines, getoneline, savedbline, 
   deldbline, updatefilter, deletefilter, getonelinedict, filterlinesdict,
   countfilter)
@@ -167,7 +169,7 @@ class schooldbutil(AsyncWebsocketConsumer):
                 schooldict = await getonelinedict(school, {'id' : framedict['school'], }, ['id', 'e_school', 'dir'])
                 xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schooldict, }
-              imagepath = self.schoolinfo['schooldict']['dir']+framedict['name']
+              imagepath = self.schoolinfo['schooldict']['dir'] + 'frames/' + framedict['name']
             if imglist is None:
               imglist = np.empty((0, self.schoolinfo['xdim'], self.schoolinfo['ydim'], 3), np.uint8)
             np_image = Image.open(imagepath)
@@ -204,7 +206,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       if access.check('S', trainframedict['school'], self.user, 'W'):
         await deletefilter(trainframe, {'id' : params['img'], })
         schooldict = await getonelinedict(school, {'id' : trainframedict['school'], }, ['dir'])
-        framefile = schooldict['dir']+trainframedict['name']
+        framefile = schooldict['dir'] + 'frames/' + trainframedict['name']
         if path.exists(framefile):
           remove(framefile)
         else:
@@ -258,7 +260,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           list_for_del = await filterlinesdict(trainframe, filterdict)
           await deletefilter(trainframe, filterdict)
           for item in list_for_del:
-            framefile = filepath+item['name']
+            framefile = filepath + 'frames/' + item['name']
             if path.exists(framefile):
               remove(framefile)
             else:
@@ -298,7 +300,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           for item in list_for_copy:
             if not (await check_extratags_async(params['school'], item)):
               destfilename = uniquename(destpath, path.splitext(item['name'])[0], 'bmp')  
-              copy(sourcepath+item['name'], destpath+destfilename)
+              copy(sourcepath + 'frames/' + item['name'], destpath + 'frames/' + destfilename)
               newitem = trainframe(made = item['made'],
                 school = 1,
                 name = destfilename,
@@ -346,14 +348,18 @@ class schooldbutil(AsyncWebsocketConsumer):
         framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', 'time', 'trainframe', ])
         i = 0
         for item in framelines:
-          newname = 'frames/'+item['name'].replace('/','_')
+          pathadd = str(randint(0,99))+'/'
+          if not path.exists(modelpath + 'frames/' + pathadd):
+            makedirs(modelpath + 'frames/' + pathadd)
+          ts = datetime.timestamp(item['time'])
+          newname = uniquename(modelpath + 'frames/', pathadd+ts2filename(ts, noblank=True), 'bmp')
           updatedict = {}
           for j in range(10):
             updatedict['c'+str(j)] = params['cblist'][i][j]
           if eventdict['done']:
             await updatefilter(trainframe, {'id' : item['trainframe'], }, updatedict)
           else:
-            copy(schoolframespath + item['name'], modelpath + newname)
+            copy(schoolframespath + item['name'], modelpath + 'frames/' + newname)
             t = trainframe(made=item['time'],
               school=schoolnr,
               name=newname,
@@ -384,8 +390,6 @@ class schooldbutil(AsyncWebsocketConsumer):
       try:
         eventdict = await getonelinedict(event, {'id' : params['event'], }, ['id', 'school', 'videoclip'])
         schoolnr = eventdict['school']
-        schooldict = await getonelinedict(school, {'id' : schoolnr, }, ['dir'])
-        modelpath = schooldict['dir']
         if access.check('S', schoolnr, self.scope['user'], 'W'):
           framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', ])
           for item in framelines:

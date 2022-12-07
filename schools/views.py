@@ -73,8 +73,12 @@ def getbmp(request, schoolnr, name, outtype, xycontained, x, y):
     name = name.replace('$', '/', 2)
     filepath = djconf.getconfig('schoolframespath', 'data/schoolframes/') + name
   else:
+    print('name1:', name)
+    name = name.replace('$', '/', 1)
+    print('name2:', name)
     line = school.objects.get(id=schoolnr)
     filepath = line.dir + 'frames/' + name
+    print('filepath:', name)
   with open(filepath, "rb") as f:
     myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, xout=x, yout=y)
   return HttpResponse(myframe, content_type="image/jpeg")

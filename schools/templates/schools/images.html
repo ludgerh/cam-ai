@@ -145,6 +145,8 @@ let last_frame_visible;
 let page_nr = 1;
 let min_id = 0;
 let max_id = 0;
+let do_run;
+let get_images_active = false;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
@@ -176,7 +178,17 @@ $('#pagesizeselect').change(function() {
   draw_all_cards();
 });
 
+function wait_for_done() {
+  if (get_images_active) {
+    setTimeout(wait, 100);
+  } else {
+    do_run = 1;
+    getimages();
+  };
+};
+
 function draw_all_cards() {
+  do_run = 0;
   $('#gallery').children().slice(0,-1).remove();
 
   SchoolDButilSocket.sendandwait({
@@ -225,17 +237,19 @@ function draw_all_cards() {
       max_id = frames[frames.length-1].id;
     };
     frames_count = frames.length;
-    frames_ready = 0;
+    frames_ready = 0;frames_ready
     last_frame_visible = 0;
-    getimages();
+    wait_for_done();
   })
   .catch(err => {console.log(err);});
 };
 
 function getimages() {
+  get_images_active = true;
   while ((frames_ready < frames_count) 
       && ((frames_ready - last_frame_visible) <= 32)
-      && $('#endtrigger').isInViewport()) {
+      && $('#endtrigger').isInViewport()
+      && do_run) {
     let frame_processing = frames_ready; 
     frames_ready += 1;
     SchoolDButilSocket.sendandwait({
@@ -245,61 +259,64 @@ function getimages() {
       'is_school' : false,
     })
     .then((predictions) => {
-      newname = frames[frame_processing].name.replace('frames/', '');
-      newaddition = '<div id="col' + frames[frame_processing].id+'" class="col-sm-auto m-0 p-0">'
-        + '<div class="card m-1 p-0"'
-        + ' style="border: 1; width: 212px; height: auto;" done=0>' + frames[frame_processing].made
-          + '<a href="/schools/getbigbmp/{{ schoolnr }}/'+newname+'/" target="_blank">'
-          + '<img idx='+frames[frame_processing].id+' style="width: 210px; height: 210px; object-fit: contain" src="'
-          + window.location.protocol + '//' +  window.location.host
-          + '/schools/getbmp/{{ schoolnr }}/'
-          + newname+'/3/1/210/210/"></a><br>'
-          newaddition += '<div class="checklist h4">';
-          for (let i=0; i<taglines.length; i++) {
-{% if may_write %}
-		        newaddition += '<input type="checkbox" class="tc'+frames[frame_processing].id+'" img="'+frames[frame_processing].id+'" cnt="'+i+'"';
-		        if (frames[frame_processing].cs[i] >= 0.5) {
-			        newaddition += ' checked>';
-		        } else {
-			        newaddition += '>';
-		        };
-{% endif %}
-            if (predictions[0][i] >= 0.5) {
-              if (frames[frame_processing].cs[i] < 0.5) {
-                newaddition += '<span class="blue">';
+      if (do_run) {
+        newname = frames[frame_processing].name;
+        newaddition = '<div id="col' + frames[frame_processing].id+'" class="col-sm-auto m-0 p-0">'
+          + '<div class="card m-1 p-0"'
+          + ' style="border: 1; width: 212px; height: auto;" done=0>' + frames[frame_processing].made
+            + '<a href="/schools/getbigbmp/{{ schoolnr }}/'+newname.replace(/\//g,'$')+'/" target="_blank">'
+            + '<img idx='+frames[frame_processing].id+' style="width: 210px; height: 210px; object-fit: contain" src="'
+            + window.location.protocol + '//' +  window.location.host
+            + '/schools/getbmp/{{ schoolnr }}/'
+            + newname.replace(/\//g,'$')+'/3/1/210/210/"></a><br>'
+            newaddition += '<div class="checklist h4">';
+            for (let i=0; i<taglines.length; i++) {
+  {% if may_write %}
+		          newaddition += '<input type="checkbox" class="tc'+frames[frame_processing].id+'" img="'+frames[frame_processing].id+'" cnt="'+i+'"';
+		          if (frames[frame_processing].cs[i] >= 0.5) {
+			          newaddition += ' checked>';
+		          } else {
+			          newaddition += '>';
+		          };
+  {% endif %}
+              if (predictions[0][i] >= 0.5) {
+                if (frames[frame_processing].cs[i] < 0.5) {
+                  newaddition += '<span class="blue">';
+                } else {
+                  newaddition += '<span>';
+                };
               } else {
-                newaddition += '<span>';
+                if (frames[frame_processing].cs[i] >= 0.5) {
+                  newaddition += '<span class="blue">';
+                } else {
+                  newaddition += '<span>';
+                };
               };
-            } else {
-              if (frames[frame_processing].cs[i] >= 0.5) {
-                newaddition += '<span class="blue">';
-              } else {
-                newaddition += '<span>';
-              };
-            };
-		        newaddition += taglines[i].substr(0,3)+': ';
-		        newaddition += Math.round(predictions[0][i]*10000)
-				        /10000+'</span><br>';
-	        };
-          newaddition += '<h6>'+frame_processing+': Tagged by '+frames[frame_processing].made_by+'</h6>';
-{% if may_write %}
-          newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="checkone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Check</button>';
-          newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="delone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Delete</button>';
-{% endif %}
-	        newaddition += '</div>';
+		          newaddition += taglines[i].substr(0,3)+': ';
+		          newaddition += Math.round(predictions[0][i]*10000)
+				          /10000+'</span><br>';
+	          };
+            newaddition += '<h6>'+frame_processing+': Tagged by '+frames[frame_processing].made_by+'</h6>';
+  {% if may_write %}
+            newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="checkone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Check</button>';
+            newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="delone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Delete</button>';
+  {% endif %}
+	          newaddition += '</div>';
 
-        + '</div>'
-      + '</div>';
-      $('#lastcol').before(newaddition);
-{% if may_write %}
-      $('.tc'+frames[frame_processing].id).change(function(event) {
-        tagcheck_changed(event);
-      });
-{% endif %}
-      last_frame_visible = frame_processing;
+          + '</div>'
+        + '</div>';
+        $('#lastcol').before(newaddition);
+  {% if may_write %}
+        $('.tc'+frames[frame_processing].id).change(function(event) {
+          tagcheck_changed(event);
+        });
+  {% endif %}
+        last_frame_visible = frame_processing;
+      };
     })
     .catch(err => {console.log(err);});
   };
+  get_images_active = false;
 };
 
 {% if may_write %}
