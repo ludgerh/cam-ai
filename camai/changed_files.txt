@@ -126,5 +126,17 @@ trainers/consumers.py
 index/index.html
 index/urls.py
 viewers/consumers.py
+tools/consumers.py
+oneitem/onecam.html
+oneitem/onedetector.html
+oneitem/oneeventer.html
+
+v 0.8.2
+camai/version.py
+trainers/train_worker_remote.py
+trainers/consumers.py
+schools/views.py
+schools/images.html
+tools/consumers.py
 
 

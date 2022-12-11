@@ -355,7 +355,7 @@ $(document).ready(function() {
     SchoolDButilSocket = result;
     return(SchoolDButilSocket.sendandwait({
       'command' : 'register_ai',
-      'school' : 1,
+      'school' : {{ schoolnr }},
     }));
   })
   .then(() => {

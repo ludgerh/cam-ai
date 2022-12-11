@@ -108,6 +108,7 @@ class train_once_remote():
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
         self.logger.info('Deleting: ' + item)
+        self.ws.recv()
       for item in (localset - remoteset):
         outdict = {
           'code' : 'send',
@@ -119,11 +120,12 @@ class train_once_remote():
         filepath = self.myschool.dir + 'frames/' + item
         with open(filepath, "rb") as f:
           self.ws.send_binary(f.read())
+        self.ws.recv()
       outdict = {
         'code' : 'trainnow',
       } 
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      self.logger.info('Sent trigger for train_now... ' + item)
+      self.logger.info('Sent trigger for train_now... ')
       self.ws.close()
     except:
       self.logger.error(format_exc())

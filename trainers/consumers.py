@@ -68,6 +68,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           train_status = 1,
         )
         await savedbline(frameline)
+        await self.send('OK')
         return()
       if text_data == 'Ping':
         return()
@@ -100,6 +101,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       elif indict['code'] == 'delete':
         await deletefilter(trainframe, {'name' : indict['name'], }, )
         remove(self.myschooldict['dir'] + 'frames/' + indict['name'])
+        await self.send('OK')
       elif indict['code'] == 'trainnow':
         await updatefilter(school, 
           {'id' : self.myschooldict['id'], }, 

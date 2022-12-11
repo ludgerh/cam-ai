@@ -500,6 +500,9 @@ CREATE TABLE `streams_stream` (
   `cam_yres` int(11) NOT NULL,
   `cam_fpslimit` double NOT NULL,
   `cam_fpsactual` double NOT NULL,
+  `cam_min_x_view` int(11) NOT NULL,
+  `cam_max_x_view` int(11) NOT NULL,
+  `cam_scale_x_view` double NOT NULL,
   `cam_feed_type` int(11) NOT NULL,
   `cam_url` varchar(256) NOT NULL,
   `cam_apply_mask` tinyint(1) NOT NULL,
@@ -515,6 +518,9 @@ CREATE TABLE `streams_stream` (
   `det_view` tinyint(1) NOT NULL,
   `det_fpslimit` double NOT NULL,
   `det_fpsactual` double NOT NULL,
+  `det_min_x_view` int(11) NOT NULL,
+  `det_max_x_view` int(11) NOT NULL,
+  `det_scale_x_view` double NOT NULL,
   `det_threshold` int(11) NOT NULL,
   `det_backgr_delay` int(11) NOT NULL,
   `det_dilation` int(11) NOT NULL,
@@ -526,6 +532,9 @@ CREATE TABLE `streams_stream` (
   `eve_view` tinyint(1) NOT NULL,
   `eve_fpslimit` double NOT NULL,
   `eve_fpsactual` double NOT NULL,
+  `eve_min_x_view` int(11) NOT NULL,
+  `eve_max_x_view` int(11) NOT NULL,
+  `eve_scale_x_view` double NOT NULL,
   `eve_alarm_email` varchar(255) NOT NULL,
   `eve_event_time_gap` int(11) NOT NULL,
   `eve_margin` int(11) NOT NULL,
@@ -534,7 +543,7 @@ CREATE TABLE `streams_stream` (
   PRIMARY KEY (`id`),
   KEY `streams_stream_eve_school_id_3e307b1b_fk_tf_workers_school_id` (`eve_school_id`),
   CONSTRAINT `streams_stream_eve_school_id_3e307b1b_fk_tf_workers_school_id` FOREIGN KEY (`eve_school_id`) REFERENCES `tf_workers_school` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -982,4 +991,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-11-25 22:24:12
+-- Dump completed on 2022-12-09 23:42:37

@@ -22,6 +22,8 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `apt install locales`
 
+   `dpkg-reconfigure tzdata`
+
    `apt install systemd-cron`
 
    It is recommended to create a special user for operating the camera server. In our example this users name will be cam_ai :
@@ -53,6 +55,38 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `timeout 180;`
 
+   Some more finetuning:
+
+   `sudo nano /etc/sysctl.conf`
+
+   Add at the bottom of this file:
+
+   `vm.overcommit_memory = 1`
+
+   `net.core.somaxconn=1024`
+
+   Save and leave Nano. Create the file
+
+   `sudo nano /etc/systemd/system/disable-transparent-huge-pages.service`
+
+   and put this in:
+
+   `[Unit]`
+   `Description=Disable Transparent Huge Pages`
+
+   `[Service]`
+   `Type=oneshot`
+   `ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/enabled"`
+   `ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/defrag"`
+
+   `[Install]`
+   `WantedBy=multi-user.target`
+
+   Then enable the service:
+
+   `sudo systemctl enable disable-transparent-huge-pages`
+   `sudo systemctl start disable-transparent-huge-pages`
+
    
 
 2. #### Installing a database server
@@ -61,13 +95,11 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    Here are the steps to install the server:
 
-   `sudo apt update`
-
    `sudo apt install mariadb-server`
 
    `sudo mysql_secure_installation` 
 
-   The Secure-Installation-Tool will ask you to set the database password. Do that and accept the default for all the other questions.
+   The Secure-Installation-Tool will ask you for the root password. Do that and accept the default for all the other questions.
 
    
 
@@ -164,14 +196,23 @@ This is an installation tutorial for a development system of the CAM-AI Server o
    `sudo apt install redis`
 
    In default Redis saves all database contents to disk. We do not want this. So we switch it off:
+
    `sudo nano /etc/redis/redis.conf`
+
    Find the lines
+
    `save 900 1`
+
    `save 300 10`
+
    `save 60 10000`
-   and change them to 
+
+    and change them to 
+
    `#save 900 1`
+
    `#save 300 10`
+
    `#save 60 10000`
 
    
@@ -180,7 +221,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `pip install django`
 
-   `pip install channels`
+   `pip install channels==3.0.5`
 
    `pip install mysqlclient` 
 
@@ -206,11 +247,19 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    
 
-9. #### Start the server
+10. #### Start the server
 
    `nano ~/cam-ai/camai/settings.py`
 
    Find the variable ALLOWED_HOSTS and add your hosts domain or IP address to the bracket.
+
+   Find the line
+
+   `STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]`
+
+   and replace it with
+
+   `#STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]`
 
    Save and close Nano.
 
@@ -225,44 +274,3 @@ This is an installation tutorial for a development system of the CAM-AI Server o
     The initial login information is user=admin password=cam-ai-123
 
     
-
-sudo nano /etc/sysctl.conf
-
-# Add at the bottom of file
-vm.overcommit_memory = 1
-net.core.somaxconn=1024
-
-Transparent Huge Pages
-
-Thanks to [github](https://gist.githubusercontent.com/PyYoshi/a7ca64b6c92b5ef1834b/raw/d49c0a4333f25fb6c58c60536ebba809e24d0076/disable-transparent-huge-pages.service) & [PyYoshi](https://gist.github.com/PyYoshi)
- I found this example for systemd
-
-Create the file  
-
-```
-sudo nano /etc/systemd/system/disable-transparent-huge-pages.service
-```
-
-Put this into the service file
-
-For debian/ubuntu users
-
-```
-[Unit]
-Description=Disable Transparent Huge Pages
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/enabled"
-ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/defrag"
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Then enable the service  
-
-```
-sudo systemctl enable disable-transparent-huge-pages
-sudo systemctl start disable-transparent-huge-pages
-```

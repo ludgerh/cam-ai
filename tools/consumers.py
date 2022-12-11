@@ -75,9 +75,16 @@ class health(AsyncWebsocketConsumer):
 
     if params['command'] == 'checkschool':
       myschool = await getonelinedict(school, {'id' : params['school'], }, ['dir'])
-      self.filesetdict[params['school']] = {item.name for item in (Path(myschool['dir']) / 'frames').iterdir()}
+      self.filesetdict[params['school']] = set()
+      for item in (Path(myschool['dir']) / 'frames').iterdir():
+        if item.is_file():
+          self.filesetdict[params['school']].add(item.name)
+        elif item.is_dir():
+          subdir = item.name
+          for item in (Path(myschool['dir']) / 'frames' / subdir).iterdir():
+            self.filesetdict[params['school']].add(subdir+'/'+item.name)
       dbset = await filterlinesdict(trainframe, {'school' : params['school'], }, ['name'])
-      self.dbsetdict[params['school']] = {item['name'][7:] for item in dbset}
+      self.dbsetdict[params['school']] = {item['name'] for item in dbset}
       outlist['data'] = {
         'correct' : len(self.filesetdict[params['school']] & self.dbsetdict[params['school']]),
         'missingdb' : len(self.filesetdict[params['school']] - self.dbsetdict[params['school']]),
@@ -96,7 +103,7 @@ class health(AsyncWebsocketConsumer):
 
     elif params['command'] == 'fixmissingfiles':	
       for item in (self.dbsetdict[params['school']] - self.filesetdict[params['school']]):
-        await deletefilter(trainframe, {'name' : 'frames/'+item, })	
+        await deletefilter(trainframe, {'name' : item, })	
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
@@ -305,10 +312,13 @@ class admintools(AsyncWebsocketConsumer):
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'installcam':
+      myschools = await filterlinesdict(school, {'active' : True, }, ['id', ])
+      myschool = myschools[0]['id']
       newstream = dbstream()
       newstream.cam_url = params['camurl']
       newstream.cam_video_codec = params['videocodec']
       newstream.cam_audio_codec = params['audiocodec']
+      newstream.eve_school_id = myschool
       await savedbline(newstream)
       while start_stream_list:
         sleep(long_brake)

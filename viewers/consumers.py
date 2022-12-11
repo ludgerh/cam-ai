@@ -102,9 +102,9 @@ class triggerConsumer(WebsocketConsumer):
               if streams[params['idx']].dbline.eve_max_x_view:
                 outx = min(streams[params['idx']].dbline.eve_max_x_view, outx)
             myviewer = streams[params['idx']].myeventer.viewer
+          outx = min(streams[params['idx']].dbline.cam_xres, outx)
           self.outxdict[params['idx']] = round(outx)
           self.queuedict[params['idx']] = myviewer.inqueue
-
           self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
 
           def onf(onf_viewer):

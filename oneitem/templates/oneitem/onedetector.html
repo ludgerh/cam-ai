@@ -219,6 +219,7 @@ $(document).ready(function() {
     xinput = result.outx;
     yinput = 
       Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
+    trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
 		trigger_Socket.socket.onclose = function(e) {
 			console.log('Trigger-Socket closed');
 		};
