@@ -23,6 +23,7 @@ from collections import deque
 from time import time, sleep
 from threading import Thread
 from subprocess import run
+from psutil import Process
 from django.forms.models import model_to_dict
 from django.db import connection
 from django.db.utils import OperationalError
@@ -153,6 +154,7 @@ class c_eventer(c_device):
         self.set_cam_counts()
       elif (received[0] == 'save_conditions'):
         self.cond_dict[received[1]] = json.loads(received[2])
+        self.set_cam_counts()
       else:
         return(False)
       return(True)
@@ -365,6 +367,13 @@ class c_eventer(c_device):
                   '-q:v', '2', 
                   savepath[:-4]+'.jpg'
                 ])
+                p = run([
+                  'ffmpeg', 
+                  '-v', 'info', 
+                  '-i', savepath, 
+                  savepath[:-4]+'.webm'
+                ])
+                Process(p.pid).nice(19)
               myevent.status = min(-2, 
                 myevent.status)
             else:  

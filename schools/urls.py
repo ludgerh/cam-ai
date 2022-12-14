@@ -13,12 +13,13 @@
 
 from django.urls import path
 
-from .views import images, classroom, getbmp, getbigbmp
+from .views import images, classroom, getbmp, getbigbmp, getbigmp4
 
 urlpatterns = [
 	path('images/<int:schoolnr>/', images, name='images'),
 	path('classroom/<int:schoolnr>/', classroom, name='classroom'),
 	path('getbmp/<int:schoolnr>/<str:name>/<int:outtype>/<int:xycontained>/<int:x>/<int:y>/', getbmp, name='getbmp'),
 	path('getbigbmp/<int:schoolnr>/<str:name>/', getbigbmp, name='getbigbmp'),
+	path('getbigmp4/<int:eventnr>/video.html', getbigmp4, name='getbigmp4'),
 ]
 

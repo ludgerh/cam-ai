@@ -115,7 +115,7 @@ oneitem/oneeventer.html
 index/index.html
 streams/models.py
 
-v 0.8.1
+v 0.8.1 bugfixing
 camai/version.py
 schools/images.html
 schools/consumers.py
@@ -131,7 +131,7 @@ oneitem/onecam.html
 oneitem/onedetector.html
 oneitem/oneeventer.html
 
-v 0.8.2
+v 0.8.2 bugfixing
 camai/version.py
 trainers/train_worker_remote.py
 trainers/consumers.py
@@ -139,4 +139,24 @@ schools/views.py
 schools/images.html
 tools/consumers.py
 
+v 0.8.3 bugfixing
+camai/version.py
+eventers/c_eventers.py
+eventers/c_event.py
+eventers/views.py
+eventers/urls.py
+eventers/oneevent.html
+schools/urls.py
+schools/views.py
+schools/bigbmp.html
+schools/bigmp4.html
 
+v 0.8.4 bugfixing & item #5
+camai/version.py x
+schools/consumers.py
+schools/bigmp4.html x
+eventers/views.py x
+eventers/urls.py x
+eventers/c_eventers.py x
+tools/consumers.py
+tools/health.html

@@ -118,8 +118,9 @@ class health(AsyncWebsocketConsumer):
       )]
       fileset_jpg = {item.stem for item in fileset if (item.name[:2] == 'E_') and (item.suffix == '.jpg')}
       fileset_mp4 = {item.stem for item in fileset if (item.name[:2] == 'E_') and (item.suffix == '.mp4')}
+      fileset_webm = {item.stem for item in fileset if (item.name[:2] == 'E_') and (item.suffix == '.webm')}
       self.fileset = fileset_jpg & fileset_mp4
-      self.fileset_all = fileset_jpg | fileset_mp4
+      self.fileset_all = fileset_jpg | fileset_mp4 | fileset_webm
       mydbset = await filterlinesdict(event, {'videoclip__startswith' : 'E_',}, ['videoclip', 'start', ])
       self.dbset = set()
       self.dbtimedict = {}
@@ -129,6 +130,7 @@ class health(AsyncWebsocketConsumer):
       outlist['data'] = {
         'jpg' : len(fileset_jpg),
         'mp4' : len(fileset_mp4),
+        'webm' : len(fileset_webm),
         'temp' : len(self.fileset_c),
         'correct' : len(self.fileset & self.dbset),
         'missingdb' : len(self.fileset_all - self.dbset),
@@ -147,7 +149,7 @@ class health(AsyncWebsocketConsumer):
 
     elif params['command'] == 'fixmissingdb_rec':	
       for item in (self.fileset_all - self.dbset):
-        for ext in ['.jpg', '.mp4']:
+        for ext in ['.jpg', '.mp4', '.webm']:
           delpath = recordingspath / (item+ext)
           if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
             delpath.unlink()
@@ -159,7 +161,7 @@ class health(AsyncWebsocketConsumer):
       for item in (self.dbset - self.fileset):
         if self.dbtimedict[item].timestamp()  < (time() - 1800):
           await updatefilter(event, {'videoclip' : item, }, {'videoclip' : '', }) 
-          for ext in ['.jpg', '.mp4']:
+          for ext in ['.jpg', '.mp4', '.webm']:
             delpath = recordingspath / (item+ext)
             if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
               delpath.unlink()

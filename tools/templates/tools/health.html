@@ -92,6 +92,11 @@
             <td></td>
           </tr>
           <tr>
+            <td>WEBM files</td>
+            <td id="webm_rec">?</td>
+            <td></td>
+          </tr>
+          <tr>
             <td>Old temporary files</td>
             <td id="temp_rec">?</td>
             <td> <button class="btn btn-primary m-2 fixtemp_rec" 
@@ -253,6 +258,7 @@ function updaterecfiles() {
     };
     $('#jpg_rec').text(result.jpg);
     $('#mp4_rec').text(result.mp4);
+    $('#webm_rec').text(result.webm);
     $('#correct_rec').text(result.correct);
     $('#temp_rec').text(result.temp);
     $('#missingdb_rec').text(result.missingdb);

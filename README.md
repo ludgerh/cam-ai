@@ -55,7 +55,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `timeout 180;`
 
-   Some more finetuning:
+   Following the rcommendations of the Redis logfile I did some more finetuning:
 
    `sudo nano /etc/sysctl.conf`
 

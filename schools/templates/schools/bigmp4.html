@@ -14,29 +14,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>CAM-AI Image</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-  body, html {
-    height: 100%;
-    margin: 1%;
-  }
-
-  .bg {
-    background-image: url("/schools/getbmp/{{ school }}/{{ name }}/3/0/0/0/");
-    height: 100%; 
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: contain;
-  }
-  </style>
+  <title>CAM-AI MP4</title>
 </head>
 <body>
-
-<div class="bg"></div>
-
-<p>/schools/getbmp/{{ school }}/{{ name }}</p>
+<video autoplay width="50" height="auto" id="video" poster="/eventers/eventjpg/{{ eventnr }}/video.jpg" controls>
+  <source src="/eventers/eventwebm/{{ eventnr }}/video.webm" type="video/webm"/>
+  <source src="/eventers/eventmp4/{{ eventnr }}/video.mp4" type="video/mp4"/>
+  Your browser does not support the video tag.
+</video>
 
 </body>
 </html>
+{% if emulatestatic %}{{ emulestatic }}
+  {% load static %}
+  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+{% else %}
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+  </script>
+{% endif %}
+
+<script>
+
+let displaywidth = Math.round($(window).width() * 0.97);
+
+$(document).ready(function() {
+  $('#video').attr('width', displaywidth+'px');
+});
+	
+</script>
+
 

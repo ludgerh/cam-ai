@@ -69,24 +69,36 @@ def oneevent(request, schoolnr, eventnr):
   else:
     return(HttpResponse('No Access'))
 
-@login_required
+#@login_required
 def eventjpg(request, eventnr):
   myevent = event.objects.get(id=eventnr)
-  myschool = myevent.school.id
-  if access.check('S', myschool, request.user, 'R'):
-    filename = (myevent.videoclip + '.jpg')
-    filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
-    with open(filepath, "rb") as f:
-      return HttpResponse(f.read(), content_type="image/jpeg")
-  else:
-    return(HttpResponse('No Access'))
+  #myschool = myevent.school.id
+  #if access.check('S', myschool, request.user, 'R'):
+  filename = (myevent.videoclip + '.jpg')
+  filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+  with open(filepath, "rb") as f:
+    return HttpResponse(f.read(), content_type="image/jpeg")
+  #else:
+  #  return(HttpResponse('No Access'))
 
 #@login_required
 #no login when called from email
 def eventmp4(request, eventnr):
   myevent = event.objects.get(id=eventnr)
-  myschool = myevent.school.id
+  #myschool = myevent.school.id
   filename = (myevent.videoclip + '.mp4')
   filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
   with open(filepath, "rb") as f:
-    return HttpResponse(f.read(), content_type="video/mp4")
+    result = HttpResponse(f.read(), content_type="video/mp4")
+    return(result)
+
+#@login_required
+#no login when called from email
+def eventwebm(request, eventnr):
+  myevent = event.objects.get(id=eventnr)
+  #myschool = myevent.school.id
+  filename = (myevent.videoclip + '.webm')
+  filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+  with open(filepath, "rb") as f:
+    result = HttpResponse(f.read(), content_type="video/webm")
+    return(result)

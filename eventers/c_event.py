@@ -204,7 +204,6 @@ class c_event(list):
   def merge_frames(self, the_other_one):
     with self.frames_lock:
       self.frames = {**self.frames, **the_other_one.frames}
-      #self.frames_filter(self.number_of_frames)
       if the_other_one.focus_max > self.focus_max:
         self.focus_max = the_other_one.focus_max
         self.focus_time = the_other_one.focus_time
@@ -330,23 +329,30 @@ class c_event(list):
       message['From'] = (djconf.getconfig('smtp_name', 'CAM-AI Emailer') 
         +' <'+djconf.getconfig('smtp_email')+'>')
       message['To'] = receiver
-      text = ('Hello CAM-AI user,\n' 
-        + 'We had some movement.\n'  
-        + 'Here are the images: \n')  
-      for item in self.mailimages:
-        text += clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/ <br> \n' 
+      text = 'Hello CAM-AI user,\n' 
+      text += 'We had some movement.\n'  
       if self.savename:
-        text += ('...and here is the movie: \n' 
-          + clienturl + 'eventers/eventmp4/video.mp4' 
-          + str(self.dbline.id) + '/ <br> \n') 
-      html = ('<html><body><p>Hello CAM-AI user, <br>\n' 
-        + 'We had some movement. <br> \n' 
-        + 'Here are the images: <br> \n')
+        text += 'Here is the movie: \n' 
+        text += clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/video.html \n' 
+      text += 'Here are the images: \n'  
       for item in self.mailimages:
-        html += ('<img src="' + clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/">\n') 
+        text += clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/ \n' 
+      html = '<html><body><p>Hello CAM-AI user, <br>\n' 
+      html += 'We had some movement. <br> \n' 
       if self.savename:
-        html += ('<br>...and here is the movie: <br> \n' 
-          + clienturl + 'eventers/eventmp4/' + str(self.dbline.id) + '/video.mp4 <br>\n')
+        html += '<br>Here is the movie (click on the image): <br> \n' 
+        html += '<a href="' + clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/video.html'
+        html += '" target="_blank">'
+        html += '<img src="' + clienturl + 'eventers/eventjpg/' + str(self.dbline.id) + '/video.jpg'
+        html += '" style="width: 400px; height: auto"</a> <br>\n'
+      html += 'Here are the images: <br> \n'
+      for item in self.mailimages:
+        html += '<a href="' + clienturl + 'schools/getbigbmp/0/' + item
+        html += '" target="_blank">'
+        html += '<img src="' + clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/'
+        html += '" style="width: 200px; height: 200px; object-fit: contain"</a> \n'
+      html += '<br> \n'
+
 
       message.attach(MIMEText(text, 'plain'))
       message.attach(MIMEText(html, 'html'))

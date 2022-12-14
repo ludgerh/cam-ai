@@ -634,7 +634,7 @@ CREATE TABLE `tf_workers_worker` (
 
 LOCK TABLES `tf_workers_worker` WRITE;
 /*!40000 ALTER TABLE `tf_workers_worker` DISABLE KEYS */;
-INSERT INTO `tf_workers_worker` VALUES (1,0,'TF-Worker 1',8,0.1,64,20,0,-1,0,0,1,'wss://cam-ai.de/','','','',0);
+INSERT INTO `tf_workers_worker` VALUES (1,0,'TF-Worker 1',8,0.1,64,20,0,-1,0,0,1,'wss://django.cam-ai.de/','','','',0);
 /*!40000 ALTER TABLE `tf_workers_worker` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -793,7 +793,7 @@ CREATE TABLE `trainers_trainer` (
 
 LOCK TABLES `trainers_trainer` WRITE;
 /*!40000 ALTER TABLE `trainers_trainer` DISABLE KEYS */;
-INSERT INTO `trainers_trainer` VALUES (2,1,'Trainer 1',3,0,0,'00:00:00','24:00:00',1,'wss://server.com/','','');
+INSERT INTO `trainers_trainer` VALUES (1,1,'Trainer 1',3,0,0,'00:00:00','24:00:00',1,'wss://django.cam-ai.de/','','');
 /*!40000 ALTER TABLE `trainers_trainer` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -991,4 +991,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-09 23:42:37
+-- Dump completed on 2022-12-14 14:49:24

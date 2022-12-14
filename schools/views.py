@@ -80,12 +80,23 @@ def getbmp(request, schoolnr, name, outtype, xycontained, x, y):
     myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, xout=x, yout=y)
   return HttpResponse(myframe, content_type="image/jpeg")
 
-@login_required
+#@login_required
 #schoolnr = 0 --> from school directory
 def getbigbmp(request, schoolnr, name): 
   template = loader.get_template('schools/bigbmp.html')
   context = {
     'school' : schoolnr,
     'name' : name,
+  }
+  return(HttpResponse(template.render(context)))
+
+#@login_required
+#no login when called from email
+def getbigmp4(request, eventnr):
+  template = loader.get_template('schools/bigmp4.html')
+  context = {
+    'version' : djconf.getconfig('version', 'X.Y.Z'),
+    'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+    'eventnr' : eventnr,
   }
   return(HttpResponse(template.render(context)))

@@ -56,13 +56,18 @@
         Videos
       </button>
     </h2>
+{% if event.videoclip %}
+    <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#eventaccordion">
+{% else %}
     <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#eventaccordion">
+{% endif %}
       <div class="accordion-body">
 {% if event.videoclip %}
         <div class="row" id="crd{{ event.id }}" dtype="1">
-          <a href="/eventers/eventmp4/{{ event.id }}/video.mp4" target="_blank">
-          <img class='img-fluid w-100' src="/eventers/eventjpg/{{ event.id }}/" alt="" /><br>
-          <h2>Click to see the video</h2></a>
+          <video width="50" height="auto" id="video" poster="/eventers/eventjpg/{{ event.id }}/" controls>
+            <source src="/eventers/eventmp4/{{ event.id }}/video.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
         </div>
         <div class="row">
           <button type="button"  id="{{ event.id }}" class="btn btn-primary m-3 videoarchbutton" style="width: 120px;">To Archive</button>
@@ -86,7 +91,11 @@
         Images
       </button>
     </h2>
+{% if event.videoclip %}
     <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#eventaccordion">
+{% else %}
+    <div id="collapseTwo" class="accordion-collapse collapse show" aria-labelledby="headingTwo" data-bs-parent="#eventaccordion">
+{% endif %}
       <div class="accordion-body">
         <div class="container-fluid float-left">
           <div class="row">
@@ -113,6 +122,8 @@
 </div>
 
 <script >
+
+let displaywidth = Math.round($(window).width() * 0.97);
 
 {% if may_write %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
@@ -142,6 +153,7 @@ $.fn.isInViewport = function() {
 };
 
 $(document).ready(function() {
+  $('#video').attr('width', displaywidth+'px');
 	WSAsync(
 		  ws_scheme + '//'
 		  + window.location.host

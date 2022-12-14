@@ -406,6 +406,10 @@ class schooldbutil(AsyncWebsocketConsumer):
                 remove(videofile + '.mp4')
               else:
                 logger.warning('delevent - Delete did not find: ' + videofile + '.mp4')
+              if path.exists(videofile + '.webm'):
+                remove(videofile + '.webm')
+              else:
+                logger.warning('delevent - Delete did not find: ' + videofile + '.webm')
               if path.exists(videofile + '.jpg'):
                 remove(videofile + '.jpg')
               else:
@@ -440,6 +444,10 @@ class schooldbutil(AsyncWebsocketConsumer):
               remove(videofile + '.mp4')
             else:
               logger.warning('delitem - Delete did not find: ' + videofile + '.mp4')
+            if path.exists(videofile + '.webm'):
+              remove(videofile + '.webm')
+            else:
+              logger.warning('delitem - Delete did not find: ' + videofile + '.webm')
             if path.exists(videofile + '.jpg'):
               remove(videofile + '.jpg')
             else:
