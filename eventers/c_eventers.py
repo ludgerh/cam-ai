@@ -358,22 +358,27 @@ class c_eventer(c_device):
               myevent.dbline.double = isdouble
               myevent.dbline.save()
               if not isdouble:
-                run([
-                  'ffmpeg', 
-                  '-ss', str(vid_offset), 
-                  '-v', 'fatal', 
-                  '-i', savepath, 
-                  '-vframes', '1', 
-                  '-q:v', '2', 
-                  savepath[:-4]+'.jpg'
-                ])
-                p = run([
-                  'ffmpeg', 
-                  '-v', 'info', 
-                  '-i', savepath, 
-                  savepath[:-4]+'.webm'
-                ])
-                Process(p.pid).nice(19)
+                try:
+                  run([
+                    'ffmpeg', 
+                    '-ss', str(vid_offset), 
+                    '-v', 'fatal', 
+                    '-i', savepath, 
+                    '-vframes', '1', 
+                    '-q:v', '2', 
+                    savepath[:-4]+'.jpg'
+                  ])
+                  p = run([
+                    'ffmpeg', 
+                    '-v', 'fatal', 
+                    '-i', savepath, 
+                    '-crf', '51', #0 = lossless, 51 = very bad
+                    '-vf', 'scale=500:-1',
+                    savepath[:-4]+'.webm'
+                  ])
+                  Process(p.pid).nice(19)
+                except AttributeError:
+                  self.logger.warning('AttributeError in c_eventer.py line 377')
               myevent.status = min(-2, 
                 myevent.status)
             else:  

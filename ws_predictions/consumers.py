@@ -122,11 +122,8 @@ class predictionsConsumer(WebsocketConsumer):
                 self.permitted_schools.add(myschool)
               else:
                 self.close()
-            self.mydatacache['schooldata'][myschool]['numberofframes'] = indict['nrf']
             try:
-              self.mydatacache['schooldata'][myschool]['imglist'] = np.empty((
-                0, self.mydatacache['schooldata'][myschool]['xdim'], 
-                self.mydatacache['schooldata'][myschool]['ydim'], 3), np.uint8)
+              self.mydatacache['schooldata'][myschool]['imglist'] = []
             except KeyError:
               logger.warning('KeyError while initializing ImgList')
           elif indict['code'] == 'done':
@@ -142,7 +139,7 @@ class predictionsConsumer(WebsocketConsumer):
                 -1,
               )
               predictions = np.empty((0, len(taglist)), np.float32)
-              while predictions.shape[0]<self.mydatacache['schooldata'][myschool]['imglist'].shape[0]:
+              while predictions.shape[0] < len(self.mydatacache['schooldata'][myschool]['imglist']):
                 predictions = np.vstack((predictions, 
                   tf_workers[self.mydatacache['workernr']].get_from_outqueue(
                     self.mydatacache['tf_w_index'])))
@@ -155,11 +152,13 @@ class predictionsConsumer(WebsocketConsumer):
         logger.debug('<-- Length = ' + str(len(bytes_data)))
         frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
           dtype=np.uint8), cv.IMREAD_UNCHANGED)
-        frame = np.expand_dims(frame, axis=0)
+        if ((frame.shape[1] != self.mydatacache['schooldata'][myschool]['xdim'])
+            or (frame.shape[0] != self.mydatacache['schooldata'][myschool]['ydim'])):
+          frame = cv.resize(frame, (
+            self.mydatacache['schooldata'][myschool]['ydim'], 
+            self.mydatacache['schooldata'][myschool]['xdim']))
         try:
-          self.mydatacache['schooldata'][myschool]['imglist'] = np.vstack((
-            self.mydatacache['schooldata'][myschool]['imglist'], frame))
-          self.mydatacache['schooldata'][myschool]['numberofframes'] -= 1
+          self.mydatacache['schooldata'][myschool]['imglist'].append(frame)
         except KeyError:
           logger.warning('KeyError while adding image data')
     except:

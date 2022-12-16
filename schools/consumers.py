@@ -171,11 +171,9 @@ class schooldbutil(AsyncWebsocketConsumer):
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schooldict, }
               imagepath = self.schoolinfo['schooldict']['dir'] + 'frames/' + framedict['name']
             if imglist is None:
-              imglist = np.empty((0, self.schoolinfo['xdim'], self.schoolinfo['ydim'], 3), np.uint8)
-            np_image = Image.open(imagepath)
-            np_image = cv.resize(np.array(np_image), (self.schoolinfo['xdim'], self.schoolinfo['ydim']))
-            np_image = np.expand_dims(np_image, axis=0)
-            imglist = np.append(imglist, np_image, 0)
+              imglist = []
+            np_image = np.array(Image.open(imagepath))
+            imglist.append(np_image)
           except FileNotFoundError:
             logger.error('File not found: ' + imagepath)
         self.tf_worker.ask_pred(
@@ -186,7 +184,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           -1,
         )
         predictions = np.empty((0, len(classes_list)), np.float32)
-        while predictions.shape[0] < imglist.shape[0]:
+        while predictions.shape[0] < len(imglist):
           predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
         outlist['data'] = predictions.tolist()
         logger.debug('--> ' + str(outlist))

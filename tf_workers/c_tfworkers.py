@@ -65,13 +65,14 @@ def sigint_handler(signal, frame):
 
 class model_buffer(deque):
 
-  def __init__(self, schoolnr, xdim, ydim):
+  def __init__(self, schoolnr, xdim, ydim, websocket):
     super().__init__()
     self.ts = time()
     self.xdim = xdim
     self.ydim = ydim
     self.bufferlock1 = Lock()
     self.bufferlock2 = Lock()
+    self.websocket = websocket
 
   def append(self, initem):
     # structure of initem:
@@ -80,11 +81,17 @@ class model_buffer(deque):
     # structure of list outitem:
     # outitem[0] = np.image, outitem[1] = userindex,
     # outitem[2] = frame_id, outitem[3] = entnr
-    framecount = initem[0].shape[0]
-    imagelist = np.vsplit(initem[0], framecount)
+    framecount = len(initem[0])
+    imagelist = initem[0]
     with self.bufferlock1:
       for i in range(framecount):
-        outitem = [imagelist[i]]
+        frame = imagelist[i]
+        if self.websocket:
+          if ((frame.shape[1] * frame.shape[0]) > (self.xdim * self.ydim)):
+            frame = cv.resize(frame, (self.xdim, self.ydim))
+        else:
+          frame = cv.resize(frame, (self.xdim, self.ydim))
+        outitem = [frame]
         outitem.append(initem[1])
         if initem[2]:
           outitem.append(initem[2][i])
@@ -110,7 +117,7 @@ class model_buffer(deque):
       tempres3.append(initem[3])
       if len(tempres0) >= maxcount:
         break
-    return(np.vstack(tempres0), tempres1, tempres2, tempres3)
+    return(tempres0, tempres1, tempres2, tempres3)
 
 class tf_user(object):
 
@@ -147,7 +154,6 @@ class tf_worker():
       if gpus:
         for gpu in gpus:
           tf.config.experimental.set_memory_growth(gpu, True)
-        #tf.config.experimental.set_visible_devices(gpus[self.dbline.gpu_nr], 'GPU')
       from tensorflow.keras.models import load_model
       self.load_model = load_model
       self.tf = tf
@@ -284,7 +290,9 @@ class tf_worker():
             self.check_model(schoolnr, self.logger)
             self.model_buffers[schoolnr] = model_buffer(schoolnr, 
               self.allmodels[schoolnr]['xdim'], 
-              self.allmodels[schoolnr]['ydim'])
+              self.allmodels[schoolnr]['ydim'],
+              self.dbline.use_websocket,
+            )
           self.model_buffers[schoolnr].append(received[2:])
           with self.model_buffers[schoolnr].bufferlock2:
             while len(self.model_buffers[schoolnr]) >= self.dbline.maxblock:
@@ -495,13 +503,12 @@ class tf_worker():
         outdict = {
           'code' : 'imgl',
           'scho' : myschool.e_school,
-          'nrf' : framelist.shape[0],
         }
         self.continue_sending(json.dumps(outdict), opcode=1, logger=logger)
         while True:
           try:
-            for i in range(framelist.shape[0]):
-              jpgdata = cv.imencode('.jpg', framelist[i])[1].tobytes()
+            for item in framelist:
+              jpgdata = cv.imencode('.jpg', item)[1].tobytes()
               schoolbytes = myschool.e_school.to_bytes(8, 'big')
               self.continue_sending(schoolbytes+jpgdata, opcode=0, logger=logger, get_answer=False)
             outdict = {
@@ -510,7 +517,7 @@ class tf_worker():
             }
             predictions = self.continue_sending(json.dumps(outdict), opcode=1, logger=logger, get_answer=True)
             if predictions == 'incomplete':
-              predictions = np.zeros((framelist.shape[0], len(taglist)), np.float32)
+              predictions = np.zeros((len(framelist), len(taglist)), np.float32)
             else:
               predictions = np.array(json.loads(predictions), dtype=np.float32)
             break
@@ -518,22 +525,26 @@ class tf_worker():
             sleep(djconf.getconfigfloat('long_brake', 1.0))
             self.reset_websocket()
       else: #local GPU
-        if framelist.shape[0] < self.dbline.maxblock:
-          patch = np.zeros((self.dbline.maxblock - framelist.shape[0], 
-            framelist.shape[1], 
-            framelist.shape[2], 
-            framelist.shape[3]), 
+        npframelist = []
+        for i in range(len(framelist)):
+          npframelist.append(np.expand_dims(framelist[i], axis=0))
+        npframelist = np.vstack(npframelist)
+        if npframelist.shape[0] < self.dbline.maxblock:
+          patch = np.zeros((self.dbline.maxblock - npframelist.shape[0], 
+            npframelist.shape[1], 
+            npframelist.shape[2], 
+            npframelist.shape[3]), 
             np.uint8)
-          portion = np.vstack((framelist, patch))
+          portion = np.vstack((npframelist, patch))
           predictions = (
             self.activemodels[schoolnr].predict_on_batch(portion))
-          predictions = predictions[:framelist.shape[0]]
+          predictions = predictions[:npframelist.shape[0]]
         else:
           predictions = (
-            self.activemodels[schoolnr].predict_on_batch(framelist))
+            self.activemodels[schoolnr].predict_on_batch(npframelist))
       starting = 0
-      for i in range(framelist.shape[0]):
-        if ((i == framelist.shape[0] - 1) 
+      for i in range(len(framelist)):
+        if ((i == len(framelist) - 1) 
             or (framesinfo[0][i] != framesinfo[0][i+1])):
           if ((framesinfo[0][starting] in self.users) 
               and (framesinfo[0][starting] in self.outqueues)):
@@ -551,7 +562,7 @@ class tf_worker():
         logtext += ('  Buffer Size: ' 
           + str(len(mybuffer)).zfill(5))
         logtext += ('  Block Size: ' 
-          + str(framelist.shape[0]).zfill(5))
+          + str(len(framelist)).zfill(5))
         logtext += ('  Proc Time: ' 
           + str(round(newtime - ts_one, 3)).ljust(5, '0'))
         if had_timeout:

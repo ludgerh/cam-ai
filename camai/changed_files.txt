@@ -151,12 +151,20 @@ schools/views.py
 schools/bigbmp.html
 schools/bigmp4.html
 
-v 0.8.4 bugfixing & item #5
-camai/version.py x
+v 0.8.4 bugfixing & issue #5
+camai/version.py
 schools/consumers.py
-schools/bigmp4.html x
-eventers/views.py x
-eventers/urls.py x
-eventers/c_eventers.py x
+schools/bigmp4.html
+eventers/views.py
+eventers/urls.py
+eventers/c_eventers.py
 tools/consumers.py
 tools/health.html
+
+v 0.8.5 issue #10
+camai/version.py
+eventers/c_eventers.py
+eventers/c_event.py
+tf_workers/c_tfworkers.py
+ws_predictions/consumers.py
+schools/consumers.py

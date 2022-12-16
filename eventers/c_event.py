@@ -91,7 +91,6 @@ def resolve_rules(conditions, predictions):
 
       if item['bracket'] < 0: 
         cond_str += ')' * (-1 * item['bracket'])
-    #print(cond_str)
     return(eval(cond_str))
   else:
     return(False)
@@ -163,15 +162,13 @@ class c_event(list):
         framescopy = self.frames.copy()
       frames_to_process = [x for x in framescopy if framescopy[x][2] <= 0.0]
       if frames_to_process and ((time() - ts1) < 1.0):
-        imglist = np.empty((0, self.xdim, self.ydim, 3), np.uint8)
+        imglist = []
         frame_idxs = []
         for i in frames_to_process:
           if i in self.frames:
             self.frames[i][2] = 0.1
-            np_image = cv.resize(self.frames[i][0][1],(self.xdim, self.ydim))
-            np_image = cv.cvtColor(np_image, cv.COLOR_BGR2RGB)
-            np_image = np.expand_dims(np_image, axis=0)
-            imglist = np.append(imglist, np_image, 0)
+            np_image = cv.cvtColor(self.frames[i][0][1], cv.COLOR_BGR2RGB)
+            imglist.append(np_image)
             frame_idxs.append(i)
         if self.tf_w_index is not None:
           self.tf_worker.ask_pred(
