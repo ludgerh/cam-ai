@@ -72,19 +72,25 @@ This is an installation tutorial for a development system of the CAM-AI Server o
    and put this in:
 
    `[Unit]`
-   `Description=Disable Transparent Huge Pages`
+
+   ``Description=Disable Transparent Huge Pages`
 
    `[Service]`
+
    `Type=oneshot`
+
    `ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/enabled"`
+
    `ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/defrag"`
 
    `[Install]`
+
    `WantedBy=multi-user.target`
 
    Then enable the service:
 
    `sudo systemctl enable disable-transparent-huge-pages`
+
    `sudo systemctl start disable-transparent-huge-pages`
 
    
@@ -217,7 +223,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    
 
-8. #### Fill the environment with all needed libraries
+9. #### Fill the environment with all needed libraries
 
    `pip install django`
 
@@ -249,28 +255,27 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
 10. #### Start the server
 
-   `nano ~/cam-ai/camai/settings.py`
+     `nano ~/cam-ai/camai/settings.py`
 
-   Find the variable ALLOWED_HOSTS and add your hosts domain or IP address to the bracket.
+    Find the variable ALLOWED_HOSTS and add your hosts domain or IP address to the bracket.
 
-   Find the line
+    Find the line
 
-   `STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]`
+    `STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]`
 
-   and replace it with
+    and replace it with
 
-   `#STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]`
+    `#STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]`
 
-   Save and close Nano.
+    Save and close Nano.
 
-   After that you should be able to start the server. Replace the IP (plus brackets(!)) with the actual address of your server host.
+    After that you should be able to start the server. Replace the IP (plus brackets(!)) with the actual address of your server host.
 
-   `python manage.py runserver [ip]:8000 --noreload`
+    `python manage.py runserver [ip]:8000 --noreload`
 
-10. #### Log in
+11. #### **Log in**
 
     From another PC in the same network you can now log in by giving your browser:
     `https://[ip]:8000/`
     The initial login information is user=admin password=cam-ai-123
 
-    

@@ -24,6 +24,7 @@ from tf_workers.models import worker
 from tf_workers.c_tfworkers import tf_workers, tf_worker
 from trainers.models import trainer as trainerdb
 from trainers.c_trainers import trainers, trainer
+from tools.health import stop as stophealth
 from .models import stream
 from .c_streams import streams, c_stream
 #from threading import enumerate
@@ -58,6 +59,7 @@ def restartcheck_proc():
     
 
 def newexit(eins, zwei):
+  stophealth()
   check_timer.stop()
   print ('Caught KeyboardInterrupt...')
   for i in streams:

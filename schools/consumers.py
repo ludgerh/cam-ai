@@ -386,35 +386,40 @@ class schooldbutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'delevent':
       try:
-        eventdict = await getonelinedict(event, {'id' : params['event'], }, ['id', 'school', 'videoclip'])
-        schoolnr = eventdict['school']
+        if params['eventnr']:
+          eventdicts = await filterlinesdict(event, {'id' : params['eventnr'], }, ['id', 'school', 'videoclip'])
+          schoolnr = eventdicts[0]['school']
+        else:
+          eventdicts = await filterlinesdict(event, {'school__id' : params['schoolnr'], 'done' : True, }, ['id', 'school', 'videoclip'])
+          schoolnr =  params['schoolnr']
         if access.check('S', schoolnr, self.scope['user'], 'W'):
-          framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', ])
-          for item in framelines:
-            framefile = schoolframespath + item['name']
-            if path.exists(framefile):
-              remove(framefile)
-            else:
-              logger.warning('delevent - Delete did not find: ' + framefile)
-            await deletefilter(event_frame, {'id' : item['id'], })
-          if eventdict['videoclip']:
-            if (await countfilter(event, {'videoclip' : eventdict['videoclip'], })) <= 1:
-              videofile = recordingspath + eventdict['videoclip']
-              if path.exists(videofile + '.mp4'):
-                remove(videofile + '.mp4')
+          for eitem in eventdicts:
+            framelines = await filterlinesdict(event_frame, {'event__id' : eitem['id'], }, ['id', 'name', ])
+            for fitem in framelines:
+              framefile = schoolframespath + fitem['name']
+              if path.exists(framefile):
+                remove(framefile)
               else:
-                logger.warning('delevent - Delete did not find: ' + videofile + '.mp4')
-              if path.exists(videofile + '.webm'):
-                remove(videofile + '.webm')
-              else:
-                logger.warning('delevent - Delete did not find: ' + videofile + '.webm')
-              if path.exists(videofile + '.jpg'):
-                remove(videofile + '.jpg')
-              else:
-                logger.warning('delevent - Delete did not find: ' + videofile + '.jpg')
-          await deletefilter(event, {'id' : eventdict['id'], })
+                logger.warning('delevent - Delete did not find: ' + framefile)
+              await deletefilter(event_frame, {'id' : fitem['id'], })
+            if eitem['videoclip']:
+              if (await countfilter(event, {'videoclip' : eitem['videoclip'], })) <= 1:
+                videofile = recordingspath + eitem['videoclip']
+                if path.exists(videofile + '.mp4'):
+                  remove(videofile + '.mp4')
+                else:
+                  logger.warning('delevent - Delete did not find: ' + videofile + '.mp4')
+                if path.exists(videofile + '.webm'):
+                  remove(videofile + '.webm')
+                else:
+                  logger.warning('delevent - Delete did not find: ' + videofile + '.webm')
+                if path.exists(videofile + '.jpg'):
+                  remove(videofile + '.jpg')
+                else:
+                  logger.warning('delevent - Delete did not find: ' + videofile + '.jpg')
+            await deletefilter(event, {'id' : eitem['id'], })
       except event.DoesNotExist:
-        logger.warning('delevent - Did not find DB line: ' + params['event'])
+        logger.warning('delevent - Did not find DB line: ' + str(params['eventnr']))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			

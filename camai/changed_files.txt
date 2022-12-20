@@ -168,3 +168,15 @@ eventers/c_event.py
 tf_workers/c_tfworkers.py
 ws_predictions/consumers.py
 schools/consumers.py
+
+v 0.8.6 issue #11
+camai/version.py
+camai/basis.html
+tools/health.py
+tools/consumers.py
+tools/l_tools.py
+streams/startup.py
+streams/c_cams.py
+schools/consumers.py
+eventers/events.html
+oneitem/oneeventer.html

@@ -256,3 +256,20 @@ def seq_to_int(in_seq):
     if in_seq[i]:
       result += 1 << i
   return(result) 
+
+def displaybytes(numberin):
+  stringout = 'B'
+  result = float(numberin)
+  if result >= 100.0:
+    result /= 1000.0
+    stringout = 'K'
+  if result >= 100.0:
+    result /= 1000.0
+    stringout = 'M'
+  if result >= 100.0:
+    result /= 1000.0
+    stringout = 'G'
+  if result >= 100.0:
+    result /= 1000.0
+    stringout = 'T'
+  return(str(round(result, 3))+stringout)

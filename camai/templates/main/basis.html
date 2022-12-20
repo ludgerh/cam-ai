@@ -140,6 +140,14 @@
           Software Version {{ version }}
           (User: {{ user }})
         </div>
+
+        <div class="col-sm-auto">
+          Free disc space <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> (<span id="freepercent">?</span>%)
+        </div>
+        <div class="progress px-0 my-1 mx-2" style="width: 200px">
+          <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
+        </div>
+
       </div>
     </div>
     {% else %}
@@ -160,5 +168,63 @@
 
     {% block content %}No Content yet...{% endblock %}
 
+
+<script>
+let active_bg = 'bg-success';
+let active_percentage = 1;
+if (typeof healthSocket == 'undefined') { 
+  let healthSocket;
+};
+
+function updatediscinfo() {
+  healthSocket.sendandwait({
+    'command' : 'getdiscinfo',
+  })
+  .then((result) => {
+    percentage = Math.round((1.0 - (result.free / result.total)) * 100); 
+    if (active_percentage != percentage) {
+      $('#freepercent').text(100 - percentage);
+      $('#totaldiscspace').text(result.totalstr);
+      $('#freediscspace').text(result.freestr);
+      $('#progressbar').css("width", percentage.toString() + "%");
+      if (percentage > 75) {
+        new_bg = 'bg-danger';
+      } else {
+        if (percentage > 50) {
+          new_bg = 'bg-warning';
+        } else {
+          new_bg = 'bg-success';
+        };
+      };
+      if (active_bg !== new_bg) {
+        $('#progressbar').removeClass(active_bg);
+        $('#progressbar').addClass(new_bg);
+        active_bg = new_bg;
+      };
+      active_percentage = percentage;
+    };
+  })
+  .catch(err => {console.log(err);});
+};
+
+$(document).ready(function() {
+  if (typeof healthSocket == 'undefined') { 
+    WSAsync(
+      ws_scheme + '//'
+      + window.location.host
+      + '/ws/health/'
+    )
+    .then((result) => {
+      healthSocket = result;
+      updatediscinfo();
+      setInterval(updatediscinfo, 60000);
+    })
+    .catch(err => {console.log(err);});
+  } else {
+    setInterval(updatediscinfo, 60000);
+  };
+});
+</script>
   </body>
 </html>
+

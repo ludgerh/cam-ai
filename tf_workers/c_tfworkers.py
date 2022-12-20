@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# c_tfworkers.py V0.8.5
+
 import json
 import numpy as np
 import cv2 as cv
@@ -216,7 +218,8 @@ class tf_worker():
             WebSocketConnectionClosedException,
             OSError,
           ):
-        self.logger.warning('BrokenPipe or Timeout while resetting prediction websocket server')
+        self.logger.warning('BrokenPipe or Timeout while resetting '
+          + 'prediction websocket server')
         sleep(djconf.getconfigfloat('long_brake', 1.0))
 
   def continue_sending(self, payload, opcode=1, logger=None, get_answer=False):
@@ -235,7 +238,8 @@ class tf_worker():
             ):
           if logger:
             frameinfo = getframeinfo(currentframe())
-            logger.warning('Pipe error while sending in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
+            logger.warning('Pipe error while sending in ' + frameinfo.filename 
+              + ':' + str(frameinfo.lineno))
           sleep(djconf.getconfigfloat('long_brake', 1.0))
           self.reset_websocket()
       if get_answer:
@@ -246,7 +250,8 @@ class tf_worker():
               ConnectionRefusedError,
             ):
           if logger:
-            logger.warning('Pipe error while reading in ' + frameinfo.filename + ':' + str(frameinfo.lineno))
+            logger.warning('Pipe error while reading in ' + frameinfo.filename 
+              + ':' + str(frameinfo.lineno))
           sleep(djconf.getconfigfloat('long_brake', 1.0))
           self.reset_websocket()
       else:
@@ -407,7 +412,8 @@ class tf_worker():
             #'scho' : schoolnr,
             'scho' : myschool.e_school,
           }
-          xytemp = json.loads(self.continue_sending(json.dumps(outdict), opcode=1, logger=logger, get_answer=True))
+          xytemp = json.loads(self.continue_sending(json.dumps(outdict), 
+            opcode=1, logger=logger, get_answer=True))
           self.allmodels[schoolnr]['xdim'] = xytemp[0]
           self.allmodels[schoolnr]['ydim'] = xytemp[1]
           sleep(self.dbline.gpu_sim_loading) 
@@ -510,12 +516,14 @@ class tf_worker():
             for item in framelist:
               jpgdata = cv.imencode('.jpg', item)[1].tobytes()
               schoolbytes = myschool.e_school.to_bytes(8, 'big')
-              self.continue_sending(schoolbytes+jpgdata, opcode=0, logger=logger, get_answer=False)
+              self.continue_sending(schoolbytes+jpgdata, opcode=0, 
+                logger=logger, get_answer=False)
             outdict = {
               'code' : 'done',
               'scho' : myschool.e_school,
             }
-            predictions = self.continue_sending(json.dumps(outdict), opcode=1, logger=logger, get_answer=True)
+            predictions = self.continue_sending(json.dumps(outdict), opcode=1, 
+              logger=logger, get_answer=True)
             if predictions == 'incomplete':
               predictions = np.zeros((len(framelist), len(taglist)), np.float32)
             else:

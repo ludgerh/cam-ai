@@ -297,7 +297,12 @@ class c_cam(c_device):
         probe['streams'][self.video_codec]['height'])
       self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
       self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
-      self.dbline.save(update_fields=['cam_xres', 'cam_yres'])
+      while True:
+        try:
+          self.dbline.save(update_fields=['cam_xres', 'cam_yres'])
+          break
+        except OperationalError:
+          connection.close()
       if self.dbline.cam_audio_codec == -1:
         self.audio_codec = 0
         try:

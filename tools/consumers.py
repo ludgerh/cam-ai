@@ -24,13 +24,16 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from tools.c_logger import log_ini
 from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter, savedbline
-from tools.l_tools import djconf
+from tools.l_tools import djconf, displaybytes
 from tf_workers.models import school, worker
 from trainers.models import trainframe, trainer
 from eventers.models import event, event_frame
 from streams.c_streams import streams, c_stream
 from streams.models import stream as dbstream
 from streams.startup import start_stream_list, start_worker_list, start_trainer_list
+from .health import totaldiscspace, freediscspace
+
+from random import randint
 
 logname = 'ws_toolsconsumers'
 logger = getLogger(logname)
@@ -242,6 +245,16 @@ class health(AsyncWebsocketConsumer):
         except event.DoesNotExist:
           pass
       outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
+
+    elif params['command'] == 'getdiscinfo':
+      outlist['data'] = {
+        'total' : totaldiscspace,
+        'free' : freediscspace,
+        'totalstr' : displaybytes(totaldiscspace),
+        'freestr' : displaybytes(freediscspace),
+      }
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
