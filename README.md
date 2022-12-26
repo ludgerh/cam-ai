@@ -73,7 +73,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `[Unit]`
 
-   ``Description=Disable Transparent Huge Pages`
+   `Description=Disable Transparent Huge Pages`
 
    `[Service]`
 
@@ -149,7 +149,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    Import the initial data:
 
-   `mysql -u CAM-AI -p "CAM-AI" < ~/cam-ai/sql/new.sql` !!!!
+   `mysql -u CAM-AI -p "CAM-AI" < ~/cam-ai/sql/new.sql`
 
    
 

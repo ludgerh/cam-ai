@@ -180,3 +180,9 @@ streams/c_cams.py
 schools/consumers.py
 eventers/events.html
 oneitem/oneeventer.html
+
+v 0.8.7 issue #12 & mem leaks in tf_worker
+camai/version.py
+l_buffer/l_buffer.py
+tools/l_tools.py
+tf_workers/c_tfworkers.py

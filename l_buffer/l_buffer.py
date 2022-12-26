@@ -137,11 +137,14 @@ class l_buffer:
           name='l_buffer_get_block_worker')
         self.out_block_wthread.start()
       ts = time()
-      while (self.out_blocked 
-        or (not self.redis.exists(l_buffer.redis_dict[self.storage]))):
+      if (not self.redis.exists(l_buffer.redis_dict[self.storage])):
+        return(None)
+      blockdelay = 0.005
+      while self.out_blocked:
         if (time() - ts) > 5.0:
           return(None)
-        sleep(0.005)
+        sleep(blockdelay)
+        blockdelay += 0.005
       if self.bget:
         #print('get_block')
         self.out_blocked = True
@@ -162,10 +165,12 @@ class l_buffer:
           name='l_buffer_put_block_worker')
         self.in_block_wthread.start()
       ts = time()
+      blockdelay = 0.005
       while self.in_blocked:
         if (time() - ts) > 5.0:
           return(None)
-        sleep(0.005)
+        sleep(blockdelay)
+        blockdelay += 0.005
       if self.bput:
         #print('put_block')
         self.in_blocked = True

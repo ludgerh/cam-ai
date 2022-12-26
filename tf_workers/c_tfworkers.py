@@ -16,12 +16,15 @@
 import json
 import numpy as np
 import cv2 as cv
+import sys
+import gc
 from os import environ, path, makedirs
 from multiprocessing import Process, Queue
 from collections import deque
 from time import sleep, time
 from threading import Thread, Lock, get_native_id
 from random import random
+from multitimer import MultiTimer
 from traceback import format_exc
 from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
@@ -38,6 +41,9 @@ from tools.c_tools import cmetrics, hit100
 from tools.c_logger import log_ini
 from .models import school, worker
 from schools.c_schools import get_taglist
+
+from psutil import virtual_memory
+from tools.l_tools import displaybytes
 
 tf_workers = {}
 for item in school.objects.filter(active=True):
@@ -148,17 +154,6 @@ class tf_worker():
     #*** Common Vars
     self.id = idx
     self.dbline = worker.objects.get(id=self.id)
-    if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
-      environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-      environ["CUDA_VISIBLE_DEVICES"]=str(self.dbline.gpu_nr)
-      import tensorflow as tf
-      gpus = tf.config.list_physical_devices('GPU')
-      if gpus:
-        for gpu in gpus:
-          tf.config.experimental.set_memory_growth(gpu, True)
-      from tensorflow.keras.models import load_model
-      self.load_model = load_model
-      self.tf = tf
 
     self.inqueue = Queue()
     self.registerqueue = Queue()
@@ -270,6 +265,7 @@ class tf_worker():
         received = self.inqueue.get()
         #print('TFW in', received)
         if (received[0] == 'stop'):
+          self.health_proc.stop()
           self.do_run = False
           while not self.inqueue.empty():
             received = self.inqueue.get()
@@ -314,6 +310,19 @@ class tf_worker():
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
+  def health_check_proc(self):
+    try:
+      for i in self.model_buffers:
+        logstring = '***' + str(i) + ': '
+        logstring += str(len(self.model_buffers[i]))
+        logstring += ' - ' + str(sys.getsizeof(self.model_buffers[i]))
+        self.logger.info(logstring)
+      gc.collect()
+      self.logger.info('??? ' + displaybytes(self.memlevel1) + '  ' + displaybytes(self.memlevel2) + '  '  + displaybytes(self.memlevel3))
+    except:
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
+
   def runner(self):
     self.dbline = worker.objects.get(id=self.id)
     self.clientset = set(range(self.dbline.max_nr_clients))
@@ -328,7 +337,27 @@ class tf_worker():
     log_ini(self.logger, self.logname)
     try:
       setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
+      if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
+        environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        environ["CUDA_VISIBLE_DEVICES"]=str(self.dbline.gpu_nr)
+        import tensorflow as tf
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+          for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        from tensorflow.keras.models import load_model
+        self.load_model = load_model
+        self.tf = tf
       self.model_buffers = {}
+
+      self.memall = 0.0    
+      self.memlevel1 = 0.0
+      self.memlevel2 = 0.0
+      self.memlevel3 = 0.0
+      self.health_proc = MultiTimer(interval=60, function=self.health_check_proc, 
+        runonstart=False)
+      self.health_proc.start()
+
       if self.dbline.gpu_sim >= 0:
         self.cachedict = {}
       elif self.dbline.use_websocket:
@@ -544,12 +573,40 @@ class tf_worker():
             npframelist.shape[3]), 
             np.uint8)
           portion = np.vstack((npframelist, patch))
+          
+          
+          memused = virtual_memory().used
+          self.memlevel1 += (memused - self.memall)
+          self.memall = memused 
+
+
           predictions = (
             self.activemodels[schoolnr].predict_on_batch(portion))
+          
+          
+          memused = virtual_memory().used
+          self.memlevel2 += (memused - self.memall)
+          self.memall = memused 
+
+
           predictions = predictions[:npframelist.shape[0]]
         else:
+          
+          
+          memused = virtual_memory().used
+          self.memlevel1 += (memused - self.memall)
+          self.memall = memused 
+
+
           predictions = (
             self.activemodels[schoolnr].predict_on_batch(npframelist))
+          
+          
+          memused = virtual_memory().used
+          self.memlevel3 += (memused - self.memall)
+          self.memall = memused 
+
+
       starting = 0
       for i in range(len(framelist)):
         if ((i == len(framelist) - 1) 
