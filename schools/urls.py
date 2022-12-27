@@ -18,8 +18,11 @@ from .views import images, classroom, getbmp, getbigbmp, getbigmp4
 urlpatterns = [
 	path('images/<int:schoolnr>/', images, name='images'),
 	path('classroom/<int:schoolnr>/', classroom, name='classroom'),
-	path('getbmp/<int:schoolnr>/<str:name>/<int:outtype>/<int:xycontained>/<int:x>/<int:y>/', getbmp, name='getbmp'),
-	path('getbigbmp/<int:schoolnr>/<str:name>/', getbigbmp, name='getbigbmp'),
+	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>/<int:x>/<int:y>/', getbmp, name='getbmp'),
+	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>/<int:x>/<int:y>/<int:tokennr>/<str:token>/', getbmp, name='getbmptoken'),
+	path('getbigbmp/<int:mode>/<int:framenr>/', getbigbmp, name='getbigbmp'),
+	path('getbigbmp/<int:mode>/<int:framenr>/<int:tokennr>/<str:token>/', getbigbmp, name='getbigbmptoken'),
 	path('getbigmp4/<int:eventnr>/video.html', getbigmp4, name='getbigmp4'),
+	path('getbigmp4/<int:eventnr>/<int:tokennr>/<str:token>/video.html', getbigmp4, name='getbigmp4token'),
 ]
 

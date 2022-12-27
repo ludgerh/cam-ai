@@ -102,8 +102,8 @@
 {% for item in frames %}
             <div id="col{{ frame.id }}" class="col-sm-auto">
               <div class="card m-2" id="crd{{ item.id }}" dtype="0" style="width: 375px; height: 480px;">
-	              <a href="/schools/getbigbmp/0/{{ item.name }}/" target="_blank">
-                  <img src="/schools/getbmp/0/{{ item.name }}/3/1/375/375/" style="width: 375px; height: 375px; object-fit: contain;"></a>
+	              <a href="/schools/getbigbmp/0/{{ item.id }}/" target="_blank">
+                  <img src="/schools/getbmp/0/{{ item.id }}/3/1/375/375/" style="width: 375px; height: 375px; object-fit: contain;"></a>
                   <div class="card-body">
                     <h6 class="card-title">{{ item.time|date:'d.m.Y H:i:s' }}</h6>
                     <button type="button"  id="{{ item.id }}" class="btn btn-primary position-absolute bottom-0 start-0 m-3 framearchbutton" style="width: 120px;">To Archive</button>

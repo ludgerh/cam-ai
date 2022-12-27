@@ -186,3 +186,24 @@ camai/version.py
 l_buffer/l_buffer.py
 tools/l_tools.py
 tf_workers/c_tfworkers.py
+
+v 0.8.8 issue #17 first part (email)
+camai/version.py
+tools/tokens.py
+tools/models.py
+eventers/c_event.py
+eventers/c_eventers.py
+eventers/urls.py
+eventers/views.py
+eventers/models.py
+eventers/oneevent.html
+eventers/events.html
+schools/urls.py
+schools/views.py
+schools/bigbmp.html
+schools/images.html
+schools/classroom.html
+schools/bigmp4.html
+trainers/c_trainers.py
+trainers/c_train_worker_gpu.py
+tf_workers/c_tfworkers.py

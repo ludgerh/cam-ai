@@ -28,7 +28,6 @@ class event(models.Model):
   ymax = models.IntegerField(default=0)
   numframes = models.IntegerField(default=0)
   school = models.ForeignKey(school, on_delete=models.CASCADE, default=1)
-  locktime = models.DateTimeField(default=None, null=True)
   done = models.BooleanField(default=False)
   videoclip = models.CharField(max_length=256, default='')
   double = models.BooleanField(default=False)

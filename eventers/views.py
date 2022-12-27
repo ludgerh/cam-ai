@@ -19,8 +19,9 @@ from django.http import HttpResponse
 from django.views.generic import ListView
 from access.c_access import access
 from tools.l_tools import djconf
-from eventers.models import event, event_frame
+from tools.tokens import checktoken
 from tf_workers.models import school
+from .models import event, event_frame
 
 @login_required
 def events(request, schoolnr):
@@ -69,34 +70,53 @@ def oneevent(request, schoolnr, eventnr):
   else:
     return(HttpResponse('No Access'))
 
-#@login_required
-def eventjpg(request, eventnr):
+def eventjpg(request, eventnr, tokennr=None, token=None):
   myevent = event.objects.get(id=eventnr)
-  #myschool = myevent.school.id
-  #if access.check('S', myschool, request.user, 'R'):
+  if request.user.id is None:
+    if (tokennr and token):
+      go_on = checktoken((tokennr, token), 'EVR', eventnr)
+    else:
+      go_on = False
+  else:
+    myschool = myevent.school.id
+    go_on = access.check('S', myschool, request.user, 'R')
+  if not go_on:
+    return(HttpResponse('No Access'))
   filename = (myevent.videoclip + '.jpg')
   filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
   with open(filepath, "rb") as f:
     return HttpResponse(f.read(), content_type="image/jpeg")
-  #else:
-  #  return(HttpResponse('No Access'))
 
-#@login_required
-#no login when called from email
-def eventmp4(request, eventnr):
+def eventmp4(request, eventnr, tokennr=None, token=None):
   myevent = event.objects.get(id=eventnr)
-  #myschool = myevent.school.id
+  if request.user.id is None:
+    if (tokennr and token):
+      go_on = checktoken((tokennr, token), 'EVR', eventnr)
+    else:
+      go_on = False
+  else:
+    myschool = myevent.school.id
+    go_on = access.check('S', myschool, request.user, 'R')
+  if not go_on:
+    return(HttpResponse('No Access'))
   filename = (myevent.videoclip + '.mp4')
   filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
   with open(filepath, "rb") as f:
     result = HttpResponse(f.read(), content_type="video/mp4")
     return(result)
 
-#@login_required
-#no login when called from email
-def eventwebm(request, eventnr):
+def eventwebm(request, eventnr, tokennr=None, token=None):
   myevent = event.objects.get(id=eventnr)
-  #myschool = myevent.school.id
+  if request.user.id is None:
+    if (tokennr and token):
+      go_on = checktoken((tokennr, token), 'EVR', eventnr)
+    else:
+      go_on = False
+  else:
+    myschool = myevent.school.id
+    go_on = access.check('S', myschool, request.user, 'R')
+  if not go_on:
+    return(HttpResponse('No Access'))
   filename = (myevent.videoclip + '.webm')
   filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
   with open(filepath, "rb") as f:

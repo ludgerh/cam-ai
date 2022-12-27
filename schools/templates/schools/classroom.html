@@ -106,10 +106,10 @@ getimages = function() {
 			      indices[$(this).attr('id')].push(framelines[$(this).attr('id')][j].id);
             mycard = $('<div id="card'+framelines[$(this).attr('id')][j].id+'" class="card m-1 p-0" style="width: 212px; height: auto;">'
               + '<a href="/schools/getbigbmp/0/'
-			        + framelines[$(this).attr('id')][j].name.replace(/\//g,'$')+'/'
+			        + framelines[$(this).attr('id')][j].id + '/'
 			        + '" target="_blank">'
 			        + '<img src="/schools/getbmp/0/'
-			        + framelines[$(this).attr('id')][j].name.replace(/\//g,'$')+'/3/1/210/210/'
+			        + framelines[$(this).attr('id')][j].id + '/3/1/210/210/'
               +'" style="width: 210px; height: 210px; object-fit: contain"</a>'
             + '</div>');
             mycard.appendTo($(this));

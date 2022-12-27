@@ -14,16 +14,29 @@
 from django.db import models
 
 class setting(models.Model):
-	setting =  models.CharField(max_length=100)
-	value =  models.CharField(max_length=100)
-	comment =  models.CharField(max_length=255)
+  setting =  models.CharField(max_length=100)
+  value =  models.CharField(max_length=100)
+  comment =  models.CharField(max_length=255)
 
-	def __str__(self):
-		return('Setting: ' + self.setting+' = ' + self.value)
+  def __str__(self):
+    return('Setting: ' + self.setting+' = ' + self.value)
 
 class camurl(models.Model):
-	type =  models.CharField(max_length=100)
-	url =  models.CharField(max_length=255)
+  type = models.CharField(max_length=100)
+  url =  models.CharField(max_length=255)
 
-	def __str__(self):
-		return('CamUrl model: ' + self.type+' - ' + self.url)
+  def __str__(self):
+    return('CamUrl model: ' + self.type+' - ' + self.url)
+
+class token(models.Model):
+  passwd = models.CharField(max_length=20)
+  made = models.DateTimeField()
+  cat = models.CharField(max_length=3, default='NON')
+  #'EVR' = Eventer read (from email)
+  idx = models.IntegerField(default=0)
+  info = models.CharField(max_length=255, default='...')
+  count = models.IntegerField(default=0)
+  valid = models.BooleanField(default=True)
+
+  def __str__(self):
+    return('Token: ' + self.passwd)

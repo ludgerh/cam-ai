@@ -22,7 +22,7 @@ from setproctitle import setproctitle
 from collections import deque
 from time import time, sleep
 from threading import Thread
-from subprocess import run
+from subprocess import Popen, run
 from psutil import Process
 from django.forms.models import model_to_dict
 from django.db import connection
@@ -368,7 +368,7 @@ class c_eventer(c_device):
                     '-q:v', '2', 
                     savepath[:-4]+'.jpg'
                   ])
-                  p = run([
+                  p = Popen([
                     'ffmpeg', 
                     '-v', 'fatal', 
                     '-i', savepath, 
@@ -420,7 +420,8 @@ class c_eventer(c_device):
             if myevent.status <= -2:
               if (myevent.end <= self.last_display) or (not self.redis.view_from_dev('E', self.dbline.id)): 
                 if not (myevent.isrecording 
-                    or myevent.goes_to_school): 
+                    or myevent.goes_to_school
+                    or myevent.to_email): 
                   while True:
                     try:
                       event.objects.get(id=myevent.dbline.id).delete()

@@ -368,7 +368,6 @@ CREATE TABLE `eventers_event` (
   `ymin` int(11) NOT NULL,
   `ymax` int(11) NOT NULL,
   `numframes` int(11) NOT NULL,
-  `locktime` datetime(6) DEFAULT NULL,
   `done` tinyint(1) NOT NULL,
   `videoclip` varchar(256) NOT NULL,
   `double` tinyint(1) NOT NULL,
@@ -690,6 +689,35 @@ INSERT INTO `tools_setting` VALUES (1,'loglevel','INFO','No Comment'),(2,'emulat
 UNLOCK TABLES;
 
 --
+-- Table structure for table `tools_token`
+--
+
+DROP TABLE IF EXISTS `tools_token`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `tools_token` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `passwd` varchar(20) NOT NULL,
+  `made` datetime(6) NOT NULL,
+  `count` int(11) NOT NULL,
+  `valid` tinyint(1) NOT NULL,
+  `cat` varchar(3) NOT NULL,
+  `idx` int(11) NOT NULL,
+  `info` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `tools_token`
+--
+
+LOCK TABLES `tools_token` WRITE;
+/*!40000 ALTER TABLE `tools_token` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tools_token` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `trainers_epoch`
 --
 
@@ -991,4 +1019,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-14 14:49:24
+-- Dump completed on 2022-12-27 22:03:04

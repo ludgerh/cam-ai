@@ -260,15 +260,14 @@ function getimages() {
     })
     .then((predictions) => {
       if (do_run) {
-        newname = frames[frame_processing].name;
         newaddition = '<div id="col' + frames[frame_processing].id+'" class="col-sm-auto m-0 p-0">'
           + '<div class="card m-1 p-0"'
           + ' style="border: 1; width: 212px; height: auto;" done=0>' + frames[frame_processing].made
-            + '<a href="/schools/getbigbmp/{{ schoolnr }}/'+newname.replace(/\//g,'$')+'/" target="_blank">'
+            + '<a href="/schools/getbigbmp/1/'+frames[frame_processing].id+'/" target="_blank">'
             + '<img idx='+frames[frame_processing].id+' style="width: 210px; height: 210px; object-fit: contain" src="'
             + window.location.protocol + '//' +  window.location.host
-            + '/schools/getbmp/{{ schoolnr }}/'
-            + newname.replace(/\//g,'$')+'/3/1/210/210/"></a><br>'
+            + '/schools/getbmp/1/'
+            + frames[frame_processing].id +'/3/1/210/210/"></a><br>'
             newaddition += '<div class="checklist h4">';
             for (let i=0; i<taglines.length; i++) {
   {% if may_write %}

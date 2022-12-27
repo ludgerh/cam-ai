@@ -19,7 +19,10 @@ urlpatterns = [
 	path('events/<int:schoolnr>/', events, name='events'),
 	path('oneevent/<int:schoolnr>/<int:eventnr>/', oneevent, name='oneevent'),
 	path('eventjpg/<int:eventnr>/video.jpg', eventjpg, name='eventjpg'),
+	path('eventjpg/<int:eventnr>/<int:tokennr>/<str:token>/video.jpg', eventjpg, name='eventjpgtoken'),
 	path('eventmp4/<int:eventnr>/video.mp4', eventmp4, name='eventmp4'),
+	path('eventmp4/<int:eventnr>/<int:tokennr>/<str:token>/video.mp4', eventmp4, name='eventmp4token'),
 	path('eventwebm/<int:eventnr>/video.webm', eventwebm, name='eventwebm'),
+	path('eventwebm/<int:eventnr>/<int:tokennr>/<str:token>/video.webm', eventwebm, name='eventwebmtoken'),
 ]
 

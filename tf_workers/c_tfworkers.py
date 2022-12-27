@@ -265,7 +265,7 @@ class tf_worker():
         received = self.inqueue.get()
         #print('TFW in', received)
         if (received[0] == 'stop'):
-          self.health_proc.stop()
+          #self.health_proc.stop()
           self.do_run = False
           while not self.inqueue.empty():
             received = self.inqueue.get()
@@ -310,18 +310,18 @@ class tf_worker():
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
-  def health_check_proc(self):
-    try:
-      for i in self.model_buffers:
-        logstring = '***' + str(i) + ': '
-        logstring += str(len(self.model_buffers[i]))
-        logstring += ' - ' + str(sys.getsizeof(self.model_buffers[i]))
-        self.logger.info(logstring)
-      gc.collect()
-      self.logger.info('??? ' + displaybytes(self.memlevel1) + '  ' + displaybytes(self.memlevel2) + '  '  + displaybytes(self.memlevel3))
-    except:
-      self.logger.error(format_exc())
-      self.logger.handlers.clear()
+  #def health_check_proc(self):
+  #  try:
+  #    for i in self.model_buffers:
+  #      logstring = '***' + str(i) + ': '
+  #      logstring += str(len(self.model_buffers[i]))
+  #      logstring += ' - ' + str(sys.getsizeof(self.model_buffers[i]))
+  #      self.logger.info(logstring)
+  #    gc.collect()
+  #    self.logger.info('??? ' + displaybytes(self.memlevel1) + '  ' + displaybytes(self.memlevel2) + '  '  + displaybytes(self.memlevel3))
+  #  except:
+  #    self.logger.error(format_exc())
+  #    self.logger.handlers.clear()
 
   def runner(self):
     self.dbline = worker.objects.get(id=self.id)
@@ -350,13 +350,13 @@ class tf_worker():
         self.tf = tf
       self.model_buffers = {}
 
-      self.memall = 0.0    
-      self.memlevel1 = 0.0
-      self.memlevel2 = 0.0
-      self.memlevel3 = 0.0
-      self.health_proc = MultiTimer(interval=60, function=self.health_check_proc, 
-        runonstart=False)
-      self.health_proc.start()
+      #self.memall = 0.0    
+      #self.memlevel1 = 0.0
+      #self.memlevel2 = 0.0
+      #self.memlevel3 = 0.0
+      #self.health_proc = MultiTimer(interval=60, function=self.health_check_proc, 
+      #  runonstart=False)
+      #self.health_proc.start()
 
       if self.dbline.gpu_sim >= 0:
         self.cachedict = {}
@@ -575,36 +575,36 @@ class tf_worker():
           portion = np.vstack((npframelist, patch))
           
           
-          memused = virtual_memory().used
-          self.memlevel1 += (memused - self.memall)
-          self.memall = memused 
+          #memused = virtual_memory().used
+          #self.memlevel1 += (memused - self.memall)
+          #self.memall = memused 
 
 
           predictions = (
             self.activemodels[schoolnr].predict_on_batch(portion))
           
           
-          memused = virtual_memory().used
-          self.memlevel2 += (memused - self.memall)
-          self.memall = memused 
+          #memused = virtual_memory().used
+          #self.memlevel2 += (memused - self.memall)
+          #self.memall = memused 
 
 
           predictions = predictions[:npframelist.shape[0]]
         else:
           
           
-          memused = virtual_memory().used
-          self.memlevel1 += (memused - self.memall)
-          self.memall = memused 
+          #memused = virtual_memory().used
+          #self.memlevel1 += (memused - self.memall)
+          #self.memall = memused 
 
 
           predictions = (
             self.activemodels[schoolnr].predict_on_batch(npframelist))
           
           
-          memused = virtual_memory().used
-          self.memlevel3 += (memused - self.memall)
-          self.memall = memused 
+          #memused = virtual_memory().used
+          #self.memlevel3 += (memused - self.memall)
+          #self.memall = memused 
 
 
       starting = 0

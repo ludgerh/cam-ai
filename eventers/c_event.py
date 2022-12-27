@@ -30,6 +30,7 @@ from django.utils import timezone
 from django.db.utils import OperationalError
 from .models import event, event_frame, school
 from tools.l_tools import ts2filename, uniquename, randomfilter, np_mov_avg, djconf
+from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 
 schoolpath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
@@ -109,6 +110,7 @@ class c_event(list):
     self.number_of_frames = djconf.getconfigint('frames_event', 32)
     self.isrecording = False
     self.goes_to_school = False
+    self.to_email = ''
     self.status = 0
     self.ts = None
     self.savename = ''
@@ -261,41 +263,44 @@ class c_event(list):
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
 
   def save(self, cond_dict):
-
-    #self.logger.info('*** Saving Event: '+str(self.dbline.id))
-    self.frames_filter(self.number_of_frames, cond_dict)
-    frames_to_save = self.frames.values()
-    self.dbline.p_string=self.eventer_name+'('+str(self.eventer_id)+'): '+self.p_string()
-    self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
-    self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
-    self.dbline.xmin=self[0]
-    self.dbline.xmax=self[1]
-    self.dbline.ymin=self[2]
-    self.dbline.ymax=self[3]
-    self.dbline.numframes=len(frames_to_save)
-    self.dbline.done = not self.goes_to_school
-    self.dbline.save()
-    self.mailimages = []
-    for item in frames_to_save:
-      pathadd = str(self.schoolnr)+'/'+str(randint(0,99))
-      if not path.exists(schoolpath+pathadd):
-        makedirs(schoolpath+pathadd)
-      filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[0][2], 
-        noblank=True), 'bmp')
-      self.mailimages.append(filename.replace('/', '$', 2))
-      cv.imwrite(schoolpath+filename, item[0][1])
-      frameline = event_frame(
-        time=timezone.make_aware(datetime.fromtimestamp(item[0][2])),
-        name=filename,
-        x1=item[0][3],
-        x2=item[0][4],
-        y1=item[0][5],
-        y2=item[0][6],
-        event=self.dbline,
-      )
-      frameline.save()
-    if len(self.to_email) > 0:
-      self.send_emails()
+    try:
+      #self.logger.info('*** Saving Event: '+str(self.dbline.id))
+      self.frames_filter(self.number_of_frames, cond_dict)
+      frames_to_save = self.frames.values()
+      self.dbline.p_string=self.eventer_name+'('+str(self.eventer_id)+'): '+self.p_string()
+      self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
+      self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
+      self.dbline.xmin=self[0]
+      self.dbline.xmax=self[1]
+      self.dbline.ymin=self[2]
+      self.dbline.ymax=self[3]
+      self.dbline.numframes=len(frames_to_save)
+      self.dbline.done = not self.goes_to_school
+      self.dbline.save()
+      self.mailimages = []
+      for item in frames_to_save:
+        pathadd = str(self.schoolnr)+'/'+str(randint(0,99))
+        if not path.exists(schoolpath+pathadd):
+          makedirs(schoolpath+pathadd)
+        filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[0][2], 
+          noblank=True), 'bmp')
+        cv.imwrite(schoolpath+filename, item[0][1])
+        frameline = event_frame(
+          time=timezone.make_aware(datetime.fromtimestamp(item[0][2])),
+          name=filename,
+          x1=item[0][3],
+          x2=item[0][4],
+          y1=item[0][5],
+          y2=item[0][6],
+          event=self.dbline,
+        )
+        frameline.save()
+        self.mailimages.append(frameline.id)
+      if len(self.to_email) > 0:
+        self.send_emails()
+    except:
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def smt_send_mail(self, message, context, receiver):
     count = 0
@@ -318,6 +323,7 @@ class c_event(list):
   def send_emails(self):
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
+      mytoken = maketoken('EVR', self.dbline.id, receiver)
       mylist = self.pred_read(max=1.0)[1:].tolist()
       maxpos = mylist.index(max(mylist))  
       message = MIMEMultipart('alternative')
@@ -330,27 +336,31 @@ class c_event(list):
       text += 'We had some movement.\n'  
       if self.savename:
         text += 'Here is the movie: \n' 
-        text += clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/video.html \n' 
+        text += clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
+        text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
       text += 'Here are the images: \n'  
       for item in self.mailimages:
-        text += clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/ \n' 
+        text += clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
+        text += str(mytoken[0]) + '/' + mytoken[1] + '/ \n' 
       html = '<html><body><p>Hello CAM-AI user, <br>\n' 
       html += 'We had some movement. <br> \n' 
       if self.savename:
         html += '<br>Here is the movie (click on the image): <br> \n' 
-        html += '<a href="' + clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/video.html'
+        html += '<a href="' + clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
+        html += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
         html += '" target="_blank">'
-        html += '<img src="' + clienturl + 'eventers/eventjpg/' + str(self.dbline.id) + '/video.jpg'
+        html += '<img src="' + clienturl + 'eventers/eventjpg/' + str(self.dbline.id) + '/'
+        html += str(mytoken[0]) + '/' + mytoken[1] + '/video.jpg'
         html += '" style="width: 400px; height: auto"</a> <br>\n'
       html += 'Here are the images: <br> \n'
       for item in self.mailimages:
-        html += '<a href="' + clienturl + 'schools/getbigbmp/0/' + item
+        html += '<a href="' + clienturl + 'schools/getbigbmp/0/' + str(item) + '/'
+        html += str(mytoken[0]) + '/' + mytoken[1] + '/' 
         html += '" target="_blank">'
-        html += '<img src="' + clienturl + 'schools/getbmp/0/' + item + '/3/1/200/200/'
+        html += '<img src="' + clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
+        html += str(mytoken[0]) + '/' + mytoken[1] + '/' 
         html += '" style="width: 200px; height: 200px; object-fit: contain"</a> \n'
       html += '<br> \n'
-
-
       message.attach(MIMEText(text, 'plain'))
       message.attach(MIMEText(html, 'html'))
       context = ssl.create_default_context()

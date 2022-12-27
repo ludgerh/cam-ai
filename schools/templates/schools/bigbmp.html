@@ -23,7 +23,11 @@
   }
 
   .bg {
-    background-image: url("/schools/getbmp/{{ school }}/{{ name }}/3/0/0/0/");
+{% if tokennr %}
+    background-image: url("/schools/getbmp/{{ mode }}/{{ framenr }}/3/0/0/0/{{ tokennr }}/{{ token }}/");
+{% else %}
+    background-image: url("/schools/getbmp/{{ mode }}/{{ framenr }}/3/0/0/0/");
+{% endif %}
     height: 100%; 
     background-position: center;
     background-repeat: no-repeat;
@@ -35,7 +39,7 @@
 
 <div class="bg"></div>
 
-<p>/schools/getbmp/{{ school }}/{{ name }}</p>
+<p>/schools/getbmp/{{ mode }}/{{ framenr }}</p>
 
 </body>
 </html>

@@ -11,6 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+import gc
 from multiprocessing import Process, Queue
 from threading import Thread, Lock
 from queue import Queue as threadqueue, Empty
@@ -205,6 +206,7 @@ class trainer():
               trainframe.objects.filter(**filterdict).update(train_status=2)
             with self.mylock:
               self.job_queue_list.remove(myschool.id)
+            gc.collect()
           except Empty:
             pass
         sleep(10.0)

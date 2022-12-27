@@ -17,6 +17,7 @@ from random import seed, uniform, shuffle
 from shutil import copyfile
 from time import time
 import numpy as np
+from traceback import format_exc
 from math import ceil, sqrt, pi, log
 from django.utils import timezone
 from django.db import connection as sqlconnection
@@ -230,29 +231,32 @@ class MyCallback(Callback):
     sqlconnection.close()
 
 def gpu_init(gpu_nr, gpu_mem_limit, logger):
-  global global_load_model
-  global global_tf
-  logger.info('Init Gpu: '+str(gpu_nr))
-  environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-  environ["CUDA_VISIBLE_DEVICES"]=str(gpu_nr)
-  import tensorflow as tf
-  global_tf = tf
-  if gpu_mem_limit:
-    gpus = tf.config.list_physical_devices('GPU')
-    for gpu in gpus:
-      tf.config.set_logical_device_configuration(
-          gpu, [tf.config.LogicalDeviceConfiguration(memory_limit=gpu_mem_limit)])
+  try:
+    global global_load_model
+    global global_tf
+    logger.info('Init Gpu: '+str(gpu_nr))
+    environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+    environ["CUDA_VISIBLE_DEVICES"]=str(gpu_nr)
+    import tensorflow as tf
+    global_tf = tf
+    if gpu_mem_limit:
+      gpus = tf.config.list_physical_devices('GPU')
+      for gpu in gpus:
+        tf.config.set_logical_device_configuration(
+            gpu, [tf.config.LogicalDeviceConfiguration(memory_limit=gpu_mem_limit)])
       logical_gpus = tf.config.list_logical_devices('GPU')
       logger.info(str(len(gpus))+" Physical GPUs, "+str(len(logical_gpus))+" Logical GPUs")
-
-  from tensorflow.keras.models import load_model
-  global_load_model = load_model
-  logger.info("TensorFlow version: "+tf.__version__)
-  device_name = tf.test.gpu_device_name()
-  if device_name:
-	  logger.info('Found GPU at: '+device_name)
-  else:
-	  logger.info('GPU device not found')
+    from tensorflow.keras.models import load_model
+    global_load_model = load_model
+    logger.info("TensorFlow version: "+tf.__version__)
+    device_name = tf.test.gpu_device_name()
+    if device_name:
+	    logger.info('Found GPU at: '+device_name)
+    else:
+	    logger.info('GPU device not found')
+  except:
+    logger.error(format_exc())
+    logger.handlers.clear()
 
 def getlines(myschool, logger):
   filterdict = {}
