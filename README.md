@@ -251,6 +251,8 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `pip install psutil`
 
+   `pip install ua-parser`
+
    
 
 10. #### Start the server

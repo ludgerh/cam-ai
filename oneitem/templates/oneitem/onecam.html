@@ -207,6 +207,8 @@ $(document).ready(function() {
 	    'mode' : 'C',
       'idx' : {{ dbline.id }},
       'width' : displaywidth,
+      'tokennr' : {{ tokennr }},
+      'token' : '{{ token }}',
     }));
   })
   .then((result) => {

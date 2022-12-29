@@ -468,6 +468,8 @@ $(document).ready(function() {
 	    'mode' : 'E',
       'idx' : {{ dbline.id }},
       'width' : displaywidth,
+      'tokennr' : {{ tokennr }},
+      'token' : '{{ token }}',
     }));
   })
   .then((result) => {
@@ -504,7 +506,6 @@ $(document).ready(function() {
 		return(oneitemSocket.sendandwait({
 			'command' : 'get_all_conditions',
 		}));
-{% endif %}
 	})
 	.then((result) => {
 		c_dict = result;
@@ -512,6 +513,7 @@ $(document).ready(function() {
       refresh_one(k);
     };
     reset_triggers(true);
+{% endif %}
 	})
 	.catch(err => {console.log(err);});
 });

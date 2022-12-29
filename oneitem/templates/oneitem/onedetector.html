@@ -213,6 +213,8 @@ $(document).ready(function() {
 	    'mode' : 'D',
       'idx' : {{ dbline.id }},
       'width' : displaywidth,
+      'tokennr' : {{ tokennr }},
+      'token' : '{{ token }}',
     }));
   })
   .then((result) => {

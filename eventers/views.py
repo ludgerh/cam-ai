@@ -11,6 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+from ua_parser import user_agent_parser
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.template import loader
@@ -53,11 +54,16 @@ def oneevent(request, schoolnr, eventnr):
     frames = event_frame.objects.filter(event_id=eventnr)
     for item in frames:
       item.name = item.name.replace('/', '$', 2)
-
+    useragent = user_agent_parser.Parse(request.META['HTTP_USER_AGENT'])
+    is_android = (useragent['os']['family'] == 'Android') or (useragent['user_agent']['family'] == 'Samsung Internet') 
     template = loader.get_template('eventers/oneevent.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'is_android' : is_android,
+      'uastring' : useragent['string'],
+      'os' : useragent['os']['family'],
+      'browser' : useragent['user_agent']['family'],
       'event' : event.objects.get(id=eventnr),
       'frames' : frames,
       'debug' : settings.DEBUG,

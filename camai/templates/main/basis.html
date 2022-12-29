@@ -168,7 +168,7 @@
 
     {% block content %}No Content yet...{% endblock %}
 
-
+{% if user.id %}
 <script>
 let active_bg = 'bg-success';
 let active_percentage = 1;
@@ -225,6 +225,7 @@ $(document).ready(function() {
   };
 });
 </script>
+{% endif %}
   </body>
 </html>
 

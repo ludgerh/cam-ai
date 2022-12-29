@@ -28,6 +28,7 @@ from tools.c_redis import myredis
 from tools.c_logger import log_ini
 from tools.c_tools import c_convert
 from tools.l_tools import djconf
+from tools.tokens import checktoken
 from tools.djangodbasync import savedbline, updatefilter
 from .models import view_log
 
@@ -79,7 +80,19 @@ class triggerConsumer(WebsocketConsumer):
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'starttrigger':
-        if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
+        if self.scope['user'].id is None:
+          if (params['tokennr'] and params['token']):
+            if params['mode'] == 'C':
+              go_on = checktoken((params['tokennr'], params['token']), 'CAR', params['idx'])
+            elif params['mode'] == 'D':
+              go_on = checktoken((params['tokennr'], params['token']), 'DER', params['idx'])
+            elif params['mode'] == 'E':
+              go_on = checktoken((params['tokennr'], params['token']), 'ETR', params['idx'])
+          else:
+            go_on = False
+        else:
+          go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
+        if go_on:
           outx = params['width']
           if params['mode'] == 'C':
             if outx > streams[params['idx']].dbline.cam_min_x_view:

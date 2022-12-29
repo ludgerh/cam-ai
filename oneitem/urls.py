@@ -16,7 +16,10 @@ from sys import argv
 from .views import onecam , onedetector, oneeventer
 
 urlpatterns = [
-  path('cam/<int:camnr>/', onecam, name='onecam_get'),
+  path('cam/<int:camnr>/', onecam, name='onecam'),
+  path('cam/<int:camnr>/<int:tokennr>/<str:token>/', onecam, name='onecamtoken'),
   path('detector/<int:detectornr>/', onedetector, name='onedetector'),
+  path('detector/<int:detectornr>/<int:tokennr>/<str:token>/', onedetector, name='onedetectortoken'),
   path('eventer/<int:eventernr>/', oneeventer, name='oneeventer'),
+  path('eventer/<int:eventernr>/<int:tokennr>/<str:token>/', oneeventer, name='oneeventertoken'),
 ]

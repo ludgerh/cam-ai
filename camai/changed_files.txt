@@ -207,3 +207,16 @@ schools/bigmp4.html
 trainers/c_trainers.py
 trainers/c_train_worker_gpu.py
 tf_workers/c_tfworkers.py
+
+v 0.8.9 issue #17 second part (viewers)
+camai/version.py
+camai/basis.html
+oneitem/urls.py
+oneitem/views.py
+oneitem/onecam.html
+oneitem/onedetector.html
+oneitem/oneeventer.html
+schools/views.py
+schools/bigmp4.html
+eventers/views.py
+eventers/oneevent.html

@@ -12,6 +12,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from PIL import Image
+from ua_parser import user_agent_parser
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.template import loader
@@ -125,8 +126,6 @@ def getbigbmp(request, mode, framenr, tokennr=0, token=''):
   }
   return(HttpResponse(template.render(context)))
 
-#@login_required
-#no login when called from email
 def getbigmp4(request, eventnr, tokennr=None, token=None):
   myevent = event.objects.get(id=eventnr)
   if request.user.id is None:
@@ -139,10 +138,16 @@ def getbigmp4(request, eventnr, tokennr=None, token=None):
     go_on = access.check('S', myschool, request.user, 'R')
   if not go_on:
     return(HttpResponse('No Access'))
+  useragent = user_agent_parser.Parse(request.META['HTTP_USER_AGENT'])
+  is_android = (useragent['os']['family'] == 'Android') or (useragent['user_agent']['family'] == 'Samsung Internet') 
   template = loader.get_template('schools/bigmp4.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+    'is_android' : is_android,
+    'uastring' : useragent['string'],
+    'os' : useragent['os']['family'],
+    'browser' : useragent['user_agent']['family'],
     'eventnr' : eventnr,
     'tokennr' : tokennr,
     'token' : token,
