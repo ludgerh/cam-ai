@@ -70,7 +70,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'setonefield':
       if self.may_write:
-        if params['pname'] == 'cam_fpslimit':
+        if params['pname'] == 'cam_pause':
+          self.myitem.dbline.cam_pause = params['value']
+          self.myitem.set_pause(params['value'])
+        elif params['pname'] == 'cam_fpslimit':
           self.myitem.dbline.cam_fpslimit = float(params['value'])
         elif params['pname'] == 'cam_feed_type':
           self.myitem.dbline.cam_feed_type = int(params['value'])

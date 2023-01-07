@@ -31,7 +31,7 @@ def sigint_handler(signal, frame):
 class c_device():
 
   def __init__(self, dbline, logger, detector=None):
-    if detector: #Camsa only
+    if detector: #Cams only
       self.mydetector = detector
     self.dbline = dbline
     self.id = dbline.id

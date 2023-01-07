@@ -63,6 +63,8 @@ class c_cam(c_device):
     else:
       if (received[0] == 'reset_cam'):
         self.reset_cam()
+      elif (received[0] == 'pause'):
+        self.dbline.cam_pause = received[1]
       else:
         return(False)
       return(True)
@@ -72,7 +74,24 @@ class c_cam(c_device):
       return(None)
     thistime = time()
     while True:
-      if not self.redis.check_if_counts_zero('C', self.dbline.id):
+      if self.redis.check_if_counts_zero('C', self.dbline.id) or self.dbline.cam_pause:
+        if self.cam_active:
+          if self.cam_ts is None:
+            self.cam_ts = time()
+            break
+          else:
+            if ((time() - self.cam_ts) > 60) or self.dbline.cam_pause:
+              self.logger.info('Cam #'+str(self.dbline.id)+' is off')
+              self.cam_active = False
+              self.cam_ts = None
+              self.stopprocess()
+            else:
+              break
+        else:
+          if not self.do_run:
+            return(None)
+          sleep(djconf.getconfigfloat('short_brake', 0.01))
+      else:
         if self.cam_active:
           if ((not self.redis.record_from_dev('C', self.dbline.id)) 
               and self.cam_recording):
@@ -92,23 +111,6 @@ class c_cam(c_device):
           self.cam_active = True
         self.cam_ts = None
         break
-      else:
-        if self.cam_active:
-          if self.cam_ts is None:
-            self.cam_ts = time()
-            break
-          else:
-            if (time() - self.cam_ts) < 60:
-              break
-            else:
-              self.logger.info('Cam #'+str(self.dbline.id)+' is off')
-              self.cam_active = False
-              self.cam_ts = None
-              self.stopprocess()
-        else:
-          if not self.do_run:
-            return(None)
-          sleep(djconf.getconfigfloat('short_brake', 0.01))
     while True:
       if self.dbline.cam_feed_type == 1:
         frame = None
@@ -333,6 +335,8 @@ class c_cam(c_device):
           try:
             move(self.vid_file_path(self.vid_count), 
               self.recordingspath + '/' + targetname)
+            self.logger.info('CAM sending: ' + str(('new_video', self.vid_count, 
+              targetname, timestamp)))
             self.mydetector.myeventer.inqueue.put(('new_video', self.vid_count, 
               targetname, timestamp))
             self.vid_count += 1
@@ -465,6 +469,9 @@ class c_cam(c_device):
     self.dbline.refresh_from_db()
     self.newprocess() 
     self.logger.info('Cam #'+str(self.dbline.id)+' is on')
+
+  def set_pause(self, status):
+    self.inqueue.put(('pause', status))
 
   def stop(self):
     super().stop()

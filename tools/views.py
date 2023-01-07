@@ -17,7 +17,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from streams.models import stream
 from access.c_access import access
-from tf_workers.models import school
+from tf_workers.models import school, worker
 from tools.l_tools import djconf
 from .models import camurl
 
@@ -87,6 +87,33 @@ class addschool(TemplateView):
       'detectorlist' : detectorlist,
       'eventerlist' : eventerlist,
       'schoollist' : schoollist,
+    })
+    return context
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))
+
+class linkworkers(TemplateView):
+  template_name = 'tools/linkworkers.html'
+
+  def get_context_data(self, **kwargs):
+    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
+    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
+    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
+    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'debug' : settings.DEBUG,
+      'camlist' : camlist,
+      'detectorlist' : detectorlist,
+      'eventerlist' : eventerlist,
+      'schoollist' : schoollist,
+      'workerlist' : worker.objects.filter(active=True),
     })
     return context
 

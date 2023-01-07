@@ -208,7 +208,7 @@ trainers/c_trainers.py
 trainers/c_train_worker_gpu.py
 tf_workers/c_tfworkers.py
 
-v 0.8.9 issue #17 second part (viewers)
+v 0.8.9 issue #17 second part (viewers) and issue #19
 camai/version.py
 camai/basis.html
 oneitem/urls.py
@@ -220,3 +220,36 @@ schools/views.py
 schools/bigmp4.html
 eventers/views.py
 eventers/oneevent.html
+viewers/consumers.py
+
+v 0.9.0 issue #21
+camai/version.py
+eventers/c_eventers.py
+
+v 0.9.1 bugfixing
+camai/version.py
+eventers/events.html
+tools/c_tools.py
+streams/c_cams.py
+streams/models.py
+oneitem/forms.py
+oneitem/consumers.py
+oneitem/views.py
+oneitem/onecam.html
+
+v 0.9.2 bugfixing
+camai/version.py
+tools/consumers.py
+viewers/consumers.py
+oneitem/onecam.html
+oneitem/onedetector.html
+oneitem/oneeventer.html
+ws_predictions/consumers.py
+
+v 0.9.3 bugfixing
+camai/version.py
+camai/basis.py
+tools/urls.py
+tools/views.py
+tools/linkworkers.html
+tools/addschool.html

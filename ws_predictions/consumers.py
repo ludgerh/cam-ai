@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# ws_predictions.py V0.9.2
+
 import json
 import numpy as np
 import cv2 as cv
@@ -60,9 +62,12 @@ class predictionsConsumer(WebsocketConsumer):
         if 'tf_w_index' in self.mydatacache:
           return(xytemp)
     self.mydatacache['schooldata'][myschool] = {}
-    self.mydatacache['workernr'] = school.objects.get(id=myschool).tf_worker.id
-    self.mydatacache['tf_w_index'] = tf_workers[self.mydatacache['workernr']].register()
-    tf_workers[self.mydatacache['workernr']].run_out(self.mydatacache['tf_w_index'])
+    self.mydatacache['workernr'] = (
+      school.objects.get(id=myschool).tf_worker.id)
+    self.mydatacache['tf_w_index'] = (
+      tf_workers[self.mydatacache['workernr']].register())
+    tf_workers[self.mydatacache['workernr']].run_out(
+      self.mydatacache['tf_w_index'])
     xytemp = tf_workers[self.mydatacache['workernr']].get_xy(
       myschool, self.mydatacache['tf_w_index'])
     self.mydatacache['schooldata'][myschool]['xdim'] = xytemp[0]
@@ -91,18 +96,22 @@ class predictionsConsumer(WebsocketConsumer):
               self.mydatacache = (
                 self.datacache[indict['server_nr']][indict['worker_nr']])
               if 'tf_w_index' in self.mydatacache:
-                tf_workers[self.mydatacache['workernr']].stop_out(self.mydatacache['tf_w_index'])
-                tf_workers[self.mydatacache['workernr']].unregister(self.mydatacache['tf_w_index'])
+                tf_workers[self.mydatacache['workernr']].stop_out(
+                  self.mydatacache['tf_w_index'])
+                tf_workers[self.mydatacache['workernr']].unregister(
+                  self.mydatacache['tf_w_index'])
                 del self.mydatacache['tf_w_index']
               logger.info('Successful websocket-login: System-Nr.: ' 
-                + str(indict['server_nr']) + ' - Worker-Number: ' + str(indict['worker_nr'])
-                + ' - Software-Version: ' + indict['soft_ver'])
+                + str(indict['server_nr']) + ' - Worker-Number: ' 
+                + str(indict['worker_nr']) + ' - Software-Version: ' 
+                + indict['soft_ver'])
               self.server_nr = indict['server_nr']
               self.worker_nr = indict['worker_nr']
               self.authed = True
             else:
               logger.warning('Failure of websocket-login: ' 
-                + str(indict['server_nr']) + '-' + str(indict['worker_nr']) + ' - Software-Version: ' + indict['soft_ver'])
+                + str(indict['server_nr']) + '-' + str(indict['worker_nr']) 
+                + ' - Software-Version: ' + indict['soft_ver'])
               self.close() 
           elif indict['code'] == 'get_xy':
             myschool = indict['scho']
@@ -130,7 +139,8 @@ class predictionsConsumer(WebsocketConsumer):
             myschool = indict['scho']
             self.checkschooldata(myschool)
             if ('imglist' in self.mydatacache['schooldata'][myschool]):
-              tf_workers[self.mydatacache['workernr']].client_check_model(myschool, test_pred = False)
+              tf_workers[self.mydatacache['workernr']].client_check_model(
+                myschool, test_pred = False)
               tf_workers[self.mydatacache['workernr']].ask_pred(
                 myschool, 
                 self.mydatacache['schooldata'][myschool]['imglist'], 
@@ -139,7 +149,8 @@ class predictionsConsumer(WebsocketConsumer):
                 -1,
               )
               predictions = np.empty((0, len(taglist)), np.float32)
-              while predictions.shape[0] < len(self.mydatacache['schooldata'][myschool]['imglist']):
+              while (predictions.shape[0] 
+                  < len(self.mydatacache['schooldata'][myschool]['imglist'])):
                 predictions = np.vstack((predictions, 
                   tf_workers[self.mydatacache['workernr']].get_from_outqueue(
                     self.mydatacache['tf_w_index'])))
@@ -152,12 +163,14 @@ class predictionsConsumer(WebsocketConsumer):
         logger.debug('<-- Length = ' + str(len(bytes_data)))
         frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
           dtype=np.uint8), cv.IMREAD_UNCHANGED)
-        if ((frame.shape[1] != self.mydatacache['schooldata'][myschool]['xdim'])
-            or (frame.shape[0] != self.mydatacache['schooldata'][myschool]['ydim'])):
-          frame = cv.resize(frame, (
-            self.mydatacache['schooldata'][myschool]['ydim'], 
-            self.mydatacache['schooldata'][myschool]['xdim']))
         try:
+          if ((frame.shape[1] 
+                != self.mydatacache['schooldata'][myschool]['xdim'])
+              or (frame.shape[0] 
+                != self.mydatacache['schooldata'][myschool]['ydim'])):
+            frame = cv.resize(frame, (
+              self.mydatacache['schooldata'][myschool]['ydim'], 
+              self.mydatacache['schooldata'][myschool]['xdim']))
           self.mydatacache['schooldata'][myschool]['imglist'].append(frame)
         except KeyError:
           logger.warning('KeyError while adding image data')

@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.db import connection
 from django.db.utils import OperationalError
 from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
+from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
 from access.c_access import access
 from streams.startup import streams
@@ -184,6 +185,10 @@ class triggerConsumer(WebsocketConsumer):
 
 class c_viewConsumer(AsyncWebsocketConsumer):
 
+  @database_sync_to_async
+  def mychecktoken(self, *args):
+    return(checktoken(*args))
+
   async def connect(self):
     await self.accept()
 
@@ -193,7 +198,19 @@ class c_viewConsumer(AsyncWebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}
 
     if params['command'] == 'getcaminfo':
-      if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
+      if self.scope['user'].id is None:
+        if (params['tokennr'] and params['token']):
+          if params['mode'] == 'C':
+            go_on = await self.mychecktoken((params['tokennr'], params['token']), 'CAR', params['idx'])
+          elif params['mode'] == 'D':
+            go_on = await self.mychecktoken((params['tokennr'], params['token']), 'DER', params['idx'])
+          elif params['mode'] == 'E':
+            go_on = await self.mychecktoken((params['tokennr'], params['token']), 'ETR', params['idx'])
+        else:
+          go_on = False
+      else:
+        go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
+      if go_on:
         outlist['data'] = {}
         outlist['data']['fps'] = round(redis.fps_from_dev(params['mode'], params['idx']), 2)
         outlist['data']['viewers'] = redis.view_from_dev(params['mode'], params['idx'])

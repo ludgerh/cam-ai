@@ -170,17 +170,28 @@ $(document).ready(function() {
 		})
 		.catch(err => {console.log(err);});
 	});
-	$('#oneform').children(':first').children(':first').children('.col-auto')
-			.children(
-        '#id_cam_fpslimit, '
-        +'#id_cam_feed_type, '
-        +'#id_cam_url, '
-        +'#id_cam_repeater'
-      ).change(function(evt) {
+	$('#id_cam_fpslimit, '
+    +'#id_cam_feed_type, '
+    +'#id_cam_url, '
+    +'#id_cam_repeater'
+  ).change(function(evt) {
 		oneitemSocket.sendandwait({
 			'command' : 'setonefield',
 			'pname' : $(evt.target).attr('name'),
 			'value' : $(evt.target).val(),
+		})
+		.then((result) => {
+			if (result === 'OK') {
+				$(evt.target).addClass('blue');
+			};
+		})
+		.catch(err => {console.log(err);});
+	});
+	$('#id_cam_pause').change(function(evt) {
+		oneitemSocket.sendandwait({
+			'command' : 'setonefield',
+			'pname' : $(evt.target).attr('name'),
+			'value' : $(evt.target).prop('checked'),
 		})
 		.then((result) => {
 			if (result === 'OK') {
@@ -314,6 +325,8 @@ $(document).ready(function() {
         'command' : 'getcaminfo',
         'mode' : 'C',
         'idx' : {{ dbline.id }},
+        'tokennr' : {{ tokennr }},
+        'token' : '{{ token }}',
       })
       .then((result) => {
         $('#fpstag').text(result.fps);

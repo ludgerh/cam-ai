@@ -18,17 +18,12 @@ from tools.l_tools import djconf
 if djconf.getconfigbool('local_trainer', True):
   #from tensorflow.keras import backend as K
   import tensorflow as tf
-test = False
 
 def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0):
 # Frame Types:
 # 1 : opencv Data
 # 2 : BMP Data
 # 3 : Jpeg Data
-  global test
-  while test:
-    sleep(0.1)
-  test = True
   if not typeout:
     typeout = typein
   if typein != 1:
@@ -58,7 +53,6 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0):
     frame = cv.imencode('.bmp', frame)[1].tostring()
   elif typeout == 3:
     frame = cv.imencode('.jpg', frame)[1].tostring()
-  test = False
   return(frame)
 
 

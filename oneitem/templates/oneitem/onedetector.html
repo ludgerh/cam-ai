@@ -318,6 +318,8 @@ $(document).ready(function() {
         'command' : 'getcaminfo',
         'mode' : 'D',
         'idx' : {{ dbline.id }},
+        'tokennr' : {{ tokennr }},
+        'token' : '{{ token }}',
       })
       .then((result) => {
         $('#fpstag').text(result.fps);

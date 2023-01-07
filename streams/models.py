@@ -43,6 +43,7 @@ class stream(models.Model):
   cam_ffmpeg_crf = models.IntegerField("ffmpeg CRF", default=23)
   cam_video_codec = models.IntegerField(default=-1)
   cam_audio_codec = models.IntegerField(default=-1)
+  cam_pause = models.BooleanField(default=False)
 
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
   det_mode_flag = models.IntegerField(default=2)

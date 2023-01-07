@@ -13,7 +13,7 @@
 
 import cv2 as cv
 import json
-from os import remove, path
+from os import remove, path, nice
 from math import inf
 from shutil import copyfile
 from traceback import format_exc
@@ -22,8 +22,8 @@ from setproctitle import setproctitle
 from collections import deque
 from time import time, sleep
 from threading import Thread
+from multiprocessing import Process
 from subprocess import Popen, run
-from psutil import Process
 from django.forms.models import model_to_dict
 from django.db import connection
 from django.db.utils import OperationalError
@@ -63,7 +63,6 @@ class c_eventer(c_device):
     self.eventdict = {}
     self.buffer_ts = time()
     self.display_ts = 0
-    self.clean_up_ts = time()
     self.nr_of_cond_ed = 0
     self.read_conditions()
     self.tag_list = get_taglist(self.dbline.eve_school.id)
@@ -92,10 +91,7 @@ class c_eventer(c_device):
       while self.do_run:
         frameline = self.dataqueue.get()
         if (self.do_run and (frameline is not None) and self.sl.greenlight(self.period, frameline[2])):
-          self.run_one(frameline)  
-        if time() - self.clean_up_ts > 600.0:
-          self.clean_up_ts = time()
-          self.clean_up()
+          self.run_one(frameline) 
       self.dataqueue.stop()
       self.detectorqueue.stop()
       for item in self.eventdict.values():
@@ -112,52 +108,66 @@ class c_eventer(c_device):
     #  print(thread)
 
   def in_queue_handler(self, received):
-    if super().in_queue_handler(received):
-      return(True)
-    else:
-      if (received[0] == 'new_video'):
-        self.vid_deque.append(received[1:])
-      elif (received[0] == 'set_fpslimit'):
-        self.dbline.eve_fpslimit = received[1]
-        if received[1] == 0:
-          self.period = 0.0
-        else:
-          self.period = 1.0 / received[1]
-      elif (received[0] == 'set_margin'):
-        self.dbline.eve_margin = received[1]
-      elif (received[0] == 'set_event_time_gap'):
-        self.dbline.eve_event_time_gap = received[1]
-      elif (received[0] == 'set_school'):
-        self.dbline.eve_school = school.objects.get(id=received[1])
-      elif (received[0] == 'set_alarm_email'):
-        self.dbline.eve_alarm_email = received[1]
-      elif (received[0] == 'cond_open'):
-        self.nr_of_cond_ed += 1
-        self.last_cond_ed = received[1]
-      elif (received[0] == 'cond_close'):
-        self.nr_of_cond_ed = max(0, self.nr_of_cond_ed - 1)
-      elif (received[0] == 'new_condition'):
-        self.cond_dict[received[1]].append(received[2])
-        self.set_cam_counts()
-      elif (received[0] == 'del_condition'):
-        self.cond_dict[received[1]] = [item 
-          for item in self.cond_dict[received[1]] 
-          if item['id'] != received[2]]
-        self.set_cam_counts()
-      elif (received[0] == 'save_condition'):
-        for item in self.cond_dict[received[1]]:
-          if item['id'] == received[2]:
-	          item['c_type'] = received[3]
-	          item['x'] = received[4]
-	          item['y'] = received[5]
-	          break
-        self.set_cam_counts()
-      elif (received[0] == 'save_conditions'):
-        self.cond_dict[received[1]] = json.loads(received[2])
-        self.set_cam_counts()
+    try:
+      if super().in_queue_handler(received):
+        return(True)
       else:
-        return(False)
-      return(True)
+        self.logger.info(str(received))
+        if (received[0] == 'new_video'):
+          self.vid_deque.append(received[1:])
+          self.logger.info('comparing: ' + str(time()) + ' ' + str(self.vid_deque[0][2]) + ' ' + str(time() - self.vid_deque[0][2]))
+          while (time() - self.vid_deque[0][2]) > 300:
+            listitem = self.vid_deque.popleft()
+            try:
+              self.logger.info('removing: ' + self.recordingspath + listitem[1])
+              remove(self.recordingspath + listitem[1])
+            except FileNotFoundError:
+              self.logger.warning('*** Delete did not find: '
+                + self.recordingspath + listitem[1])
+        elif (received[0] == 'set_fpslimit'):
+          self.dbline.eve_fpslimit = received[1]
+          if received[1] == 0:
+            self.period = 0.0
+          else:
+            self.period = 1.0 / received[1]
+        elif (received[0] == 'set_margin'):
+          self.dbline.eve_margin = received[1]
+        elif (received[0] == 'set_event_time_gap'):
+          self.dbline.eve_event_time_gap = received[1]
+        elif (received[0] == 'set_school'):
+          self.dbline.eve_school = school.objects.get(id=received[1])
+        elif (received[0] == 'set_alarm_email'):
+          self.dbline.eve_alarm_email = received[1]
+        elif (received[0] == 'cond_open'):
+          self.nr_of_cond_ed += 1
+          self.last_cond_ed = received[1]
+        elif (received[0] == 'cond_close'):
+          self.nr_of_cond_ed = max(0, self.nr_of_cond_ed - 1)
+        elif (received[0] == 'new_condition'):
+          self.cond_dict[received[1]].append(received[2])
+          self.set_cam_counts()
+        elif (received[0] == 'del_condition'):
+          self.cond_dict[received[1]] = [item 
+            for item in self.cond_dict[received[1]] 
+            if item['id'] != received[2]]
+          self.set_cam_counts()
+        elif (received[0] == 'save_condition'):
+          for item in self.cond_dict[received[1]]:
+            if item['id'] == received[2]:
+	            item['c_type'] = received[3]
+	            item['x'] = received[4]
+	            item['y'] = received[5]
+	            break
+          self.set_cam_counts()
+        elif (received[0] == 'save_conditions'):
+          self.cond_dict[received[1]] = json.loads(received[2])
+          self.set_cam_counts()
+        else:
+          return(False)
+        return(True)
+    except:
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def run_one(self, frame):
     if (not self.redis.view_from_dev('E', self.dbline.id)):
@@ -288,6 +298,21 @@ class c_eventer(c_device):
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
+  def make_webm(self, savepath):
+    niceness = nice(0)
+    nice(19 - niceness)
+    myts = time()
+    run([
+      'ffmpeg', 
+      '-v', 'fatal', 
+      '-i', savepath, 
+      '-crf', '51', #0 = lossless, 51 = very bad
+      '-vf', 'scale=500:-1',
+      savepath[:-4]+'.webm'
+    ])
+    self.logger.info('WEBM-Conversion: E' + str(self.id) + ' ' + str(round(time() - myts)) + ' sec')
+    
+
   def check_events(self, idict):
     try:
       myevent = self.eventdict[idict]
@@ -358,27 +383,16 @@ class c_eventer(c_device):
               myevent.dbline.double = isdouble
               myevent.dbline.save()
               if not isdouble:
-                try:
-                  run([
-                    'ffmpeg', 
-                    '-ss', str(vid_offset), 
-                    '-v', 'fatal', 
-                    '-i', savepath, 
-                    '-vframes', '1', 
-                    '-q:v', '2', 
-                    savepath[:-4]+'.jpg'
-                  ])
-                  p = Popen([
-                    'ffmpeg', 
-                    '-v', 'fatal', 
-                    '-i', savepath, 
-                    '-crf', '51', #0 = lossless, 51 = very bad
-                    '-vf', 'scale=500:-1',
-                    savepath[:-4]+'.webm'
-                  ])
-                  Process(p.pid).nice(19)
-                except AttributeError:
-                  self.logger.warning('AttributeError in c_eventer.py line 377')
+                run([
+                  'ffmpeg', 
+                  '-ss', str(vid_offset), 
+                  '-v', 'fatal', 
+                  '-i', savepath, 
+                  '-vframes', '1', 
+                  '-q:v', '2', 
+                  savepath[:-4]+'.jpg'
+                ])
+                p = Process(target=self.make_webm, args=(savepath, )).start()
               myevent.status = min(-2, 
                 myevent.status)
             else:  
@@ -397,15 +411,6 @@ class c_eventer(c_device):
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
-
-  def clean_up(self):
-    while self.vid_deque and (self.vid_deque[0][2] < (time() - 600)):
-      try:
-        remove(self.recordingspath + self.vid_deque[0][1])
-      except FileNotFoundError:
-        self.logger.warning('*** Delete did not find: '
-          + self.recordingspath + self.vid_deque[0][1])
-      self.vid_deque.popleft()
 
   def inserter(self):
     try:

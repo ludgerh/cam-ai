@@ -184,8 +184,9 @@ function make_list_line(condition, reaction, count) {
   newline += '<button type="button" title="Bracket in" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 in-bt"';
   if (bracketlevel == 0) {newline +=' disabled';};
   newline += '><i class="bi bi-caret-left-fill"></i></button>';
-  newline += '<button type="button" title="Bracket out" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 out-bt">';
-  newline += '<i class="bi bi-caret-right-fill"></i></button>';
+  newline += '<button type="button" title="Bracket out" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 out-bt"';
+  if (c_dict[reaction].length == 1) {newline += ' disabled';};
+  newline += '><i class="bi bi-caret-right-fill"></i></button>';
   newline += '<button type="button" title="Change type" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 next-bt">';
   newline += '<i class="bi bi-skip-forward-fill"></i></button>';
   newline += '<button type="button" title="Delete" react="'+reaction+'" nr="'+count+'" class="btn btn-primary btn-sm p-1 m-1 del-bt">';
@@ -514,6 +515,20 @@ $(document).ready(function() {
     };
     reset_triggers(true);
 {% endif %}
+    setInterval(() => {
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'mode' : 'E',
+        'idx' : {{ dbline.id }},
+        'tokennr' : {{ tokennr }},
+        'token' : '{{ token }}',
+      })
+      .then((result) => {
+        $('#fpstag').text(result.fps);
+        $('#vnrtag').text(result.viewers);
+      })
+      .catch(err => {console.log(err);});
+    }, 5000);
 	})
 	.catch(err => {console.log(err);});
 });

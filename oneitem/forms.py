@@ -20,11 +20,13 @@ class CamForm(forms.ModelForm):
 		model = stream
 		fields = (
       'name',
+      'cam_pause', 
       'cam_fpslimit', 
       'cam_feed_type', 
       'cam_url', 
     )
 		widgets = { 
+      'cam_pause' : forms.CheckboxInput(),
 			'cam_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
 			'cam_url' : forms.TextInput(attrs={'size': 70}),
 		}

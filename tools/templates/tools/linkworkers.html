@@ -21,17 +21,20 @@
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 {% endif %}
-<div class="mb-3 m-2">
-  <label for="schoolname" class="form-label h4">Name of the new school:</label>
-  <input type="text" class="form-control" id="schoolname">
+{% for item in workerlist %}
+<div class="mb-3 m-2 h4">
+  {{ item.name }}  
+  {% if item.wsname %}
+    &#10003;
+  {% else %}
+    <input type="text" class="mb-3 m-2" id="serverinput" placeholder="wss://yourserver" value="{{ item.wsserver }}" size="40">
+    <input type="text" class="mb-3 m-2" id="userinput" placeholder="username" size="20">
+    <input type="text" class="mb-3 m-2" id="passinput" placeholder="password" size="20">
+    <button class="btn btn-primary m-2 link-button" type="button" idx= "{{ item.id }}">Link to Server</button>
+  {% endif %}
 </div>
-<div class="mb-3 m-2">
-  <input class="form-check-input h4" type="checkbox" id="own_ai">
-  <label class="form-check-label h4" for="own_ai">Make own AI model</label>
-</div>
-<div>
-  <button class="btn btn-primary m-2 make-button" type="button">Make new school</button>
-</div>
+{% endfor %}
+
 <script>
 
 let admintoolsSocket;
@@ -39,7 +42,6 @@ let admintoolsSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 $(document).ready(function() {
-  $('#own_ai').prop("checked", false);
   WSAsync(
     ws_scheme + '//'
     + window.location.host
@@ -47,17 +49,19 @@ $(document).ready(function() {
   )
   .then((result) => {
     admintoolsSocket = result;
-    $('.make-button').click(function() {
-      $('.make-button').addClass('btn-warning');
+    $('.link-button').click(function(evt) {
+      $(evt.target).addClass('btn-warning');
       admintoolsSocket.sendandwait({
-        'command' : 'makeschool',
-        'name' : $('#schoolname').val(),
-        'remote_ai' : true,
-        'own_ai' : $('#own_ai').prop("checked"),
+        'command' : 'linkworker',
+        'workernr' : parseInt($(evt.target).attr("idx")),
+        'server' : $('#serverinput').val(),
+        'user' : $('#userinput').val(),
+        'pass' : $('#passinput').val(),
       })  
       .then((result) => {
+        console.log(result);
         if (result == 'OK') {
-          $('.make-button').removeClass('btn-warning');
+          $(evt.target).removeClass('btn-warning');
         };
       })
       .catch(err => {console.log(err);});
