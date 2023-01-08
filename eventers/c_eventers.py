@@ -112,14 +112,14 @@ class c_eventer(c_device):
       if super().in_queue_handler(received):
         return(True)
       else:
-        self.logger.info(str(received))
+        #self.logger.info(str(received))
         if (received[0] == 'new_video'):
           self.vid_deque.append(received[1:])
-          self.logger.info('comparing: ' + str(time()) + ' ' + str(self.vid_deque[0][2]) + ' ' + str(time() - self.vid_deque[0][2]))
+          #self.logger.info('comparing: ' + str(time()) + ' ' + str(self.vid_deque[0][2]) + ' ' + str(time() - self.vid_deque[0][2]))
           while (time() - self.vid_deque[0][2]) > 300:
             listitem = self.vid_deque.popleft()
             try:
-              self.logger.info('removing: ' + self.recordingspath + listitem[1])
+              #self.logger.info('removing: ' + self.recordingspath + listitem[1])
               remove(self.recordingspath + listitem[1])
             except FileNotFoundError:
               self.logger.warning('*** Delete did not find: '

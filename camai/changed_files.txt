@@ -253,3 +253,4 @@ tools/urls.py
 tools/views.py
 tools/linkworkers.html
 tools/addschool.html
+streams/c_cams.py

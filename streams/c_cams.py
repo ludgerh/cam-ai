@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# c_cams.py V0.9.3
+
 import sys
 import cv2 as cv
 import numpy as np
@@ -74,7 +76,8 @@ class c_cam(c_device):
       return(None)
     thistime = time()
     while True:
-      if self.redis.check_if_counts_zero('C', self.dbline.id) or self.dbline.cam_pause:
+      if (self.redis.check_if_counts_zero('C', self.dbline.id) 
+          or self.dbline.cam_pause):
         if self.cam_active:
           if self.cam_ts is None:
             self.cam_ts = time()
@@ -138,8 +141,14 @@ class c_cam(c_device):
         if in_bytes:
           self.framewait = 0.0
           nptemp = np.frombuffer(in_bytes, np.uint8)
-          frame = nptemp.reshape(self.dbline.cam_yres,
-            self.dbline.cam_xres, 3)
+          try:
+            frame = nptemp.reshape(self.dbline.cam_yres,
+              self.dbline.cam_xres, 3)
+          except ValueError:
+            self.logger.warning('ValueError: cannot reshape array of size ' 
+              + str(nptemp.size) + ' into shape ' 
+              + str((self.dbline.cam_yres, self.dbline.cam_xres, 3)))
+            return(None)
           self.getting_newprozess = False
         else:
           if self.framewait < 10.0:
@@ -290,7 +299,8 @@ class c_cam(c_device):
       else:
         self.video_codec = self.dbline.cam_video_codec
       self.video_codec_name = probe['streams'][self.video_codec]['codec_name']
-      self.cam_fps = probe['streams'][self.video_codec]['r_frame_rate'].split('/')
+      self.cam_fps = (
+        probe['streams'][self.video_codec]['r_frame_rate'].split('/'))
       self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
       self.logger.info('Video codec: ' + self.video_codec_name + ' / ' 
         + str(self.cam_fps) + 'fps')
@@ -330,15 +340,16 @@ class c_cam(c_device):
     try:
       if self.cam_recording:
         if path.exists(self.vid_file_path(self.vid_count + 1)):
-          timestamp = time()
+          #timestamp = time()
+          timestamp = path.getmtime(self.vid_file_path(self.vid_count))
           targetname = self.ts_targetname(timestamp)
           try:
             move(self.vid_file_path(self.vid_count), 
               self.recordingspath + '/' + targetname)
-            self.logger.info('CAM sending: ' + str(('new_video', self.vid_count, 
-              targetname, timestamp)))
             self.mydetector.myeventer.inqueue.put(('new_video', self.vid_count, 
               targetname, timestamp))
+            #self.logger.info('CAM sent: ' + str(('new_video', self.vid_count, 
+            #  targetname, timestamp)))
             self.vid_count += 1
           except FileNotFoundError:
             self.logger.warning(
@@ -436,7 +447,8 @@ class c_cam(c_device):
           outparams2 += ' ' + filepath
         else:
           outparams2 = ''
-      cmd = ('/usr/bin/ffmpeg ' + generalparams + inparams + outparams1 + outparams2)
+      cmd = ('/usr/bin/ffmpeg ' + generalparams + inparams + outparams1 
+        + outparams2)
       self.ff_proc = Popen(cmd, stdout=PIPE, shell=True)
       if self.dbline.cam_repeater > 0:
         self.repeater.rep_connect(self.dbline.cam_url, self.rep_cam_nr)

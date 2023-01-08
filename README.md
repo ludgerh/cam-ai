@@ -259,6 +259,8 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
      `nano ~/cam-ai/camai/settings.py`
 
+    Add IP to ALLOWED_HOSTS
+
     Find the variable ALLOWED_HOSTS and add your hosts domain or IP address to the bracket.
 
     Find the line
