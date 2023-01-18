@@ -16,11 +16,14 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from tf_workers.models import school
-from ws_predictions.models import client
 
 class userinfo(models.Model):
   user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-  client_nr = models.ForeignKey(client, on_delete=models.SET_NULL, null=True, default=None)
+  made = models.DateTimeField(default=timezone.now)
+  allowed_schools = models.IntegerField(default=1)
+  used_schools = models.IntegerField(default=1)
+  pay_tokens = models.IntegerField(default=0)
+  deadline = models.DateTimeField(default=timezone.make_aware(datetime(2100, 1, 1)))
 
   def __str__(self):
     return('userinfo model (TBD ...)')

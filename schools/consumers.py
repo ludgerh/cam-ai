@@ -40,7 +40,6 @@ from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school
 from eventers.models import event, event_frame
 from trainers.models import trainframe
-from ws_predictions.models import client
 from users.models import userinfo, archive
 
 logname = 'ws_schoolsconsumers'

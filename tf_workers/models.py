@@ -32,7 +32,6 @@ class worker(models.Model):
   wsid = models.IntegerField(default=0)
   wsname = models.CharField(max_length=50, default='')
   wspass = models.CharField(max_length=50, default='')
-  wsadminpass = models.CharField(max_length=50, default='')
 
   def __str__(self):
     return('Worker model, TBD')

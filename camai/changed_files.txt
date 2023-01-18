@@ -253,4 +253,19 @@ tools/urls.py
 tools/views.py
 tools/linkworkers.html
 tools/addschool.html
+
+v 0.9.4 TF-Worker-Linker
+camai/version.py
+tools/consumers.py
+tools/djangodbasync.py
+tools/linkworkers.html
+tools/addstream.html
 streams/c_cams.py
+eventers/c_eventers.py
+users/models.py
+users/consumers.py
+tf_workers/models.py
+tf_workers/c_tfworkers.py
+ws_predictions/models.py
+ws_predictions/consumers.py
+schools/consumers.py

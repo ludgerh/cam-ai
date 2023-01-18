@@ -200,7 +200,8 @@ class tf_worker():
           'code' : 'auth',
           'name' : self.dbline.wsname,
           'pass' : self.dbline.wspass,
-          'server_nr' : djconf.getconfigint('system_number'),
+          'ws_id' : self.dbline.wsid,
+          'ws_name' : self.dbline.wsname,
           'worker_nr' : self.id,
           'soft_ver' : djconf.getconfig('version', 'not set'),
         }
@@ -361,7 +362,8 @@ class tf_worker():
       if self.dbline.gpu_sim >= 0:
         self.cachedict = {}
       elif self.dbline.use_websocket:
-        self.reset_websocket()
+        if self.dbline.wsname:
+          self.reset_websocket()
       self.is_ready = True
       schoolnr = -1
       while (len(self.model_buffers) == 0) and self.do_run:

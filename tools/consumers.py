@@ -20,10 +20,14 @@ from subprocess import Popen, PIPE
 from logging import getLogger
 from ipaddress import ip_network, ip_address
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, gaierror
+from MySQLdb import _mysql
+from passlib.hash import phpass
+from django.contrib.auth.models import User
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from camai.passwords import db_password
 from tools.c_logger import log_ini
-from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter, savedbline
+from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter, savedbline, getexists, createuser
 from tools.l_tools import djconf, displaybytes
 from tf_workers.models import school, worker
 from trainers.models import trainframe, trainer
@@ -31,6 +35,7 @@ from eventers.models import event, event_frame
 from streams.c_streams import streams, c_stream
 from streams.models import stream as dbstream
 from streams.startup import start_stream_list, start_worker_list, start_trainer_list
+from users.models import userinfo
 from .health import totaldiscspace, freediscspace
 
 from random import randint
@@ -41,7 +46,6 @@ log_ini(logger, logname)
 recordingspath = Path(djconf.getconfig('recordingspath', 'data/recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', 'data/schoolframes/'))
 schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
-system_number = djconf.getconfigint('system_number')
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 
 s = socket(AF_INET, SOCK_DGRAM)
@@ -292,17 +296,20 @@ def scanoneip(ipstring, myports):
 class admintools(AsyncWebsocketConsumer):
 
   async def connect(self):
-    if self.scope['user'].is_superuser:
-      await self.accept()
-    else:
-      await self.close()
+    await self.accept()
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
 
+#*****************************************************************************
+# functions for the client
+#*****************************************************************************
+
     if params['command'] == 'scanoneip':
+      if not self.scope['user'].is_superuser:
+        await self.close()
       if params['portaddr'] == 554:
         cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
           '-rtsp_transport', 'tcp', '-show_streams', params['camurl']]
@@ -316,6 +323,8 @@ class admintools(AsyncWebsocketConsumer):
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'scanips':
+      if not self.scope['user'].is_superuser:
+        await self.close()
       if params['portaddr']:
         portlist = [params['portaddr'], ]
       else:
@@ -330,12 +339,16 @@ class admintools(AsyncWebsocketConsumer):
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'installcam':
+      if not self.scope['user'].is_superuser:
+        await self.close()
       myschools = await filterlinesdict(school, {'active' : True, }, ['id', ])
       myschool = myschools[0]['id']
       newstream = dbstream()
       newstream.cam_url = params['camurl']
       newstream.cam_video_codec = params['videocodec']
       newstream.cam_audio_codec = params['audiocodec']
+      newstream.cam_xres = params['xresolution']
+      newstream.cam_yres = params['yresolution']
       newstream.eve_school_id = myschool
       await savedbline(newstream)
       while start_stream_list:
@@ -347,6 +360,8 @@ class admintools(AsyncWebsocketConsumer):
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'makeschool':
+      if not self.scope['user'].is_superuser:
+        await self.close()
       from websocket import WebSocket
       newschool = school()
       newschool.name = params['name']
@@ -419,8 +434,74 @@ class admintools(AsyncWebsocketConsumer):
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'linkworker':
+      if not self.scope['user'].is_superuser:
+        await self.close()
+      from websocket import WebSocket
+      ws = WebSocket()
+      ws.connect(params['server'] + 'ws/admintools/')
+      outdict = {
+        'command' : 'linkserver',
+        'user' : params['user'],
+        'pass' : params['pass'],
+      }
+      ws.send(json.dumps({
+        'tracker' : 0, 
+        'data' : outdict, 
+      }), opcode=1) #1 = Text
+      resultdict = json.loads(ws.recv())
+      ws.close()
+      print(resultdict)
+      if resultdict['data']['status'] == 'new':
+        await updatefilter(worker, {'id' : params['workernr'], }, {
+          'active' : True,
+          'gpu_sim' : -1,
+          'use_websocket' : True,
+          'wsserver' : params['server'],
+          'wsname' : resultdict['data']['user'],
+          'wspass' : params['pass'],
+          'wsid' : resultdict['data']['idx'],
+        })
+        while start_worker_list:
+          sleep(long_brake)
+        start_worker_list.add(params['workernr'])
+      outlist['data'] = resultdict['data']['status'] 
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
 
-      outlist['data'] = 'OK'
+#*****************************************************************************
+# functions for the server
+#*****************************************************************************
+
+    elif params['command'] == 'linkserver':
+      outlist['data'] = {}
+      ws_user = 'ws_user_' + params['user']
+      if await getexists(User, {'username' : ws_user, }):
+        outlist['data']['status'] = 'exists'
+      else:
+        db=_mysql.connect(
+          "localhost",
+          "CAM-AI",
+          db_password,
+          "wp",
+        )
+        db.query("select user_pass, user_email from wp_users where user_login = '" + params['user'] + "' ")
+        result=db.store_result().fetch_row()
+        if  len(result):
+          if (phpass.verify(params['pass'], result[0][0])):
+            newuser = await createuser(ws_user, result[0][1].decode("utf-8"), params['pass'])
+            newuserinfo = userinfo()
+            newuserinfo.user = newuser
+            newuserinfo.client_nr = newuser.id
+            await savedbline(newuserinfo)
+            outlist['data']['status'] = 'new'
+            outlist['data']['idx'] = newuser.id
+            outlist['data']['user'] = ws_user
+          else:
+            outlist['data']['status'] = 'noauth'
+        else:
+          outlist['data']['status'] = 'missing'
+        db.close()
+
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 

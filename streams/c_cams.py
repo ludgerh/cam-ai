@@ -52,6 +52,7 @@ class c_cam(c_device):
     self.finished = False
     self.recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
     self.framewait = 0.0
+    self.checkmp4busy = False
     if not path.exists(self.recordingspath):
       makedirs(self.recordingspath)
     if self.dbline.cam_view:
@@ -337,9 +338,12 @@ class c_cam(c_device):
       self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
 
   def checkmp4(self):
+    if self.checkmp4busy:
+      return()
     try:
+      self.checkmp4busy = True
       if self.cam_recording:
-        if path.exists(self.vid_file_path(self.vid_count + 1)):
+        if path.exists(self.vid_file_path(self.vid_count + 2)):
           #timestamp = time()
           timestamp = path.getmtime(self.vid_file_path(self.vid_count))
           targetname = self.ts_targetname(timestamp)
@@ -354,7 +358,9 @@ class c_cam(c_device):
           except FileNotFoundError:
             self.logger.warning(
                 'Move did not find: '+self.vid_file_path(self.vid_count))
+      self.checkmp4busy = False
     except:
+      self.checkmp4busy = False
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
@@ -424,6 +430,8 @@ class c_cam(c_device):
       inparams = ' -i "' + source_string + '"'
       if self.video_codec_name == 'h264':
         generalparams = ' -v fatal'
+        #generalparams += ' -hwaccel auto'
+        #generalparams += ' -codec:v h264_v4l2m2m'
         if filepath:
           outparams2 = ' -c copy'
           outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
@@ -435,6 +443,8 @@ class c_cam(c_device):
       else:
         generalparams = ' -v fatal'
         generalparams += ' -use_wallclock_as_timestamps 1'
+        #generalparams += ' -hwaccel auto'
+        #generalparams += ' -codec:v h264_v4l2m2m'
         if filepath:
           outparams2 = ' -c libx264'
           if self.dbline.cam_ffmpeg_fps:

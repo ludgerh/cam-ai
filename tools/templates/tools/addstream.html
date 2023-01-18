@@ -46,6 +46,14 @@ Scanning your network. Please wait a while...
   <input type="text" class="form-control" id="ipaddress" placeholder="...">
 </div>
 <div class="h4 m-2">
+  <div>
+    Username:
+    <input class="mb-3 m-2" type="text" id="userinput" placeholder="user" size="30">
+  </div>
+  <div>
+    Password:
+    <input class="mb-3 m-2" type="text" id="passinput" placeholder="pass" size="30">
+  </div>
   Type of your camera:
   <select class="form-select m-2" id="urlselect">
     <option value="[custom url]" selected>Other Type</option>
@@ -86,15 +94,26 @@ let admintoolsSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
+let xresolutions;
+let yresolutions;
+
 $(document).ready(function() {
   $('#ipaddress').change(function() {
     $('#codecdiv').addClass("d-none");
     urlstr = portstrings[portaddr] + '://';
     urlstr += $('#ipaddress').val();
-    urlstr += $('#urlselect').val();
+    tempstr = $('#urlselect').val().replace('{user}', $('#userinput').val()).replace('{pass}', $('#passinput').val());
+    urlstr += tempstr;
     $('#camurl').val(urlstr);
   });
+  $('#ipaddress').trigger( "change" );
   $('#urlselect').change(function() {
+    $('#ipaddress').trigger( "change" );
+  });
+  $('#userinput').change(function() {
+    $('#ipaddress').trigger( "change" );
+  });
+  $('#passinput').change(function() {
     $('#ipaddress').trigger( "change" );
   });
   WSAsync(
@@ -153,6 +172,8 @@ $(document).ready(function() {
           firstaudiooption = true;
           $('#videoselect').empty();
           $('#audioselect').empty();
+          xresolutions = [];
+          yresolutions = [];
           for (item of result.streams) {
             if (item.codec_type == 'video') {
               newoption = '<option value="' + item.index + '"';
@@ -166,6 +187,8 @@ $(document).ready(function() {
                 + eval(item.r_frame_rate) + 'fps' 
                 + '</option>');
               $('#videoselect').append(newoption);
+              xresolutions[item.index] = item.coded_width;
+              yresolutions[item.index] = item.coded_height;
             };
             if (item.codec_type == 'audio') {
               newoption = '<option value="' + item.index + '"';
@@ -191,6 +214,8 @@ $(document).ready(function() {
         'camurl' : $('#camurl').val(),
         'videocodec' : $('#videoselect').val(),
         'audiocodec' : $('#audioselect').val(),
+        'xresolution' : xresolutions[$('#videoselect').val()],
+        'yresolution' : yresolutions[$('#videoselect').val()],
       })  
       .catch(err => {console.log(err);});
     });

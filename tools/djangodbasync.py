@@ -12,6 +12,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from itertools import chain
+from django.contrib.auth.models import User
 from channels.db import database_sync_to_async
 
 def model_to_dict(dbline, fields=None):
@@ -56,6 +57,10 @@ def getonelinedict(model, filterdict, fields=None):
   return(model_to_dict(result, fields=fields))
 
 @database_sync_to_async
+def getexists(model, filterdict):
+  return(model.objects.filter(**filterdict).exists())
+
+@database_sync_to_async
 def filterlines(model, filterdict):
   return(model.objects.filter(**filterdict).order_by("id"))
 
@@ -70,4 +75,13 @@ def filterlinesdict(model, filterdict=None, fields=None):
 @database_sync_to_async
 def countfilter(model, filterdict):
   return(model.objects.filter(**filterdict).count())
+
+@database_sync_to_async
+def createuser(username, email, password):
+  newuser = User.objects.create_user(
+    username=username,
+    email=email,
+    password=password,
+  )
+  return(newuser)
 

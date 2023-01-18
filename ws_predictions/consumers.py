@@ -44,11 +44,12 @@ class predictionsConsumer(WebsocketConsumer):
     self.authed = False
     self.permitted_schools = set()
     self.user = None
-    self.server_nr = 0
+    self.ws_id = 0
     self.worker_nr = 0
 
   def disconnect(self, close_code):
-    logger.info('Websocket-logout: System-Nr.: ' + str(self.server_nr) 
+    logger.info('Websocket-logout: WS-ID: ' + str(self.ws_id) 
+      + ' - WS-Name: '  + str(self.ws_name) 
       + ' - Worker-Number: ' + str(self.worker_nr))
 
   def checkschooldata(self, myschool):
@@ -87,30 +88,32 @@ class predictionsConsumer(WebsocketConsumer):
             self.user = User.objects.get(username=indict['name'])
             if self.user.check_password(indict['pass']):
               logger.debug('Success!')
-              if not (indict['server_nr'] in self.datacache):
-                self.datacache[indict['server_nr']] = {}
+              if not (indict['ws_id'] in self.datacache):
+                self.datacache[indict['ws_id']] = {}
               if not (indict['worker_nr'] 
-                  in self.datacache[indict['server_nr']]):
-                self.datacache[indict['server_nr']][indict['worker_nr']]=(
+                  in self.datacache[indict['ws_id']]):
+                self.datacache[indict['ws_id']][indict['worker_nr']]=(
                   {})
               self.mydatacache = (
-                self.datacache[indict['server_nr']][indict['worker_nr']])
+                self.datacache[indict['ws_id']][indict['worker_nr']])
               if 'tf_w_index' in self.mydatacache:
                 tf_workers[self.mydatacache['workernr']].stop_out(
                   self.mydatacache['tf_w_index'])
                 tf_workers[self.mydatacache['workernr']].unregister(
                   self.mydatacache['tf_w_index'])
                 del self.mydatacache['tf_w_index']
-              logger.info('Successful websocket-login: System-Nr.: ' 
-                + str(indict['server_nr']) + ' - Worker-Number: ' 
+              logger.info('Successful websocket-login: WS-ID: ' 
+                + str(indict['ws_id']) + ' - WS-Name: ' 
+                + str(indict['ws_name']) + ' - Worker-Number: ' 
                 + str(indict['worker_nr']) + ' - Software-Version: ' 
                 + indict['soft_ver'])
-              self.server_nr = indict['server_nr']
+              self.ws_id = indict['ws_id']
+              self.ws_name = indict['ws_name']
               self.worker_nr = indict['worker_nr']
               self.authed = True
             else:
               logger.warning('Failure of websocket-login: ' 
-                + str(indict['server_nr']) + '-' + str(indict['worker_nr']) 
+                + str(indict['ws_id']) + '-' + str(indict['worker_nr']) 
                 + ' - Software-Version: ' + indict['soft_ver'])
               self.close() 
           elif indict['code'] == 'get_xy':

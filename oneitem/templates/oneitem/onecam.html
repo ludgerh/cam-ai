@@ -119,11 +119,10 @@ let ctx = canvas.getContext("2d");
 
 function timedRefresh(bytebuffer) {
   if (wait == 0) {
-    wait = 1;
     UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
     imgsource = new ImageData(UI8Carray, xinput, yinput);
     createImageBitmap(imgsource)
-		.then((result) => { 
+		.then((result) => {
       ctx.drawImage(result, 0,0, displaywidth, displayheight)
       wait = 0;
     })

@@ -12,11 +12,3 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.db import models
-
-class client(models.Model):
-	name =  models.CharField(max_length=100)
-	hash =  models.CharField(max_length=100)
-	comment =  models.CharField(max_length=100, default='')
-
-	def __str__(self):
-		return('WS-Predictions-Client: ' + self.id + ': ' + self.name)

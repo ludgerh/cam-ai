@@ -113,7 +113,7 @@ class linkworkers(TemplateView):
       'detectorlist' : detectorlist,
       'eventerlist' : eventerlist,
       'schoollist' : schoollist,
-      'workerlist' : worker.objects.filter(active=True),
+      'workerlist' : worker.objects.all(),
     })
     return context
 

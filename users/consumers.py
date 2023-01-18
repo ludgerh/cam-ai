@@ -22,7 +22,6 @@ from channels.db import database_sync_to_async
 from tools.c_logger import log_ini
 from tools.djangodbasync import getonelinedict, savedbline, getoneline
 from users.archive import myarchive, uniquename
-from ws_predictions.models import client
 from .models import userinfo
 
 logname = 'ws_usersconsumers'

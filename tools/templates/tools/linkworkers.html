@@ -24,6 +24,7 @@
 {% for item in workerlist %}
 <div class="mb-3 m-2 h4">
   {{ item.name }}  
+  <span id="form{{ item.id }}">
   {% if item.wsname %}
     &#10003;
   {% else %}
@@ -32,7 +33,9 @@
     <input type="text" class="mb-3 m-2" id="passinput" placeholder="password" size="20">
     <button class="btn btn-primary m-2 link-button" type="button" idx= "{{ item.id }}">Link to Server</button>
   {% endif %}
+  </span>
 </div>
+<div class="mb-3 m-2 h4" id="status{{ item.id }}"></div>
 {% endfor %}
 
 <script>
@@ -59,10 +62,20 @@ $(document).ready(function() {
         'pass' : $('#passinput').val(),
       })  
       .then((result) => {
-        console.log(result);
-        if (result == 'OK') {
-          $(evt.target).removeClass('btn-warning');
+        if (result == 'new'){
+          $('#form' + $(evt.target).attr("idx")).html('&#10003;');
+          $('#status' + $(evt.target).attr("idx")).text('Success: This worker is linked.');
         };
+        if (result == 'exists'){
+          $('#status' + $(evt.target).attr("idx")).text('Error: This user already exists.');
+        };
+        if (result == 'noauth'){
+          $('#status' + $(evt.target).attr("idx")).text('Error: This password is wrong.');
+        };
+        if (result == 'missing'){
+          $('#status' + $(evt.target).attr("idx")).text('Error: This account does not exist.');
+        };
+        $(evt.target).removeClass('btn-warning');
       })
       .catch(err => {console.log(err);});
     });
