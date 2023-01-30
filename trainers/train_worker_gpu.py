@@ -19,6 +19,8 @@ from time import time
 import numpy as np
 from traceback import format_exc
 from math import ceil, sqrt, pi, log
+from setproctitle import setproctitle
+from logging import getLogger
 from django.utils import timezone
 from django.db import connection as sqlconnection
 from tensorflow.keras.utils import Sequence
@@ -28,6 +30,7 @@ from tensorflow.keras.optimizers import Adam
 import tensorflow_addons as tfa
 from tools.l_tools import djconf
 from tools.c_tools import cmetrics, hit100
+from tools.c_logger import log_ini
 from schools.c_schools import get_tagnamelist
 from .models import trainframe, fit as sqlfit, epoch
 from .hwcheck import getcputemp, getcpufan1, getcpufan2, getgputemp, getgpufan
@@ -234,7 +237,6 @@ def gpu_init(gpu_nr, gpu_mem_limit, logger):
   try:
     global global_load_model
     global global_tf
-    logger.info('Init Gpu: '+str(gpu_nr))
     environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     environ["CUDA_VISIBLE_DEVICES"]=str(gpu_nr)
     import tensorflow as tf
@@ -296,7 +298,13 @@ def getlines(myschool, logger):
   logger.info('Updatetd Model: TR '+str(len(result['TR']))+', VA'+str(len(result['VA'])))
   return(result)
 
-def train_once_gpu(myschool, myfit, logger):
+def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
+  logname = 'GPU #'+str(gpu_nr)
+  logger = getLogger(logname)
+  log_ini(logger, logname)
+  setproctitle('CAM-AI-GPU #' + str(gpu_nr))
+  logger.info('***Launching GPU#' + str(gpu_nr) + ', MemLimit: ' + str(gpu_mem_limit))
+  gpu_init(gpu_nr, gpu_mem_limit, logger)
   seed()
   epochs = djconf.getconfigint('tr_epochs', 1000)
   batchsize = djconf.getconfigint('tr_batchsize', 32)
@@ -481,7 +489,3 @@ train_sequence = sql_sequence(trlist, xdim, ydim, myschool,
     "cpufan2", "gputemp", "gpufan", "status", "description", ])
 
   logger.info('***  Done  ***')
-
-
-
-  return(True)

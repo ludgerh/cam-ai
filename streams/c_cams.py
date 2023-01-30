@@ -59,6 +59,14 @@ class c_cam(c_device):
       self.viewer = c_viewer(self, self.logger)
     else:
       self.viewer = None
+    for f in glob(self.recordingspath + 'C' + str(self.dbline.id).zfill(4) 
+        + '_????????.mp4'):
+      try:
+        remove(f)
+      except:
+        self.logger.error(format_exc())
+        self.logger.handlers.clear()
+        #self.logger.warning('Cam-Task failed to delete: '+f)
 
   def in_queue_handler(self, received):
     if super().in_queue_handler(received):
@@ -305,8 +313,7 @@ class c_cam(c_device):
       self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
       self.logger.info('Video codec: ' + self.video_codec_name + ' / ' 
         + str(self.cam_fps) + 'fps')
-      self.redis.x_y_res_to_cam(
-        self.dbline.id, probe['streams'][self.video_codec]['width'], 
+      self.redis.x_y_res_to_cam(self.dbline.id, probe['streams'][self.video_codec]['width'], 
         probe['streams'][self.video_codec]['height'])
       self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
       self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
@@ -344,8 +351,11 @@ class c_cam(c_device):
       self.checkmp4busy = True
       if self.cam_recording:
         if path.exists(self.vid_file_path(self.vid_count + 2)):
-          #timestamp = time()
-          timestamp = path.getmtime(self.vid_file_path(self.vid_count))
+          try:
+            timestamp = path.getmtime(self.vid_file_path(self.vid_count))
+          except FileNotFoundError:
+            self.checkmp4busy = False
+            return()
           targetname = self.ts_targetname(timestamp)
           try:
             move(self.vid_file_path(self.vid_count), 
@@ -401,14 +411,7 @@ class c_cam(c_device):
     else:
       frame_rate = self.cam_fps
     self.wd_ts = time()
-    for f in glob(self.recordingspath + 'C' + str(self.dbline.id).zfill(4) 
-        + '_????????.mp4'):
-      try:
-        remove(f)
-      except:
-        self.logger.error(format_exc())
-        self.logger.handlers.clear()
-        #self.logger.warning('Cam-Task failed to delete: '+f)
+    self.mydetector.myeventer.inqueue.put(('purge_videos', ))
     if self.dbline.cam_feed_type in {2, 3}:
       if self.dbline.cam_repeater > 0:
         self.rep_cam_nr = self.repeater.get_rep_cam_nr()

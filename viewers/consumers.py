@@ -39,6 +39,8 @@ log_ini(logger, logname)
 
 redis = myredis()
 
+longbreak = djconf.getconfigfloat('long_brake', 1.0)
+
 #*****************************************************************************
 # triggerConsumer
 # This is not async because the funtion ONF gets called from Sync
@@ -95,28 +97,36 @@ class triggerConsumer(WebsocketConsumer):
           go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
         if go_on:
           outx = params['width']
+          mystream = streams[params['idx']]
           if params['mode'] == 'C':
-            if outx > streams[params['idx']].dbline.cam_min_x_view:
-              outx *= streams[params['idx']].dbline.cam_scale_x_view
-              outx = max(streams[params['idx']].dbline.cam_min_x_view, outx)
-              if streams[params['idx']].dbline.cam_max_x_view:
-                outx = min(streams[params['idx']].dbline.cam_max_x_view, outx)
-            myviewer = streams[params['idx']].mycam.viewer
+            if outx > mystream.dbline.cam_min_x_view:
+              outx *= mystream.dbline.cam_scale_x_view
+              outx = max(mystream.dbline.cam_min_x_view, outx)
+              if mystream.dbline.cam_max_x_view:
+                outx = min(mystream.dbline.cam_max_x_view, outx)
+            myviewer = mystream.mycam.viewer
           elif params['mode'] == 'D':
-            if outx > streams[params['idx']].dbline.det_min_x_view:
-              outx *= streams[params['idx']].dbline.det_scale_x_view
-              outx = max(streams[params['idx']].dbline.det_min_x_view, outx)
-              if streams[params['idx']].dbline.det_max_x_view:
-                outx = min(streams[params['idx']].dbline.det_max_x_view, outx)
-            myviewer = streams[params['idx']].mydetector.viewer
+            mydetector = mystream.mydetector
+            while mydetector.scaledown is None:
+              sleep(longbreak)
+            if outx > mystream.dbline.det_min_x_view:
+              outx *= mystream.dbline.det_scale_x_view
+              outx = max(mystream.dbline.det_min_x_view, outx)
+              if mystream.dbline.det_max_x_view:
+                outx = min(mystream.dbline.det_max_x_view, outx)
+              if mydetector.scaledown > 1:
+                outx = min(outx, mystream.dbline.cam_xres / mydetector.scaledown)
+            myviewer = mydetector.viewer
           elif params['mode'] == 'E':
-            if outx > streams[params['idx']].dbline.eve_min_x_view:
-              outx *= streams[params['idx']].dbline.eve_scale_x_view
-              outx = max(streams[params['idx']].dbline.eve_min_x_view, outx)
-              if streams[params['idx']].dbline.eve_max_x_view:
-                outx = min(streams[params['idx']].dbline.eve_max_x_view, outx)
-            myviewer = streams[params['idx']].myeventer.viewer
-          outx = min(streams[params['idx']].dbline.cam_xres, outx)
+            myeventer = mystream.myeventer
+            myeventer.inqueue.put(('setdscrwidth', outx, ))
+            if outx > mystream.dbline.eve_min_x_view:
+              outx *= mystream.dbline.eve_scale_x_view
+              outx = max(mystream.dbline.eve_min_x_view, outx)
+              if mystream.dbline.eve_max_x_view:
+                outx = min(mystream.dbline.eve_max_x_view, outx)
+            myviewer = myeventer.viewer
+          outx = min(mystream.dbline.cam_xres, outx)
           self.outxdict[params['idx']] = round(outx)
           self.queuedict[params['idx']] = myviewer.inqueue
           self.busydict[params['mode']+str(params['idx']).zfill(9)] = True

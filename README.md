@@ -2,47 +2,49 @@
 
 #### CAM-AI reads security cameras and adds artificial intelligence: No more false alarms!
 
-This is an installation tutorial for a development system of the CAM-AI Server on a Raspberry Pi 4 and Debian 11 (bullseye) 64bit (get it at https://raspi.debian.net/tested-images/ , and install it on your Raspberry Pi). Other configurations are probably possible, but might need some testing and modifications. Raspberry Pi OS does not work. Raspi 3 does not work. Here we go:
+This is an installation tutorial for a development system of the CAM-AI Server on a Raspberry Pi 4 (Minimum 4 GB of internal RAM) and Raspberry Pi OS 11 (bullseye) 64bit. Download and install it following the instructions at https://www.raspberrypi.com/software/. We recommend using the 64bit Lite version. 
+
+If you already downloaded the OS image file in an compressed archive (file extension = .xy), you can write it to your SD card with this command:
+
+`xzcat {YOUR_FILENAME}.xz | sudo dd of=/dev/{YOUR_DEVICE} bs=64k oflag=dsync status=progress`
+
+Make sure you are writing to the right device, dont kill your notebooks harddisk...
+
+Other configurations are probably possible, but might need some testing and modifications. Raspi 3 does not work. Here we go:
 
 1. ####  Initial customizing of Raspi
 
-   On a fresh installation you first need to a root password, initially thats empty. You log in as root and continue like this:
+   For the initial installation of the Raspi you will need to connect it with a power supply, a monitor, a keyboard and a network cable with internet connection. Later you will only need the power and the network.
 
-   `passwd root`
+   After you put in the SD card with the newly written OS and applied power, the raspi will launch into some basic configuration screens. You can select the correct keyboard and the names of the first user. 
+
+   On a fresh installation you first need to set the root password, initially thats not set. You log in as the user you just created and continue like this:
+
+   `sudo passwd root`
 
    Then you might want to set the Raspi to the korrekt keyboard layout:
 
-   `apt update`
+   `sudo apt update`
 
-   `apt upgrade`
-
-   `apt install keyboard-configuration`
-
-   `apt install console-setup`
-
-   `apt install locales`
-
-   `dpkg-reconfigure tzdata`
-
-   `apt install systemd-cron`
+   `sudo apt upgrade`
 
    It is recommended to create a special user for operating the camera server. In our example this users name will be cam_ai :
 
-   **If the sudo-utility is not yet installed** on your target system, you can install it by doing:
-
-   `apt install sudo`
-
-   Then you continue:
-
-   `adduser cam_ai`
+   `sudo adduser cam_ai`
 
    You will be asked for all kind of information for the new user. The only thing you need to provide is a valid password (2 times), you can skip the rest by hitting return a couple of times. 
 
    `usermod -aG sudo cam_ai`
 
+   Last you need to activate SSH so that you can do the rest of the work from the console.
+
+   `sudo raspi-config`
+
+   Go got "Interface Options" and enable SSH there. After that you can log out:
+
    `exit`
 
-   **Then you login on a new console with the new users credential, either local or remote.**
+   Now  you can disconnect keyboard and monitor and bring the raspi to its final position. Then you login from a console on your PC with SSH and the new users credentials.
 
    There is one setting in the DHCP-configuration that causes proplems. We need to fix that:
 
@@ -65,33 +67,7 @@ This is an installation tutorial for a development system of the CAM-AI Server o
 
    `net.core.somaxconn=1024`
 
-   Save and leave Nano. Create the file
-
-   `sudo nano /etc/systemd/system/disable-transparent-huge-pages.service`
-
-   and put this in:
-
-   `[Unit]`
-
-   `Description=Disable Transparent Huge Pages`
-
-   `[Service]`
-
-   `Type=oneshot`
-
-   `ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/enabled"`
-
-   `ExecStart=/bin/sh -c "/usr/bin/echo "never" | tee /sys/kernel/mm/transparent_hugepage/defrag"`
-
-   `[Install]`
-
-   `WantedBy=multi-user.target`
-
-   Then enable the service:
-
-   `sudo systemctl enable disable-transparent-huge-pages`
-
-   `sudo systemctl start disable-transparent-huge-pages`
+   Save and leave Nano. 
 
    
 
@@ -252,6 +228,8 @@ This is an installation tutorial for a development system of the CAM-AI Server o
    `pip install psutil`
 
    `pip install ua-parser`
+
+   `pip install passlib`
 
    
 

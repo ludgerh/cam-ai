@@ -21,8 +21,8 @@ class stream(models.Model):
   made = models.DateTimeField(default=timezone.now)
   lastused = models.DateTimeField(default=timezone.now)
 
-  # 0: Not active  1: Runnin in parents process  2: Running in own process  
   cam_mode_flag = models.IntegerField(default=2)
+  # 0: Not active  1: Runnin in parents process  2: Running in own process  
   cam_view = models.BooleanField(default=True)
   cam_xres = models.IntegerField(default=0)
   cam_yres = models.IntegerField(default=0)
@@ -44,9 +44,9 @@ class stream(models.Model):
   cam_video_codec = models.IntegerField(default=-1)
   cam_audio_codec = models.IntegerField(default=-1)
   cam_pause = models.BooleanField(default=False)
-
-  # 0: Not active  1: Runnin in parents process  2: Running in own process  
+ 
   det_mode_flag = models.IntegerField(default=2)
+  # 0: Not active  1: Runnin in parents process  2: Running in own process  
   det_view = models.BooleanField(default=True)
   det_fpslimit = models.FloatField("FPS limit", default=0)
   det_fpsactual = models.FloatField(default=0)
@@ -60,9 +60,11 @@ class stream(models.Model):
   det_max_rect = models.IntegerField("max. number", default=20)
   det_max_size = models.IntegerField("max. size", default=100)
   det_apply_mask = models.BooleanField(default=False)
+  det_scaledown = models.IntegerField("scaledown", default=0)
+  # 0: automatic, epending on size, 1: switch off scaling
 
-  # 0: Not active  1: Runnin in parents process  2: Running in own process  
   eve_mode_flag = models.IntegerField(default=2)
+  # 0: Not active  1: Runnin in parents process  2: Running in own process  
   eve_view = models.BooleanField(default=True)
   eve_fpslimit = models.FloatField("FPS limit", default=0)
   eve_fpsactual = models.FloatField(default=0)

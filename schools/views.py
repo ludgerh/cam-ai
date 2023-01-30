@@ -11,7 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-from PIL import Image
+#from PIL import Image
 from ua_parser import user_agent_parser
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
@@ -50,14 +50,9 @@ def images(request, schoolnr):
 def classroom(request, schoolnr):
   if access.check('S', schoolnr, request.user, 'R'):
     template = loader.get_template('schools/classroom.html')
-    try:
-      myuserinfo = userinfo.objects.get(user = request.user.id)
-    except userinfo.DoesNotExist:
-      myuserinfo = userinfo(user_id=request.user.id, school_id=schoolnr, counter=0)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
-      'userinfo' : myuserinfo,
       'school' : school.objects.get(id=schoolnr),
       'events' : event.objects.filter(school_id=schoolnr, done=False, xmax__gt=0),
       'debug' : settings.DEBUG,

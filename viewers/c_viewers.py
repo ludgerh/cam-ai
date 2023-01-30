@@ -41,7 +41,7 @@ class c_viewer():
 
   def pop_from_onf(self, count):
     with self.onf_dict_lock:
-	    del self.onf_dict[count]
+      del self.onf_dict[count]
 
   def stop(self):
     self.inqueue.stop()

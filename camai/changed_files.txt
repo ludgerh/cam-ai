@@ -269,3 +269,20 @@ tf_workers/c_tfworkers.py
 ws_predictions/models.py
 ws_predictions/consumers.py
 schools/consumers.py
+schools/c_schools.py
+
+v 0.9.5 speed optimization in Detector and Eventer
+camai/version.py
+streams/c_cams.py
+streams/c_streams.py
+streams/models.py
+eventers/c_eventers.py
+trainers/c_trainers.py
+trainers/c_train_worker_gpu.py
+detectors/c_detectors.py
+viewers/consumers.py
+schools/views.py
+schools/consumers.py
+l_buffer/l_buffer.py
+tools/c_tools.py
+

@@ -29,6 +29,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.hashers import check_password
 from tools.l_tools import ts2filename, djconf, uniquename
+from tools.c_tools import reduce_image
 from tools.djangodbasync import (filterlines, getoneline, savedbline, 
   deldbline, updatefilter, deletefilter, getonelinedict, filterlinesdict,
   countfilter)
@@ -356,7 +357,8 @@ class schooldbutil(AsyncWebsocketConsumer):
           if eventdict['done']:
             await updatefilter(trainframe, {'id' : item['trainframe'], }, updatedict)
           else:
-            copy(schoolframespath + item['name'], modelpath + 'frames/' + newname)
+            if not reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, 400, 500):
+              copy(schoolframespath + item['name'], modelpath + 'frames/' + newname)
             t = trainframe(made=item['time'],
               school=schoolnr,
               name=newname,

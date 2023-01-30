@@ -57,7 +57,7 @@ class c_eventer(c_device):
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
     self.dataqueue = l_buffer(envi='D', bget=True)
-    self.detectorqueue = l_buffer(envi='D', bget=True, bput=True)
+    self.detectorqueue = l_buffer(envi='D', bget=True, buff=True)
     self.frameslist = deque()
     self.inserter_ts = 0
     self.eventdict = {}
@@ -86,6 +86,7 @@ class c_eventer(c_device):
 
       self.finished = False
       self.do_run = True
+      self.scaling = None
 
       Thread(target=self.inserter, name='InserterThread').start()
       while self.do_run:
@@ -124,6 +125,15 @@ class c_eventer(c_device):
             except FileNotFoundError:
               self.logger.warning('*** Delete did not find: '
                 + self.recordingspath + listitem[1])
+        elif (received[0] == 'purge_videos'):
+          for item in self.vid_deque.copy():
+            try:
+              #self.logger.info('removing: ' + self.recordingspath + item[1])
+              remove(self.recordingspath + item[1])
+            except FileNotFoundError:
+              self.logger.warning('*** Delete did not find: '
+                + self.recordingspath + item[1])
+          self.vid_deque.clear()
         elif (received[0] == 'set_fpslimit'):
           self.dbline.eve_fpslimit = received[1]
           if received[1] == 0:
@@ -162,6 +172,9 @@ class c_eventer(c_device):
         elif (received[0] == 'save_conditions'):
           self.cond_dict[received[1]] = json.loads(received[2])
           self.set_cam_counts()
+        elif (received[0] == 'setdscrwidth'):
+          self.scrwidth = received[1]
+          self.scaling = None
         else:
           return(False)
         return(True)
@@ -170,6 +183,7 @@ class c_eventer(c_device):
       self.logger.handlers.clear()
 
   def run_one(self, frame):
+    #ts1 = time()
     if (not self.redis.view_from_dev('E', self.dbline.id)):
       if self.frameslist:
         self.frameslist.clear()
@@ -177,6 +191,16 @@ class c_eventer(c_device):
     else:
       if (frame is None) or (len(self.frameslist) >= 100):
         return(None)
+      myframe = frame[1]
+      
+      if self.scaling is None:
+        if myframe.shape[1] > self.scrwidth:
+          self.scaling = self.scrwidth / myframe.shape[1]
+        else:
+          self.scaling = 1.0  
+      if self.scaling < 1:    
+        myframe = cv.resize(myframe, None, fx=self.scaling, fy=self.scaling)
+      frame = (frame[0], myframe, frame[2])
       frameplusevents = {}
       frameplusevents['frame'] = frame
       frameplusevents['events'] = []
@@ -234,11 +258,11 @@ class c_eventer(c_device):
         if all_done:
           frame = myframeplusevents['frame']
           newimage = frame[1].copy()
-          buffer_diff = min(1.0, frame[2] - self.buffer_ts)
-          while (time() - self.display_ts) < (buffer_diff * 0.9):
-            sleep(djconf.getconfigfloat('short_brake', 0.01))
-          self.buffer_ts = frame[2]
-          self.display_ts = time()
+          #buffer_diff = min(1.0, frame[2] - self.buffer_ts)
+          #while (time() - self.display_ts) < (buffer_diff * 0.9):
+          #  sleep(djconf.getconfigfloat('short_brake', 0.01))
+          #self.buffer_ts = frame[2]
+          #self.display_ts = time()
           for i in myframeplusevents['events']:
             if i[0] in self.eventdict:
               item = self.eventdict[i[0]]
@@ -252,14 +276,16 @@ class c_eventer(c_device):
                     colorcode= (0, 255, 0)
                   else:
                     colorcode= (0, 0, 255)
-                  displaylist = [(j, predictions[j]) for j in range(10)]
+                  displaylist = [(j, predictions[j]) for j in range(3)]
                   displaylist.sort(key=lambda x: -x[1])
-                  cv.rectangle(newimage, rect_btoa(itemold), colorcode, 5)
-                  if itemold[2] < (self.dbline.cam_yres - itemold[3]):
-                    y0 = itemold[3]+20
+                  if self.scaling < 1:
+                    itemold = [round(item * self.scaling) for item in itemold]
+                  cv.rectangle(newimage, rect_btoa(itemold), colorcode, 4)
+                  if itemold[2] < (self.dbline.cam_yres * self.scaling - itemold[3]):
+                    y0 = itemold[3] + 20
                   else:
-                    y0 = itemold[2]-190
-                  for j in range(10):
+                    y0 = itemold[2] - 55
+                  for j in range(3):
                     cv.putText(newimage, 
                       self.tag_list[displaylist[j][0]].name[:3]
                       +' - '+str(round(displaylist[j][1],2)), 
@@ -274,7 +300,9 @@ class c_eventer(c_device):
                         pmax = predictions[j]
                         imax = j
                   if resolve_rules(self.cond_dict[1], predictions):
-                    cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), 5)
+                    if self.scaling < 1:
+                      itemold = [round(item * self.scaling) for item in itemold]
+                    cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), 4)
                     cv.putText(newimage, self.tag_list[imax].name[:3], 
                       (itemold[0]+10, itemold[2]+30), 
                       cv.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv.LINE_AA)

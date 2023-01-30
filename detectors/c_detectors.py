@@ -15,10 +15,11 @@ import numpy as np
 import cv2 as cv
 from traceback import format_exc
 from logging import getLogger
-from time import sleep, time
+from time import time, sleep
 from setproctitle import setproctitle
 from django.db import connection
 from django.db.utils import OperationalError
+from tools.l_tools import djconf
 from tools.c_tools import rect_atob, rect_btoa, hasoverlap, merge_rects
 from tools.c_logger import log_ini
 from l_buffer.l_buffer import l_buffer
@@ -40,6 +41,7 @@ class c_detector(c_device):
         self.viewer = c_viewer(self, self.logger)
       else:
         self.viewer = None
+      self.scaledown = None
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
@@ -69,6 +71,34 @@ class c_detector(c_device):
       else:
         return(False)
       return(True)
+
+  def run(self):
+    cam_xres = self.dbline.cam_xres
+    cam_yres = self.dbline.cam_yres
+    #while True:
+    #  try:
+    #    cam_xres, cam_yres = self.redis.x_y_res_from_cam(self.dbline.id)
+    #    break
+    #  except TypeError:
+    #    sleep(djconf.getconfigfloat('long_brake', 1.0))
+    myscaledown = self.dbline.det_scaledown
+    if not myscaledown:
+      if (cam_xres >= 2560) or (cam_yres >= 2560):
+        myscaledown = 4
+      elif (cam_xres >= 1280) or (cam_yres >= 1280):
+        myscaledown = 2
+      else:
+        myscaledown = 1
+    self.scaledown = myscaledown   
+    self.xres = cam_xres // self.scaledown
+    self.yres = cam_yres // self.scaledown
+    if self.scaledown >= 4:
+      self.linewidth = 3
+    elif self.scaledown >= 2:
+      self.linewidth = 4
+    else:
+      self.linewidth = 5
+    super().run()
 
   def runner(self):
     try:
@@ -105,22 +135,33 @@ class c_detector(c_device):
       if self.dbline.det_apply_mask and (self.viewer.drawpad.mask is not None):
         frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
       if self.firstdetect:
-        self.background = np.float32(frame)
-        self.buffer = frame
+        if self.scaledown > 1:
+          self.buffer = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
+        else:
+          self.buffer = frame
+        self.background = np.float32(self.buffer)
         self.firstdetect = False
+      if self.scaledown > 1:
+        frame = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
       objectmaxsize = round(max(self.buffer.shape[0],self.buffer.shape[1])*self.dbline.det_max_size)
       buffer1 = cv.absdiff(self.buffer, frame)
       buffer1 = cv.split(buffer1)
       buffer2 = cv.max(buffer1[0], buffer1[1])
       buffer1 = cv.max(buffer2, buffer1[2])
       ret, buffer1 = cv.threshold(buffer1,self.dbline.det_threshold,255,cv.THRESH_BINARY)
-      erosion = self.dbline.det_erosion
+      if self.scaledown > 1:
+      	erosion = round(self.dbline.det_erosion / self.scaledown)
+      else:
+      	erosion = self.dbline.det_erosion
       if (erosion > 0) :
         kernel = np.ones((erosion*2 + 1,erosion*2 + 1),np.uint8)
         buffer2 = cv.erode(buffer1,kernel,iterations =1)
       else:
         buffer2 = buffer1
-      dilation = self.dbline.det_dilation
+      if self.scaledown > 1:
+      	dilation = round(self.dbline.det_dilation / self.scaledown)
+      else:
+      	dilation = self.dbline.det_dilation
       if (dilation > 0) :
         kernel = np.ones((dilation*2 + 1,dilation*2 + 1),np.uint8)
         buffer3 = cv.dilate(buffer2,kernel,iterations =1)
@@ -149,19 +190,21 @@ class c_detector(c_device):
             if y < ymax + grid:
               y = min(y, ymax)
               if (buffer3[y,x] == 255) :
-	              retval, image, dummy, recta = cv.floodFill(buffer3, None,
-		              (x, y), 100)
-	              rectb = rect_atob(recta)
-	              rectb.append(False)
-	              rect_list.append(rectb)
-	              recta = rect_btoa(rectb)
+                retval, image, dummy, recta = cv.floodFill(buffer3, None,
+                  (x, y), 100)
+                rectb = rect_atob(recta)
+                rectb.append(False)
+                rect_list.append(rectb)
+                recta = rect_btoa(rectb)
       rect_list = merge_rects(rect_list)
       sendtime = frametime
       for rect in rect_list[:self.dbline.det_max_rect]:
         recta = rect_btoa(rect)
-        cv.rectangle(buffer1, recta, (200), 5)
+        cv.rectangle(buffer1, recta, (200), self.linewidth)
         if ((recta[2]<=objectmaxsize) and (recta[3]<=objectmaxsize)):
           if not self.redis.check_if_counts_zero('E', self.dbline.id):
+            if self.scaledown > 1:
+              rect = [item * self.scaledown for item in rect]
             aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
             self.myeventer.detectorqueue.put((3, aoi, sendtime, rect[0], rect[1], rect[2], rect[3]))
           sendtime += 0.000001

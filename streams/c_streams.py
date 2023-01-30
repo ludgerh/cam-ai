@@ -46,11 +46,11 @@ class c_stream():
       if self.dbline.det_mode_flag:
         self.mydetector.parent = self.mycam
       if self.dbline.cam_mode_flag == 2:
-        if self.myeventer.dbline.eve_mode_flag == 2:
-          self.myeventer.run()
+        self.mycam.run() 
         if self.mydetector.dbline.det_mode_flag == 2:
           self.mydetector.run()
-        self.mycam.run() 
+        if self.myeventer.dbline.eve_mode_flag == 2:
+          self.myeventer.run()
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()

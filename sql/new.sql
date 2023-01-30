@@ -1,8 +1,8 @@
--- MySQL dump 10.19  Distrib 10.3.36-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19  Distrib 10.6.11-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: CAM-AI-GIT
+-- Host: localhost    Database: CAM-AI_GIT
 -- ------------------------------------------------------
--- Server version	10.3.36-MariaDB-0+deb10u2
+-- Server version	10.6.11-MariaDB-2
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -30,7 +30,7 @@ CREATE TABLE `access_access_control` (
   `u_g_nr` int(11) NOT NULL,
   `r_w` varchar(1) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -39,6 +39,7 @@ CREATE TABLE `access_access_control` (
 
 LOCK TABLES `access_access_control` WRITE;
 /*!40000 ALTER TABLE `access_access_control` DISABLE KEYS */;
+INSERT INTO `access_access_control` VALUES (1,'S',1,'U',0,'R');
 /*!40000 ALTER TABLE `access_access_control` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -54,7 +55,7 @@ CREATE TABLE `auth_group` (
   `name` varchar(150) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -82,7 +83,7 @@ CREATE TABLE `auth_group_permissions` (
   KEY `auth_group_permissio_permission_id_84c5c92e_fk_auth_perm` (`permission_id`),
   CONSTRAINT `auth_group_permissio_permission_id_84c5c92e_fk_auth_perm` FOREIGN KEY (`permission_id`) REFERENCES `auth_permission` (`id`),
   CONSTRAINT `auth_group_permissions_group_id_b120cbf9_fk_auth_group_id` FOREIGN KEY (`group_id`) REFERENCES `auth_group` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -109,7 +110,7 @@ CREATE TABLE `auth_permission` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `auth_permission_content_type_id_codename_01ab375a_uniq` (`content_type_id`,`codename`),
   CONSTRAINT `auth_permission_content_type_id_2f476e4b_fk_django_co` FOREIGN KEY (`content_type_id`) REFERENCES `django_content_type` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=109 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=109 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -143,7 +144,7 @@ CREATE TABLE `auth_user` (
   `date_joined` datetime(6) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -172,7 +173,7 @@ CREATE TABLE `auth_user_groups` (
   KEY `auth_user_groups_group_id_97559544_fk_auth_group_id` (`group_id`),
   CONSTRAINT `auth_user_groups_group_id_97559544_fk_auth_group_id` FOREIGN KEY (`group_id`) REFERENCES `auth_group` (`id`),
   CONSTRAINT `auth_user_groups_user_id_6a12ed8b_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -200,7 +201,7 @@ CREATE TABLE `auth_user_user_permissions` (
   KEY `auth_user_user_permi_permission_id_1fbb5f2c_fk_auth_perm` (`permission_id`),
   CONSTRAINT `auth_user_user_permi_permission_id_1fbb5f2c_fk_auth_perm` FOREIGN KEY (`permission_id`) REFERENCES `auth_permission` (`id`),
   CONSTRAINT `auth_user_user_permissions_user_id_a95ead1b_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -233,7 +234,7 @@ CREATE TABLE `django_admin_log` (
   KEY `django_admin_log_user_id_c564eba6_fk_auth_user_id` (`user_id`),
   CONSTRAINT `django_admin_log_content_type_id_c4bce8eb_fk_django_co` FOREIGN KEY (`content_type_id`) REFERENCES `django_content_type` (`id`),
   CONSTRAINT `django_admin_log_user_id_c564eba6_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -258,7 +259,7 @@ CREATE TABLE `django_content_type` (
   `model` varchar(100) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `django_content_type_app_label_model_76bd3d3b_uniq` (`app_label`,`model`)
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -284,7 +285,7 @@ CREATE TABLE `django_migrations` (
   `name` varchar(255) NOT NULL,
   `applied` datetime(6) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -310,7 +311,7 @@ CREATE TABLE `django_session` (
   `expire_date` datetime(6) NOT NULL,
   PRIMARY KEY (`session_key`),
   KEY `django_session_expire_date_a5c62663` (`expire_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -338,7 +339,7 @@ CREATE TABLE `drawpad_mask` (
   PRIMARY KEY (`id`),
   KEY `drawpad_mask_stream_id_c1668505_fk_streams_stream_id` (`stream_id`),
   CONSTRAINT `drawpad_mask_stream_id_c1668505_fk_streams_stream_id` FOREIGN KEY (`stream_id`) REFERENCES `streams_stream` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -375,7 +376,7 @@ CREATE TABLE `eventers_event` (
   PRIMARY KEY (`id`),
   KEY `eventers_event_school_id_f65d815f_fk_tf_workers_school_id` (`school_id`),
   CONSTRAINT `eventers_event_school_id_f65d815f_fk_tf_workers_school_id` FOREIGN KEY (`school_id`) REFERENCES `tf_workers_school` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=23198 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=23198 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -409,7 +410,7 @@ CREATE TABLE `eventers_event_frame` (
   PRIMARY KEY (`id`),
   KEY `eventers_event_frame_event_id_8ccad010_fk_eventers_event_id` (`event_id`),
   CONSTRAINT `eventers_event_frame_event_id_8ccad010_fk_eventers_event_id` FOREIGN KEY (`event_id`) REFERENCES `eventers_event` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5984 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=5984 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -440,7 +441,7 @@ CREATE TABLE `eventers_evt_condition` (
   PRIMARY KEY (`id`),
   KEY `eventers_evt_condition_eventer_id_81d1605a_fk_streams_stream_id` (`eventer_id`),
   CONSTRAINT `eventers_evt_condition_eventer_id_81d1605a_fk_streams_stream_id` FOREIGN KEY (`eventer_id`) REFERENCES `streams_stream` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=60 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=60 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -466,7 +467,7 @@ CREATE TABLE `schools_tag` (
   `school` smallint(6) NOT NULL,
   `replaces` smallint(6) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -539,10 +540,11 @@ CREATE TABLE `streams_stream` (
   `eve_all_predictions` tinyint(1) NOT NULL,
   `eve_school_id` bigint(20) NOT NULL,
   `cam_pause` tinyint(1) NOT NULL,
+  `det_scaledown` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `streams_stream_eve_school_id_3e307b1b_fk_tf_workers_school_id` (`eve_school_id`),
   CONSTRAINT `streams_stream_eve_school_id_3e307b1b_fk_tf_workers_school_id` FOREIGN KEY (`eve_school_id`) REFERENCES `tf_workers_school` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -586,7 +588,7 @@ CREATE TABLE `tf_workers_school` (
   KEY `tf_workers_school_trainer_id_171876a2_fk_trainers_trainer_id` (`trainer_id`),
   CONSTRAINT `tf_workers_school_tf_worker_id_3c7f9633_fk_tf_workers_worker_id` FOREIGN KEY (`tf_worker_id`) REFERENCES `tf_workers_worker` (`id`),
   CONSTRAINT `tf_workers_school_trainer_id_171876a2_fk_trainers_trainer_id` FOREIGN KEY (`trainer_id`) REFERENCES `trainers_trainer` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -625,7 +627,7 @@ CREATE TABLE `tf_workers_worker` (
   `wsadminpass` varchar(50) NOT NULL,
   `wsid` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -650,7 +652,7 @@ CREATE TABLE `tools_camurl` (
   `type` varchar(100) NOT NULL,
   `url` varchar(255) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -676,7 +678,7 @@ CREATE TABLE `tools_setting` (
   `value` varchar(100) NOT NULL,
   `comment` varchar(255) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -706,7 +708,7 @@ CREATE TABLE `tools_token` (
   `idx` int(11) NOT NULL,
   `info` varchar(255) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=201 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=201 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -739,7 +741,7 @@ CREATE TABLE `trainers_epoch` (
   PRIMARY KEY (`id`),
   KEY `trainers_epoch_fit_id_5b11bff0_fk_trainers_fit_id` (`fit_id`),
   CONSTRAINT `trainers_epoch_fit_id_5b11bff0_fk_trainers_fit_id` FOREIGN KEY (`fit_id`) REFERENCES `trainers_fit` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -780,7 +782,7 @@ CREATE TABLE `trainers_fit` (
   `description` longtext NOT NULL,
   `status` varchar(10) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -813,7 +815,7 @@ CREATE TABLE `trainers_trainer` (
   `wsname` varchar(50) NOT NULL,
   `wspass` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -822,7 +824,7 @@ CREATE TABLE `trainers_trainer` (
 
 LOCK TABLES `trainers_trainer` WRITE;
 /*!40000 ALTER TABLE `trainers_trainer` DISABLE KEYS */;
-INSERT INTO `trainers_trainer` VALUES (1,0,'Trainer 1',3,0,0,'00:00:00','24:00:00',1,'wss://booker-hellerhoff.de:10443/','RemoteServer2','=:lBlkV-v?ZGjNA\'%K@]');
+INSERT INTO `trainers_trainer` VALUES (1,0,'Trainer 1',3,0,0,'00:00:00','24:00:00',1,'wss://django.cam-ai.de/','','');
 /*!40000 ALTER TABLE `trainers_trainer` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -855,7 +857,7 @@ CREATE TABLE `trainers_trainframe` (
   PRIMARY KEY (`id`),
   KEY `trainers_trainframe_made_by_id_4562a1cb_fk_auth_user_id` (`made_by_id`),
   CONSTRAINT `trainers_trainframe_made_by_id_4562a1cb_fk_auth_user_id` FOREIGN KEY (`made_by_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1150 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=1150 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -884,7 +886,7 @@ CREATE TABLE `users_archive` (
   PRIMARY KEY (`id`),
   KEY `users_archive_school_id_75692b37_fk_tf_workers_school_id` (`school_id`),
   CONSTRAINT `users_archive_school_id_75692b37_fk_tf_workers_school_id` FOREIGN KEY (`school_id`) REFERENCES `tf_workers_school` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -912,7 +914,7 @@ CREATE TABLE `users_archive_users` (
   KEY `users_archive_users_user_id_84bbf87a_fk_auth_user_id` (`user_id`),
   CONSTRAINT `users_archive_users_archive_id_4eb6a3aa_fk_users_archive_id` FOREIGN KEY (`archive_id`) REFERENCES `users_archive` (`id`),
   CONSTRAINT `users_archive_users_user_id_84bbf87a_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -940,7 +942,7 @@ CREATE TABLE `users_userinfo` (
   KEY `users_userinfo_client_nr_id_6a9f9eae_fk_ws_predictions_client_id` (`client_nr_id`),
   CONSTRAINT `users_userinfo_client_nr_id_6a9f9eae_fk_ws_predictions_client_id` FOREIGN KEY (`client_nr_id`) REFERENCES `ws_predictions_client` (`id`),
   CONSTRAINT `users_userinfo_user_id_6acffaf6_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -969,7 +971,7 @@ CREATE TABLE `viewers_view_log` (
   `user` int(11) NOT NULL,
   `active` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1034 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=1034 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -995,7 +997,7 @@ CREATE TABLE `ws_predictions_client` (
   `hash` varchar(100) NOT NULL,
   `comment` varchar(100) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1008,7 +1010,7 @@ LOCK TABLES `ws_predictions_client` WRITE;
 UNLOCK TABLES;
 
 --
--- Dumping routines for database 'CAM-AI-GIT'
+-- Dumping routines for database 'CAM-AI_GIT'
 --
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -1020,4 +1022,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-01-08 11:42:19
+-- Dump completed on 2023-01-30 13:52:33

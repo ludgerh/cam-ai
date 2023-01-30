@@ -29,7 +29,7 @@ from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
 from tf_workers.models import school
 from .models import trainer as dbtrainer, trainframe, fit, epoch
 if djconf.getconfigbool('local_trainer', True):
-  from .train_worker_gpu import gpu_init, train_once_gpu
+  from .train_worker_gpu import train_once_gpu
 from .train_worker_remote import train_once_remote
 
 trainers = {}
@@ -167,8 +167,6 @@ class trainer():
     try:
       setproctitle('CAM-AI-Trainer #'+str(self.dbline.id))
       self.finished = False
-      if (self.dbline.t_type == 1):
-        gpu_init(self.dbline.gpu_nr, self.dbline.gpu_mem_limit, self.logger)
       self.job_queue = threadqueue()
       Thread(target=self.job_queue_tread, name='Trainer_JobQueueThread').start()
       while self.do_run:
@@ -187,7 +185,11 @@ class trainer():
             myschool = tempread[0]
             myfit = tempread[1]
             if (self.dbline.t_type == 1):
-              trainresult = train_once_gpu(myschool, myfit, self.logger)
+              #trainresult = train_once_gpu(myschool, myfit, self.dbline.gpu_nr, self.dbline.gpu_mem_limit)
+              gpu_process = Process(target = train_once_gpu, args = (myschool, myfit, self.dbline.gpu_nr, self.dbline.gpu_mem_limit, ))
+              gpu_process.start()
+              gpu_process.join()
+              trainresult = (gpu_process.exitcode)
             elif (self.dbline.t_type == 3):
               trainresult = train_once_remote(
                 myschool, 
@@ -196,14 +198,19 @@ class trainer():
                 self.dbline.wsname, 
                 self.dbline.wspass, 
                 self.logger).run()
-            if trainresult:
+            if  not trainresult:
               filterdict = {
                 'school' : myschool.id,
                 'train_status' : 1,
               }
               if not myschool.ignore_checked:
                 filterdict['checked'] = True
-              trainframe.objects.filter(**filterdict).update(train_status=2)
+              while True:
+                try:
+                  trainframe.objects.filter(**filterdict).update(train_status=2)
+                  break
+                except OperationalError:
+                  connection.close()
             with self.mylock:
               self.job_queue_list.remove(myschool.id)
             gc.collect()

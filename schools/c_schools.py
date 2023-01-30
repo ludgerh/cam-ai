@@ -16,7 +16,12 @@ from .models import tag
 
 def get_taglist(myschoolnr):
   count = 0
-  taglist = list(tag.objects.filter(school = 1))
+  while True:
+    try:
+      taglist = list(tag.objects.filter(school = 1))
+      break
+    except OperationalError:
+      connection.close()
   for item in taglist:
     item.id = count
     count += 1
