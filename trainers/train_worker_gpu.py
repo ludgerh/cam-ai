@@ -348,8 +348,8 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
   description = "min. l_rate: " + myschool.l_rate_min
   description += "  max. l_rate: " + myschool.l_rate_max 
   description += "  patience: " + str(mypatience) + "\n" 
-  description += "weight_max: " + str(myschool.weight_max)
-  description += "  weight_min: " + str(myschool.weight_max) 
+  description += "weight_min: " + str(myschool.weight_min)
+  description += "  weight_max: " + str(myschool.weight_max) 
   description += "  weight_boost: " + str(myschool.weight_boost) + "\n" 
   l_rate = model.optimizer.learning_rate.numpy()
   logger.info('>>> Learning rate from the model: '+str(l_rate))

@@ -278,11 +278,15 @@ streams/c_streams.py
 streams/models.py
 eventers/c_eventers.py
 trainers/c_trainers.py
-trainers/c_train_worker_gpu.py
+trainers/train_worker_gpu.py
 detectors/c_detectors.py
 viewers/consumers.py
 schools/views.py
 schools/consumers.py
 l_buffer/l_buffer.py
 tools/c_tools.py
+
+v 0.9.6 
+camai/version.py
+trainers/train_worker_gpu.py
 
