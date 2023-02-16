@@ -1,6 +1,6 @@
 -- MariaDB dump 10.19  Distrib 10.6.11-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: CAM-AI_GIT
+-- Host: 127.0.0.1    Database: CAM-AI_GIT
 -- ------------------------------------------------------
 -- Server version	10.6.11-MariaDB-2
 
@@ -597,7 +597,7 @@ CREATE TABLE `tf_workers_school` (
 
 LOCK TABLES `tf_workers_school` WRITE;
 /*!40000 ALTER TABLE `tf_workers_school` DISABLE KEYS */;
-INSERT INTO `tf_workers_school` VALUES (1,'Your School','data/schools/model1/',500,'1900-01-01 00:00:00.000000',1,'1e-6','1e-6',1,'efficientnetv2b0',1,0,0,2,1,8,6,1,1);
+INSERT INTO `tf_workers_school` VALUES (1,'Standard School','data/schools/model1/',500,'1900-01-01 00:00:00.000000',1,'1e-6','1e-6',1,'efficientnetv2b0',1,0,0,2,1,8,6,1,1);
 /*!40000 ALTER TABLE `tf_workers_school` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -624,7 +624,6 @@ CREATE TABLE `tf_workers_worker` (
   `wsserver` varchar(255) NOT NULL,
   `wsname` varchar(50) NOT NULL,
   `wspass` varchar(50) NOT NULL,
-  `wsadminpass` varchar(50) NOT NULL,
   `wsid` int(11) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -636,7 +635,7 @@ CREATE TABLE `tf_workers_worker` (
 
 LOCK TABLES `tf_workers_worker` WRITE;
 /*!40000 ALTER TABLE `tf_workers_worker` DISABLE KEYS */;
-INSERT INTO `tf_workers_worker` VALUES (1,1,'TF-Worker 1',8,0.1,64,20,0,-1,0,0,1,'wss://django.cam-ai.de/','','','',30);
+INSERT INTO `tf_workers_worker` VALUES (1,1,'TF-Worker 1',8,0.1,64,20,0,-1,0,0,1,'','','',3);
 /*!40000 ALTER TABLE `tf_workers_worker` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -824,7 +823,7 @@ CREATE TABLE `trainers_trainer` (
 
 LOCK TABLES `trainers_trainer` WRITE;
 /*!40000 ALTER TABLE `trainers_trainer` DISABLE KEYS */;
-INSERT INTO `trainers_trainer` VALUES (1,0,'Trainer 1',3,0,0,'00:00:00','24:00:00',1,'wss://django.cam-ai.de/','','');
+INSERT INTO `trainers_trainer` VALUES (1,0,'Trainer 1',3,0,0,'00:00:00','24:00:00',1,'','','');
 /*!40000 ALTER TABLE `trainers_trainer` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -936,11 +935,13 @@ DROP TABLE IF EXISTS `users_userinfo`;
 CREATE TABLE `users_userinfo` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
-  `client_nr_id` bigint(20) DEFAULT NULL,
+  `allowed_schools` int(11) NOT NULL,
+  `deadline` datetime(6) NOT NULL,
+  `made` datetime(6) NOT NULL,
+  `pay_tokens` int(11) NOT NULL,
+  `used_schools` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `users_userinfo_user_id_6acffaf6_fk_auth_user_id` (`user_id`),
-  KEY `users_userinfo_client_nr_id_6a9f9eae_fk_ws_predictions_client_id` (`client_nr_id`),
-  CONSTRAINT `users_userinfo_client_nr_id_6a9f9eae_fk_ws_predictions_client_id` FOREIGN KEY (`client_nr_id`) REFERENCES `ws_predictions_client` (`id`),
   CONSTRAINT `users_userinfo_user_id_6acffaf6_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -951,7 +952,7 @@ CREATE TABLE `users_userinfo` (
 
 LOCK TABLES `users_userinfo` WRITE;
 /*!40000 ALTER TABLE `users_userinfo` DISABLE KEYS */;
-INSERT INTO `users_userinfo` VALUES (1,1,NULL);
+INSERT INTO `users_userinfo` VALUES (1,1,2,'2100-01-01 00:00:00.000000','2023-01-12 11:20:55.834211',0,0);
 /*!40000 ALTER TABLE `users_userinfo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1022,4 +1023,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-01-30 13:52:33
+-- Dump completed on 2023-02-16 12:48:48
