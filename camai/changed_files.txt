@@ -286,7 +286,19 @@ schools/consumers.py
 l_buffer/l_buffer.py
 tools/c_tools.py
 
-v 0.9.6 
+v 0.9.7 
 camai/version.py
+trainers/c_trainers.py
 trainers/train_worker_gpu.py
+trainers/train_worker_remote.py
+trainers/consumers.py
+streams/startup.py
+tools/consumers.py
+tools/l_tools.py.py
+tools/addschool.html
+tools/linkworkers.html
+tf_workers/models.py
+schools/consumers.py
+eventers/c_eventers.py
+detectors/c_detectors.py
 

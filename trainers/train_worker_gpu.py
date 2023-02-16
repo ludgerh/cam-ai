@@ -24,7 +24,8 @@ from logging import getLogger
 from django.utils import timezone
 from django.db import connection as sqlconnection
 from tensorflow.keras.utils import Sequence
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
+from tensorflow.keras.callbacks import (EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, 
+  Callback)
 from tensorflow.keras import backend as K
 from tensorflow.keras.optimizers import Adam
 import tensorflow_addons as tfa
@@ -247,7 +248,8 @@ def gpu_init(gpu_nr, gpu_mem_limit, logger):
         tf.config.set_logical_device_configuration(
             gpu, [tf.config.LogicalDeviceConfiguration(memory_limit=gpu_mem_limit)])
       logical_gpus = tf.config.list_logical_devices('GPU')
-      logger.info(str(len(gpus))+" Physical GPUs, "+str(len(logical_gpus))+" Logical GPUs")
+      logger.info(str(len(gpus))+" Physical GPUs, " + str(len(logical_gpus))
+        + " Logical GPUs")
     from tensorflow.keras.models import load_model
     global_load_model = load_model
     logger.info("TensorFlow version: "+tf.__version__)
@@ -336,7 +338,8 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
 	  fitnr = -1
   model_name = myschool.model_type
   if path.exists(myschool.dir+'model/'+model_name+'.h5'):
-    copyfile(myschool.dir+'model/'+model_name+'.h5', myschool.dir+'model/'+model_name+'_'+str(fitnr)+'.h5')
+    copyfile(myschool.dir+'model/'+model_name+'.h5', 
+      myschool.dir+'model/'+model_name+'_'+str(fitnr)+'.h5')
     model_to_load = myschool.id
   else:
     model_to_load = 1
@@ -374,11 +377,15 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
 	  if (not found_class):
 		  weightarray[len(classes_list)] += 1
 
-  class_weights = [myschool.weight_max - ((x * (myschool.weight_max - myschool.weight_min)) / max(weightarray)) for x in weightarray]
+  class_weights = [myschool.weight_max 
+    - ((x * (myschool.weight_max - myschool.weight_min)) 
+     / max(weightarray)) for x in weightarray]
   description += '*** Weight Configuration ***\n' 
   for i in range(len(classes_list)):
-    description += (classes_list[i] + ' - ' +  str(weightarray[i]) + ' - ' + str(class_weights[i])) + "\n" 
-  description += ('none - ' +  str(weightarray[-1]) + ' - ' + str(class_weights[-1])) + "\n" 
+    description += ((classes_list[i] + ' - ' +  str(weightarray[i]) + ' - ' 
+      + str(class_weights[i])) + "\n")
+  description += (('none - ' +  str(weightarray[-1]) + ' - ' + str(class_weights[-1])) 
+    + "\n")
 
   train_sequence = sql_sequence(trlist, xdim, ydim, myschool,
     normalisation = None,

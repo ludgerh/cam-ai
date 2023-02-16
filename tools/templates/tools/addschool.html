@@ -25,10 +25,7 @@
   <label for="schoolname" class="form-label h4">Name of the new school:</label>
   <input type="text" class="form-control" id="schoolname">
 </div>
-<div class="mb-3 m-2">
-  <input class="form-check-input h4" type="checkbox" id="own_ai">
-  <label class="form-check-label h4" for="own_ai">Make own AI model</label>
-</div>
+<div class="mb-3 m-2 h4" id="status"></div>
 <div>
   <button class="btn btn-primary m-2 make-button" type="button">Make new school</button>
 </div>
@@ -39,7 +36,6 @@ let admintoolsSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 $(document).ready(function() {
-  $('#own_ai').prop("checked", false);
   WSAsync(
     ws_scheme + '//'
     + window.location.host
@@ -53,11 +49,17 @@ $(document).ready(function() {
         'command' : 'makeschool',
         'name' : $('#schoolname').val(),
         'remote_ai' : true,
-        'own_ai' : $('#own_ai').prop("checked"),
       })  
       .then((result) => {
-        if (result == 'OK') {
+        if (result.status == 'OK'){
+          $('#status').html('&#10003;');
           $('.make-button').removeClass('btn-warning');
+        };
+        if (result.status == 'noauth'){
+          $('#status').text('Error: No valid login on server.');
+        };
+        if (result.status == 'nomore'){
+          $('#status').text('Error: Maximum number of schools reached.');
         };
       })
       .catch(err => {console.log(err);});

@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# /tools/consumers.py V0.9.5 02.02.2023
+
 import json
 from pathlib import Path
 from os import makedirs
@@ -19,7 +21,8 @@ from json import loads, dumps
 from subprocess import Popen, PIPE
 from logging import getLogger
 from ipaddress import ip_network, ip_address
-from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, gaierror
+from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
+  gaierror)
 from MySQLdb import _mysql
 from passlib.hash import phpass
 from django.contrib.auth.models import User
@@ -27,7 +30,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from camai.passwords import db_password
 from tools.c_logger import log_ini
-from tools.djangodbasync import getonelinedict, filterlinesdict, deletefilter, updatefilter, savedbline, getexists, createuser
+from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
+  updatefilter, savedbline, getexists, createuser)
 from tools.l_tools import djconf, displaybytes
 from tf_workers.models import school, worker
 from trainers.models import trainframe, trainer
@@ -100,26 +104,34 @@ class health(AsyncWebsocketConsumer):
             subdir = item.name
             for item in (Path(myschool['dir']) / 'frames' / subdir).iterdir():
               self.filesetdict[params['school']].add(subdir+'/'+item.name)
-        dbset = await filterlinesdict(trainframe, {'school' : params['school'], }, ['name'])
+        dbset = await filterlinesdict(trainframe, 
+          {'school' : params['school'], }, 
+          ['name'], 
+        )
         self.dbsetdict[params['school']] = {item['name'] for item in dbset}
         outlist['data'] = {
-          'correct' : len(self.filesetdict[params['school']] & self.dbsetdict[params['school']]),
-          'missingdb' : len(self.filesetdict[params['school']] - self.dbsetdict[params['school']]),
-          'missingfiles' : len(self.dbsetdict[params['school']] - self.filesetdict[params['school']]),
+          'correct' : len(
+            self.filesetdict[params['school']] & self.dbsetdict[params['school']]),
+          'missingdb' : len(
+            self.filesetdict[params['school']] - self.dbsetdict[params['school']]),
+          'missingfiles' : len(
+            self.dbsetdict[params['school']] - self.filesetdict[params['school']]),
         }
         logger.debug('--> ' + str(outlist))
         await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingdb':	
         myschool = await getonelinedict(school, {'id' : params['school'], }, ['dir'])
-        for item in (self.filesetdict[params['school']] - self.dbsetdict[params['school']]):
+        for item in (
+            self.filesetdict[params['school']] - self.dbsetdict[params['school']]):
           (Path(myschool['dir']) / 'frames' / item).unlink()
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingfiles':	
-        for item in (self.dbsetdict[params['school']] - self.filesetdict[params['school']]):
+        for item in (
+            self.dbsetdict[params['school']] - self.filesetdict[params['school']]):
           await deletefilter(trainframe, {'name' : item, })	
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
@@ -133,12 +145,17 @@ class health(AsyncWebsocketConsumer):
           and item.exists()
           and item.stat().st_mtime < (time() - 1800)
         )]
-        fileset_jpg = {item.stem for item in fileset if (item.name[:2] == 'E_') and (item.suffix == '.jpg')}
-        fileset_mp4 = {item.stem for item in fileset if (item.name[:2] == 'E_') and (item.suffix == '.mp4')}
-        fileset_webm = {item.stem for item in fileset if (item.name[:2] == 'E_') and (item.suffix == '.webm')}
+        fileset_jpg = {item.stem for item in fileset if (item.name[:2] == 'E_') 
+          and (item.suffix == '.jpg')}
+        fileset_mp4 = {item.stem for item in fileset if (item.name[:2] == 'E_') 
+          and (item.suffix == '.mp4')}
+        fileset_webm = {item.stem for item in fileset if (item.name[:2] == 'E_') 
+          and (item.suffix == '.webm')}
         self.fileset = fileset_jpg & fileset_mp4
         self.fileset_all = fileset_jpg | fileset_mp4 | fileset_webm
-        mydbset = await filterlinesdict(event, {'videoclip__startswith' : 'E_',}, ['videoclip', 'start', ])
+        mydbset = await filterlinesdict(event, 
+          {'videoclip__startswith' : 'E_',}, 
+          ['videoclip', 'start', ])
         self.dbset = set()
         self.dbtimedict = {}
         for item in mydbset:
@@ -208,8 +225,11 @@ class health(AsyncWebsocketConsumer):
       elif params['command'] == 'fixmissingframes':	
         for item in (self.eventset - self.eventframeset):
           try:
-            eventdict = await getonelinedict(event, {'id' : item, }, ['videoclip', 'start', ]) 
-            if (len(eventdict['videoclip']) < 3) and (eventdict['start'].timestamp()  < (time() - 1800)):
+            eventdict = await getonelinedict(
+              event, {'id' : item, }, 
+              ['videoclip', 'start', ]) 
+            if ((len(eventdict['videoclip']) < 3) 
+                and (eventdict['start'].timestamp()  < (time() - 1800))):
               await deletefilter(event, {'id' : item, })
             else:
               await updatefilter(event, {'id' : item, }, {'numframes' : 0, })
@@ -220,7 +240,8 @@ class health(AsyncWebsocketConsumer):
         await self.send(dumps(outlist))	
 
       elif params['command'] == 'checkframes':
-        self.framefileset = {item.relative_to(schoolframespath).as_posix() for item in schoolframespath.rglob('*.bmp')}
+        self.framefileset = {item.relative_to(schoolframespath).as_posix() 
+          for item in schoolframespath.rglob('*.bmp')}
         self.framedbset = await filterlinesdict(event_frame, None, ['name'])
         self.framedbset = {item['name'] for item in self.framedbset}
         outlist['data'] = {
@@ -371,66 +392,65 @@ class admintools(AsyncWebsocketConsumer):
         ['tf_worker', 'e_school', 'trainer'])
       worker_dict = await getonelinedict(worker, 
         {'id': school_dict['tf_worker'], }, 
-        ['wsserver', 'wsid', 'wsadminpass', 'active'])
-      if not worker_dict['active']:
-        ws = WebSocket()
-        ws.connect(worker_dict['wsserver'] + 'ws/usradmin/')
-        outdict = {
-          'code' : 'make_usr',
-          'client_nr' : system_number,
-          'pass' : worker_dict['wsadminpass'],
-        }
-        ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        resultdict = json.loads(ws.recv())
-        ws.close()
-        await updatefilter(worker, 
-          {'id': school_dict['tf_worker'], }, 
-          {
-            'wsname' : resultdict['name'], 
-            'wspass' : resultdict['pass'], 
-            'wsid' : resultdict['usrid'],
-            'active' : True, 
-          }, )
-        while start_worker_list:
-          sleep(long_brake)
-        start_worker_list.add(school_dict['tf_worker'])
-        await updatefilter(trainer, 
-          {'id': school_dict['trainer'], }, 
-          {
-            'wsname' : resultdict['name'], 
-            'wspass' : resultdict['pass'], 
-            'active' : True, 
-          }, )
-        while start_trainer_list:
-          sleep(long_brake)
-        start_trainer_list.add(school_dict['trainer'])
-      if params['own_ai']:
-        schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
-        try:
-          makedirs(schooldir+'frames')
-        except FileExistsError:
-          logger.warning('Dir already exists: '+schooldir+'frames')
-        ws = WebSocket()
-        ws.connect(worker_dict['wsserver'] + 'ws/schoolutil/')
-        outdict = {
-          'code' : 'makeschool',
-          'client_nr' : system_number,
-          'name' : 'Cl' + str(system_number)+': ' + params['name'],
-          'pass' : worker_dict['wsadminpass'],
-          'user' : worker_dict['wsid'],
-        }
-        ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        resultdict = json.loads(ws.recv())
-        ws.close()
+        ['wsserver', 'wspass', 'wsname', 'wsid', ])
+      await updatefilter(trainer, 
+        {'id': school_dict['trainer'], }, 
+        {
+          'wsserver' : worker_dict['wsserver'], 
+          'wsname' : worker_dict['wsname'], 
+          'wspass' : worker_dict['wspass'], 
+          'active' : True, 
+        }, )
+      schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
+      try:
+        makedirs(schooldir+'frames')
+      except FileExistsError:
+        logger.warning('Dir already exists: '+schooldir+'frames')
+      ws = WebSocket()
+      ws.connect(worker_dict['wsserver'] + 'ws/schoolutil/')
+      outdict = {
+        'code' : 'makeschool',
+        'name' : 'CL' + str(worker_dict['wsid'])+': ' + params['name'],
+        'pass' : worker_dict['wspass'],
+        'user' : worker_dict['wsid'],
+      }
+      ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      resultdict = json.loads(ws.recv())
+      ws.close()
+      print(resultdict)
+      if resultdict['status'] == 'OK':
         await updatefilter(school, 
           {'id' : newschool.id, }, 
           {'dir' : schooldir, 'e_school' : resultdict['school'], })
+        await updatefilter(trainer, 
+          {'id' : 1, }, 
+          {'wsserver' : worker_dict['wsserver'], 
+          'wsname' : worker_dict['wsname'], 
+          'wspass' : worker_dict['wspass'], 
+          'active' : True, 
+          't_type' : 3,
+          })
+        while start_trainer_list:
+          sleep(long_brake)
+        start_trainer_list.add(school_dict['trainer'])
+        while start_worker_list:
+          sleep(long_brake)
+        start_worker_list.add(school_dict['tf_worker'])
+        streamlist = []
+        streamdict = await filterlinesdict(dbstream,
+          {'active' : True, },
+          ['id', ],
+        )
+        while start_stream_list: 
+          sleep(long_brake)
+        for item in streamdict:
+          start_stream_list.add(item['id'])
       else:
         await updatefilter(school, 
           {'id' : newschool.id, }, 
-          {'dir' : 'no local dir', 'e_school' : 1, })
-      outlist['data'] = 'OK'
-      logger.debug('--> ' + str(outlist))
+          {'active' : False, })
+      outlist['data'] = resultdict
+      logger.info('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'linkworker':
@@ -450,7 +470,6 @@ class admintools(AsyncWebsocketConsumer):
       }), opcode=1) #1 = Text
       resultdict = json.loads(ws.recv())
       ws.close()
-      print(resultdict)
       if resultdict['data']['status'] == 'new':
         await updatefilter(worker, {'id' : params['workernr'], }, {
           'active' : True,
@@ -464,6 +483,24 @@ class admintools(AsyncWebsocketConsumer):
         while start_worker_list:
           sleep(long_brake)
         start_worker_list.add(params['workernr'])
+        schooldict = await filterlinesdict(school, 
+          {'tf_worker' : 1, }, 
+          ['id', ],
+        )
+        streamlist = []
+        for item1 in schooldict:
+          streamdict = await filterlinesdict(dbstream,
+            {'eve_school' : item1['id'], },
+            ['id', ],
+          )
+          for item2 in streamdict:
+            streamlist.append(item2['id'])
+        while start_stream_list: 
+          sleep(long_brake)
+        for i in streamlist:
+          start_stream_list.add(i)
+          
+          
       outlist['data'] = resultdict['data']['status'] 
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
@@ -484,11 +521,16 @@ class admintools(AsyncWebsocketConsumer):
           db_password,
           "wp",
         )
-        db.query("select user_pass, user_email from wp_users where user_login = '" + params['user'] + "' ")
+        db.query("select user_pass, user_email from wp_users where user_login = '" 
+          + params['user'] + "' ")
         result=db.store_result().fetch_row()
         if  len(result):
           if (phpass.verify(params['pass'], result[0][0])):
-            newuser = await createuser(ws_user, result[0][1].decode("utf-8"), params['pass'])
+            newuser = await createuser(
+              ws_user, 
+              result[0][1].decode("utf-8"), 
+              params['pass']
+            )
             newuserinfo = userinfo()
             newuserinfo.user = newuser
             newuserinfo.client_nr = newuser.id

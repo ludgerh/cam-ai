@@ -116,7 +116,7 @@ class train_once_remote():
           'tags' : localdict[item][:10]
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        self.logger.info('Sending: ' + item)
+        #self.logger.info('Sending: ' + item)
         filepath = self.myschool.dir + 'frames/' + item
         with open(filepath, "rb") as f:
           self.ws.send_binary(f.read())
@@ -130,4 +130,4 @@ class train_once_remote():
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
-    return(True)
+    return(0)

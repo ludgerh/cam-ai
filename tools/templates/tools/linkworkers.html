@@ -11,6 +11,8 @@
 {# along with this program; if not, write to the Free Software #}
 {# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
 
+{# /tools/linkworkers.html V0.9.5 02.02.2023 #}
+
 {% extends 'main/basis.html' %}
 {% block content %}
 {% if emulatestatic %}
@@ -19,7 +21,8 @@
   <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
 {% else %}
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
-  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+    </script>
 {% endif %}
 {% for item in workerlist %}
 <div class="mb-3 m-2 h4">
@@ -28,10 +31,12 @@
   {% if item.wsname %}
     &#10003;
   {% else %}
-    <input type="text" class="mb-3 m-2" id="serverinput" placeholder="wss://yourserver" value="{{ item.wsserver }}" size="40">
+    <input type="text" class="mb-3 m-2" id="serverinput" placeholder="wss://yourserver" 
+      value="{{ item.wsserver }}" size="40">
     <input type="text" class="mb-3 m-2" id="userinput" placeholder="username" size="20">
     <input type="text" class="mb-3 m-2" id="passinput" placeholder="password" size="20">
-    <button class="btn btn-primary m-2 link-button" type="button" idx= "{{ item.id }}">Link to Server</button>
+    <button class="btn btn-primary m-2 link-button" type="button" idx= "{{ item.id }}">
+      Link to Server</button>
   {% endif %}
   </span>
 </div>
@@ -64,16 +69,20 @@ $(document).ready(function() {
       .then((result) => {
         if (result == 'new'){
           $('#form' + $(evt.target).attr("idx")).html('&#10003;');
-          $('#status' + $(evt.target).attr("idx")).text('Success: This worker is linked.');
+          $('#status' 
+            + $(evt.target).attr("idx")).text('Success: This worker is linked.');
         };
         if (result == 'exists'){
-          $('#status' + $(evt.target).attr("idx")).text('Error: This user already exists.');
+          $('#status' 
+            + $(evt.target).attr("idx")).text('Error: This user already exists in CAM-AI.');
         };
         if (result == 'noauth'){
-          $('#status' + $(evt.target).attr("idx")).text('Error: This password is wrong.');
+          $('#status' 
+            + $(evt.target).attr("idx")).text('Error: This password is wrong.');
         };
         if (result == 'missing'){
-          $('#status' + $(evt.target).attr("idx")).text('Error: This account does not exist.');
+          $('#status' 
+            + $(evt.target).attr("idx")).text('Error: This account does not exist in Wordpress.');
         };
         $(evt.target).removeClass('btn-warning');
       })

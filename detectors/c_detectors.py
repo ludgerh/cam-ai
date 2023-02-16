@@ -111,7 +111,9 @@ class c_detector(c_device):
       self.do_run = True
       while self.do_run:
         frameline = self.run_one(self.dataqueue.get())
-        if frameline is not None:
+        if frameline is None:
+          sleep(djconf.getconfigfloat('short_brake', 0.1))
+        else:
           if self.dbline.det_view and self.redis.view_from_dev('D', self.dbline.id):
             self.viewer.inqueue.put(frameline)
       self.dataqueue.stop()

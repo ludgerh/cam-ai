@@ -50,7 +50,7 @@ class school(models.Model):
   tf_worker = models.ForeignKey(worker, on_delete=models.SET_DEFAULT, default=1)
   trainer = models.ForeignKey(
     trainermod, on_delete=models.SET_DEFAULT, default=1)
-  ignore_checked = models.BooleanField(default=False)
+  ignore_checked = models.BooleanField(default=True)
   extra_runs = models.IntegerField(default=0)
   donate_pics = models.BooleanField(default=False)
   weight_max = models.FloatField(default=2.0)

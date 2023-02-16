@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# /trainers/c_trainers.py V0.9.5 14.02.2023
+
 import gc
 from multiprocessing import Process, Queue
 from threading import Thread, Lock
@@ -33,7 +35,7 @@ if djconf.getconfigbool('local_trainer', True):
 from .train_worker_remote import train_once_remote
 
 trainers = {}
-very_short_brake = djconf.getconfigfloat('very_short_brake', 0.001)
+short_brake = djconf.getconfigfloat('short_brake', 0.01)
 
 def sigint_handler(signal, frame):
   #print ('TFWorkers: Interrupt is caught')
@@ -49,15 +51,14 @@ class trainer():
   def __init__(self, idx):
     self.inqueue = Queue()
     self.id = idx
-    self.outqueues = {}
-    for item in school.objects.filter(active=True, trainer=self.id):
-      self.outqueues[item.id] = Queue()
+    self.outqueue = Queue()
+    self.queueinfobuffers = {}
     self.mylock = Lock()
-    self.active_schools = set()
     self.job_queue_list = []
 
     #*** Client Var
-    self.run_out_procs = {}
+    self.active_schools = set()
+    self.run_out_proc = None
 
   def in_queue_thread(self):
     try:
@@ -69,10 +70,8 @@ class trainer():
           while not self.inqueue.empty():
             received = self.inqueue.get()
           break
-
         elif (received[0] == 'getqueueinfo'):
-          self.outqueues[received[1]].put(('getqueueinfo', self.job_queue_list))
-  
+          self.outqueue.put(('getqueueinfo', received[1], self.job_queue_list))
         else:
           raise QueueUnknownKeyword(received[0])
     except:
@@ -185,8 +184,8 @@ class trainer():
             myschool = tempread[0]
             myfit = tempread[1]
             if (self.dbline.t_type == 1):
-              #trainresult = train_once_gpu(myschool, myfit, self.dbline.gpu_nr, self.dbline.gpu_mem_limit)
-              gpu_process = Process(target = train_once_gpu, args = (myschool, myfit, self.dbline.gpu_nr, self.dbline.gpu_mem_limit, ))
+              gpu_process = Process(target = train_once_gpu, args = (myschool, myfit, 
+                self.dbline.gpu_nr, self.dbline.gpu_mem_limit, ))
               gpu_process.start()
               gpu_process.join()
               trainresult = (gpu_process.exitcode)
@@ -225,10 +224,9 @@ class trainer():
     self.logger.handlers.clear()
   
   def stop(self):
-    for i in self.run_out_procs:
-      if self.run_out_procs[i].is_alive():
-        self.outqueues[i].put(('stop',))
-        self.run_out_procs[i].join()
+    if self.run_out_proc and self.run_out_proc.is_alive():
+      self.outqueue.put(('stop',))
+      self.run_out_proc.join()
     self.inqueue.put(('stop',))
     self.run_process.join()
 
@@ -238,11 +236,11 @@ class trainer():
 #
 #***************************************************************************
 
-  def out_reader_proc(self, index):
-    while (received := self.outqueues[index].get())[0] != 'stop':
+  def out_reader_proc(self):
+    while (received := self.outqueue.get())[0] != 'stop':
       #print('Out:', received)
       if (received[0] == 'getqueueinfo'):
-        self.queueinfo = received[1]
+        self.queueinfobuffers[received[1]] = received[2]
       else:
         raise QueueUnknownKeyword(received[0])
     #print('Finished:', received)
@@ -251,22 +249,24 @@ class trainer():
     if schoolnr in self.active_schools:
       return('Busy')
     else:
+      if not self.active_schools:
+        self.run_out_proc = Thread(
+          target=self.out_reader_proc, 
+          name='RunOutThread'+str(schoolnr), 
+          )
+        self.run_out_proc.start()
       self.active_schools.add(schoolnr)
-      self.run_out_procs[schoolnr] = Thread(
-        target=self.out_reader_proc, 
-        name='RunOutThread', 
-        args = (schoolnr, ))
-      self.run_out_procs[schoolnr].start()
       return('OK')
 
   def stop_out(self, schoolnr):
-    self.outqueues[schoolnr].put(('stop',))
-    self.run_out_procs[schoolnr].join()
     self.active_schools.remove(schoolnr)
+    if not self.active_schools:
+      self.outqueue.put(('stop',))
+      self.run_out_proc.join()
 
   def getqueueinfo(self, schoolnr):
-    self.queueinfo = None
+    self.queueinfobuffers[schoolnr] = None
     self.inqueue.put(('getqueueinfo', schoolnr, ))
-    while self.queueinfo is None:
-      sleep(very_short_brake)
-    return(self.queueinfo)
+    while self.queueinfobuffers[schoolnr] is None:
+      sleep(short_brake)
+    return(self.queueinfobuffers[schoolnr])

@@ -93,6 +93,8 @@ class c_eventer(c_device):
         frameline = self.dataqueue.get()
         if (self.do_run and (frameline is not None) and self.sl.greenlight(self.period, frameline[2])):
           self.run_one(frameline) 
+        else:
+          sleep(djconf.getconfigfloat('short_brake', 0.1))
       self.dataqueue.stop()
       self.detectorqueue.stop()
       for item in self.eventdict.values():
@@ -276,7 +278,7 @@ class c_eventer(c_device):
                     colorcode= (0, 255, 0)
                   else:
                     colorcode= (0, 0, 255)
-                  displaylist = [(j, predictions[j]) for j in range(3)]
+                  displaylist = [(j, predictions[j]) for j in range(10)]
                   displaylist.sort(key=lambda x: -x[1])
                   if self.scaling < 1:
                     itemold = [round(item * self.scaling) for item in itemold]
@@ -464,7 +466,9 @@ class c_eventer(c_device):
                 del self.eventdict[idict]
             else:
               self.check_events(idict)
-        if not self.redis.check_if_counts_zero('E', self.dbline.id):
+        if self.redis.check_if_counts_zero('E', self.dbline.id):
+          sleep(djconf.getconfigfloat('short_brake', 0.1))
+        else:
           margin = self.dbline.eve_margin
           frame = self.detectorqueue.get()
           if frame:

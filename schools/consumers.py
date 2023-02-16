@@ -24,6 +24,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.core import serializers
 from django.db.models import Q
+from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -489,20 +490,33 @@ class schoolutil(AsyncWebsocketConsumer):
     logger.debug('<-- ' + str(text_data))
     indict=json.loads(text_data)
     if indict['code'] == 'makeschool':
-      myclient = await getoneline(client, {'id' : indict['client_nr'], })
-      if not check_password(indict['pass'], myclient.hash):
-        await self.send(json.dumps(None))
+      userdict = await getonelinedict(dbuser, {'id' : indict['user'], }, ['password', ])
+      hash = userdict['password']
+      if not check_password(indict['pass'], hash):
+        result = {'status' : 'noauth'}
+        await self.send(json.dumps(result))
+        return()
+      userinfodict = await getonelinedict(userinfo, {'user' : indict['user'], }, [
+        'id', 
+        'user',
+        'allowed_schools',
+        'used_schools',
+      ])
+      print(userinfodict)
+      if userinfodict['used_schools'] >= userinfodict['allowed_schools']:
+        result = {'status' : 'nomore'}
+        await self.send(json.dumps(result))
         return()
       newschool = school()
       newschool.name = indict['name']
       await savedbline(newschool)
-      result = {'school' : newschool.id, }
+      result = {'status' : 'OK', 'school' : newschool.id, }
       newaccess = access_control()
       newaccess.vtype = 'S'
       newaccess.vid = newschool.id
       newaccess.u_g = 'U'
       newaccess.u_g_nr = indict['user']
-      newaccess.r_w = 'R'
+      newaccess.r_w = 'W'
       await savedbline(newaccess)
       schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
       try:
@@ -518,5 +532,8 @@ class schoolutil(AsyncWebsocketConsumer):
       await updatefilter(school, 
         {'id' : newschool.id, }, 
         {'dir' : schooldir, })
+      await updatefilter(userinfo, 
+        {'user' : indict['user'], }, 
+        {'used_schools' : userinfodict['used_schools'] + 1, })
       await self.send(json.dumps(result))				
 

@@ -40,19 +40,23 @@ def restartcheck_proc():
   global start_stream_list
   if start_trainer_list:
     for i in start_trainer_list:
-      dbline = trainerdb.objects.get(id=i)
+      if (i in trainers) and trainers[i].do_run:
+        trainers[i].stop()
       trainers[i] = trainer(i)
       trainers[i].run()
     start_trainer_list = set()
   if start_worker_list:
     for i in start_worker_list:
-      dbline = worker.objects.get(id=i)
-      tf_workers[dbline.id] = tf_worker(i)
-      tf_workers[dbline.id].run()
+      if (i in tf_workers) and tf_workers[i].do_run:
+        tf_workers[i].stop()
+      tf_workers[i] = tf_worker(i)
+      tf_workers[i].run()
     start_worker_list = set()
   if start_stream_list:
     for i in start_stream_list:
       dbline = stream.objects.get(id=i)
+      if i in streams:
+        streams[i].stop()
       streams[i] = c_stream(dbline)
       streams[i].start()
     start_stream_list = set()
