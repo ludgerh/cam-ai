@@ -15,7 +15,7 @@
 
 import json
 from pathlib import Path
-from os import makedirs
+from os import makedirs, path as ospath
 from time import time, sleep
 from json import loads, dumps
 from subprocess import Popen, PIPE
@@ -49,6 +49,9 @@ logger = getLogger(logname)
 log_ini(logger, logname)
 recordingspath = Path(djconf.getconfig('recordingspath', 'data/recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', 'data/schoolframes/'))
+textpath = djconf.getconfig('textpath', 'data/texts/')
+if not ospath.exists(textpath):
+  makedirs(textpath)
 schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 
@@ -504,6 +507,31 @@ class admintools(AsyncWebsocketConsumer):
       outlist['data'] = resultdict['data']['status'] 
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
+      
+    elif params['command'] == 'checkserver':
+      outlist['data'] = {} 
+      if not self.scope['user'].is_superuser:
+        await self.close()
+      from websocket import WebSocket
+      from websocket._exceptions import WebSocketAddressException
+      ws = WebSocket()
+      try:
+        ws.connect(params['server'] + 'ws/admintools/')
+        outdict = {
+          'command' : 'getinfo',
+        }
+        ws.send(json.dumps({
+          'tracker' : 0, 
+          'data' : outdict, 
+        }), opcode=1) #1 = Text
+        resultdict = json.loads(ws.recv())
+        ws.close()
+        outlist['data']['status'] = 'connect'
+        outlist['data']['info'] = resultdict['data']
+      except WebSocketAddressException:
+        outlist['data']['status'] = 'noanswer'
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
 
 #*****************************************************************************
 # functions for the server
@@ -544,6 +572,17 @@ class admintools(AsyncWebsocketConsumer):
           outlist['data']['status'] = 'missing'
         db.close()
 
+      logger.debug('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
+      
+    elif params['command'] == 'getinfo':
+      filename = textpath+'serverinfo.html'
+      try:
+        with open(filename, 'r', encoding='UTF-8') as f:
+          result = f.read()
+      except FileNotFoundError:
+        result = 'No Info: ' + textpath + 'serverinfo.html does not exist...'
+      outlist['data'] = result
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 

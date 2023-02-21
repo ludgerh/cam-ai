@@ -295,10 +295,17 @@ trainers/consumers.py
 streams/startup.py
 tools/consumers.py
 tools/l_tools.py.py
+tools/c_tools.py.py
 tools/addschool.html
 tools/linkworkers.html
 tf_workers/models.py
 schools/consumers.py
 eventers/c_eventers.py
 detectors/c_detectors.py
+
+v 0.9.8 
+camai/version.py
+tools/consumers.py
+tools/l_smtp.py
+tools/linkworkers.html
 

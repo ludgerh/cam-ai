@@ -31,12 +31,22 @@
   {% if item.wsname %}
     &#10003;
   {% else %}
-    <input type="text" class="mb-3 m-2" id="serverinput" placeholder="wss://yourserver" 
+    <div>
+    <input type="text" class="mb-3 m-2" id="serverinput{{ item.id }}" placeholder="wss://yourserver" 
       value="{{ item.wsserver }}" size="40">
-    <input type="text" class="mb-3 m-2" id="userinput" placeholder="username" size="20">
-    <input type="text" class="mb-3 m-2" id="passinput" placeholder="password" size="20">
-    <button class="btn btn-primary m-2 link-button" type="button" idx= "{{ item.id }}">
+    <button class="btn btn-primary m-2 check-button" type="button" idx="{{ item.id }}">
+      Check Server</button>
+    </div>
+    <div class="mb-3 m-2 h5 border border-dark d-none" id="info{{ item.id }}">
+      <h4>This is a sample header.</h4>
+      <h5>This is a sample text.</h5>
+    </div>
+    <div>
+    <input type="text" class="mb-3 m-2 d-none" id="userinput{{ item.id }}" placeholder="username" size="20">
+    <input type="text" class="mb-3 m-2 d-none" id="passinput{{ item.id }}" placeholder="password" size="20">
+    <button class="btn btn-primary m-2 link-button d-none" type="button" id="linkbutton{{ item.id }}" idx="{{ item.id }}">
       Link to Server</button>
+    </div>
   {% endif %}
   </span>
 </div>
@@ -57,14 +67,44 @@ $(document).ready(function() {
   )
   .then((result) => {
     admintoolsSocket = result;
+    
+    $('.check-button').click(function(evt) {
+      $(evt.target).addClass('btn-warning');
+      admintoolsSocket.sendandwait({
+        'command' : 'checkserver',
+        'server' : $('#serverinput' + $(evt.target).attr("idx")).val(),
+      })  
+      .then((result) => {
+        if (result.status == 'connect'){
+          $('#info' + $(evt.target).attr("idx")).html(result.info);
+          $('#info' + $(evt.target).attr("idx")).removeClass('d-none');
+          $('#status' 
+            + $(evt.target).attr("idx")).text('We got the server info.');
+          $('#userinput' + $(evt.target).attr("idx")).removeClass('d-none');
+          $('#passinput' + $(evt.target).attr("idx")).removeClass('d-none');
+          $('#linkbutton' + $(evt.target).attr("idx")).removeClass('d-none');
+        };
+        if (result.status == 'noanswer'){
+          $('#info' + $(evt.target).attr("idx")).addClass('d-none');
+          $('#status' 
+            + $(evt.target).attr("idx")).text('Error: This server does not answer.');
+          $('#userinput' + $(evt.target).attr("idx")).addClass('d-none');
+          $('#passinput' + $(evt.target).attr("idx")).addClass('d-none');
+          $('#linkbutton' + $(evt.target).attr("idx")).addClass('d-none');
+        };
+        $(evt.target).removeClass('btn-warning');
+      })
+      .catch(err => {console.log(err);});
+    });
+
     $('.link-button').click(function(evt) {
       $(evt.target).addClass('btn-warning');
       admintoolsSocket.sendandwait({
         'command' : 'linkworker',
         'workernr' : parseInt($(evt.target).attr("idx")),
-        'server' : $('#serverinput').val(),
-        'user' : $('#userinput').val(),
-        'pass' : $('#passinput').val(),
+        'server' : $('#serverinput' + $(evt.target).attr("idx")).val(),
+        'user' : $('#userinput' + $(evt.target).attr("idx")).val(),
+        'pass' : $('#passinput' + $(evt.target).attr("idx")).val(),
       })  
       .then((result) => {
         if (result == 'new'){
@@ -85,10 +125,10 @@ $(document).ready(function() {
             + $(evt.target).attr("idx")).text('Error: This account does not exist in Wordpress.');
         };
         $(evt.target).removeClass('btn-warning');
+        
       })
       .catch(err => {console.log(err);});
     });
-
   })  
   .catch(err => {console.log(err);});
 });

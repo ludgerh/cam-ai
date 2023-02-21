@@ -22,14 +22,12 @@ from time import sleep, time
 from threading import Thread
 from collections import OrderedDict
 from traceback import format_exc
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-import smtplib, ssl
 from django.db import connection
 from django.utils import timezone
 from django.db.utils import OperationalError
 from .models import event, event_frame, school
 from tools.l_tools import ts2filename, uniquename, randomfilter, np_mov_avg, djconf
+from tools.l_smtp import l_smtp
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 
@@ -302,67 +300,74 @@ class c_event(list):
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
-  def smt_send_mail(self, message, context, receiver):
+  def smtp_send_mail(self, mysmtp, receiver):
     count = 0
-    with smtplib.SMTP_SSL(djconf.getconfig('smtp_server'), 
-        djconf.getconfigint('smtp_port', 465), 
-        context=context) as server:
-      while True:
-        count += 1
-        try: 
-          server.login(djconf.getconfig('smtp_account'), 
-            djconf.getconfig('smtp_password'))
-          server.sendmail(djconf.getconfig('smtp_email'), 
-            receiver, message.as_string())
-          break
-        except:
-          self.logger.warning('*** ['+str(count)+'] Email sending to: '+receiver+' failed')
-          sleep(300)
+    while True:
+      count += 1
+      try: 
+        mysmtp.login(
+          djconf.getconfig('smtp_account'), 
+          djconf.getconfig('smtp_password'),
+        )
+        mysmtp.sendmail(
+          djconf.getconfig('smtp_email'), 
+          receiver,
+        )
+        break
+      except:
+        self.logger.warning('*** ['+str(count)+'] Email sending to: '+receiver+' failed')
+        sleep(300)
+    mysmtp.logout()
     self.logger.info('*** ['+str(count)+'] Sent email to: '+receiver)
 
   def send_emails(self):
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
       mytoken = maketoken('EVR', self.dbline.id, receiver)
-      mylist = self.pred_read(max=1.0)[1:].tolist()
-      maxpos = mylist.index(max(mylist))  
-      message = MIMEMultipart('alternative')
-      message['Subject'] = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
+      mysmtp = l_smtp(
+        djconf.getconfig('smtp_mode', 'SSL'), 
+        djconf.getconfig('smtp_server', 'localhost'),
+      )
+      subject = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
         + self.p_string())
-      message['From'] = (djconf.getconfig('smtp_name', 'CAM-AI Emailer') 
-        +' <'+djconf.getconfig('smtp_email')+'>')
-      message['To'] = receiver
-      text = 'Hello CAM-AI user,\n' 
-      text += 'We had some movement.\n'  
+      from_name = djconf.getconfig('smtp_name', 'CAM-AI Emailer')
+      from_email = djconf.getconfig('smtp_email')
+      to_email = receiver
+      plain_text = 'Hello CAM-AI user,\n' 
+      plain_text += 'We had some movement.\n'  
       if self.savename:
-        text += 'Here is the movie: \n' 
-        text += clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
-        text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
-      text += 'Here are the images: \n'  
+        plain_text += 'Here is the movie: \n' 
+        plain_text += clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
+        plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
+      plain_text += 'Here are the images: \n'  
       for item in self.mailimages:
-        text += clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
-        text += str(mytoken[0]) + '/' + mytoken[1] + '/ \n' 
-      html = '<html><body><p>Hello CAM-AI user, <br>\n' 
-      html += 'We had some movement. <br> \n' 
+        plain_text += clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
+        plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/ \n' 
+      html_text = '<html><body><p>Hello CAM-AI user, <br>\n' 
+      html_text += 'We had some movement. <br> \n' 
       if self.savename:
-        html += '<br>Here is the movie (click on the image): <br> \n' 
-        html += '<a href="' + clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
-        html += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
-        html += '" target="_blank">'
-        html += '<img src="' + clienturl + 'eventers/eventjpg/' + str(self.dbline.id) + '/'
-        html += str(mytoken[0]) + '/' + mytoken[1] + '/video.jpg'
-        html += '" style="width: 400px; height: auto"</a> <br>\n'
-      html += 'Here are the images: <br> \n'
+        html_text += '<br>Here is the movie (click on the image): <br> \n' 
+        html_text += '<a href="' + clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
+        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
+        html_text += '" target="_blank">'
+        html_text += '<img src="' + clienturl + 'eventers/eventjpg/' + str(self.dbline.id) + '/'
+        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.jpg'
+        html_text += '" style="width: 400px; height: auto"</a> <br>\n'
+      html_text += 'Here are the images: <br> \n'
       for item in self.mailimages:
-        html += '<a href="' + clienturl + 'schools/getbigbmp/0/' + str(item) + '/'
-        html += str(mytoken[0]) + '/' + mytoken[1] + '/' 
-        html += '" target="_blank">'
-        html += '<img src="' + clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
-        html += str(mytoken[0]) + '/' + mytoken[1] + '/' 
-        html += '" style="width: 200px; height: 200px; object-fit: contain"</a> \n'
-      html += '<br> \n'
-      message.attach(MIMEText(text, 'plain'))
-      message.attach(MIMEText(html, 'html'))
-      context = ssl.create_default_context()
-      Thread(target=self.smt_send_mail, name='SMTPSendThread', args=(message, context, receiver, )).start()
+        html_text += '<a href="' + clienturl + 'schools/getbigbmp/0/' + str(item) + '/'
+        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
+        html_text += '" target="_blank">'
+        html_text += '<img src="' + clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
+        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
+        html_text += '" style="width: 200px; height: 200px; object-fit: contain"</a> \n'
+      html_text += '<br> \n'
+      mysmtp.putcontent(
+        subject, 
+        djconf.getconfig('smtp_name', 'CAM-AI Emailer'),
+        djconf.getconfig('smtp_email'), 
+        receiver,
+        plain_text,
+        html_text,)
+      Thread(target=self.smtp_send_mail, name='SMTPSendThread', args=(mysmtp, receiver,)).start()
 
