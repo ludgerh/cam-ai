@@ -515,6 +515,8 @@ class c_eventer(c_device):
               found.add_frame(frame)
             self.merge_events()
             self.inserter_ts = frame[2]
+          else:  
+            sleep(djconf.getconfigfloat('short_brake', 0.1))
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()

@@ -308,4 +308,6 @@ camai/version.py
 tools/consumers.py
 tools/l_smtp.py
 tools/linkworkers.html
+eventers/c_event.py
+eventers/c_eventers.py
 
