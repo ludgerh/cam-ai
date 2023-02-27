@@ -388,12 +388,15 @@ class schooldbutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'delevent':
       try:
-        if params['eventnr']:
+        if params['eventnr'] == -1:
+          eventdicts = await filterlinesdict(event, {'school__id' : params['schoolnr'], 'xmax__gt' : 0, }, ['id', 'school', 'videoclip'])
+          schoolnr =  params['schoolnr']
+        elif params['eventnr'] == 0:
+          eventdicts = await filterlinesdict(event, {'school__id' : params['schoolnr'], 'xmax__gt' : 0, 'done' : True, }, ['id', 'school', 'videoclip'])
+          schoolnr =  params['schoolnr']
+        else:
           eventdicts = await filterlinesdict(event, {'id' : params['eventnr'], }, ['id', 'school', 'videoclip'])
           schoolnr = eventdicts[0]['school']
-        else:
-          eventdicts = await filterlinesdict(event, {'school__id' : params['schoolnr'], 'done' : True, }, ['id', 'school', 'videoclip'])
-          schoolnr =  params['schoolnr']
         if access.check('S', schoolnr, self.scope['user'], 'W'):
           for eitem in eventdicts:
             framelines = await filterlinesdict(event_frame, {'event__id' : eitem['id'], }, ['id', 'name', ])

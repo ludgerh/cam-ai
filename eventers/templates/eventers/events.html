@@ -56,12 +56,15 @@
 {% if may_write %}
 <button type="button" class="btn btn-primary m-2" id="0" 
   data-bs-toggle="modal" data-bs-target="#deleteModal" 
-  style="width: 240px;">Purge schooled events</button></h2>
+  style="width: 240px;">Purge schooled events</button>
+<button type="button" class="btn btn-primary m-2" id="-1" 
+  data-bs-toggle="modal" data-bs-target="#deleteModal" 
+  style="width: 240px;">Purge all(!!!) events</button></h2>
 {% endif %}
 <div class="container-fluid float-left">
   <div class="row">
 {% for item in events %}
-    <div id="col{{ item.id }}" class="col-sm-auto{% if item.done %} colisdone{% endif %}">
+    <div id="col{{ item.id }}" class="col-sm-auto colall {% if item.done %} colisdone{% endif %}">
       <div class="card m-2" style="width: 375px; height: 585px;">
         <div done=0 id="{{ item.id }}" class="carousel slide card-img-top" 
             data-bs-ride="carousel" style="width: 375px; height: 375px">
@@ -103,10 +106,14 @@
 $('#deleteModal').on('shown.bs.modal', function (event) {
   const button = event.relatedTarget;
   const event_nr = button.getAttribute('id');
-  if (event_nr == '0') {
-    $('.modal-title').text('Deleting all schooled events');
+  if (event_nr == '-1') {
+    $('.modal-title').text('Deleting all (!!!) events');
   } else {
-    $('.modal-title').text('Deleting event Nr. ' + event_nr);
+    if (event_nr == '0') {
+      $('.modal-title').text('Deleting all schooled events');
+    } else {
+      $('.modal-title').text('Deleting event Nr. ' + event_nr);
+    };
   };
   $('.delbutton').attr('idx', event_nr);
 })
@@ -172,21 +179,27 @@ $(document).ready(function() {
     });
 {% if may_write %}
     $('.delbutton').click(function() {
-      const event_nr = $(this).attr('idx');
+      let event_nr = $(this).attr('idx');
       $('#deleteModal').modal('hide');
       $('#'+event_nr).addClass('btn-warning');
-      if (event_nr == '0') {
+      event_nr = parseInt(event_nr, 10);
+      if (event_nr <= 0) {
         SchoolDBUtilSocket.sendandwait({
 			    'command' : 'delevent',
-			    'eventnr' : 0,
+			    'eventnr' : event_nr,
           'schoolnr' : {{ school.id }},
 		    })
 		    .then((result) => {
 			    if (result === 'OK') {
-            $('.colisdone').remove(); 
+            if (event_nr == 0) {
+              $('.colisdone').remove();
+            };  
+            if (event_nr == -1) {
+              $('.colall').remove();
+            };  
             getimages();
           } else {
-            console.log('Error while deleting schooled events');
+            console.log('Error while deleting multiple events');
           };
         
 		    })
@@ -195,7 +208,7 @@ $(document).ready(function() {
       } else {
         SchoolDBUtilSocket.sendandwait({
 			    'command' : 'delevent',
-			    'eventnr' : parseInt(event_nr, 10),
+			    'eventnr' : event_nr,
           'schoolnr' : {{ school.id }},
 		    })
 		    .then((result) => {

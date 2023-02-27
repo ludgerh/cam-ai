@@ -144,7 +144,6 @@ class triggerConsumer(WebsocketConsumer):
                 elif params['mode'] == 'C':
                   if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
                     frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
-                if params['mode'] in {'C', 'D'}:
                   if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
                     if onf_viewer.drawpad.whitemarks:
                       frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)

@@ -311,3 +311,17 @@ tools/linkworkers.html
 eventers/c_event.py
 eventers/c_eventers.py
 
+v 0.9.9 
+camai/version.py
+detectors/c_detectors.py
+eventers/c_eventers.py
+eventers/events.html
+streams/c_cams.py
+oneitem/consumers.py
+oneitem/onecam.html
+oneitem/onedetector.html
+viewers/consumers.py
+viewers/c_viewers.py
+drawpad/drawpad.py
+schools/consumers.py
+

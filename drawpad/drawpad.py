@@ -30,11 +30,13 @@ class drawpad():
     self.edit_mask = False
     if self.parent.parent.type == 'C':
       self.whitemarks = False
+      self.scaledown = 1
     elif self.parent.parent.type == 'D':
       self.whitemarks = True
+      self.scaledown = self.parent.parent.scaledown
     self.backgr = (255,255,255)
     self.foregr = (0,0,0)
-    self.radius = 10
+    self.radius = 20
     self.xdim = self.parent.parent.dbline.cam_xres
     self.ydim = self.parent.parent.dbline.cam_yres
     self.ringlist = []
@@ -63,20 +65,24 @@ class drawpad():
       y = self.ydim
     if radius is None:
       radius = self.radius
-    result = np.full((y, x, 3), self.backgr, np.uint8)
+    if self.scaledown == 1:
+      result = np.full((y, x, 3), self.backgr, np.uint8)
+    else:
+      result = np.full((y // self.scaledown, x // self.scaledown, 3), self.backgr, np.uint8)
     self.draw_rings(result, radius)
     return(result)
 
   def new_ring(self):
+    size = 100
     myring = [
-      [round(self.xdim/2-50), round(self.ydim/2-50)], 
-      [round(self.xdim/2-50), round(self.ydim/2)], 
-      [round(self.xdim/2-50), round(self.ydim/2+50)], 
-      [round(self.xdim/2), round(self.ydim/2+50)], 
-      [round(self.xdim/2+50), round(self.ydim/2+50)], 
-      [round(self.xdim/2+50), round(self.ydim/2)], 
-      [round(self.xdim/2+50), round(self.ydim/2-50)], 
-      [round(self.xdim/2), round(self.ydim/2-50)],
+      [round(self.xdim/2-size), round(self.ydim/2-size)], 
+      [round(self.xdim/2-size), round(self.ydim/2)], 
+      [round(self.xdim/2-size), round(self.ydim/2+size)], 
+      [round(self.xdim/2), round(self.ydim/2+size)], 
+      [round(self.xdim/2+size), round(self.ydim/2+size)], 
+      [round(self.xdim/2+size), round(self.ydim/2)], 
+      [round(self.xdim/2+size), round(self.ydim/2-size)], 
+      [round(self.xdim/2), round(self.ydim/2-size)],
     ]
     self.ringlist.append(myring)
 
@@ -85,12 +91,25 @@ class drawpad():
       x = self.xdim
     if y is None:
       y = self.ydim
-    result = np.empty((y, x, 3), np.uint8)
+    result = np.empty((y // self.scaledown, x // self.scaledown, 3), np.uint8)
     result[:] = backgr
     for ring in self.ringlist:
       pts = np.array(ring).round().astype(np.int32)
       cv.fillPoly(result, [pts], foregr)
     return(result)
+    
+  def reduce_rings_size(self):  
+    if self.scaledown == 1:
+      result = self.ringlist
+    else:
+      result = []  
+      for ring in self.ringlist:
+        newring = []
+        for point in ring:
+          newpoint = [point[0] // self.scaledown, point[1] // self.scaledown] 
+          newring.append(newpoint)
+        result.append(newring)   
+    return(result)  
 
   def point_clicked(self, x, y):
     click_point = Point(x,y) 

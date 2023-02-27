@@ -37,11 +37,21 @@ class c_detector(c_device):
       self.firstdetect = True
       self.ts_background = time()
       self.finished = True
+      self.cam_xres = self.dbline.cam_xres
+      self.cam_yres = self.dbline.cam_yres
+      myscaledown = self.dbline.det_scaledown
+      if not myscaledown:
+        if (self.cam_xres >= 2560) or (self.cam_yres >= 2560):
+          myscaledown = 4
+        elif (self.cam_xres >= 1280) or (self.cam_yres >= 1280):
+          myscaledown = 2
+        else:
+          myscaledown = 1
+      self.scaledown = myscaledown   
       if self.dbline.det_view:
         self.viewer = c_viewer(self, self.logger)
       else:
         self.viewer = None
-      self.scaledown = None
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
@@ -73,25 +83,8 @@ class c_detector(c_device):
       return(True)
 
   def run(self):
-    cam_xres = self.dbline.cam_xres
-    cam_yres = self.dbline.cam_yres
-    #while True:
-    #  try:
-    #    cam_xres, cam_yres = self.redis.x_y_res_from_cam(self.dbline.id)
-    #    break
-    #  except TypeError:
-    #    sleep(djconf.getconfigfloat('long_brake', 1.0))
-    myscaledown = self.dbline.det_scaledown
-    if not myscaledown:
-      if (cam_xres >= 2560) or (cam_yres >= 2560):
-        myscaledown = 4
-      elif (cam_xres >= 1280) or (cam_yres >= 1280):
-        myscaledown = 2
-      else:
-        myscaledown = 1
-    self.scaledown = myscaledown   
-    self.xres = cam_xres // self.scaledown
-    self.yres = cam_yres // self.scaledown
+    self.xres = self.cam_xres // self.scaledown
+    self.yres = self.cam_yres // self.scaledown
     if self.scaledown >= 4:
       self.linewidth = 3
     elif self.scaledown >= 2:
@@ -134,8 +127,6 @@ class c_detector(c_device):
         return(None)
       frame = input[1]
       frameall = frame
-      if self.dbline.det_apply_mask and (self.viewer.drawpad.mask is not None):
-        frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
       if self.firstdetect:
         if self.scaledown > 1:
           self.buffer = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
@@ -145,6 +136,8 @@ class c_detector(c_device):
         self.firstdetect = False
       if self.scaledown > 1:
         frame = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
+      if self.dbline.det_apply_mask and (self.viewer.drawpad.mask is not None):
+        frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
       objectmaxsize = round(max(self.buffer.shape[0],self.buffer.shape[1])*self.dbline.det_max_size)
       buffer1 = cv.absdiff(self.buffer, frame)
       buffer1 = cv.split(buffer1)

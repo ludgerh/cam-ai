@@ -19,12 +19,13 @@ from django.db import transaction
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from access.c_access import access
-from tools.djangodbasync import getoneline, savedbline, deletefilter
+from tools.djangodbasync import getoneline, savedbline, deletefilter, updatefilter
 from tools.c_logger import log_ini
 from tf_workers.models import school
 from streams.models import stream
 from eventers.models import evt_condition
 from streams.startup import streams
+from drawpad.models import mask
 
 logname = 'ws_oneitemconsumers'
 logger = getLogger(logname)
@@ -56,6 +57,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         self.idx = params['itemid']
         if self.mode == 'C':
           self.myitem = streams[params['itemid']].mycam
+          self.mydrawpad = self.myitem.viewer.drawpad
+          self.mydetectordrawpad = self.myitem.mydetector.viewer.drawpad
         elif self.mode == 'D':
           self.myitem = streams[params['itemid']].mydetector
         elif self.mode == 'E':
@@ -157,10 +160,28 @@ class oneitemConsumer(AsyncWebsocketConsumer):
     elif params['command'] == 'setbtevent':
       if self.may_write:
         if 'bt_new' in params:
-          mydrawpad = self.myitem.viewer.drawpad
-          mydrawpad.new_ring()
-          mydrawpad.screen = mydrawpad.make_screen()
-          mydrawpad.mask = mydrawpad.mask_from_polygons()
+          self.mydrawpad.new_ring()
+          self.mydrawpad.screen = self.mydrawpad.make_screen()
+          self.mydrawpad.mask = self.mydrawpad.mask_from_polygons()
+        if 'bt_move' in params:
+          self.mydetectordrawpad.ringlist = self.mydrawpad.ringlist
+          self.mydrawpad.ringlist = []
+          self.mydrawpad.screen = self.mydrawpad.make_screen()
+          self.mydrawpad.mask = self.mydrawpad.mask_from_polygons()
+          self.mydetectordrawpad.screen = self.mydetectordrawpad.make_screen()
+          self.mydetectordrawpad.ringlist = self.mydetectordrawpad.reduce_rings_size()
+          self.mydetectordrawpad.mask = self.mydetectordrawpad.mask_from_polygons()
+          self.myitem.mydetector.inqueue.put(('set_mask', self.mydetectordrawpad.ringlist))
+          await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'C', })
+          await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'D', })
+          for ring in self.mydetectordrawpad.ringlist:
+            m = mask(
+              name='New Ring',
+              definition=json.dumps(ring),
+              stream_id=self.idx,
+              mtype='D',
+            )
+            await savedbline(m)
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	

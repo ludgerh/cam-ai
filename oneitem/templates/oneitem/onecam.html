@@ -79,22 +79,15 @@
 	  <div class="row my-1 d-none" id="cam_c_boxes">
 		  <div class="col-auto my-2">
 			  <label for="ch_show">Show</label>
-			  <input type="checkbox" id="ch_show" name="ch_show">
-		  </div>
-		  <div class="col-auto my-2">
+			  <input class="me-3" type="checkbox" id="ch_show" name="ch_show">
 			  <label for="ch_apply">Apply</label>
-			  <input type="checkbox" id="ch_apply" name="ch_apply">
-		  </div>
-		  <div class="col-auto my-2">
+			  <input class="me-3" type="checkbox" id="ch_apply" name="ch_apply">
 			  <label for="ch_edit">Edit</label>
-			  <input type="checkbox" id="ch_edit" name="ch_edit">
-		  </div>
-		  <div class="col-auto my-2">
+			  <input class="me-3" type="checkbox" id="ch_edit" name="ch_edit">
 			  <label for="ch_white">White Marks</label>
-			  <input type="checkbox" id="ch_white" name="ch_white">
-		  </div>
-		  <div class="col-auto my-2">
-			  <button type="button" id="bt_new">New Masked Area</button>
+			  <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
+			  <button class="me-3" type="button" id="bt_new">New Masked Area</button>
+			  <button type="button" id="bt_move">Move to Detector</button>
 		  </div>
 	  </div>
   </div>
@@ -166,6 +159,13 @@ $(document).ready(function() {
 		oneitemSocket.sendandwait({
 			'command' : 'setbtevent',
 			'bt_new' : 'click',
+		})
+		.catch(err => {console.log(err);});
+	});
+	$('#bt_move').click((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setbtevent',
+			'bt_move' : 'click',
 		})
 		.catch(err => {console.log(err);});
 	});

@@ -76,25 +76,11 @@
   <div class="row my-1 blue" rea="0">
 	  <div class="col-auto my-2" rea="0">Mask settings</div>
   </div>
-  <div class="row my-1 d-none" id="det_c_boxes">
 	  <div class="col-auto my-2">
 		  <label for="ch_show">Show</label>
-		  <input type="checkbox" id="ch_show" name="ch_show">
-	  </div>
-	  <div class="col-auto my-2">
+		  <input class="me-3" type="checkbox" id="ch_show" name="ch_show">
 		  <label for="ch_apply">Apply</label>
-		  <input type="checkbox" id="ch_apply" name="ch_apply">
-	  </div>
-	  <div class="col-auto my-2">
-		  <label for="ch_edit">Edit</label>
-		  <input type="checkbox" id="ch_edit" name="ch_edit">
-	  </div>
-	  <div class="col-auto my-2">
-		  <label for="ch_white">White Marks</label>
-		  <input type="checkbox" id="ch_white" name="ch_white">
-	  </div>
-	  <div class="col-auto my-2">
-		  <button type="button" id="bt_new">New Masked Area</button>
+		  <input class="me-3" type="checkbox" id="ch_apply" name="ch_apply">
 	  </div>
   </div>
 </div>
@@ -150,29 +136,6 @@ $(document).ready(function() {
 		.catch(err => {console.log(err);});
 	});
 
-	$('#ch_edit').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_edit' : $('#ch_edit').prop('checked'),
-		})
-		.catch(err => {console.log(err);});
-	});
-
-	$('#ch_white').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_white' : $('#ch_white').prop('checked'),
-		})
-		.catch(err => {console.log(err);});
-	});
-
-	$('#bt_new').click((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setbtevent',
-			'bt_new' : 'click',
-		})
-		.catch(err => {console.log(err);});
-	});
 	$('#oneform').children(':first').children(':first').children('.col-auto')
 			.children(
         '#id_det_fpslimit, '
@@ -238,8 +201,6 @@ $(document).ready(function() {
 {% if may_write %}
 		$('#ch_show').prop('checked', false);
 		$('#ch_apply').prop('checked', ('{{ dbline.det_apply_mask }}' == 'True'));
-		$('#ch_edit').prop('checked', false);
-		$('#ch_white').prop('checked', true);
 		return(WSAsync(ws_scheme + '//' + window.location.host + '/ws/oneitem/'));
 	})
 	.then((result) => {
@@ -256,63 +217,10 @@ $(document).ready(function() {
 			'command' : 'setcbstatus',
 			'ch_show' : $('#ch_show').prop('checked'),
 			'ch_apply' : $('#ch_apply').prop('checked'),
-			'ch_edit' : $('#ch_edit').prop('checked'),
 		})
 {% endif %}
 	})
 	.then(() => {
-{% if may_write %}
-		mycanvas = $('#canvas');
-		let overcanvas = false;
-		mycanvas.mousedown((evt) => {
-			if($('#ch_edit').prop('checked')) {
-				let x = evt.originalEvent.pageX - mycanvas.offset().left;
-				let y = evt.originalEvent.pageY - mycanvas.offset().top;
-				oneitemSocket.sendandwait({
-					'command' : 'mousedown',
-					'x' : x,
-					'y' : y,
-				})
-				.catch(err => {console.log(err);});
-				overcanvas = true;
-			};
-		});
-		$( document.body ).mouseup((evt) => {
-			if (overcanvas) {
-				let x = evt.originalEvent.pageX - mycanvas.offset().left;
-				let y = evt.originalEvent.pageY - mycanvas.offset().top;
-				oneitemSocket.sendandwait({
-					'command' : 'mouseup',
-					'x' : x,
-					'y' : y,
-				})
-				.catch(err => {console.log(err);});
-				overcanvas = false;
-			};
-		});
-		$( document.body ).mousemove((evt) => {
-			if (overcanvas) {
-				let x = evt.originalEvent.pageX - mycanvas.offset().left;
-				let y = evt.originalEvent.pageY - mycanvas.offset().top;
-				oneitemSocket.sendandwait({
-					'command' : 'mousemove',
-					'x' : x,
-					'y' : y,
-				})
-				.catch(err => {console.log(err);});
-			};
-		});
-		mycanvas.dblclick((evt) => {
-			let x = evt.originalEvent.pageX - mycanvas.offset().left;
-			let y = evt.originalEvent.pageY - mycanvas.offset().top;
-			oneitemSocket.sendandwait({
-				'command' : 'dblclick',
-				'x' : x,
-				'y' : y,
-			})
-			.catch(err => {console.log(err);});
-		});
-{% endif %}
     setInterval(() => {
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',

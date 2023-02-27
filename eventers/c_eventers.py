@@ -119,21 +119,25 @@ class c_eventer(c_device):
         if (received[0] == 'new_video'):
           self.vid_deque.append(received[1:])
           #self.logger.info('comparing: ' + str(time()) + ' ' + str(self.vid_deque[0][2]) + ' ' + str(time() - self.vid_deque[0][2]))
-          while (time() - self.vid_deque[0][2]) > 300:
-            listitem = self.vid_deque.popleft()
-            try:
-              #self.logger.info('removing: ' + self.recordingspath + listitem[1])
-              remove(self.recordingspath + listitem[1])
-            except FileNotFoundError:
-              self.logger.warning('*** Delete did not find: '
-                + self.recordingspath + listitem[1])
+          while True:
+            if (time() - self.vid_deque[0][2]) > 300:
+              listitem = self.vid_deque.popleft()
+              try:
+                #self.logger.info('removing: ' + self.recordingspath + listitem[1])
+                remove(self.recordingspath + listitem[1])
+              except FileNotFoundError:
+                self.logger.warning('c_eventers.py:new_video - Delete did not find: '
+                  + self.recordingspath + listitem[1])
+                #self.logger.info(str(self.vid_deque))
+            else:
+              break
         elif (received[0] == 'purge_videos'):
           for item in self.vid_deque.copy():
             try:
               #self.logger.info('removing: ' + self.recordingspath + item[1])
               remove(self.recordingspath + item[1])
             except FileNotFoundError:
-              self.logger.warning('*** Delete did not find: '
+              self.logger.warning('c_eventers.py:purge_videos - Delete did not find: '
                 + self.recordingspath + item[1])
           self.vid_deque.clear()
         elif (received[0] == 'set_fpslimit'):

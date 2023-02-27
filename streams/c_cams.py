@@ -196,6 +196,7 @@ class c_cam(c_device):
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Cam #'+str(self.dbline.id))
+      self.mp4timestamp = 0.0
       self.wd_ts = time()
       self.wd_proc = MultiTimer(interval=10, function=self.watchdog, 
         runonstart=False)
@@ -311,8 +312,14 @@ class c_cam(c_device):
       self.cam_fps = (
         probe['streams'][self.video_codec]['r_frame_rate'].split('/'))
       self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
-      self.logger.info('Video codec: ' + self.video_codec_name + ' / ' 
-        + str(self.cam_fps) + 'fps')
+      self.real_fps = (
+        probe['streams'][self.video_codec]['avg_frame_rate'].split('/'))
+      if (self.real_fps[0] == '0') or (self.real_fps[1] == '0'):
+        self.real_fps = 0.0
+      else:
+        self.real_fps = float(self.real_fps[0]) / float(self.real_fps[1])
+      self.logger.info('+++++ CAM #' + str(self.dbline.id) + ': ' + self.dbline.name)
+      self.logger.info('+++++ Video codec: ' + self.video_codec_name + ' / Cam: ' + str(self.cam_fps) + 'fps / Connect: ' + str(self.real_fps) + 'fps')
       self.redis.x_y_res_to_cam(self.dbline.id, probe['streams'][self.video_codec]['width'], 
         probe['streams'][self.video_codec]['height'])
       self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
@@ -355,6 +362,10 @@ class c_cam(c_device):
             timestamp = path.getmtime(self.vid_file_path(self.vid_count))
           except FileNotFoundError:
             self.checkmp4busy = False
+            return()
+          if timestamp > self.mp4timestamp:
+            self.mp4timestamp = timestamp
+          else:
             return()
           targetname = self.ts_targetname(timestamp)
           try:
@@ -429,6 +440,8 @@ class c_cam(c_device):
       outparams1 += ' -pix_fmt bgr24'
       outparams1 += ' -r ' + str(frame_rate)
       outparams1 += ' -vsync cfr'
+      # Replacement for -vsync with new ffmpeg:
+      #outparams1 += ' -fps_mode cfr'
       outparams1 += ' pipe:1'
       inparams = ' -i "' + source_string + '"'
       if self.video_codec_name == 'h264':
