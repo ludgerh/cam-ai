@@ -50,6 +50,7 @@ log_ini(logger, logname)
 recordingspath = Path(djconf.getconfig('recordingspath', 'data/recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', 'data/schoolframes/'))
 textpath = djconf.getconfig('textpath', 'data/texts/')
+wordpress_db = djconf.getconfig('wordpress_db', 'wp_dp')
 if not ospath.exists(textpath):
   makedirs(textpath)
 schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
@@ -370,7 +371,10 @@ class admintools(AsyncWebsocketConsumer):
       newstream = dbstream()
       newstream.cam_url = params['camurl']
       newstream.cam_video_codec = params['videocodec']
-      newstream.cam_audio_codec = params['audiocodec']
+      if params['audiocodec'] is None:
+        newstream.cam_audio_codec = -1
+      else:  
+        newstream.cam_audio_codec = params['audiocodec']
       newstream.cam_xres = params['xresolution']
       newstream.cam_yres = params['yresolution']
       newstream.eve_school_id = myschool
@@ -453,7 +457,7 @@ class admintools(AsyncWebsocketConsumer):
           {'id' : newschool.id, }, 
           {'active' : False, })
       outlist['data'] = resultdict
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'linkworker':
@@ -528,7 +532,7 @@ class admintools(AsyncWebsocketConsumer):
         ws.close()
         outlist['data']['status'] = 'connect'
         outlist['data']['info'] = resultdict['data']
-      except WebSocketAddressException:
+      except (WebSocketAddressException, OSError):
         outlist['data']['status'] = 'noanswer'
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
@@ -547,7 +551,7 @@ class admintools(AsyncWebsocketConsumer):
           "localhost",
           "CAM-AI",
           db_password,
-          "wp",
+          wordpress_db,
         )
         db.query("select user_pass, user_email from wp_users where user_login = '" 
           + params['user'] + "' ")

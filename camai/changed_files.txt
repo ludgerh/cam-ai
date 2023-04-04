@@ -325,3 +325,14 @@ viewers/c_viewers.py
 drawpad/drawpad.py
 schools/consumers.py
 
+v 0.9.10
+camai/version.py
+camai/basis.html
+tf_workers/c_tfworkers.py
+tools/consumers.py
+oneitem/views.py
+oneitem/forms.py
+detectors/c_detectors.py
+eventers/c_eventers.py
+l_buffer/l_buffer.py
+

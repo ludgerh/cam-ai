@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# c_eventer.py V0.9.9 30.03.2023
+
 import cv2 as cv
 import json
 from os import remove, path, nice
@@ -22,7 +24,7 @@ from setproctitle import setproctitle
 from collections import deque
 from time import time, sleep
 from threading import Thread
-from multiprocessing import Process
+from multiprocessing import Process, Lock, SimpleQueue
 from subprocess import Popen, run
 from django.forms.models import model_to_dict
 from django.db import connection
@@ -57,10 +59,10 @@ class c_eventer(c_device):
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
     self.dataqueue = l_buffer(envi='D', bget=True)
-    self.detectorqueue = l_buffer(envi='D', bget=True, buff=True)
+    #self.detectorqueue = l_buffer(envi='D', bget=True, buff=True)
+    self.detectorqueue = SimpleQueue()
     self.frameslist = deque()
     self.inserter_ts = 0
-    self.eventdict = {}
     self.buffer_ts = time()
     self.display_ts = 0
     self.nr_of_cond_ed = 0
@@ -76,6 +78,8 @@ class c_eventer(c_device):
     log_ini(self.logger, self.logname)
     setproctitle('CAM-AI-Eventer #'+str(self.dbline.id))
     try:
+      self.eventdict = {}
+      self.eventdict_lock = Lock()
 
       self.vid_deque = deque()
       self.vid_str_dict = {}
@@ -96,9 +100,10 @@ class c_eventer(c_device):
         else:
           sleep(djconf.getconfigfloat('short_brake', 0.1))
       self.dataqueue.stop()
-      self.detectorqueue.stop()
-      for item in self.eventdict.values():
-        event.objects.get(id=item.dbline.id).delete()
+      #self.detectorqueue.stop()
+      with self.eventdict_lock:
+        for item in self.eventdict.values():
+          event.objects.get(id=item.dbline.id).delete()
       self.finished = True
     except:
       self.logger.error(format_exc())
@@ -210,9 +215,10 @@ class c_eventer(c_device):
       frameplusevents = {}
       frameplusevents['frame'] = frame
       frameplusevents['events'] = []
-      for idict in self.eventdict.copy():
-        if ((idict in self.eventdict) and (self.eventdict[idict].status == 0)):
-          frameplusevents['events'].append((idict, self.eventdict[idict].end, self.eventdict[idict][:4]))
+      with self.eventdict_lock:
+        for i in self.eventdict:
+          if self.eventdict[i].status == 0:
+            frameplusevents['events'].append((i, self.eventdict[i].end, self.eventdict[i][:4]))
       self.frameslist.append(frameplusevents)
       self.display_events()
 
@@ -225,27 +231,28 @@ class c_eventer(c_device):
   def merge_events(self):
     while True:
       changed = False
-      for i in self.eventdict.copy():
-        if (i in self.eventdict) and (self.eventdict[i].status == 0):
-          for j in self.eventdict.copy():
-            if ((j > i) and (j in self.eventdict) 
-                and (self.eventdict[j].status == 0) 
-                and hasoverlap(self.eventdict[i], self.eventdict[j])):
-              self.eventdict[i][0] = min(self.eventdict[i][0], 
-                self.eventdict[j][0])
-              self.eventdict[i][1] = max(self.eventdict[i][1], 
-                self.eventdict[j][1])
-              self.eventdict[i][2] = min(self.eventdict[i][2], 
-                self.eventdict[j][2])
-              self.eventdict[i][3] = max(self.eventdict[i][3], 
-                self.eventdict[j][3])
-              self.eventdict[i].end = max(self.eventdict[i].end, 
-                self.eventdict[j].end)
-              self.eventdict[j].status = -3
-              self.eventdict[i].merge_frames(self.eventdict[j])
-              self.eventdict[j].isrecording = False
-              self.eventdict[j].goes_to_school = False
-              changed = True
+      with self.eventdict_lock:
+        for i in self.eventdict:
+          if (i in self.eventdict) and (self.eventdict[i].status == 0):
+            for j in self.eventdict:
+              if ((j > i) and (j in self.eventdict) 
+                  and (self.eventdict[j].status == 0) 
+                  and hasoverlap(self.eventdict[i], self.eventdict[j])):
+                self.eventdict[i][0] = min(self.eventdict[i][0], 
+                  self.eventdict[j][0])
+                self.eventdict[i][1] = max(self.eventdict[i][1], 
+                  self.eventdict[j][1])
+                self.eventdict[i][2] = min(self.eventdict[i][2], 
+                  self.eventdict[j][2])
+                self.eventdict[i][3] = max(self.eventdict[i][3], 
+                  self.eventdict[j][3])
+                self.eventdict[i].end = max(self.eventdict[i].end, 
+                  self.eventdict[j].end)
+                self.eventdict[j].status = -3
+                self.eventdict[i].merge_frames(self.eventdict[j])
+                self.eventdict[j].isrecording = False
+                self.eventdict[j].goes_to_school = False
+                changed = True
       if not changed:
         break
 
@@ -454,69 +461,77 @@ class c_eventer(c_device):
       while self.do_run:
         if (time() - local_ts) > 1.0:
           local_ts = time()
-          for idict in self.eventdict.copy():
-            myevent = self.eventdict[idict]
-            if myevent.status <= -2:
-              if (myevent.end <= self.last_display) or (not self.redis.view_from_dev('E', self.dbline.id)): 
-                if not (myevent.isrecording 
-                    or myevent.goes_to_school
-                    or myevent.to_email): 
-                  while True:
-                    try:
-                      event.objects.get(id=myevent.dbline.id).delete()
-                      break
-                    except OperationalError:
-                      connection.close()
-                del self.eventdict[idict]
-            else:
-              self.check_events(idict)
+          deletelist = []
+          with self.eventdict_lock:
+            for i in self.eventdict:
+              myevent = self.eventdict[i]
+              if myevent.status <= -2:
+                if (myevent.end <= self.last_display) or (not self.redis.view_from_dev('E', self.dbline.id)): 
+                  if not (myevent.isrecording 
+                      or myevent.goes_to_school
+                      or myevent.to_email): 
+                    while True:
+                      try:
+                        event.objects.get(id=myevent.dbline.id).delete()
+                        break
+                      except OperationalError:
+                        connection.close()
+                  deletelist.append(i)
+              else:
+                self.check_events(i)
+            for i in deletelist:
+              del self.eventdict[i]     
         if self.redis.check_if_counts_zero('E', self.dbline.id):
           sleep(djconf.getconfigfloat('short_brake', 0.1))
         else:
           margin = self.dbline.eve_margin
-          frame = self.detectorqueue.get()
+          if self.detectorqueue.empty():
+            frame = None
+          else:
+            frame = self.detectorqueue.get()
           if frame:
             if not self.dbline.cam_xres:
               self.dbline.refresh_from_db(fields=['cam_xres', 'cam_yres', ])
             found = None
-            for idict in self.eventdict.copy():
-              myevent = self.eventdict[idict]
-              if ((myevent.end > (frame[2] - 
-                  self.dbline.eve_event_time_gap))
-                and hasoverlap((frame[3]-margin, frame[4]+margin, 
-                  frame[5]-margin, frame[6]+margin), myevent)
-                and (myevent.status == 0)):
-                found = myevent
-                break
-            if found is None:
-              myevent = c_event(self.tf_worker, self.tf_w_index, frame, 
-                self.dbline.eve_margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
-                self.dbline.eve_school.id, self.id, self.dbline.name, self.logger)
-              self.eventdict[myevent.dbline.id] = myevent
-            else: 
-              s_factor = 0.1 # user changeable later: 0.0 -> No Shrinking 1.0 50%
-              if (frame[3] - margin) <= found[0]:
-                found[0] = max(0, frame[3] - margin)
-              else:
-                found[0] = round(((frame[3] - margin) * s_factor + found[0]) 
-                  / (s_factor+1.0))
-              if (frame[4] + margin) >= found[1]:
-                found[1] = min(self.dbline.cam_xres-1, frame[4] + margin)
-              else:
-                found[1] = round(((frame[4] + margin) * s_factor + found[1]) 
-                  / (s_factor+1.0))
-              if (frame[5] - margin) <= found[2]:
-                found[2] = max(0, frame[5] - margin)
-              else:
-                found[2] = round(((frame[5] - margin) * s_factor + found[2]) 
-                  / (s_factor+1.0))
-              if (frame[6] + margin) >= found[3]:
-                found[3] = min(self.dbline.cam_yres-1, frame[6] + margin)
-              else:
-                found[3] = round(((frame[6] + margin) * s_factor + found[3]) 
-                  / (s_factor+1.0))
-              found.end = frame[2]
-              found.add_frame(frame)
+            with self.eventdict_lock:
+              for idict in self.eventdict:
+                myevent = self.eventdict[idict]
+                if ((myevent.end > (frame[2] - 
+                    self.dbline.eve_event_time_gap))
+                  and hasoverlap((frame[3]-margin, frame[4]+margin, 
+                    frame[5]-margin, frame[6]+margin), myevent)
+                  and (myevent.status == 0)):
+                  found = myevent
+                  break
+              if found is None:
+                myevent = c_event(self.tf_worker, self.tf_w_index, frame, 
+                  self.dbline.eve_margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
+                  self.dbline.eve_school.id, self.id, self.dbline.name, self.logger)
+                self.eventdict[myevent.dbline.id] = myevent
+              else: 
+                s_factor = 0.1 # user changeable later: 0.0 -> No Shrinking 1.0 50%
+                if (frame[3] - margin) <= found[0]:
+                  found[0] = max(0, frame[3] - margin)
+                else:
+                  found[0] = round(((frame[3] - margin) * s_factor + found[0]) 
+                    / (s_factor+1.0))
+                if (frame[4] + margin) >= found[1]:
+                  found[1] = min(self.dbline.cam_xres-1, frame[4] + margin)
+                else:
+                  found[1] = round(((frame[4] + margin) * s_factor + found[1]) 
+                    / (s_factor+1.0))
+                if (frame[5] - margin) <= found[2]:
+                  found[2] = max(0, frame[5] - margin)
+                else:
+                  found[2] = round(((frame[5] - margin) * s_factor + found[2]) 
+                    / (s_factor+1.0))
+                if (frame[6] + margin) >= found[3]:
+                  found[3] = min(self.dbline.cam_yres-1, frame[6] + margin)
+                else:
+                  found[3] = round(((frame[6] + margin) * s_factor + found[3]) 
+                    / (s_factor+1.0))
+                found.end = frame[2]
+                found.add_frame(frame)
             self.merge_events()
             self.inserter_ts = frame[2]
           else:  

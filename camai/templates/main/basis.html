@@ -39,20 +39,6 @@
         <div class="col-sm-auto">
           <div class="dropdown">
             <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Events
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              {% spaceless %}
-                {% for item in schoollist %}
-                  <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
-                {% endfor %}
-              {% endspaceless %}
-            </ul>
-          </div>
-        </div>
-        <div class="col-sm-auto">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
               Cameras
             </button>
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
@@ -99,6 +85,20 @@
               {% spaceless %}
                 {% for item in eventerlist %}
                   <li><a class="dropdown-item" href="/oneitem/eventer/{{ item.id }}/">{{ item.name }}</a></li>
+                {% endfor %}
+              {% endspaceless %}
+            </ul>
+          </div>
+        </div>
+        <div class="col-sm-auto">
+          <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+              Events
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+              {% spaceless %}
+                {% for item in schoollist %}
+                  <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
                 {% endfor %}
               {% endspaceless %}
             </ul>

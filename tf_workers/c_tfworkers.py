@@ -33,6 +33,7 @@ from inspect import currentframe, getframeinfo, stack
 from websocket._exceptions import (WebSocketTimeoutException, 
   WebSocketConnectionClosedException,
   WebSocketBadStatusException, 
+  WebSocketAddressException,
 )
 from django.db.utils import OperationalError
 from django.db import connections, connection
@@ -212,6 +213,7 @@ class tf_worker():
             WebSocketBadStatusException, 
             ConnectionRefusedError,
             WebSocketConnectionClosedException,
+            WebSocketAddressException,
             OSError,
           ):
         self.logger.warning('BrokenPipe or Timeout while resetting '
@@ -230,7 +232,12 @@ class tf_worker():
             frameinfo = getframeinfo(currentframe())
           break
         except (BrokenPipeError,
-              WebSocketBadStatusException,
+              TimeoutError,
+              WebSocketBadStatusException, 
+              ConnectionRefusedError,
+              WebSocketConnectionClosedException,
+              WebSocketAddressException,
+              OSError,
             ):
           if logger:
             frameinfo = getframeinfo(currentframe())

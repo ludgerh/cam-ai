@@ -191,6 +191,7 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       'eve_school' : dbline.eve_school,
       'eve_alarm_email' : dbline.eve_alarm_email,
     })
+    form.fields["eve_school"].queryset = school.objects.filter(active=True)
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', request.user, 'R')

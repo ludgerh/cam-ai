@@ -11,7 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# l_buffer.py V0.9.5 26.01.2023
+# l_buffer.py V0.9.9 31.03.2023
 
 """
 Categories
@@ -47,17 +47,16 @@ from collections import deque
 from traceback import format_exc
 
 class l_buffer_not_implemented(Exception):
-  def __init__(self, envi, buff, bput, bget, quota, call):
-    self.message = ('l_buffer has no implementation for envi=' + envi + ' buff=' + str(buff)
+  def __init__(self, envi, bput, bget, quota, call):
+    self.message = ('l_buffer has no implementation for envi=' + envi
       +' bput=' + str(bput) + ' bget=' + str(bget) + ' quota=' + str(quota)+' call=' + str(call))
     super().__init__(self.message)
 
 class l_buffer:
   redis_dict = {}
 
-  def __init__(self, envi, buff=False, bput=False, bget=False, quota=False, call=None):
+  def __init__(self, envi, bput=False, bget=False, quota=False, call=None):
     self.envi = envi
-    self.buff = buff
     self.bput = bput
     self.bget = bget
     self.bget = bget
@@ -69,20 +68,15 @@ class l_buffer:
     self.put_block_wthread = None
     implemented = True
     if self.envi == 'A':
-      if self.buff:
+      self.storage = None
+      if self.bput:
         implemented = False
-      else:
-        self.storage = None
-        if self.bput:
-          implemented = False
-        elif self.bget:
-          implemented = False
-        elif self.quota:
-          implemented = False
+      elif self.bget:
+        implemented = False
+      elif self.quota:
+        implemented = False
     elif self.envi == 'D':
       self.redis = saferedis()
-      if self.buff:
-        self.mybuffer = None
       self.storage = 0
       while self.storage in l_buffer.redis_dict:
         self.storage += 1
@@ -92,7 +86,7 @@ class l_buffer:
         self.get_blocked = False
       if self.bput:  
         self.put_blocked = False
-      if (self.bput or self.quota or self.buff):
+      if (self.bput or self.quota):
         self.put_event = Event()
       if self.bget or self.call:
         self.get_event = Event()
@@ -100,7 +94,7 @@ class l_buffer:
     else:
       implemented = False
     if not implemented:
-      raise(l_buffer_not_implemented(self.envi, self.buff, self.bput, self.bget, 
+      raise(l_buffer_not_implemented(self.envi, self.bput, self.bget, 
         self.quota, self.call))
       
   def start_quota(self):
@@ -152,19 +146,6 @@ class l_buffer:
       if self.bput:
         self.put_blocked = False
         self.put_event.clear()
-      if self.buff:
-        if self.mybuffer is None:
-          sleep(0.1)
-          continue
-        try:
-          #print('+++', len(self.mybuffer))
-          data = self.mybuffer.popleft()
-          #print('---', len(self.mybuffer))
-          self.redis.set(l_buffer.redis_dict[self.storage], dumps(data)) 
-          self.get_blocked = False
-          self.put_event.clear()
-        except IndexError:
-          sleep(0.01)
 
   def get(self):
     if self.envi == 'A':
@@ -189,7 +170,7 @@ class l_buffer:
         #print('get_block')
         self.get_blocked = True
       result = loads(self.redis.get(l_buffer.redis_dict[self.storage]))
-      if (self.bput or self.quota or self.buff): 
+      if (self.bput or self.quota): 
         #print('get_release')
         self.put_event.set()
       return(result)
@@ -200,7 +181,7 @@ class l_buffer:
       if self.call is not None:
         self.call()
     elif self.envi == 'D': 
-      if self.bput or self.buff:
+      if self.bput:
         if not self.put_block_wthread:
           self.put_block_wthread=Thread(target = self.put_block_worker, 
             name = 'l_buffer_put_block_worker')
@@ -215,14 +196,7 @@ class l_buffer:
           blockdelay += 0.005
         #print('put_block')
         self.put_blocked = True
-      if self.buff:
-        if self.mybuffer is None:
-          self.mybuffer = deque()
-          self.redis.set(l_buffer.redis_dict[self.storage], dumps(data))
-        else:
-          self.mybuffer.append(data) 
-      else:  
-        self.redis.set(l_buffer.redis_dict[self.storage], dumps(data))
+      self.redis.set(l_buffer.redis_dict[self.storage], dumps(data))
       if self.call or self.bget: 
         #print('put_release')
         self.get_event.set()

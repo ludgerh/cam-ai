@@ -39,8 +39,8 @@ class DetectorForm(forms.ModelForm):
       'det_fpslimit', 
       'det_threshold', 
       'det_backgr_delay', 
-      'det_dilation', 
       'det_erosion', 
+      'det_dilation', 
       'det_max_size', 
       'det_max_rect',
     )
@@ -48,8 +48,8 @@ class DetectorForm(forms.ModelForm):
 			'det_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
 			'det_threshold' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 254}), 
 			'det_backgr_delay' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
-			'det_dilation' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
 			'det_erosion' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
+			'det_dilation' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
 			'det_max_size' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
 			'det_max_rect' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
 		}

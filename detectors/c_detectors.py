@@ -110,7 +110,6 @@ class c_detector(c_device):
           if self.dbline.det_view and self.redis.view_from_dev('D', self.dbline.id):
             self.viewer.inqueue.put(frameline)
       self.dataqueue.stop()
-      self.myeventer.detectorqueue.stop()
       self.finished = True
     except:
       self.logger.error(format_exc())
