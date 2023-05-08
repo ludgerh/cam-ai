@@ -56,7 +56,7 @@ class stream(models.Model):
   det_threshold = models.IntegerField("threshold", default=40)
   det_backgr_delay = models.IntegerField("background delay", default=1)
   det_dilation = models.IntegerField("dilation", default=20)
-  det_erosion = models.IntegerField("erosion", default=1)
+  det_erosion = models.IntegerField("erosion", default=3)
   det_max_rect = models.IntegerField("max. number", default=20)
   det_max_size = models.IntegerField("max. size", default=100)
   det_apply_mask = models.BooleanField(default=False)

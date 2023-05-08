@@ -382,7 +382,8 @@ class admintools(AsyncWebsocketConsumer):
       while start_stream_list:
         sleep(long_brake)
       start_stream_list.add(newstream.id)
-
+      while (not (newstream.id in  streams)):
+        sleep(long_brake)
       outlist['data'] = {'id' : newstream.id, }
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	

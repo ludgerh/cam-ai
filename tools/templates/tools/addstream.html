@@ -217,6 +217,9 @@ $(document).ready(function() {
         'xresolution' : xresolutions[$('#videoselect').val()],
         'yresolution' : yresolutions[$('#videoselect').val()],
       })  
+      .then((result) => {
+        window.location.href = window.location.protocol + '//' + window.location.host;
+      })
       .catch(err => {console.log(err);});
     });
   })  

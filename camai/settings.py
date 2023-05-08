@@ -25,7 +25,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from .passwords import db_password, security_key
+from .passwords import db_password, security_key, localaccess, mydomain, myip
 from .version import version
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -40,10 +40,14 @@ SECRET_KEY = security_key
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
-#ALLOWED_HOSTS = ['booker-hellerhoff.de']
-#CSRF_TRUSTED_ORIGINS = ['https://booker-hellerhoff.de:10443']
-
+ALLOWED_HOSTS = []
+if localaccess:
+  ALLOWED_HOSTS =  ['127.0.0.1', 'localhost']
+if myip:
+  ALLOWED_HOSTS.append(myip)
+if mydomain:
+  ALLOWED_HOSTS.append(mydomain)
+  CSRF_TRUSTED_ORIGINS = ['https://'+mydomain]
 
 # Application definition
 

@@ -59,7 +59,6 @@ class c_eventer(c_device):
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
     self.dataqueue = l_buffer(envi='D', bget=True)
-    #self.detectorqueue = l_buffer(envi='D', bget=True, buff=True)
     self.detectorqueue = SimpleQueue()
     self.frameslist = deque()
     self.inserter_ts = 0
@@ -93,6 +92,11 @@ class c_eventer(c_device):
       self.scaling = None
 
       Thread(target=self.inserter, name='InserterThread').start()
+      
+      self.webm_lock = Lock()
+      self.redis.set('webm_queue:' + str(self.id) + ':start', 0)
+      self.redis.set('webm_queue:' + str(self.id) + ':end', 0)
+      self.webm_proc = Process(target=self.make_webm).start()
       while self.do_run:
         frameline = self.dataqueue.get()
         if (self.do_run and (frameline is not None) and self.sl.greenlight(self.period, frameline[2])):
@@ -100,7 +104,6 @@ class c_eventer(c_device):
         else:
           sleep(djconf.getconfigfloat('short_brake', 0.1))
       self.dataqueue.stop()
-      #self.detectorqueue.stop()
       with self.eventdict_lock:
         for item in self.eventdict.values():
           event.objects.get(id=item.dbline.id).delete()
@@ -339,19 +342,37 @@ class c_eventer(c_device):
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
-  def make_webm(self, savepath):
-    niceness = nice(0)
-    nice(19 - niceness)
-    myts = time()
-    run([
-      'ffmpeg', 
-      '-v', 'fatal', 
-      '-i', savepath, 
-      '-crf', '51', #0 = lossless, 51 = very bad
-      '-vf', 'scale=500:-1',
-      savepath[:-4]+'.webm'
-    ])
-    self.logger.info('WEBM-Conversion: E' + str(self.id) + ' ' + str(round(time() - myts)) + ' sec')
+  def make_webm(self):
+    while True:
+      with self.webm_lock:
+        the_start = self.redis.get('webm_queue:' + str(self.id) + ':start')
+        if the_start == b'stop':
+          return()
+        else:
+          the_start = int(the_start)  
+        the_end = int(self.redis.get('webm_queue:' + str(self.id) + ':end'))
+        if (the_end > 0) and (the_end == the_start):
+          self.redis.set('webm_queue:' + str(self.id) + ':start', 0)
+          self.redis.set('webm_queue:' + str(self.id) + ':end', 0)
+      if the_end > the_start:
+        the_start += 1
+        savepath = self.redis.get('webm_queue:' + str(self.id) + ':item:' + str(the_start)).decode("utf-8") 
+        self.redis.delete('webm_queue:' + str(self.id) + ':item:' + str(the_start))
+        self.redis.set('webm_queue:' + str(self.id) + ':start', str(the_start))
+        niceness = nice(0)
+        nice(19 - niceness)
+        myts = time()
+        run([
+          'ffmpeg', 
+          '-v', 'fatal', 
+          '-i', savepath, 
+          '-crf', '51', #0 = lossless, 51 = very bad
+          '-vf', 'scale=500:-1',
+          savepath[:-4]+'.webm'
+        ])
+        self.logger.info('WEBM-Conversion: E' + str(self.id) + ' ' + str(round(time() - myts)) + ' sec')
+      else:
+        sleep(djconf.getconfigfloat('long_brake', 5.0))
     
 
   def check_events(self, idict):
@@ -433,7 +454,11 @@ class c_eventer(c_device):
                   '-q:v', '2', 
                   savepath[:-4]+'.jpg'
                 ])
-                p = Process(target=self.make_webm, args=(savepath, )).start()
+                with self.webm_lock:
+                  the_end = int(self.redis.get('webm_queue:' + str(self.id) + ':end'))
+                  the_end += 1
+                  self.redis.set('webm_queue:' + str(self.id) + ':item:' + str(the_end), savepath)
+                  self.redis.set('webm_queue:' + str(self.id) + ':end', str(the_end))
               myevent.status = min(-2, 
                 myevent.status)
             else:  
@@ -504,9 +529,15 @@ class c_eventer(c_device):
                   found = myevent
                   break
               if found is None:
+                while True:
+                  try:
+                    myschoolid = self.dbline.eve_school.id
+                    break
+                  except OperationalError:
+                    connection.close()
                 myevent = c_event(self.tf_worker, self.tf_w_index, frame, 
                   self.dbline.eve_margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
-                  self.dbline.eve_school.id, self.id, self.dbline.name, self.logger)
+                  myschoolid, self.id, self.dbline.name, self.logger)
                 self.eventdict[myevent.dbline.id] = myevent
               else: 
                 s_factor = 0.1 # user changeable later: 0.0 -> No Shrinking 1.0 50%
@@ -572,6 +603,7 @@ class c_eventer(c_device):
         self.eventdict[events[i]].set_pred(frames[i], predictions[i])
 
   def stop(self):
+    self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')
     super().stop()
     self.run_process.join()
     

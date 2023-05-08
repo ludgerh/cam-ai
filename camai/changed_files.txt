@@ -336,3 +336,20 @@ detectors/c_detectors.py
 eventers/c_eventers.py
 l_buffer/l_buffer.py
 
+v 0.9.11
+camai/version.py
+camai/passwords.py
+camai/passwords.py.example
+camai/settings.py
+eventers/c_eventers.py
+
+v 0.9.12
+setup.py
+camai/version.py
+streams/models.py
+tools/consumers.py
+tools/addstream.html
+eventers/c_eventers.py
+
+
+
