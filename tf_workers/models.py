@@ -14,6 +14,7 @@
 from django.db import models
 from django.utils import timezone
 from datetime import datetime
+from django.conf import settings
 from trainers.models import trainer as trainermod
 
 class worker(models.Model):
@@ -38,6 +39,7 @@ class worker(models.Model):
 
 class school(models.Model):
   name =  models.CharField(max_length=100)
+  creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_DEFAULT, default=1)
   dir = models.CharField(max_length=256, default='')
   trigger = models.IntegerField(default=500)
   lastmodelfile = models.DateTimeField(

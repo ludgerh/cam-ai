@@ -34,17 +34,17 @@
       views = <span id="vnrtag{{ item.id }}">?</span></h5>
     {% if mode == 'C' %}
       <div>
-        <a href="/oneitem/cam/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
+        <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
       </div>
     {% endif %}
     {% if mode == 'D' %}
       <div>
-        <a href="/oneitem/detector/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
+        <a href="/oneitem/detector/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
       </div>
     {% endif %}
     {% if mode == 'E' %}
       <div>
-        <a href="/oneitem/eventer/{{ item.id }}/"><canvas id="canvas{{ item.id }}" width="50px" height="50px"></canvas></a>
+        <a href="/oneitem/eventer/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
       </div>
     {% endif %}
     </div>
@@ -58,37 +58,22 @@
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let c_view_Socket;
 let trigger_Socket;
-let r_array = {};
 let displaywidth = 375 // Screen width IPhone 7
 
+let imageElements = [];
 {% for item in camlist %} 
   let displayheight{{ item.id }} = 
     Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
   let xinput{{ item.id }}
   let yinput{{ item.id }}
   let wait{{ item.id }} = 0;
-  let canvas{{ item.id }} = document.getElementById("canvas{{ item.id }}");
-  let ctx{{ item.id }} = canvas{{ item.id }}.getContext("2d");
-
-  function timedRefresh{{ item.id|stringformat:"09d" }}(bytebuffer) {
-    if (wait{{ item.id }} == 0) {
-      wait{{ item.id }} = 1;
-      UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
-      imgsource = new ImageData(UI8Carray, xinput{{ item.id }}, yinput{{ item.id }});
-      createImageBitmap(imgsource)
-      .then((result) => { 
-        ctx{{ item.id }}.drawImage(result, 0,0, displaywidth, displayheight{{ item.id }})
-        wait{{ item.id }} = 0;
-      })
-    };
-  };
-  r_array['{{ mode }}{{ item.id|stringformat:"09d" }}'] = timedRefresh{{ item.id|stringformat:"09d" }};
+  imageElements[{{ item.id }}] = document.getElementById("imagespace{{ item.id }}");
 {% endfor %}
 
 $(document).ready(function() {
 {% for item in camlist %} 
-    $('#canvas{{ item.id }}').attr('width', displaywidth+'px');
-    $('#canvas{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
+    $('#imagespace{{ item.id }}').attr('width', displaywidth+'px');
+    $('#imagespace{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
 {% endfor %}
   WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
   .then((result) => {
@@ -119,14 +104,14 @@ $(document).ready(function() {
     };
     trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-        e.data.arrayBuffer()
-        .then((bytebuffer) => {
-          miniarray = new Uint8Array(bytebuffer, 0, 10);
-          vnr = String.fromCharCode.apply(null, miniarray);
-          if (vnr in r_array) {
-            r_array[vnr](bytebuffer);
-          };
-          trigger_Socket.socket.send(vnr);
+		    blob = e.data.slice(10, e.data.size, "image/jpeg");
+		    indicator = e.data.slice(0, 10);
+		    let url = URL.createObjectURL(blob);
+        indicator.text()
+        .then((result) => {
+          vnr = parseInt(result.slice(1));
+		      imageElements[vnr].src = url;
+          trigger_Socket.socket.send(result);
         })
         .catch(err => {console.log(err);});
       };

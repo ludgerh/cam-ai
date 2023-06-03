@@ -1,8 +1,8 @@
--- MariaDB dump 10.19  Distrib 10.11.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19  Distrib 10.11.3-MariaDB, for debian-linux-gnu (x86_64)
 --
 -- Host: 127.0.0.1    Database: CAM-AI_GIT
 -- ------------------------------------------------------
--- Server version	10.11.2-MariaDB-1
+-- Server version	10.11.3-MariaDB-1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -745,8 +745,11 @@ CREATE TABLE `streams_stream` (
   `eve_school_id` bigint(20) NOT NULL,
   `cam_pause` tinyint(1) NOT NULL,
   `det_scaledown` int(11) NOT NULL,
+  `creator_id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `streams_stream_eve_school_id_3e307b1b_fk_tf_workers_school_id` (`eve_school_id`),
+  KEY `streams_stream_creator_id_6a9cc3b8_fk_auth_user_id` (`creator_id`),
+  CONSTRAINT `streams_stream_creator_id_6a9cc3b8_fk_auth_user_id` FOREIGN KEY (`creator_id`) REFERENCES `auth_user` (`id`),
   CONSTRAINT `streams_stream_eve_school_id_3e307b1b_fk_tf_workers_school_id` FOREIGN KEY (`eve_school_id`) REFERENCES `tf_workers_school` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -787,12 +790,15 @@ CREATE TABLE `tf_workers_school` (
   `patience` int(11) NOT NULL,
   `tf_worker_id` bigint(20) NOT NULL,
   `trainer_id` bigint(20) NOT NULL,
+  `creator_id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `tf_workers_school_tf_worker_id_3c7f9633_fk_tf_workers_worker_id` (`tf_worker_id`),
   KEY `tf_workers_school_trainer_id_171876a2_fk_trainers_trainer_id` (`trainer_id`),
+  KEY `tf_workers_school_creator_id_b7d23651_fk_auth_user_id` (`creator_id`),
+  CONSTRAINT `tf_workers_school_creator_id_b7d23651_fk_auth_user_id` FOREIGN KEY (`creator_id`) REFERENCES `auth_user` (`id`),
   CONSTRAINT `tf_workers_school_tf_worker_id_3c7f9633_fk_tf_workers_worker_id` FOREIGN KEY (`tf_worker_id`) REFERENCES `tf_workers_worker` (`id`),
   CONSTRAINT `tf_workers_school_trainer_id_171876a2_fk_trainers_trainer_id` FOREIGN KEY (`trainer_id`) REFERENCES `trainers_trainer` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -801,8 +807,6 @@ CREATE TABLE `tf_workers_school` (
 
 LOCK TABLES `tf_workers_school` WRITE;
 /*!40000 ALTER TABLE `tf_workers_school` DISABLE KEYS */;
-INSERT INTO `tf_workers_school` VALUES
-(1,'Standard School','data/schools/model1/',500,'1900-01-01 00:00:00.000000',1,'1e-6','1e-6',1,'efficientnetv2b0',1,0,0,2,1,8,6,1,1);
 /*!40000 ALTER TABLE `tf_workers_school` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1160,10 +1164,12 @@ CREATE TABLE `users_userinfo` (
   `made` datetime(6) NOT NULL,
   `pay_tokens` int(11) NOT NULL,
   `used_schools` int(11) NOT NULL,
+  `allowed_streams` int(11) NOT NULL,
+  `used_streams` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `users_userinfo_user_id_6acffaf6_fk_auth_user_id` (`user_id`),
   CONSTRAINT `users_userinfo_user_id_6acffaf6_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1173,7 +1179,7 @@ CREATE TABLE `users_userinfo` (
 LOCK TABLES `users_userinfo` WRITE;
 /*!40000 ALTER TABLE `users_userinfo` DISABLE KEYS */;
 INSERT INTO `users_userinfo` VALUES
-(1,1,2,'2100-01-01 00:00:00.000000','2023-01-12 11:20:55.834211',0,0);
+(1,1,2,'2100-01-01 00:00:00.000000','2023-01-12 11:20:55.834211',0,1,1,0);
 /*!40000 ALTER TABLE `users_userinfo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -2077,4 +2083,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-04-04 12:24:51
+-- Dump completed on 2023-06-03 12:27:38

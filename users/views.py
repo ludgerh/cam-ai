@@ -31,7 +31,8 @@ class archive(SingleTableView):
   def get(self, request, *args, **kwargs):
     self.request = request
     self.schoolnr = kwargs['schoolnr']
-    if access.check('S', self.schoolnr, request.user, 'R'):
+    if (((self.schoolnr > 1) or (request.user.is_superuser)) 
+        and (access.check('S', self.schoolnr, request.user, 'R'))):
       return(super().get(request, *args, **kwargs))
     else:
       return(HttpResponse('No Access'))

@@ -351,5 +351,36 @@ tools/consumers.py
 tools/addstream.html
 eventers/c_eventers.py
 
+v 0.9.13
+camai/version.py
+camai/settings.py
+camai/urls.py
+camai/templates/main/basis.html
+viewers/consumers.py
+oneitem/onecam.html
+oneitem/onedetector.html
+oneitem/oneeventer.html
+index/index.html
+accounts/urls.py
+accounts/views.py
+accounts/templates/registration/base.html
+accounts/templates/registration/login.html
+delete accounts/templates/registration/signup.html
+accounts/templates/django_registration/activation_complete.html
+accounts/templates/django_registration/activation_failed.html
+accounts/templates/django_registration/activation_email_body.txt
+accounts/templates/django_registration/activation_email_subject.txt
+accounts/templates/django_registration/registration_complete.html
+accounts/templates/django_registration/registration_form.html
+accounts/templates/django_registration/terms.html
+users/models.py
+trainers/views.py
+schools/views.py
+eventers/views.py
+streams/models.py
+tf_workers/models.py
+
+
+
 
 

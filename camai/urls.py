@@ -34,6 +34,7 @@ if (argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith(
   urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
+    path('accounts/', include('django_registration.backends.activation.urls')),
     path('accounts/', include('django.contrib.auth.urls')),
     path('index/', include('index.urls')),
     path('oneitem/', include('oneitem.urls')),

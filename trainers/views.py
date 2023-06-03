@@ -24,7 +24,8 @@ from .models import fit
 
 @login_required
 def trainer(request, schoolnr):
-  if access.check('S', schoolnr, request.user, 'R'):
+  if (((schoolnr > 1) or (request.user.is_superuser)) 
+      and (access.check('S', schoolnr, request.user, 'R'))):
     myschool = school.objects.get(pk = schoolnr)
     template = loader.get_template('trainers/trainer.html')
     context = {
@@ -41,7 +42,8 @@ def trainer(request, schoolnr):
     return(HttpResponse('No Access'))
 
 def epochs(request, schoolnr, fitnr):
-  if access.check('S', schoolnr, request.user, 'R'):
+  if (((schoolnr > 1) or (request.user.is_superuser)) 
+      and (access.check('S', schoolnr, request.user, 'R'))):
     template = loader.get_template('trainers/epochs.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -55,7 +57,8 @@ def epochs(request, schoolnr, fitnr):
     return(HttpResponse('No Access'))
 
 def dashboard(request, schoolnr):
-  if access.check('S', schoolnr, request.user, 'R'):
+  if (((schoolnr > 1) or (request.user.is_superuser)) 
+      and (access.check('S', schoolnr, request.user, 'R'))):
     myschool = school.objects.get(pk = schoolnr)
     template = loader.get_template('trainers/dashboard.html')
     context = {

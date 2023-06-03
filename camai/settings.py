@@ -25,7 +25,8 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from .passwords import db_password, security_key, localaccess, mydomain, myip
+from .passwords import (db_password, security_key, localaccess, mydomain, myip, 
+  smtp_account, smtp_password, smtp_server, smtp_port, smtp_email, smtp_use_ssl)
 from .version import version
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -38,7 +39,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = security_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = []
 if localaccess:
@@ -52,10 +53,12 @@ if mydomain:
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'channels',
     'django_tables2',
     'django.contrib.admin',
     'django.contrib.auth',
+    'django_registration',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
@@ -162,10 +165,17 @@ USE_TZ = True
 
 STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
 #STATIC_URL = 'static/'
-STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
+#STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
 STATIC_ROOT = str(BASE_DIR)+'/data/static'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+ACCOUNT_ACTIVATION_DAYS = 7 # One-week activation window
+DEFAULT_FROM_EMAIL = smtp_email
+EMAIL_HOST = smtp_server
+EMAIL_HOST_PASSWORD = smtp_password
+EMAIL_HOST_USER = smtp_account
+EMAIL_PORT = smtp_port
+EMAIL_USE_TLS = smtp_use_ssl

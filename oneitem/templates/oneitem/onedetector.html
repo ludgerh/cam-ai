@@ -30,11 +30,11 @@
 	<div class="row">
 		<div class="col-auto">
       <div>
-          <h1>D{{ dbline.id }}: {{ dbline.name }}</h1>
-		      <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
-            fps = <span id="fpstag">?</span>, 
-            views = <span id="vnrtag">?</span></h5>
-          <canvas id="canvas" width="50px" height="50px"></canvas>
+        <h1>D{{ dbline.id }}: {{ dbline.name }}</h1>
+	      <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+          fps = <span id="fpstag">?</span>, 
+          views = <span id="vnrtag">?</span></h5>
+        <img id="imagespace" />
       </div>
 		</div>
 	</div>
@@ -99,26 +99,11 @@ let trigger_Socket;
 let oneitemSocket;
 {% endif %}
 let wait = 0;
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
-
-function timedRefresh(bytebuffer) {
-  if (wait == 0) {
-    wait = 1;
-    UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
-    imgsource = new ImageData(UI8Carray, xinput, yinput);
-    createImageBitmap(imgsource)
-		.then((result) => { 
-      ctx.drawImage(result, 0,0, displaywidth, displayheight)
-      wait = 0;
-    })
-		.catch(err => {console.log(err);});
-  };
-};
+let imageElement = document.getElementById("imagespace");
 
 $(document).ready(function() {
-  $('#canvas').attr('width', displaywidth+'px');
-  $('#canvas').attr('height', displayheight+'px');
+  $('#imagespace').attr('width', displaywidth+'px');
+  $('#imagespace').attr('height', displayheight+'px');
 {% if may_write %}
 	$('#ch_show').change((evt) => {
 		oneitemSocket.sendandwait({
@@ -190,13 +175,12 @@ $(document).ready(function() {
 		};
 		trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-        e.data.arrayBuffer()
-        .then((bytebuffer) => {
-				  timedRefresh(bytebuffer);
-          trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
-        })
-        .catch(err => {console.log(err);});
-			};
+		    blob = e.data.slice(10, e.data.size, "image/jpeg")
+		    console.log(blob);
+		    let url = URL.createObjectURL(blob);
+		    imageElement.src = url;
+        trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
+      };
 		};
 {% if may_write %}
 		$('#ch_show').prop('checked', false);

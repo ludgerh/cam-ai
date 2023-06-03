@@ -26,7 +26,8 @@ from .models import event, event_frame
 
 @login_required
 def events(request, schoolnr):
-  if access.check('S', schoolnr, request.user, 'R'):
+  if (((schoolnr > 1) or (request.user.is_superuser)) 
+      and (access.check('S', schoolnr, request.user, 'R'))):
     template = loader.get_template('eventers/events.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -44,7 +45,9 @@ def events(request, schoolnr):
 @login_required
 def oneevent(request, schoolnr, eventnr):
   myevent = event.objects.get(id=eventnr)
-  if (myevent.school.id == schoolnr) and access.check('S', schoolnr, request.user, 'R'):
+  if ((myevent.school.id == schoolnr) 
+      and ((schoolnr > 1) or (request.user.is_superuser))
+      and access.check('S', schoolnr, request.user, 'R')):
     length_in_seconds = round(myevent.end.timestamp() - myevent.start.timestamp())
     length = str(length_in_seconds // 60)+':'
     seconds = str(length_in_seconds % 60)

@@ -31,11 +31,11 @@
 	<div class="row">
 		<div class="col-auto">
       <div>
-          <h1>E{{ dbline.id }}: {{ dbline.name }}</h1>
-          <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
-            fps = <span id="fpstag">?</span>, 
-            views = <span id="vnrtag">?</span></h5>
-          <canvas id="canvas" width="50px" height="50px"></canvas>
+        <h1>E{{ dbline.id }}: {{ dbline.name }}</h1>
+        <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+          fps = <span id="fpstag">?</span>, 
+          views = <span id="vnrtag">?</span></h5>
+        <img id="imagespace" />
       </div>
 		</div>
 	</div>
@@ -120,8 +120,7 @@ let oneitemSocket;
 let SchoolDBUtilSocket;
 {% endif %}
 let wait = 0;
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
+let imageElement = document.getElementById("imagespace");
 let taglines;
 let tagselect;
 let c_dict;
@@ -384,8 +383,8 @@ function reset_triggers(first = false) {
 };
 
 $(document).ready(function() {
-  $('#canvas').attr('width', displaywidth+'px');
-  $('#canvas').attr('height', displayheight+'px');
+  $('#imagespace').attr('width', displaywidth+'px');
+  $('#imagespace').attr('height', displayheight+'px');
 {% if may_write %}
 	$('#oneform').children(':first').children(':first').children('.col-auto')
 			.children(
@@ -482,13 +481,12 @@ $(document).ready(function() {
 		};
 		trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-        e.data.arrayBuffer()
-        .then((bytebuffer) => {
-				  timedRefresh(bytebuffer);
-          trigger_Socket.socket.send('E{{ dbline.id|stringformat:"09d" }}');
-        })
-        .catch(err => {console.log(err);});
-			};
+		    blob = e.data.slice(10, e.data.size, "image/jpeg")
+		    console.log(blob);
+		    let url = URL.createObjectURL(blob);
+		    imageElement.src = url;
+        trigger_Socket.socket.send('E{{ dbline.id|stringformat:"09d" }}');
+      };
 		};
 {% if may_write %}
 		return(WSAsync(ws_scheme + '//' + window.location.host + '/ws/oneitem/'));

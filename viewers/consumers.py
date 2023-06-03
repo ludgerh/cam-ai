@@ -16,6 +16,7 @@ import cv2 as cv
 from time import time, sleep
 from logging import getLogger
 from traceback import format_exc
+from zlib import compress
 import numpy as np
 from django.utils import timezone
 from django.db import connection
@@ -149,15 +150,11 @@ class triggerConsumer(WebsocketConsumer):
                       frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
                     else:
                       frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
-                frame = c_convert(frame, typein=1, xout=self.outxdict[onf_viewer.parent.id])
-                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-                dims3 = (frame.shape[0], frame.shape[1], 1)
-                alpha = np.full(dims3, 255, dtype=np.uint8)
-                frame = np.concatenate((frame, alpha), axis=2)
+                frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
                 try:
-                  self.send(bytes_data=indicator.encode()+frame.tobytes())
+                  self.send(bytes_data=indicator.encode()+frame)
                 except Disconnected:
-                  logger.error('*** Could not send Trigger, socket closed...')
+                  logger.error('*** Could not send Frame, socket closed...')
             except:
               logger.error(format_exc())
               logger.handlers.clear()

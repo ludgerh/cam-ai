@@ -30,7 +30,8 @@ from trainers.models import trainframe
 
 @login_required
 def images(request, schoolnr):
-  if access.check('S', schoolnr, request.user, 'R'):
+  if (((schoolnr > 1) or (request.user.is_superuser)) 
+      and (access.check('S', schoolnr, request.user, 'R'))):
     myschool = school.objects.get(pk = schoolnr)
     template = loader.get_template('schools/images.html')
     context = {
@@ -48,7 +49,8 @@ def images(request, schoolnr):
 
 @login_required
 def classroom(request, schoolnr):
-  if access.check('S', schoolnr, request.user, 'R'):
+  if (((schoolnr > 1) or (request.user.is_superuser)) 
+      and (access.check('S', schoolnr, request.user, 'R'))):
     template = loader.get_template('schools/classroom.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),

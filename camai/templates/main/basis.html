@@ -48,10 +48,8 @@
                 {% for item in camlist %}
                   <li><a class="dropdown-item" href="/oneitem/cam/{{ item.id }}/">{{ item.name }}</a></li>
                 {% endfor %}
-              {% if user.is_superuser %}
               <div class="dropdown-divider"></div>
               <a class="dropdown-item" href="/tools/addstream/">Add camera stream</a>
-              {% endif %}
               {% endspaceless %}
             </ul>
           </div>
@@ -98,7 +96,9 @@
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
               {% spaceless %}
                 {% for item in schoollist %}
-                  <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
+                  {% if item.id != 1 or user.is_superuser %}
+                    <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}{{ item.id }}</a></li>
+                  {% endif %}
                 {% endfor %}
               {% endspaceless %}
             </ul>
@@ -112,12 +112,12 @@
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
               {% spaceless %}
                 {% for item in schoollist %}
-                  <li><a class="dropdown-item" href="/schools/images/{{ item.id }}/">{{ item.name }}</a></li>
+                  {% if item.id != 1 or user.is_superuser %}
+                    <li><a class="dropdown-item" href="/schools/images/{{ item.id }}/">{{ item.name }}{{ item.id }}</a></li>
+                  {% endif %}
                 {% endfor %}
-                {% if user.is_superuser %}
-                  <div class="dropdown-divider"></div>
-                  <a class="dropdown-item" href="/tools/addschool/">Add School</a>
-                {% endif %}
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="/tools/addschool/">Add School</a>
               {% endspaceless %}
             </ul>
           </div>

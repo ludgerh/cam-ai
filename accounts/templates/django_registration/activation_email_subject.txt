@@ -1,0 +1,1 @@
+CAM-AI activation, {{ expiration_days }} days left to complete

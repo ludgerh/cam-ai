@@ -11,7 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# /tools/consumers.py V0.9.5 02.02.2023
+# /tools/consumers.py V0.9.12 19.05.2023
 
 import json
 from pathlib import Path
@@ -324,7 +324,7 @@ class admintools(AsyncWebsocketConsumer):
     await self.accept()
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + text_data)
+    logger.info('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
 
@@ -344,7 +344,7 @@ class admintools(AsyncWebsocketConsumer):
       p = Popen(cmds, stdout=PIPE)
       output, _ = p.communicate()
       outlist['data'] = loads(output)
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'scanips':

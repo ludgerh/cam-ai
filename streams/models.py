@@ -13,6 +13,7 @@
 
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 from tf_workers.models import school
 
 class stream(models.Model):
@@ -20,6 +21,7 @@ class stream(models.Model):
   name = models.CharField(max_length=100, default='New Stream')
   made = models.DateTimeField(default=timezone.now)
   lastused = models.DateTimeField(default=timezone.now)
+  creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_DEFAULT, default=1)
 
   cam_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  

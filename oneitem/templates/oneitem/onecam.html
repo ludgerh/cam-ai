@@ -34,7 +34,7 @@
         <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
           fps = <span id="fpstag">?</span>, 
           views = <span id="vnrtag">?</span></h5>
-        <canvas id="canvas" width="50px" height="50px"></canvas>
+        <img id="imagespace" />
       </div>
 		</div>
 	</div>
@@ -73,7 +73,7 @@
 			  </div>
 		  </form>
 	  </div>
-	  <div class="row my-1 blue" rea="0">
+	  <div class="row my-1 blue" rea="0"js unpack zlib blob>
 		  <div class="col-auto my-2" rea="0">Mask settings</div>
 	  </div>
 	  <div class="row my-1 d-none" id="cam_c_boxes">
@@ -96,10 +96,9 @@
 <script>
 
 let displaywidth = Math.round($(window).width() * 0.97);
-let displayheight = 
-  Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
-let xinput
-let yinput
+let displayheight = Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }});
+let xinput;
+let yinput;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let c_view_Socket;
 let trigger_Socket;
@@ -107,25 +106,11 @@ let trigger_Socket;
 let oneitemSocket;
 {% endif %}
 let wait = 0;
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
-
-function timedRefresh(bytebuffer) {
-  if (wait == 0) {
-    UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
-    imgsource = new ImageData(UI8Carray, xinput, yinput);
-    createImageBitmap(imgsource)
-		.then((result) => {
-      ctx.drawImage(result, 0,0, displaywidth, displayheight)
-      wait = 0;
-    })
-		.catch(err => {console.log(err);});
-  };
-};
+let imageElement = document.getElementById("imagespace");
 
 $(document).ready(function() {
-  $('#canvas').attr('width', displaywidth+'px');
-  $('#canvas').attr('height', displayheight+'px');
+  $('#imagespace').attr('width', displaywidth+'px');
+  $('#imagespace').attr('height', displayheight+'px');
 {% if may_write %}
 	$('#ch_show').change((evt) => {
 		oneitemSocket.sendandwait({
@@ -231,12 +216,11 @@ $(document).ready(function() {
 		};
 		trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-        e.data.arrayBuffer()
-        .then((bytebuffer) => {
-				  timedRefresh(bytebuffer);
-          trigger_Socket.socket.send('C{{ dbline.id|stringformat:"09d" }}');
-        })
-        .catch(err => {console.log(err);});
+		    blob = e.data.slice(10, e.data.size, "image/jpeg")
+		    console.log(blob);
+		    let url = URL.createObjectURL(blob);
+		    imageElement.src = url;
+        trigger_Socket.socket.send('C{{ dbline.id|stringformat:"09d" }}');
       };
 		};
 {% if may_write %}
@@ -266,38 +250,39 @@ $(document).ready(function() {
 	})
 	.then(() => {
 {% if may_write %}
-		mycanvas = $('#canvas');
-		let overcanvas = false;
-		mycanvas.mousedown((evt) => {
+		myimage = $('#imagespace');
+		myimage.attr('draggable', false);
+		let overimage = false;
+		myimage.mousedown((evt) => {
 			if($('#ch_edit').prop('checked')) {
-				let x = evt.originalEvent.pageX - mycanvas.offset().left;
-				let y = evt.originalEvent.pageY - mycanvas.offset().top;
+				let x = evt.originalEvent.pageX - myimage.offset().left;
+				let y = evt.originalEvent.pageY - myimage.offset().top;
 				oneitemSocket.sendandwait({
 					'command' : 'mousedown',
 					'x' : x,
 					'y' : y,
 				})
 				.catch(err => {console.log(err);});
-				overcanvas = true;
+				overimage = true;
 			};
 		});
 		$( document.body ).mouseup((evt) => {
-			if (overcanvas) {
-				let x = evt.originalEvent.pageX - mycanvas.offset().left;
-				let y = evt.originalEvent.pageY - mycanvas.offset().top;
+			if (overimage) {
+				let x = evt.originalEvent.pageX - myimage.offset().left;
+				let y = evt.originalEvent.pageY - myimage.offset().top;
 				oneitemSocket.sendandwait({
 					'command' : 'mouseup',
 					'x' : x,
 					'y' : y,
 				})
 				.catch(err => {console.log(err);});
-				overcanvas = false;
+				overimage = false;
 			};
 		});
 		$( document.body ).mousemove((evt) => {
-			if (overcanvas) {
-				let x = evt.originalEvent.pageX - mycanvas.offset().left;
-				let y = evt.originalEvent.pageY - mycanvas.offset().top;
+			if (overimage) {
+				let x = evt.originalEvent.pageX - myimage.offset().left;
+				let y = evt.originalEvent.pageY - myimage.offset().top;
 				oneitemSocket.sendandwait({
 					'command' : 'mousemove',
 					'x' : x,
@@ -306,10 +291,10 @@ $(document).ready(function() {
 				.catch(err => {console.log(err);});
 			};
 		});
-		mycanvas.dblclick((evt) => {
+		myimage.dblclick((evt) => {
 			if($('#ch_edit').prop('checked')) {
-			  let x = evt.originalEvent.pageX - mycanvas.offset().left;
-			  let y = evt.originalEvent.pageY - mycanvas.offset().top;
+			  let x = evt.originalEvent.pageX - myimage.offset().left;
+			  let y = evt.originalEvent.pageY - myimage.offset().top;
 			  oneitemSocket.sendandwait({
 				  'command' : 'dblclick',
 				  'x' : x,
