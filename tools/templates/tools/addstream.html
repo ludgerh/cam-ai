@@ -13,6 +13,7 @@
 
 {% extends 'main/basis.html' %}
 {% block content %}
+{% if mayadd %}
 {% if emulatestatic %}
   {% load static %}
   <script src="{% static 'camai/git/js/wstools.js' %}"></script>
@@ -32,8 +33,10 @@
   <label class="btn btn-outline-primary" for="btnradio4">HTTPS (443)</label>
 </div>
 <div>
+{% if user.is_superuser %}
 <button class="btn btn-primary m-2 scan-button" type="button">Scan your network (may take some minutes)</button>
 </div>
+{% endif %}
 <div class="h2 m-2 d-none" id="please_wait">
 Scanning your network. Please wait a while...
 </div>
@@ -42,7 +45,7 @@ Scanning your network. Please wait a while...
   </div>
 </div>
 </div><div class="mb-3 m-2">
-  <label for="ipaddress" class="form-label h4">IP of your camera:</label>
+  <label for="ipaddress" class="form-label h4">IP or address of your camera:</label>
   <input type="text" class="form-control" id="ipaddress" placeholder="...">
 </div>
 <div class="h4 m-2">
@@ -226,5 +229,12 @@ $(document).ready(function() {
   .catch(err => {console.log(err);});
 });
 </script>
+{% else %}
+  <div class="h2 m-2">
+  You can create {{ streamlimit }} camera streams.<br>
+  You already have {{ streamcount }}.<br>
+  Please delete one or more to create a new one...
+  </div>
+{% endif %}
 
 {% endblock %}

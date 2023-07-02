@@ -2,30 +2,60 @@
 
 from django.db import migrations, models
 
+def fill_table(apps, schema_editor):
+  Setting = apps.get_model("tools", "setting")
+  if not Setting.objects.all().count():
+    Setting.objects.create(setting='loglevel', value='INFO', comment='None')
+    Setting.objects.create(setting='emulatestatic', value='0', comment='None')
+    Setting.objects.create(setting='version', value='0.0.0', comment='None')
+    Setting.objects.create(setting='local_trainer', value='0', comment='None')
+    Setting.objects.create(setting='smtp_account', value='heo@tester.de', comment='None')
+    Setting.objects.create(setting='smtp_password', value='yourpassword', comment='None')
+    Setting.objects.create(setting='smtp_server', value='smtp.provider.com', comment='None')
+    Setting.objects.create(setting='smtp_port', value='465', comment='None')
+    Setting.objects.create(setting='smtp_email', value='theo@tester.de', comment='None')
+    Setting.objects.create(setting='smtp_name', value='CAM-AI Emailer', comment='None')
+    Setting.objects.create(setting='system_number', value='-1', comment='None')
+    Setting.objects.create(setting='deletethreshold', value='0', comment='None')
+
 
 class Migration(migrations.Migration):
 
-    initial = True
+  initial = True
 
-    dependencies = [
-    ]
+  dependencies = [
+  ]
 
-    operations = [
-        migrations.CreateModel(
-            name='camurl',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('type', models.CharField(max_length=100)),
-                ('url', models.CharField(max_length=255)),
-            ],
-        ),
-        migrations.CreateModel(
-            name='setting',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('setting', models.CharField(max_length=100)),
-                ('value', models.CharField(max_length=100)),
-                ('comment', models.CharField(max_length=255)),
-            ],
-        ),
-    ]
+  operations = [
+    migrations.CreateModel(
+      name='camurl',
+      fields=[
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('type', models.CharField(max_length=100)),
+        ('url', models.CharField(max_length=255)),
+      ],
+    ),
+    migrations.CreateModel(
+      name='setting',
+      fields=[
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('setting', models.CharField(max_length=100)),
+        ('value', models.CharField(max_length=100)),
+        ('comment', models.CharField(max_length=255)),
+      ],
+    ),
+    migrations.RunPython(fill_table),
+    migrations.CreateModel(
+      name='token',
+      fields=[
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('passwd', models.CharField(max_length=20)),
+        ('made', models.DateTimeField()),
+        ('count', models.IntegerField(default=0)),
+        ('valid', models.BooleanField(default=True)),
+        ('cat', models.CharField(default='NON', max_length=3)),
+        ('idx', models.IntegerField(default=0)),
+        ('info', models.CharField(default='...', max_length=255)),
+      ],
+    ),
+  ]

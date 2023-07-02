@@ -306,6 +306,18 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           )
           await savedbline(db_line)
         outlist['data'] = 'OK'
+        
+      else:
+        outlist['data'] = 'No Access'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'delete_cam':
+      if self.may_write:
+        if params['itemid'] in streams:
+          streams[params['itemid']].stop()
+        await updatefilter(stream, {'id' : params['itemid'], }, {'active' : False, })
+        outlist['data'] = 'OK'
       else:
         outlist['data'] = 'No Access'
       logger.debug('--> ' + str(outlist))

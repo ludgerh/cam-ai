@@ -380,7 +380,27 @@ eventers/views.py
 streams/models.py
 tf_workers/models.py
 
-
-
-
-
+v 0.9.14
+camai/version.py
+camai/settings.py
+camai/templates/main/basis.html
+tools/consumers.py x
+tools/views.py
+tools/c_redis.py.py
+tools/addstream.html
+tools/addschool.html
+l_buffer/l_buffer.py x
+oneitem/consumers.py
+oneitem/onecam.html 
+oneitem/onedetector.html
+oneitem/oneeventer.html x
+streams/models.py
+streams/startup.py
+streams/c_devices.py
+streams/c_cams.py
+users/models.py
+eventers/c_eventers.py x
+eventers/c_event.py
+detectors/c_detectors.py
+viewers/c_viewers.py
+viewers/consumers.py

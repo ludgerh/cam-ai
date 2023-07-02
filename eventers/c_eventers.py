@@ -58,7 +58,7 @@ class c_eventer(c_device):
       self.viewer = None
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
-    self.dataqueue = l_buffer(envi='D', bget=True)
+    self.dataqueue = l_buffer(1, block=True)
     self.detectorqueue = SimpleQueue()
     self.frameslist = deque()
     self.inserter_ts = 0
@@ -212,8 +212,9 @@ class c_eventer(c_device):
           self.scaling = self.scrwidth / myframe.shape[1]
         else:
           self.scaling = 1.0  
-      if self.scaling < 1:    
-        myframe = cv.resize(myframe, None, fx=self.scaling, fy=self.scaling)
+        self.linewidth = round(4.0 / self.scaling)
+        self.textheight = round(0.51 / self.scaling)
+        self.textthickness = round(2.0 / self.scaling)
       frame = (frame[0], myframe, frame[2])
       frameplusevents = {}
       frameplusevents['frame'] = frame
@@ -274,11 +275,6 @@ class c_eventer(c_device):
         if all_done:
           frame = myframeplusevents['frame']
           newimage = frame[1].copy()
-          #buffer_diff = min(1.0, frame[2] - self.buffer_ts)
-          #while (time() - self.display_ts) < (buffer_diff * 0.9):
-          #  sleep(djconf.getconfigfloat('short_brake', 0.01))
-          #self.buffer_ts = frame[2]
-          #self.display_ts = time()
           for i in myframeplusevents['events']:
             if i[0] in self.eventdict:
               item = self.eventdict[i[0]]
@@ -294,19 +290,17 @@ class c_eventer(c_device):
                     colorcode= (0, 0, 255)
                   displaylist = [(j, predictions[j]) for j in range(10)]
                   displaylist.sort(key=lambda x: -x[1])
-                  if self.scaling < 1:
-                    itemold = [round(item * self.scaling) for item in itemold]
-                  cv.rectangle(newimage, rect_btoa(itemold), colorcode, 4)
-                  if itemold[2] < (self.dbline.cam_yres * self.scaling - itemold[3]):
-                    y0 = itemold[3] + 20
+                  cv.rectangle(newimage, rect_btoa(itemold), colorcode, self.linewidth)
+                  if itemold[2] < (self.dbline.cam_yres - itemold[3]):
+                    y0 = itemold[3] + 30 * self.textheight
                   else:
-                    y0 = itemold[2] - 55
+                    y0 = itemold[2] - 70 * self.textheight
                   for j in range(3):
                     cv.putText(newimage, 
                       self.tag_list[displaylist[j][0]].name[:3]
                       +' - '+str(round(displaylist[j][1],2)), 
-                      (itemold[0]+2, y0 + j * 20), 
-                      cv.FONT_HERSHEY_SIMPLEX, 0.5, colorcode, 2, cv.LINE_AA)
+                      (itemold[0]+2, y0 + j * 30 * self.textheight), 
+                      cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, self.textthickness, cv.LINE_AA)
                 else:
                   imax = -1
                   pmax = -1
@@ -316,12 +310,10 @@ class c_eventer(c_device):
                         pmax = predictions[j]
                         imax = j
                   if resolve_rules(self.cond_dict[1], predictions):
-                    if self.scaling < 1:
-                      itemold = [round(item * self.scaling) for item in itemold]
-                    cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), 4)
+                    cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), self.linewidth)
                     cv.putText(newimage, self.tag_list[imax].name[:3], 
                       (itemold[0]+10, itemold[2]+30), 
-                      cv.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv.LINE_AA)
+                      cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), self.textthickness, cv.LINE_AA)
               self.last_display = frame[2]
           if self.dbline.eve_view:
             fps = self.som.gettime()
@@ -529,15 +521,15 @@ class c_eventer(c_device):
                   found = myevent
                   break
               if found is None:
-                while True:
-                  try:
-                    myschoolid = self.dbline.eve_school.id
-                    break
-                  except OperationalError:
-                    connection.close()
+                #while True:
+                #  try:
+                #    myschoolid = self.dbline.eve_school.id
+                #    break
+                #  except OperationalError:
+                #    connection.close()
                 myevent = c_event(self.tf_worker, self.tf_w_index, frame, 
                   self.dbline.eve_margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
-                  myschoolid, self.id, self.dbline.name, self.logger)
+                  self.dbline.eve_school.id, self.id, self.dbline.name, self.logger)
                 self.eventdict[myevent.dbline.id] = myevent
               else: 
                 s_factor = 0.1 # user changeable later: 0.0 -> No Shrinking 1.0 50%
@@ -562,7 +554,7 @@ class c_eventer(c_device):
                   found[3] = round(((frame[6] + margin) * s_factor + found[3]) 
                     / (s_factor+1.0))
                 found.end = frame[2]
-                found.add_frame(frame)
+                found.add_frame(frame, self.dbline.eve_school.id)
             self.merge_events()
             self.inserter_ts = frame[2]
           else:  
@@ -604,6 +596,7 @@ class c_eventer(c_device):
 
   def stop(self):
     self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')
+    self.dataqueue.stop()
     super().stop()
-    self.run_process.join()
+    #self.run_process.join()
     

@@ -20,7 +20,7 @@ class c_viewer():
   def __init__(self, parent, logger):
     self.logger = logger
     self.parent = parent
-    self.inqueue = l_buffer(envi='D', call=self.callback)
+    self.inqueue = l_buffer(1, call=self.callback)
     self.onf_dict_lock = Lock()
     self.onf_dict = {}
     if self.parent.type in {'C', 'D'}:

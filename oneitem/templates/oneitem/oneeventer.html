@@ -56,7 +56,20 @@
 					  {% for field in form %}
 					  <div class="col-auto my-2">
 						  {{ field.errors }}
-						  {{ field.label_tag }} {{ field }}
+						  {{ field.label_tag }}
+						  {% if field.name == 'eve_school' %}
+              <select name="eve_school" id="id_eve_school">
+                {% for item in schoollist %}
+                  {% if dbline.eve_school.id == item.id %}
+                    <option value="{{ item.id }}" selected>{{ item.name }}</option>
+                  {% else %}  
+                    <option value="{{ item.id }}">{{ item.name }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+						  {% else %} 
+						    {{ field }}
+						  {% endif %} 	
 						  {% if field.help_text %}
 						  <p class="help">{{ field.help_text|safe }}</p>
 						  {% endif %}
@@ -482,7 +495,6 @@ $(document).ready(function() {
 		trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
 		    blob = e.data.slice(10, e.data.size, "image/jpeg")
-		    console.log(blob);
 		    let url = URL.createObjectURL(blob);
 		    imageElement.src = url;
         trigger_Socket.socket.send('E{{ dbline.id|stringformat:"09d" }}');

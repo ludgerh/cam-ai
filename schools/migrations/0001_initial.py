@@ -2,23 +2,38 @@
 
 from django.db import migrations, models
 
+def fill_table(apps, schema_editor):
+  Tag = apps.get_model("schools", "tag")
+  if not Tag.objects.all().count():
+    Tag.objects.create(name='night', description='Night')
+    Tag.objects.create(name='human', description='Human(s)')
+    Tag.objects.create(name='cat', description='Cat(s)')
+    Tag.objects.create(name='dog', description='Dog(s)')
+    Tag.objects.create(name='bird', description='Bird(s)')
+    Tag.objects.create(name='insect', description='Insect(s)')
+    Tag.objects.create(name='car', description='Car(s)')
+    Tag.objects.create(name='truck', description='Truck(s)')
+    Tag.objects.create(name='motorcycle', description='Motorcycle(s)')
+    Tag.objects.create(name='bicycle', description='Bicycle(s)')
+
 
 class Migration(migrations.Migration):
 
-    initial = True
+  initial = True
 
-    dependencies = [
-    ]
+  dependencies = [
+  ]
 
-    operations = [
-        migrations.CreateModel(
-            name='tag',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100)),
-                ('description', models.CharField(max_length=100)),
-                ('school', models.SmallIntegerField(default=0)),
-                ('replaces', models.SmallIntegerField(default=-1)),
-            ],
-        ),
-    ]
+  operations = [
+    migrations.CreateModel(
+      name='tag',
+      fields=[
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('name', models.CharField(max_length=100)),
+        ('description', models.CharField(max_length=100)),
+        ('school', models.SmallIntegerField(default=0)),
+        ('replaces', models.SmallIntegerField(default=-1)),
+      ],
+    ),
+    migrations.RunPython(fill_table),
+  ]

@@ -33,7 +33,7 @@ class c_detector(c_device):
       self.type = 'D'
       super().__init__(*args, **kwargs)
       self.mode_flag = self.dbline.det_mode_flag
-      self.dataqueue = l_buffer(envi='D', bget=True)
+      self.dataqueue = l_buffer(1, block=True)
       self.firstdetect = True
       self.ts_background = time()
       self.finished = True
@@ -233,6 +233,6 @@ class c_detector(c_device):
     pass
 
   def stop(self):
+    self.dataqueue.stop()
     super().stop()
-    self.run_process.join()
 

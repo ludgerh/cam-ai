@@ -97,7 +97,7 @@
               {% spaceless %}
                 {% for item in schoollist %}
                   {% if item.id != 1 or user.is_superuser %}
-                    <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}{{ item.id }}</a></li>
+                    <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
                   {% endif %}
                 {% endfor %}
               {% endspaceless %}
@@ -113,7 +113,7 @@
               {% spaceless %}
                 {% for item in schoollist %}
                   {% if item.id != 1 or user.is_superuser %}
-                    <li><a class="dropdown-item" href="/schools/images/{{ item.id }}/">{{ item.name }}{{ item.id }}</a></li>
+                    <li><a class="dropdown-item" href="/schools/images/{{ item.id }}/">{{ item.name }}</a></li>
                   {% endif %}
                 {% endfor %}
                 <div class="dropdown-divider"></div>

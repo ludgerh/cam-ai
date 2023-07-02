@@ -12,12 +12,12 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
+import numpy as np
 import cv2 as cv
 from time import time, sleep
 from logging import getLogger
 from traceback import format_exc
 from zlib import compress
-import numpy as np
 from django.utils import timezone
 from django.db import connection
 from django.db.utils import OperationalError
@@ -62,7 +62,7 @@ class triggerConsumer(WebsocketConsumer):
     for viewer in self.viewerlist:
       viewer.parent.take_view_count()
       if not redis.view_from_dev(viewer.parent.type, viewer.parent.id):
-        viewer.inqueue.stop()
+        #viewer.inqueue.stop()
         viewer.pop_from_onf(self.indexdict[viewer.parent.id])
     for item in self.loglist:
       item.stop = timezone.now()
@@ -151,6 +151,9 @@ class triggerConsumer(WebsocketConsumer):
                     else:
                       frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
                 frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
+                #return()
+                if int(redis.get('KBInt')):
+                  return()  
                 try:
                   self.send(bytes_data=indicator.encode()+frame)
                 except Disconnected:
@@ -161,7 +164,7 @@ class triggerConsumer(WebsocketConsumer):
 
           myviewer.parent.add_view_count()
           self.indexdict[params['idx']] = myviewer.push_to_onf(onf)
-          myviewer.inqueue.register_callback()
+          #myviewer.inqueue.register_callback()
           self.viewerlist.append(myviewer)
           if self.scope['user'].is_authenticated:
             myuser = self.scope['user'].id

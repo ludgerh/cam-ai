@@ -11,7 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# /trainers/c_trainers.py V0.9.5 14.02.2023
+# /trainers/c_trainers.py V0.9.14 11.06.2023
 
 import gc
 from multiprocessing import Process, Queue
@@ -33,6 +33,8 @@ from .models import trainer as dbtrainer, trainframe, fit, epoch
 if djconf.getconfigbool('local_trainer', True):
   from .train_worker_gpu import train_once_gpu
 from .train_worker_remote import train_once_remote
+
+#from threading import enumerate
 
 trainers = {}
 short_brake = djconf.getconfigfloat('short_brake', 0.01)
@@ -220,6 +222,8 @@ class trainer():
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
+    #for thread in enumerate(): 
+    #  print(thread)
     self.logger.info('Finished Process '+self.logname+'...')
     self.logger.handlers.clear()
   

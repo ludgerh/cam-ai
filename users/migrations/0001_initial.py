@@ -4,38 +4,58 @@ import datetime
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-from django.utils.timezone import utc
+from django.utils.timezone import utc, now
+
+def fill_table(apps, schema_editor):
+  User = apps.get_model("auth", "user")
+  Userinfo = apps.get_model("users", "userinfo")
+  if not User.objects.all().count():
+    newline = User.objects.create(
+      password='pbkdf2_sha256$390000$S1kU2slc9jyJIPerlg0Zke$XhcjiuIc1UQY9GpuGPFFE0YSDaM7blJVxsxSZqfBRZQ=',
+      is_superuser=True,
+      username='admin',
+      first_name='admin',
+      last_name='admin',
+      email='theo@tester.de',
+      is_staff=True,
+      is_active=True,
+    )
+    Userinfo.objects.create(user_id=newline.id)
 
 
 class Migration(migrations.Migration):
 
-    initial = True
+  initial = True
 
-    dependencies = [
-        ('tf_workers', '0001_initial'),
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-    ]
+  dependencies = [
+    ('tf_workers', '0001_initial'),
+    migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+  ]
 
-    operations = [
-        migrations.CreateModel(
-            name='userinfo',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('counter', models.IntegerField(default=0)),
-                ('school', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='tf_workers.school')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-            ],
-        ),
-        migrations.CreateModel(
-            name='archive',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('typecode', models.IntegerField(default=0)),
-                ('number', models.IntegerField(default=0)),
-                ('name', models.CharField(max_length=100)),
-                ('made', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
-                ('school', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='tf_workers.school')),
-                ('users', models.ManyToManyField(to=settings.AUTH_USER_MODEL)),
-            ],
-        ),
-    ]
+  operations = [
+    migrations.CreateModel(
+      name='userinfo',
+      fields=[
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+        ('allowed_schools', models.IntegerField(default=1)),
+        ('allowed_streams', models.IntegerField(default=1)),
+        ('deadline', models.DateTimeField(default=datetime.datetime(2100, 1, 1, 0, 0, tzinfo=utc))),
+        ('made', models.DateTimeField(default=now)),
+        ('pay_tokens', models.IntegerField(default=0)),
+      ],
+    ),
+    migrations.RunPython(fill_table),
+    migrations.CreateModel(
+      name='archive',
+      fields=[
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('typecode', models.IntegerField(default=0)),
+        ('number', models.IntegerField(default=0)),
+        ('name', models.CharField(max_length=100)),
+        ('made', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
+        ('school', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='tf_workers.school')),
+        ('users', models.ManyToManyField(to=settings.AUTH_USER_MODEL)),
+      ],
+    ),
+  ]

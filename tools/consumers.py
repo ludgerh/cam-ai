@@ -16,6 +16,7 @@
 import json
 from pathlib import Path
 from os import makedirs, path as ospath
+from shutil import copyfile
 from time import time, sleep
 from json import loads, dumps
 from subprocess import Popen, PIPE
@@ -31,18 +32,24 @@ from channels.db import database_sync_to_async
 from camai.passwords import db_password
 from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
-  updatefilter, savedbline, getexists, createuser)
+  updatefilter, savedbline, getexists, createuser, countfilter)
 from tools.l_tools import djconf, displaybytes
 from tf_workers.models import school, worker
+from tools.c_redis import myredis
 from trainers.models import trainframe, trainer
 from eventers.models import event, event_frame
 from streams.c_streams import streams, c_stream
 from streams.models import stream as dbstream
-from streams.startup import start_stream_list, start_worker_list, start_trainer_list
 from users.models import userinfo
+from access.models import access_control
 from .health import totaldiscspace, freediscspace
 
 from random import randint
+
+using_websocket = worker.objects.get(id = 1).use_websocket
+model_type = school.objects.get(id = 1).model_type
+
+redis = myredis()
 
 logname = 'ws_toolsconsumers'
 logger = getLogger(logname)
@@ -322,9 +329,27 @@ class admintools(AsyncWebsocketConsumer):
 
   async def connect(self):
     await self.accept()
+    
+  async def check_create_stream_priv(self):
+    if self.scope['user'].is_superuser:
+      return(True)
+    else:
+      limit = await getonelinedict(userinfo, {'user' : self.scope['user'].id, }, ['allowed_streams',])
+      limit = limit['allowed_streams']
+      streamcount = await countfilter(dbstream, {'creator' : self.scope['user'].id, 'active' : True,})
+      return(streamcount < limit)  
+    
+  async def check_create_school_priv(self):
+    if self.scope['user'].is_superuser:
+      return(True)
+    else:
+      limit = await getonelinedict(userinfo, {'user' : self.scope['user'].id, }, ['allowed_schools',])
+      limit = limit['allowed_schools']
+      schoolcount = await countfilter(school, {'creator' : self.scope['user'].id, 'active' : True,})
+      return(schoolcount < limit)  
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
 
@@ -333,7 +358,7 @@ class admintools(AsyncWebsocketConsumer):
 #*****************************************************************************
 
     if params['command'] == 'scanoneip':
-      if not self.scope['user'].is_superuser:
+      if not await self.check_create_stream_priv():
         await self.close()
       if params['portaddr'] == 554:
         cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
@@ -344,27 +369,26 @@ class admintools(AsyncWebsocketConsumer):
       p = Popen(cmds, stdout=PIPE)
       output, _ = p.communicate()
       outlist['data'] = loads(output)
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'scanips':
-      if not self.scope['user'].is_superuser:
-        await self.close()
-      if params['portaddr']:
-        portlist = [params['portaddr'], ]
-      else:
-        portlist = [80, 443, 554, 1935, ]
       contactlist = []
-      for item in my_net.hosts():        
-        if item != my_ip:
-          if (checkresult := scanoneip(str(item), portlist)):
-            contactlist.append(checkresult)
+      if self.scope['user'].is_superuser:
+        if params['portaddr']:
+          portlist = [params['portaddr'], ]
+        else:
+          portlist = [80, 443, 554, 1935, ]
+        for item in my_net.hosts():        
+          if item != my_ip:
+            if (checkresult := scanoneip(str(item), portlist)):
+              contactlist.append(checkresult)
       outlist['data'] = contactlist
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'installcam':
-      if not self.scope['user'].is_superuser:
+      if not await self.check_create_stream_priv():
         await self.close()
       myschools = await filterlinesdict(school, {'active' : True, }, ['id', ])
       myschool = myschools[0]['id']
@@ -378,10 +402,18 @@ class admintools(AsyncWebsocketConsumer):
       newstream.cam_xres = params['xresolution']
       newstream.cam_yres = params['yresolution']
       newstream.eve_school_id = myschool
-      await savedbline(newstream)
-      while start_stream_list:
+      newstream.creator = self.scope['user']
+      newlineid = await savedbline(newstream)
+      if not self.scope['user'].is_superuser:
+        myaccess = access_control()
+        myaccess.vtype = 'X'
+        myaccess.vid = newlineid
+        myaccess.u_g_nr = self.scope['user'].id
+        myaccess.r_w = 'W'
+        await savedbline(myaccess)
+      while redis.get_start_stream_busy():
         sleep(long_brake)
-      start_stream_list.add(newstream.id)
+      redis.set_start_stream_busy(newstream.id)
       while (not (newstream.id in  streams)):
         sleep(long_brake)
       outlist['data'] = {'id' : newstream.id, }
@@ -389,70 +421,93 @@ class admintools(AsyncWebsocketConsumer):
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'makeschool':
-      if not self.scope['user'].is_superuser:
+      if not await self.check_create_school_priv():
         await self.close()
-      from websocket import WebSocket
+      if using_websocket:
+        from websocket import WebSocket
       newschool = school()
       newschool.name = params['name']
+      newschool.creator = self.scope['user']
       await savedbline(newschool)
-      school_dict = await getonelinedict(school, 
-        {'id': newschool.id, }, 
-        ['tf_worker', 'e_school', 'trainer'])
-      worker_dict = await getonelinedict(worker, 
-        {'id': school_dict['tf_worker'], }, 
-        ['wsserver', 'wspass', 'wsname', 'wsid', ])
-      await updatefilter(trainer, 
-        {'id': school_dict['trainer'], }, 
-        {
-          'wsserver' : worker_dict['wsserver'], 
-          'wsname' : worker_dict['wsname'], 
-          'wspass' : worker_dict['wspass'], 
-          'active' : True, 
-        }, )
+      if using_websocket:
+        school_dict = await getonelinedict(school, 
+          {'id': newschool.id, }, 
+          ['tf_worker', 'e_school', 'trainer'])
+        worker_dict = await getonelinedict(worker, 
+          {'id': school_dict['tf_worker'], }, 
+          ['wsserver', 'wspass', 'wsname', 'wsid', ])
+        await updatefilter(trainer, 
+          {'id': school_dict['trainer'], }, 
+          {
+            't_type' : 3,
+            'wsserver' : worker_dict['wsserver'], 
+            'wsname' : worker_dict['wsname'], 
+            'wspass' : worker_dict['wspass'], 
+            'active' : True, 
+          }, )
+      else:
+        school_dict = await getonelinedict(school, 
+          {'id': newschool.id, }, 
+          ['tf_worker', 'trainer'])
+        await updatefilter(trainer, 
+          {'id': school_dict['trainer'], }, 
+          {
+            't_type' : 1,
+            'active' : True, 
+          }, )
       schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
       try:
         makedirs(schooldir+'frames')
       except FileExistsError:
         logger.warning('Dir already exists: '+schooldir+'frames')
-      ws = WebSocket()
-      ws.connect(worker_dict['wsserver'] + 'ws/schoolutil/')
-      outdict = {
-        'code' : 'makeschool',
-        'name' : 'CL' + str(worker_dict['wsid'])+': ' + params['name'],
-        'pass' : worker_dict['wspass'],
-        'user' : worker_dict['wsid'],
-      }
-      ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      resultdict = json.loads(ws.recv())
-      ws.close()
-      print(resultdict)
-      if resultdict['status'] == 'OK':
+      try:
+        makedirs(schooldir+'model')
+      except FileExistsError:
+        logger.warning('Dir already exists: '+schooldir+'model')
+      if using_websocket:
+        ws = WebSocket()
+        ws.connect(worker_dict['wsserver'] + 'ws/schoolutil/')
+        outdict = {
+          'code' : 'makeschool',
+          'name' : 'CL' + str(worker_dict['wsid'])+': ' + params['name'],
+          'pass' : worker_dict['wspass'],
+          'user' : worker_dict['wsid'],
+        }
+        ws.send(json.dumps(outdict), opcode=1) #1 = Text
+        resultdict = json.loads(ws.recv())
+        ws.close()
+      else:
+        print(schoolsdir)
+        print(schoolsdir + 'model1/model/' + model_type)
+        print(schooldir + 'model/' + model_type)
+        copyfile(schoolsdir + 'model1/model/' + model_type + '.h5', 
+          schooldir + 'model/' + model_type + '.h5')
+      if using_websocket:
+        if resultdict['status'] == 'OK':
+          await updatefilter(school, 
+            {'id' : newschool.id, }, 
+            {'dir' : schooldir, 'e_school' : resultdict['school'], })
+          await updatefilter(trainer, 
+            {'id' : school_dict['trainer'], }, 
+            {'wsserver' : worker_dict['wsserver'], 
+            'wsname' : worker_dict['wsname'], 
+            'wspass' : worker_dict['wspass'], 
+            'active' : True, 
+            't_type' : 3,
+            })
+      else:
+        resultdict = {'status' : 'OK', }
         await updatefilter(school, 
           {'id' : newschool.id, }, 
-          {'dir' : schooldir, 'e_school' : resultdict['school'], })
-        await updatefilter(trainer, 
-          {'id' : 1, }, 
-          {'wsserver' : worker_dict['wsserver'], 
-          'wsname' : worker_dict['wsname'], 
-          'wspass' : worker_dict['wspass'], 
-          'active' : True, 
-          't_type' : 3,
-          })
-        while start_trainer_list:
-          sleep(long_brake)
-        start_trainer_list.add(school_dict['trainer'])
-        while start_worker_list:
-          sleep(long_brake)
-        start_worker_list.add(school_dict['tf_worker'])
-        streamlist = []
-        streamdict = await filterlinesdict(dbstream,
-          {'active' : True, },
-          ['id', ],
-        )
-        while start_stream_list: 
-          sleep(long_brake)
-        for item in streamdict:
-          start_stream_list.add(item['id'])
+          {'dir' : schooldir, 'model_type' : model_type, })
+      if resultdict['status'] == 'OK':
+        if not self.scope['user'].is_superuser:
+          myaccess = access_control()
+          myaccess.vtype = 'S'
+          myaccess.vid = newschool.id
+          myaccess.u_g_nr = self.scope['user'].id
+          myaccess.r_w = 'W'
+          await savedbline(myaccess)
       else:
         await updatefilter(school, 
           {'id' : newschool.id, }, 
@@ -488,9 +543,9 @@ class admintools(AsyncWebsocketConsumer):
           'wspass' : params['pass'],
           'wsid' : resultdict['data']['idx'],
         })
-        while start_worker_list:
+        while redis.get_start_worker_busy():
           sleep(long_brake)
-        start_worker_list.add(params['workernr'])
+        redis.set_start_worker_busy(params['workernr'])
         schooldict = await filterlinesdict(school, 
           {'tf_worker' : 1, }, 
           ['id', ],
@@ -503,12 +558,10 @@ class admintools(AsyncWebsocketConsumer):
           )
           for item2 in streamdict:
             streamlist.append(item2['id'])
-        while start_stream_list: 
-          sleep(long_brake)
         for i in streamlist:
-          start_stream_list.add(i)
-          
-          
+          while redis.get_start_stream_busy(): 
+            sleep(long_brake)
+          redis.set_start_stream_busy(i)
       outlist['data'] = resultdict['data']['status'] 
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	

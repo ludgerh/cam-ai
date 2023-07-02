@@ -103,3 +103,15 @@ class myredis(saferedis):
 
   def fps_from_dev(self, type, idx):
     return(float(self.get(type+':'+str(idx)+':fps')))
+    
+  def set_start_worker_busy(self, value):
+    self.set('start_worker_busy', str(value)) 
+    
+  def set_start_stream_busy(self, value):
+    self.set('start_stream_busy', str(value)) 
+    
+  def get_start_worker_busy(self):
+    return(int(self.get('start_worker_busy')))  
+    
+  def get_start_stream_busy(self):
+    return(int(self.get('start_stream_busy'))) 

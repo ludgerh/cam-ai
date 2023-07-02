@@ -21,9 +21,7 @@ class userinfo(models.Model):
   user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
   made = models.DateTimeField(default=timezone.now)
   allowed_schools = models.IntegerField(default=1)
-  used_schools = models.IntegerField(default=0)
   allowed_streams = models.IntegerField(default=1)
-  used_streams = models.IntegerField(default=0)
   pay_tokens = models.IntegerField(default=0)
   deadline = models.DateTimeField(default=timezone.make_aware(datetime(2100, 1, 1)))
 

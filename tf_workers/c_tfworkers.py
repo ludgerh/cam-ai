@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -11,7 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# c_tfworkers.py V0.8.5
+# /tf_workers/c_tfworkers.py V0.9.13 11.06.2023
 
 import json
 import numpy as np
@@ -318,19 +318,6 @@ class tf_worker():
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
-  #def health_check_proc(self):
-  #  try:
-  #    for i in self.model_buffers:
-  #      logstring = '***' + str(i) + ': '
-  #      logstring += str(len(self.model_buffers[i]))
-  #      logstring += ' - ' + str(sys.getsizeof(self.model_buffers[i]))
-  #      self.logger.info(logstring)
-  #    gc.collect()
-  #    self.logger.info('??? ' + displaybytes(self.memlevel1) + '  ' + displaybytes(self.memlevel2) + '  '  + displaybytes(self.memlevel3))
-  #  except:
-  #    self.logger.error(format_exc())
-  #    self.logger.handlers.clear()
-
   def runner(self):
     self.dbline = worker.objects.get(id=self.id)
     self.clientset = set(range(self.dbline.max_nr_clients))
@@ -357,15 +344,6 @@ class tf_worker():
         self.load_model = load_model
         self.tf = tf
       self.model_buffers = {}
-
-      #self.memall = 0.0    
-      #self.memlevel1 = 0.0
-      #self.memlevel2 = 0.0
-      #self.memlevel3 = 0.0
-      #self.health_proc = MultiTimer(interval=60, function=self.health_check_proc, 
-      #  runonstart=False)
-      #self.health_proc.start()
-
       if self.dbline.gpu_sim >= 0:
         self.cachedict = {}
       elif self.dbline.use_websocket:
@@ -447,7 +425,6 @@ class tf_worker():
           myschool = school.objects.get(id=schoolnr)
           outdict = {
             'code' : 'get_xy',
-            #'scho' : schoolnr,
             'scho' : myschool.e_school,
           }
           xytemp = json.loads(self.continue_sending(json.dumps(outdict), 
@@ -582,40 +559,12 @@ class tf_worker():
             npframelist.shape[3]), 
             np.uint8)
           portion = np.vstack((npframelist, patch))
-          
-          
-          #memused = virtual_memory().used
-          #self.memlevel1 += (memused - self.memall)
-          #self.memall = memused 
-
-
           predictions = (
             self.activemodels[schoolnr].predict_on_batch(portion))
-          
-          
-          #memused = virtual_memory().used
-          #self.memlevel2 += (memused - self.memall)
-          #self.memall = memused 
-
-
           predictions = predictions[:npframelist.shape[0]]
         else:
-          
-          
-          #memused = virtual_memory().used
-          #self.memlevel1 += (memused - self.memall)
-          #self.memall = memused 
-
-
           predictions = (
             self.activemodels[schoolnr].predict_on_batch(npframelist))
-          
-          
-          #memused = virtual_memory().used
-          #self.memlevel3 += (memused - self.memall)
-          #self.memall = memused 
-
-
       starting = 0
       for i in range(len(framelist)):
         if ((i == len(framelist) - 1) 

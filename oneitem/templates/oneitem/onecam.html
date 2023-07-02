@@ -1,4 +1,4 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -25,6 +25,29 @@
   </script>
 	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
 {% endif %}
+
+<!-- Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" 
+    aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Deleting this camera stream</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" 
+          aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
+          style="width: 120px;">Close</button>
+        <button type="button" class="btn btn-primary delbutton" 
+          style="width: 120px;">Yes, delete!</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="container-fluid float-left">
 	<div class="row">
@@ -67,7 +90,10 @@
 			  <div class="container-fluid float-left">
 				  <div class="row my-1">
 					  <div class="col-auto my-2">
-						  <input type="submit" value="Submit">
+						  <input type="submit" class="btn btn-primary m-2" value="Submit">
+					    <button class="btn btn-primary m-2" data-bs-toggle="modal" 
+					      data-bs-target="#deleteModal" id="delete_button" 
+					      type="button">Delete this stream</button>
 					  </div>
 				  </div>
 			  </div>
@@ -217,7 +243,6 @@ $(document).ready(function() {
 		trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
 		    blob = e.data.slice(10, e.data.size, "image/jpeg")
-		    console.log(blob);
 		    let url = URL.createObjectURL(blob);
 		    imageElement.src = url;
         trigger_Socket.socket.send('C{{ dbline.id|stringformat:"09d" }}');
@@ -232,6 +257,21 @@ $(document).ready(function() {
 	})
 	.then((result) => {
 		oneitemSocket = result;
+		
+		
+    $('.delbutton').click(function() {
+      $('#deleteModal').modal('hide');
+      oneitemSocket.sendandwait({
+        'command' : 'delete_cam',
+			  'itemid' : {{ dbline.id }},
+      })  
+      .then((result) => {
+        window.location.href = window.location.protocol + '//' + window.location.host;
+      })
+      .catch(err => {console.log(err);});
+    });
+    
+    
 		oneitemSocket.sendandwait({
 			'command' : 'setmyitem',
 			'mode' : 'C',

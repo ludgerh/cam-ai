@@ -39,7 +39,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = security_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = []
 if localaccess:
@@ -47,7 +47,7 @@ if localaccess:
 if myip:
   ALLOWED_HOSTS.append(myip)
 if mydomain:
-  ALLOWED_HOSTS.append(mydomain)
+  ALLOWED_HOSTS.append(mydomain.split(':')[0])
   CSRF_TRUSTED_ORIGINS = ['https://'+mydomain]
 
 # Application definition

@@ -14,9 +14,10 @@
 import sys
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
-from redis import Redis
 from multitimer import MultiTimer
+from time import sleep
 from tools.l_tools import djconf
+from tools.c_redis import myredis
 from camai.version import version as software_version
 print('***** Software-Version: ', software_version, '*****')
 djconf.setconfig('version', software_version)
@@ -27,45 +28,37 @@ from trainers.c_trainers import trainers, trainer
 from tools.health import stop as stophealth
 from .models import stream
 from .c_streams import streams, c_stream
+
 #from threading import enumerate
 
 check_timer = None
-start_trainer_list = set()
-start_worker_list = set()
-start_stream_list = set()
+redis = myredis()
+redis.set_start_worker_busy(0)
+redis.set_start_stream_busy(0)
+redis.set('KBInt', 0)
 
 def restartcheck_proc():
-  global start_trainer_list
-  global start_worker_list
-  global start_stream_list
-  if start_trainer_list:
-    for i in start_trainer_list:
-      if (i in trainers) and trainers[i].do_run:
-        trainers[i].stop()
-      trainers[i] = trainer(i)
-      trainers[i].run()
-    start_trainer_list = set()
-  if start_worker_list:
-    for i in start_worker_list:
-      if (i in tf_workers) and tf_workers[i].do_run:
-        tf_workers[i].stop()
-      tf_workers[i] = tf_worker(i)
-      tf_workers[i].run()
-    start_worker_list = set()
-  if start_stream_list:
-    for i in start_stream_list:
-      dbline = stream.objects.get(id=i)
-      if i in streams:
-        streams[i].stop()
-      streams[i] = c_stream(dbline)
-      streams[i].start()
-    start_stream_list = set()
+  if (item := redis.get_start_worker_busy()):
+    if (item in tf_workers) and tf_workers[item].do_run:
+      tf_workers[item].stop()
+    tf_workers[item] = tf_worker(item)
+    tf_workers[item].run()
+    redis.set_start_worker_busy(0)
+  if (item := redis.get_start_stream_busy()):
+    dbline = stream.objects.get(id=item)
+    if item in streams:
+      streams[item].stop()
+    streams[item] = c_stream(dbline)
+    streams[item].start()
+    redis.set_start_stream_busy(0)
     
 
 def newexit(eins, zwei):
+  redis.set('KBInt', 1)
+  print ('Caught KeyboardInterrupt...')
+  sleep(5.0)
   stophealth()
   check_timer.stop()
-  print ('Caught KeyboardInterrupt...')
   for i in streams:
     print('Closing stream #', i)
     streams[i].stop()
@@ -87,9 +80,6 @@ def run():
   signal(SIGHUP, newexit)
 
   setproctitle('CAM-AI-Starter')
-
-  myredis = Redis(health_check_interval=30)
-  myredis.set('camai_number_postprocesses', 0)
 
   for dbline in trainerdb.objects.filter(active=True):
     trainers[dbline.id] = trainer(dbline.id)

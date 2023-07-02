@@ -176,7 +176,6 @@ $(document).ready(function() {
 		trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
 		    blob = e.data.slice(10, e.data.size, "image/jpeg")
-		    console.log(blob);
 		    let url = URL.createObjectURL(blob);
 		    imageElement.src = url;
         trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');

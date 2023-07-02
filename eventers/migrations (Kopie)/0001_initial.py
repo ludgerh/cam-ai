@@ -28,6 +28,7 @@ class Migration(migrations.Migration):
                 ('ymin', models.IntegerField(default=0)),
                 ('ymax', models.IntegerField(default=0)),
                 ('numframes', models.IntegerField(default=0)),
+                ('locktime', models.DateTimeField(default=None, null=True)),
                 ('done', models.BooleanField(default=False)),
                 ('videoclip', models.CharField(default='', max_length=256)),
                 ('double', models.BooleanField(default=False)),

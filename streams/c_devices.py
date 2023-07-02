@@ -90,6 +90,8 @@ class c_device():
         received = self.inqueue.get()
         #print(self.type+str(self.dbline.id)+' in_queue_thread:', self.type, self.dbline.id, received)
         if (received[0] == 'stop'):
+          #if self.viewer:
+          #  self.viewer.stop()
           self.do_run = False
           while not self.inqueue.empty():
             received = self.inqueue.get()
@@ -157,7 +159,7 @@ class c_device():
       self.parent.take_data_count()
 
   def stop(self):
-    self.inqueue.put(('stop',))
-    self.run_process.join()
     if self.viewer:
       self.viewer.stop()
+    self.inqueue.put(('stop',))
+    self.run_process.join()

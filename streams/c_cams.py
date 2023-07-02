@@ -338,11 +338,13 @@ class c_cam(c_device):
           self.audio_codec_name=probe['streams'][self.audio_codec]['codec_name']
         except IndexError:
           self.audio_codec = -1
-          self.audio_codec_name = 'none'
       else:
         self.audio_codec = self.dbline.cam_audio_codec
-      self.audio_codec_name = probe['streams'][self.audio_codec]['codec_name']
-      self.logger.info('Audio codec: ' + self.audio_codec_name)
+      if self.audio_codec >= 0: 
+        self.audio_codec_name = probe['streams'][self.audio_codec]['codec_name']
+      else:  
+        self.audio_codec_name = 'none'
+      self.logger.info('+++++ Audio codec: ' + self.audio_codec_name)
       while True:
         try:
           self.dbline.save(update_fields=['cam_xres', 'cam_yres'])
@@ -513,5 +515,5 @@ class c_cam(c_device):
 
   def stop(self):
     super().stop()
-    self.run_process.join()
+    #self.run_process.join()
     

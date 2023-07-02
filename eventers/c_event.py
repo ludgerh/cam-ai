@@ -192,7 +192,8 @@ class c_event(list):
             self.focus_max = self.frames[frame][2]
             self.focus_time = self.frames[frame][0][2]
 
-  def add_frame(self, frame):
+  def add_frame(self, frame, schoolnr):
+    self.schoolnr = schoolnr
     index = self.get_new_frame_index(frame[2])
     with self.frames_lock:
       self.frames[index] = [frame, None, 0.0]
