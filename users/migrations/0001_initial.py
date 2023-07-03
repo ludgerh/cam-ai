@@ -9,18 +9,9 @@ from django.utils.timezone import utc, now
 def fill_table(apps, schema_editor):
   User = apps.get_model("auth", "user")
   Userinfo = apps.get_model("users", "userinfo")
-  if not User.objects.all().count():
-    newline = User.objects.create(
-      password='pbkdf2_sha256$390000$S1kU2slc9jyJIPerlg0Zke$XhcjiuIc1UQY9GpuGPFFE0YSDaM7blJVxsxSZqfBRZQ=',
-      is_superuser=True,
-      username='admin',
-      first_name='admin',
-      last_name='admin',
-      email='theo@tester.de',
-      is_staff=True,
-      is_active=True,
-    )
-    Userinfo.objects.create(user_id=newline.id)
+  myuser = User.objects.first()
+  if not Userinfo.objects.all().count():
+    Userinfo.objects.create(user_id=myuser.id)
 
 
 class Migration(migrations.Migration):

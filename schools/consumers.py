@@ -488,9 +488,18 @@ class schooldbutil(AsyncWebsocketConsumer):
 #*****************************************************************************
 
 class schoolutil(AsyncWebsocketConsumer):		
+    
+  async def check_create_school_priv(self):
+    if self.scope['user'].is_superuser:
+      return(True)
+    else:
+      limit = await getonelinedict(userinfo, {'user' : self.scope['user'].id, }, ['allowed_schools',])
+      limit = limit['allowed_schools']
+      schoolcount = await countfilter(school, {'creator' : self.scope['user'].id, 'active' : True,})
+      return(schoolcount < limit)  
 
   async def receive(self, text_data=None, bytes_data=None):
-    logger.debug('<-- ' + str(text_data))
+    logger.info('<-- ' + str(text_data))
     indict=json.loads(text_data)
     if indict['code'] == 'makeschool':
       userdict = await getonelinedict(dbuser, {'id' : indict['user'], }, ['password', ])
@@ -506,7 +515,7 @@ class schoolutil(AsyncWebsocketConsumer):
         'used_schools',
       ])
       print(userinfodict)
-      if userinfodict['used_schools'] >= userinfodict['allowed_schools']:
+      if not await self.check_create_school_priv():
         result = {'status' : 'nomore'}
         await self.send(json.dumps(result))
         return()
@@ -538,5 +547,6 @@ class schoolutil(AsyncWebsocketConsumer):
       await updatefilter(userinfo, 
         {'user' : indict['user'], }, 
         {'used_schools' : userinfodict['used_schools'] + 1, })
+      print('Result:', result)
       await self.send(json.dumps(result))				
 

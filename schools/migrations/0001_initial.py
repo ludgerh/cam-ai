@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
         ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
         ('name', models.CharField(max_length=100)),
         ('description', models.CharField(max_length=100)),
-        ('school', models.SmallIntegerField(default=0)),
+        ('school', models.SmallIntegerField(default=1)),
         ('replaces', models.SmallIntegerField(default=-1)),
       ],
     ),

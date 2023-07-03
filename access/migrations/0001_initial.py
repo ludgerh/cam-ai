@@ -2,24 +2,36 @@
 
 from django.db import migrations, models
 
+def fill_table(apps, schema_editor):
+  Access = apps.get_model("access", "access_control")
+  if not Access.objects.all().count():
+    Access.objects.create(
+      vtype='S',
+      vid=1,
+      u_g='U',
+      u_g_nr=0,
+      r_w='R',  
+    )
+
 
 class Migration(migrations.Migration):
 
-    initial = True
+  initial = True
 
-    dependencies = [
-    ]
+  dependencies = [
+  ]
 
-    operations = [
-        migrations.CreateModel(
-            name='access_control',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('vtype', models.CharField(max_length=1)),
-                ('vid', models.IntegerField()),
-                ('u_g', models.CharField(default='U', max_length=1)),
-                ('u_g_nr', models.IntegerField(default=0)),
-                ('r_w', models.CharField(default='R', max_length=1)),
-            ],
-        ),
-    ]
+  operations = [
+    migrations.CreateModel(
+      name='access_control',
+      fields=[
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('vtype', models.CharField(max_length=1)),
+        ('vid', models.IntegerField()),
+        ('u_g', models.CharField(default='U', max_length=1)),
+        ('u_g_nr', models.IntegerField(default=0)),
+        ('r_w', models.CharField(default='R', max_length=1)),
+      ],
+    ),
+    migrations.RunPython(fill_table),
+  ]

@@ -24,7 +24,6 @@ from logging import getLogger
 from ipaddress import ip_network, ip_address
 from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
   gaierror)
-from MySQLdb import _mysql
 from passlib.hash import phpass
 from django.contrib.auth.models import User
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -47,7 +46,10 @@ from .health import totaldiscspace, freediscspace
 from random import randint
 
 using_websocket = worker.objects.get(id = 1).use_websocket
-model_type = school.objects.get(id = 1).model_type
+if school.objects.count():
+  model_type = school.objects.first().model_type
+else:
+  model_type = 'NotDefined'
 
 redis = myredis()
 
@@ -57,7 +59,6 @@ log_ini(logger, logname)
 recordingspath = Path(djconf.getconfig('recordingspath', 'data/recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', 'data/schoolframes/'))
 textpath = djconf.getconfig('textpath', 'data/texts/')
-wordpress_db = djconf.getconfig('wordpress_db', 'wp_dp')
 if not ospath.exists(textpath):
   makedirs(textpath)
 schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
@@ -349,7 +350,7 @@ class admintools(AsyncWebsocketConsumer):
       return(schoolcount < limit)  
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + text_data)
+    logger.info('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
 
@@ -597,40 +598,20 @@ class admintools(AsyncWebsocketConsumer):
 
     elif params['command'] == 'linkserver':
       outlist['data'] = {}
-      ws_user = 'ws_user_' + params['user']
-      if await getexists(User, {'username' : ws_user, }):
-        outlist['data']['status'] = 'exists'
-      else:
-        db=_mysql.connect(
-          "localhost",
-          "CAM-AI",
-          db_password,
-          wordpress_db,
-        )
-        db.query("select user_pass, user_email from wp_users where user_login = '" 
-          + params['user'] + "' ")
-        result=db.store_result().fetch_row()
-        if  len(result):
-          if (phpass.verify(params['pass'], result[0][0])):
-            newuser = await createuser(
-              ws_user, 
-              result[0][1].decode("utf-8"), 
-              params['pass']
-            )
-            newuserinfo = userinfo()
-            newuserinfo.user = newuser
-            newuserinfo.client_nr = newuser.id
-            await savedbline(newuserinfo)
-            outlist['data']['status'] = 'new'
-            outlist['data']['idx'] = newuser.id
-            outlist['data']['user'] = ws_user
-          else:
-            outlist['data']['status'] = 'noauth'
+      try:
+        myuser = await User.objects.aget(username = params['user'])
+      except User.DoesNotExist:
+        myuser = None
+      if myuser:
+        if myuser.check_password(params['pass']):
+          outlist['data']['status'] = 'new'
+          outlist['data']['idx'] = myuser.id
+          outlist['data']['user'] = params['user']
         else:
-          outlist['data']['status'] = 'missing'
-        db.close()
-
-      logger.debug('--> ' + str(outlist))
+          outlist['data']['status'] = 'noauth'
+      else:
+        outlist['data']['status'] = 'missing'
+      logger.info('--> ' + str(outlist))
       await self.send(dumps(outlist))	
       
     elif params['command'] == 'getinfo':
