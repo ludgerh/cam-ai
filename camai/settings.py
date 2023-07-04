@@ -27,6 +27,10 @@ import os
 from pathlib import Path
 from .passwords import (db_password, security_key, localaccess, mydomain, myip, 
   smtp_account, smtp_password, smtp_server, smtp_port, smtp_email, smtp_use_ssl)
+try:  
+  from .passwords import httpsport
+except  ImportError:
+  httpsport = '' 
 from .version import version
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -48,7 +52,10 @@ if myip:
   ALLOWED_HOSTS.append(myip)
 if mydomain:
   ALLOWED_HOSTS.append(mydomain.split(':')[0])
-  CSRF_TRUSTED_ORIGINS = ['https://'+mydomain]
+  trustedorigin = 'https://'+mydomain
+  if httpsport:
+    trustedorigin += (':'+httpsport)
+  CSRF_TRUSTED_ORIGINS = [trustedorigin]
 
 # Application definition
 
