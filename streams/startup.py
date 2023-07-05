@@ -33,11 +33,18 @@ from .c_streams import streams, c_stream
 
 check_timer = None
 redis = myredis()
+redis.set_start_trainer_busy(0)
 redis.set_start_worker_busy(0)
 redis.set_start_stream_busy(0)
 redis.set('KBInt', 0)
 
 def restartcheck_proc():
+  if (item := redis.get_start_trainer_busy()):
+    if (item in trainers) and trainers[item].do_run:
+      trainers[item].stop()
+    trainers[item] = trainer(item)
+    trainers[item].run()
+    redis.set_start_trainer_busy(0)
   if (item := redis.get_start_worker_busy()):
     if (item in tf_workers) and tf_workers[item].do_run:
       tf_workers[item].stop()
@@ -79,7 +86,7 @@ def run():
   signal(SIGTERM, newexit)
   signal(SIGHUP, newexit)
 
-  setproctitle('CAM-AI-Starter')
+  setproctitle('CAM-AI-Startup')
 
   for dbline in trainerdb.objects.filter(active=True):
     trainers[dbline.id] = trainer(dbline.id)

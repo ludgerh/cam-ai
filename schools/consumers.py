@@ -42,7 +42,7 @@ from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school
 from eventers.models import event, event_frame
 from trainers.models import trainframe
-from users.models import userinfo, archive
+from users.models import userinfo
 
 logname = 'ws_schoolsconsumers'
 logger = getLogger(logname)
@@ -489,17 +489,17 @@ class schooldbutil(AsyncWebsocketConsumer):
 
 class schoolutil(AsyncWebsocketConsumer):		
     
-  async def check_create_school_priv(self):
+  async def check_create_school_priv(self, userid):
     if self.scope['user'].is_superuser:
       return(True)
     else:
-      limit = await getonelinedict(userinfo, {'user' : self.scope['user'].id, }, ['allowed_schools',])
+      limit = await getonelinedict(userinfo, {'user' : userid, }, ['allowed_schools',])
       limit = limit['allowed_schools']
-      schoolcount = await countfilter(school, {'creator' : self.scope['user'].id, 'active' : True,})
-      return(schoolcount < limit)  
+      schoolcount = await countfilter(school, {'creator' : userid, 'active' : True,})
+      return((schoolcount, limit))
 
   async def receive(self, text_data=None, bytes_data=None):
-    logger.info('<-- ' + str(text_data))
+    logger.debug('<-- ' + str(text_data))
     indict=json.loads(text_data)
     if indict['code'] == 'makeschool':
       userdict = await getonelinedict(dbuser, {'id' : indict['user'], }, ['password', ])
@@ -508,21 +508,16 @@ class schoolutil(AsyncWebsocketConsumer):
         result = {'status' : 'noauth'}
         await self.send(json.dumps(result))
         return()
-      userinfodict = await getonelinedict(userinfo, {'user' : indict['user'], }, [
-        'id', 
-        'user',
-        'allowed_schools',
-        'used_schools',
-      ])
-      print(userinfodict)
-      if not await self.check_create_school_priv():
-        result = {'status' : 'nomore'}
+      quota =  await self.check_create_school_priv(indict['user'])
+      if quota[0] >= quota[1]:
+        result = {'status' : 'nomore', 'quota' : quota}
         await self.send(json.dumps(result))
         return()
+      quota = (quota[0] + 1, quota[1])
       newschool = school()
       newschool.name = indict['name']
       await savedbline(newschool)
-      result = {'status' : 'OK', 'school' : newschool.id, }
+      result = {'status' : 'OK', 'school' : newschool.id, 'quota' : quota }
       newaccess = access_control()
       newaccess.vtype = 'S'
       newaccess.vid = newschool.id
@@ -530,7 +525,7 @@ class schoolutil(AsyncWebsocketConsumer):
       newaccess.u_g_nr = indict['user']
       newaccess.r_w = 'W'
       await savedbline(newaccess)
-      schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
+      schooldir = schoolsdir + '/' + 'model' + str(newschool.id) + '/'
       try:
         makedirs(schooldir+'frames')
       except FileExistsError:
@@ -543,10 +538,6 @@ class schoolutil(AsyncWebsocketConsumer):
         schooldir + 'model/' + newschool.model_type + '.h5')
       await updatefilter(school, 
         {'id' : newschool.id, }, 
-        {'dir' : schooldir, })
-      await updatefilter(userinfo, 
-        {'user' : indict['user'], }, 
-        {'used_schools' : userinfodict['used_schools'] + 1, })
-      print('Result:', result)
+        {'dir' : schooldir, 'creator_id' : indict['user']})
       await self.send(json.dumps(result))				
 

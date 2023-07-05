@@ -350,7 +350,7 @@ class admintools(AsyncWebsocketConsumer):
       return(schoolcount < limit)  
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
 
@@ -478,9 +478,6 @@ class admintools(AsyncWebsocketConsumer):
         resultdict = json.loads(ws.recv())
         ws.close()
       else:
-        print(schoolsdir)
-        print(schoolsdir + 'model1/model/' + model_type)
-        print(schooldir + 'model/' + model_type)
         copyfile(schoolsdir + 'model1/model/' + model_type + '.h5', 
           schooldir + 'model/' + model_type + '.h5')
       if using_websocket:
@@ -611,7 +608,7 @@ class admintools(AsyncWebsocketConsumer):
           outlist['data']['status'] = 'noauth'
       else:
         outlist['data']['status'] = 'missing'
-      logger.info('--> ' + str(outlist))
+      logger.dbug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
       
     elif params['command'] == 'getinfo':

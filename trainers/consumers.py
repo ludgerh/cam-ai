@@ -261,10 +261,8 @@ class trainerutil(AsyncWebsocketConsumer):
       else:
         myuser = await getoneline(User, {'username' : params['name'], })
         if myuser.check_password(params['pass']):
-          logger.debug('Success!')
           self.authed = True
         if not self.authed:
-          logger.debug('Failure!')
           self.close() 
       if access.check('S', self.schoolnr, myuser, 'R'):
         self.maywrite = access.check('S', self.schoolnr, myuser, 'W')
