@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -34,8 +34,7 @@ class stream(models.Model):
   cam_max_x_view = models.IntegerField(default=0)
   cam_scale_x_view = models.FloatField(default=1.0)
   cam_feed_type = models.IntegerField("feed type", choices=((1, 'JPeg'), (2, 'Others'), (3, 'RTSP')), default=2)
-  cam_url = models.CharField("video url", max_length=256, 
-    default='rtmp://192.168.1.99/bcs/channel0_main.bcs?channel=0&stream=1&user=user1&password=password1')
+  cam_url = models.CharField("video url", max_length=256, default='')
   cam_apply_mask = models.BooleanField(default=False)
   cam_repeater = models.IntegerField(default=0)
   cam_checkdoubles = models.BooleanField(default=True)
@@ -46,6 +45,10 @@ class stream(models.Model):
   cam_video_codec = models.IntegerField(default=-1)
   cam_audio_codec = models.IntegerField(default=-1)
   cam_pause = models.BooleanField(default=False)
+  cam_onvif_ip = models.CharField(max_length=256, default='')
+  cam_onvif_port = models.IntegerField(default=0)
+  cam_onvif_adminuser = models.CharField(max_length=256, default='')
+  cam_onvif_adminpasswd = models.CharField(max_length=256, default='')
  
   det_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  

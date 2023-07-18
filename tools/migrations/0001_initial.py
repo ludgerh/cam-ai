@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-def fill_table(apps, schema_editor):
+def fill_table_setting(apps, schema_editor):
   Setting = apps.get_model("tools", "setting")
   if not Setting.objects.all().count():
     Setting.objects.create(setting='loglevel', value='INFO', comment='None')
@@ -17,6 +17,11 @@ def fill_table(apps, schema_editor):
     Setting.objects.create(setting='smtp_name', value='CAM-AI Emailer', comment='None')
     Setting.objects.create(setting='system_number', value='-1', comment='None')
     Setting.objects.create(setting='deletethreshold', value='0', comment='None')
+
+def fill_table_url(apps, schema_editor):
+  Setting = apps.get_model("tools", "camurl")
+  if not Setting.objects.all().count():
+    Setting.objects.create(type='Reolink RLC-410W', url='/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={password}')
 
 
 class Migration(migrations.Migration):
@@ -35,6 +40,7 @@ class Migration(migrations.Migration):
         ('url', models.CharField(max_length=255)),
       ],
     ),
+    migrations.RunPython(fill_table_url),
     migrations.CreateModel(
       name='setting',
       fields=[
@@ -44,7 +50,7 @@ class Migration(migrations.Migration):
         ('comment', models.CharField(max_length=255)),
       ],
     ),
-    migrations.RunPython(fill_table),
+    migrations.RunPython(fill_table_setting),
     migrations.CreateModel(
       name='token',
       fields=[

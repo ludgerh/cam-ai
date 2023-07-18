@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -11,7 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# /tools/consumers.py V0.9.12 19.05.2023
+# /tools/consumers.py V0.9.15d 05.07.2023
 
 import json
 from pathlib import Path
@@ -23,7 +23,7 @@ from subprocess import Popen, PIPE
 from logging import getLogger
 from ipaddress import ip_network, ip_address
 from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
-  gaierror)
+  gaierror, inet_aton)
 from passlib.hash import phpass
 from django.contrib.auth.models import User
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -38,6 +38,7 @@ from tools.c_redis import myredis
 from trainers.models import trainframe, trainer
 from eventers.models import event, event_frame
 from streams.c_streams import streams, c_stream
+from streams.c_camera import c_camera
 from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
@@ -75,6 +76,14 @@ finally:
   s.close()
 my_net = ip_network(my_ip+'/'+subnetmask, strict=False)
 my_ip = ip_address(my_ip)
+
+def is_valid_IP_Address(ip_str):
+  result = True
+  try:
+    inet_aton(ip_str)
+  except OSError:
+    result = False
+  return result
 
 #*****************************************************************************
 # health
@@ -335,22 +344,36 @@ class admintools(AsyncWebsocketConsumer):
     if self.scope['user'].is_superuser:
       return(True)
     else:
-      limit = await getonelinedict(userinfo, {'user' : self.scope['user'].id, }, ['allowed_streams',])
+      limit = await getonelinedict(
+        userinfo, 
+        {'user' : self.scope['user'].id, }, 
+        ['allowed_streams',]
+      )
       limit = limit['allowed_streams']
-      streamcount = await countfilter(dbstream, {'creator' : self.scope['user'].id, 'active' : True,})
+      streamcount = await countfilter(
+        dbstream, 
+        {'creator' : self.scope['user'].id, 'active' : True,},
+      )
       return(streamcount < limit)  
     
   async def check_create_school_priv(self):
     if self.scope['user'].is_superuser:
       return(True)
     else:
-      limit = await getonelinedict(userinfo, {'user' : self.scope['user'].id, }, ['allowed_schools',])
+      limit = await getonelinedict(
+        userinfo, 
+        {'user' : self.scope['user'].id, }, 
+        ['allowed_schools',]
+      )
       limit = limit['allowed_schools']
-      schoolcount = await countfilter(school, {'creator' : self.scope['user'].id, 'active' : True,})
+      schoolcount = await countfilter(
+        school, 
+        {'creator' : self.scope['user'].id, 'active' : True,}
+      )
       return(schoolcount < limit)  
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + text_data)
+    logger.info('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
 
@@ -361,12 +384,12 @@ class admintools(AsyncWebsocketConsumer):
     if params['command'] == 'scanoneip':
       if not await self.check_create_stream_priv():
         await self.close()
-      if params['portaddr'] == 554:
-        cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
-          '-rtsp_transport', 'tcp', '-show_streams', params['camurl']]
+      if self.mycam.get_user(name=params['user']):
+        self.mycam.set_users(name=params['user'], passwd=params['pass'])
       else:
-        cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
-          '-show_streams', params['camurl']]
+        self.mycam.create_users(name=params['user'], passwd=params['pass'])
+      cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
+        '-show_streams', params['camurl']]
       p = Popen(cmds, stdout=PIPE)
       output, _ = p.communicate()
       outlist['data'] = loads(output)
@@ -388,12 +411,51 @@ class admintools(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
+    elif params['command'] == 'scanonvif':
+      contactlist = []
+      if self.scope['user'].is_superuser:
+        portlist = [params['portaddr'], ]
+        if params['ip']:
+          iplist = (params['ip'], )
+        else:
+          iplist = my_net.hosts()
+        print(iplist)
+        for item in iplist:        
+          if item != my_ip:
+            if (checkresult := scanoneip(str(item), portlist)):
+              self.mycam = c_camera(
+                onvif_ip=checkresult['ip'], 
+                onvif_port=params['portaddr'], 
+                admin_user=params['admin'], 
+                admin_passwd=params['pass'],
+              )
+              if self.mycam.status == 'OK':
+                for item in self.mycam.deviceinfo:
+                  checkresult[item] = self.mycam.deviceinfo[item]
+                if is_valid_IP_Address(params['ip']):
+                  checkresult['urlscheme'] = self.mycam.urlscheme 
+                else:
+                  partitioned = self.mycam.urlscheme.partition('@')
+                  print(partitioned)
+                  leftpart = partitioned[0] + partitioned[1]
+                  print(leftpart)
+                  partitioned = partitioned[2].partition(':')
+                  print(partitioned)
+                  rightpart = partitioned[1] + partitioned[2]
+                  checkresult ['urlscheme'] = (leftpart + params['ip'] + rightpart)
+                contactlist.append(checkresult)
+      outlist['data'] = contactlist
+      logger.info('--> ' + str(outlist))
+      await self.send(dumps(outlist))	
+
     elif params['command'] == 'installcam':
       if not await self.check_create_stream_priv():
         await self.close()
       myschools = await filterlinesdict(school, {'active' : True, }, ['id', ])
       myschool = myschools[0]['id']
       newstream = dbstream()
+      if 'name' in params:
+        newstream.name = params['name']
       newstream.cam_url = params['camurl']
       newstream.cam_video_codec = params['videocodec']
       if params['audiocodec'] is None:

@@ -284,14 +284,9 @@ class tf_worker():
         elif (received[0] == 'get_is_ready'):
           self.outqueues[received[1]].put(('put_is_ready', self.is_ready))
         elif (received[0] == 'get_xy'):
-          if self.dbline.use_websocket:
-            self.check_model(received[1], self.logger)
-            xdim = self.allmodels[received[1]]['xdim']
-            ydim = self.allmodels[received[1]]['ydim']
-          else:
-            self.check_model(received[1], self.logger)
-            xdim = self.allmodels[received[1]]['xdim']
-            ydim = self.allmodels[received[1]]['ydim']
+          self.check_model(received[1], self.logger)
+          xdim = self.allmodels[received[1]]['xdim']
+          ydim = self.allmodels[received[1]]['ydim']
           self.outqueues[received[2]].put(('put_xy', (xdim, ydim)))
         elif (received[0] == 'imglist'):
           schoolnr = received[1]

@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     'schools',
     'users',
     'ws_predictions',
+    'onvif',
 ]
 
 MIDDLEWARE = [

@@ -46,6 +46,7 @@ class predictionsConsumer(WebsocketConsumer):
     self.user = None
     self.ws_id = 0
     self.worker_nr = 0
+    self.ws_name = 'undefined'
 
   def disconnect(self, close_code):
     logger.info('Websocket-logout: WS-ID: ' + str(self.ws_id) 

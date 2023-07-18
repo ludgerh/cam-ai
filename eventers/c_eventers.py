@@ -497,7 +497,7 @@ class c_eventer(c_device):
               else:
                 self.check_events(i)
             for i in deletelist:
-              del self.eventdict[i]     
+              del self.eventdict[i]  
         if self.redis.check_if_counts_zero('E', self.dbline.id):
           sleep(djconf.getconfigfloat('short_brake', 0.1))
         else:
@@ -554,7 +554,7 @@ class c_eventer(c_device):
                   found[3] = round(((frame[6] + margin) * s_factor + found[3]) 
                     / (s_factor+1.0))
                 found.end = frame[2]
-                found.add_frame(frame, self.dbline.eve_school.id)
+                found.add_frame(frame, self.dbline.eve_school.id) 
             self.merge_events()
             self.inserter_ts = frame[2]
           else:  

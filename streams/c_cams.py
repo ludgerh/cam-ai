@@ -36,6 +36,7 @@ from tools.l_tools import djconf, ts2filename, NonBlockingStreamReader
 from viewers.c_viewers import c_viewer
 from .c_devices import c_device
 from .models import stream
+from .c_camera import c_camera, logger_init
 
 class c_cam(c_device):
   def __init__(self, *args, **kwargs):
@@ -53,6 +54,7 @@ class c_cam(c_device):
     self.recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
     self.framewait = 0.0
     self.checkmp4busy = False
+    
     if not path.exists(self.recordingspath):
       makedirs(self.recordingspath)
     if self.dbline.cam_view:
@@ -196,6 +198,23 @@ class c_cam(c_device):
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Cam #'+str(self.dbline.id))
+      logger_init(self.logger)
+      if (self.dbline.cam_onvif_ip and self.dbline.cam_onvif_port):
+        self.mycam = c_camera(
+          onvif_ip=self.dbline.cam_onvif_ip, 
+          onvif_port=self.dbline.cam_onvif_port, 
+          admin_user=self.dbline.cam_onvif_adminuser, 
+          admin_passwd=self.dbline.cam_onvif_adminpasswd, 
+          url=self.dbline.cam_url,
+        )
+        if self.mycam.status == 'OK':
+          print(self.mycam.deviceinfo)
+          print(self.mycam.url)
+          print(self.mycam.urlscheme)
+          print(self.mycam.adminurl)
+      else:
+        self.mycam = c_camera(url=self.dbline.cam_url)
+        #print(self.mycam.url)
       self.mp4timestamp = 0.0
       self.wd_ts = time()
       self.wd_proc = MultiTimer(interval=10, function=self.watchdog, 
@@ -253,7 +272,7 @@ class c_cam(c_device):
     if self.dbline.cam_feed_type == 1:
       self.online = False
       try:
-        frame = Image.open(requests.get(self.dbline.cam_url, 
+        frame = Image.open(requests.get(self.mycam.url, 
           stream=True).raw).convert('RGB') 
         frame = cv.cvtColor(np.array(frame), cv.COLOR_RGB2BGR)
         self.redis.x_y_res_to_cam(self.dbline.id, frame.shape[1], 
@@ -290,17 +309,10 @@ class c_cam(c_device):
         except json.decoder.JSONDecodeError:
           self.online = False
       else:
-        if self.dbline.cam_feed_type == 2:
-          cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
-            '-show_streams', self.dbline.cam_url]
-        else:
-          cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
-            '-rtsp_transport', 'tcp', '-show_streams', self.dbline.cam_url]
-        p = Popen(cmds, stdout=PIPE)
-        output, _ = p.communicate()
-        probe = json.loads(output)
+        self.mycam.ffprobe()
+        probe = self.mycam.probe
         #print('***', probe, '***')
-        self.online = (len(probe) > 0)
+        self.online = self.mycam.online
     if self.online:
       if self.dbline.cam_video_codec == -1:
         self.video_codec = 0
@@ -431,7 +443,7 @@ class c_cam(c_device):
         source_string = ('c_client/fifo/rep_fifo_'
           + str(self.dbline.cam_repeater) + '_' + str(self.rep_cam_nr))
       else:
-        source_string = self.dbline.cam_url
+        source_string = self.mycam.url
       if self.redis.record_from_dev(self.type, self.dbline.id):
         self.vid_count = 0
         filepath = (self.recordingspath + 'C' 
@@ -479,7 +491,7 @@ class c_cam(c_device):
         + outparams2)
       self.ff_proc = Popen(cmd, stdout=PIPE, shell=True)
       if self.dbline.cam_repeater > 0:
-        self.repeater.rep_connect(self.dbline.cam_url, self.rep_cam_nr)
+        self.repeater.rep_connect(self.mycam.url, self.rep_cam_nr)
 
   def stopprocess(self):
     if self.ff_proc is not None:
