@@ -20,7 +20,9 @@ from shutil import copyfile
 from time import time, sleep
 from json import loads, dumps
 from subprocess import Popen, PIPE
+from multiprocessing import Process, Pipe, Lock
 from logging import getLogger
+from traceback import format_exc
 from ipaddress import ip_network, ip_address
 from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
   gaierror, inet_aton)
@@ -44,9 +46,11 @@ from users.models import userinfo
 from access.models import access_control
 from .health import totaldiscspace, freediscspace
 
-from random import randint
+OUT = 0
+IN = 1
 
 using_websocket = worker.objects.get(id = 1).use_websocket
+remote_trainer = worker.objects.get(id=1).remote_trainer
 if school.objects.count():
   model_type = school.objects.first().model_type
 else:
@@ -84,6 +88,177 @@ def is_valid_IP_Address(ip_str):
   except OSError:
     result = False
   return result
+  
+outPipe, inPipe = Pipe()  
+
+proc_dict = {}
+pipe_dict = {}
+lock_dict = {}
+
+
+countdict = {}
+
+def checkschool(myschool):
+  myschooldir = school.objects.get(id=myschool).dir
+  fileset = set()
+  for item in (Path(myschooldir) / 'frames').iterdir():
+    if item.is_file():
+      fileset.add(item.name)
+    elif item.is_dir():
+      subdir = item.name
+      for item in (Path(myschooldir) / 'frames' / subdir).iterdir():
+        fileset.add(subdir+'/'+item.name)
+  dbsetquery = trainframe.objects.filter(school=myschool)
+  dbset = {item.name for item in dbsetquery}
+  result = {
+    'correct' : fileset & dbset,
+    'missingdb' : fileset - dbset,
+    'missingfiles' : dbset - fileset,
+  }
+  pipe_dict[myschool][OUT].send(result)
+  
+def fixmissingdb(myschool):
+  myschooldir = school.objects.get(id=myschool).dir
+  set_to_delete = pipe_dict[myschool][IN].recv()
+  for item in set_to_delete:
+    (Path(myschooldir) / 'frames' / item).unlink()
+  
+def fixmissingfiles(myschool):
+  set_to_delete = pipe_dict[myschool][IN].recv()
+  for item in set_to_delete:
+    trainframe.objects.get(name=item).delete()
+    
+def checkrecordings():
+  filelist = list(recordingspath.iterdir())
+  filelist_c = [item.name for item in filelist if (
+    item.name[0] == 'C' 
+    and item.suffix == '.mp4'
+    and item.stat().st_mtime < (time() - 1800)
+    and item.exists()
+  )]
+  fileset_jpg = {item.stem for item in filelist if (item.name[:2] == 'E_') 
+    and (item.suffix == '.jpg')}
+  fileset_mp4 = {item.stem for item in filelist if (item.name[:2] == 'E_') 
+    and (item.suffix == '.mp4')}
+  fileset_webm = {item.stem for item in filelist if (item.name[:2] == 'E_') 
+    and (item.suffix == '.webm')}
+  fileset = fileset_jpg & fileset_mp4
+  fileset_all = fileset_jpg | fileset_mp4 | fileset_webm
+  mydbset = event.objects.filter(videoclip__startswith='E_')
+  dbset = set()
+  dbtimedict = {}
+  for item in mydbset:
+    dbset.add(item.videoclip)
+    dbtimedict[item.videoclip] = item.start
+  correct = fileset & dbset
+  missingdb = fileset_all - dbset
+  missingfiles = dbset - fileset
+  result = {
+    'jpg' : len(fileset_jpg),
+    'mp4' : len(fileset_mp4),
+    'webm' : len(fileset_webm),
+    'temp' : filelist_c,
+    'correct' : len(correct),
+    'missingdb' : missingdb,
+    'missingfiles' : missingfiles,
+    'dbtimedict' : dbtimedict,  
+  }
+  check_rec_pipe[OUT].send(result)
+  
+def fixtemp_rec():
+  list_to_delete = check_rec_pipe[IN].recv()
+  for item in list_to_delete:
+    if (recordingspath / item).exists():
+      (recordingspath / item).unlink()
+  
+def fixmissingdb_rec():
+  list_to_delete = check_rec_pipe[IN].recv()
+  for item in list_to_delete:
+    for ext in ['.jpg', '.mp4', '.webm']:
+      delpath = recordingspath / (item+ext)
+      if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
+        delpath.unlink()
+  
+def fixmissingfiles_rec():
+  list_to_delete = check_rec_pipe[IN].recv()
+  dbtimedict = check_rec_pipe[IN].recv()
+  for item in list_to_delete:
+    if dbtimedict[item].timestamp()  < (time() - 1800):
+      event.objects.filter(videoclip=item).update(videoclip='')
+      for ext in ['.jpg', '.mp4', '.webm']:
+        delpath = recordingspath / (item+ext)
+        if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
+          delpath.unlink()
+  
+check_rec_proc = None
+check_rec_pipe = None
+check_rec_lock = Lock()
+    
+def checkevents():
+  eventframequery = event_frame.objects.all()
+  eventframeset = {item.event.id for item in eventframequery}
+  eventquery = event.objects.all()
+  eventset = {item.id for item in eventquery}
+  result = {
+    'correct' : len(eventset & eventframeset),
+    #'missingevents' : (eventframeset - eventset),
+    'missingframes' : (eventset - eventframeset),
+  }
+  check_rec_pipe[OUT].send(result)
+  
+def fixmissingframes():
+  list_to_delete = check_rec_pipe[IN].recv()
+  for item in list_to_delete:
+    try:
+      eventline = event.objects.get(id=item)
+      if ((len(eventline.videoclip) < 3) 
+          and (eventline.start.timestamp()  < (time() - 1800))):
+        eventline.delete()
+      else:
+        event.objects.filter(id=item).update(numframes=0)
+    except event.DoesNotExist:
+      pass
+    
+def checkframes():
+  framefileset = {item.relative_to(schoolframespath).as_posix() 
+    for item in schoolframespath.rglob('*.bmp')}
+  framedbquery = event_frame.objects.all()
+  framedbset = {item.name for item in framedbquery}
+  result = {
+    'correct' : len(framefileset & framedbset),
+    'missingdblines' : framefileset - framedbset,
+    'missingfiles' : framedbset - framefileset,
+  }
+  check_rec_pipe[OUT].send(result)
+  
+def fixmissingframesdb():
+  global countdict
+  list_to_delete = check_rec_pipe[IN].recv()
+  for item in list_to_delete:
+    delpath = schoolframespath / item
+    if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
+      delpath.unlink()
+      countpath = delpath.parent
+      myindex = countpath.parent.name+'_'+countpath.name
+      if myindex in countdict:
+        countdict[myindex] -= 1
+        mycount = countdict[myindex]
+      else:
+        mycount = len(list(countpath.iterdir()))
+        countdict[myindex] = mycount
+      if mycount == 0:
+        countpath.rmdir()
+        pass
+  
+def fixmissingframesfiles():
+  list_to_delete = check_rec_pipe[IN].recv()
+  for item in list_to_delete:
+    try:
+      frameline = event_frame.objects.get(name=item)
+      if frameline.time.timestamp()  < (time() - 1800):
+        frameline.delete()
+    except event_frame.DoesNotExist:
+      pass
 
 #*****************************************************************************
 # health
@@ -93,12 +268,13 @@ class health(AsyncWebsocketConsumer):
 
   async def connect(self):
     if self.scope['user'].is_superuser:
-      self.filesetdict = {}
-      self.dbsetdict = {}
-      self.countdict = {}
-    await self.accept()
+      self.missingdbdict= {}
+      self.missingfilesdict = {}
+      await self.accept()
 
   async def receive(self, text_data):
+    global check_rec_proc
+    global check_rec_pipe
     logger.debug('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
@@ -116,126 +292,135 @@ class health(AsyncWebsocketConsumer):
     elif self.scope['user'].is_superuser:
 
       if params['command'] == 'checkschool':
-        myschool = await getonelinedict(school, {'id' : params['school'], }, ['dir'])
-        self.filesetdict[params['school']] = set()
-        for item in (Path(myschool['dir']) / 'frames').iterdir():
-          if item.is_file():
-            self.filesetdict[params['school']].add(item.name)
-          elif item.is_dir():
-            subdir = item.name
-            for item in (Path(myschool['dir']) / 'frames' / subdir).iterdir():
-              self.filesetdict[params['school']].add(subdir+'/'+item.name)
-        dbset = await filterlinesdict(trainframe, 
-          {'school' : params['school'], }, 
-          ['name'], 
-        )
-        self.dbsetdict[params['school']] = {item['name'] for item in dbset}
-        outlist['data'] = {
-          'correct' : len(
-            self.filesetdict[params['school']] & self.dbsetdict[params['school']]),
-          'missingdb' : len(
-            self.filesetdict[params['school']] - self.dbsetdict[params['school']]),
-          'missingfiles' : len(
-            self.dbsetdict[params['school']] - self.filesetdict[params['school']]),
-        }
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        if not (params['school'] in lock_dict):
+          lock_dict[params['school']] = Lock()
+        with lock_dict[params['school']]:
+          proc_dict[params['school']] = Process(target=checkschool, args=(params['school'],))
+          pipe_dict[params['school']] = Pipe()
+          proc_dict[params['school']].start()
+          result = pipe_dict[params['school']][IN].recv()
+          proc_dict[params['school']].join()
+          del pipe_dict[params['school']]
+          del proc_dict[params['school']]
+          self.missingdbdict[params['school']] = result['missingdb']
+          self.missingfilesdict[params['school']] = result['missingfiles']
+          outlist['data'] = {
+            'correct' : len(result['correct']),
+            'missingdb' : len(result['missingdb']),
+            'missingfiles' : len(result['missingfiles']),
+          }
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingdb':	
-        myschool = await getonelinedict(school, {'id' : params['school'], }, ['dir'])
-        for item in (
-            self.filesetdict[params['school']] - self.dbsetdict[params['school']]):
-          (Path(myschool['dir']) / 'frames' / item).unlink()
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with lock_dict[params['school']]:
+          proc_dict[params['school']] = Process(target=fixmissingdb, args=(params['school'],))
+          pipe_dict[params['school']] = Pipe()
+          proc_dict[params['school']].start()
+          pipe_dict[params['school']][OUT].send(self.missingdbdict[params['school']])
+          proc_dict[params['school']].join()
+          del pipe_dict[params['school']]
+          del proc_dict[params['school']]
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingfiles':	
-        for item in (
-            self.dbsetdict[params['school']] - self.filesetdict[params['school']]):
-          await deletefilter(trainframe, {'name' : item, })	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with lock_dict[params['school']]:
+          proc_dict[params['school']] = Process(target=fixmissingfiles, args=(params['school'],))
+          pipe_dict[params['school']] = Pipe()
+          proc_dict[params['school']].start()
+          pipe_dict[params['school']][OUT].send(self.missingfilesdict[params['school']])
+          proc_dict[params['school']].join()
+          del pipe_dict[params['school']]
+          del proc_dict[params['school']]
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'checkrecfiles':
-        fileset = [item for item in recordingspath.iterdir()]
-        self.fileset_c = [item.name for item in fileset if (
-          item.name[0] == 'C' 
-          and item.suffix == '.mp4'
-          and item.exists()
-          and item.stat().st_mtime < (time() - 1800)
-        )]
-        fileset_jpg = {item.stem for item in fileset if (item.name[:2] == 'E_') 
-          and (item.suffix == '.jpg')}
-        fileset_mp4 = {item.stem for item in fileset if (item.name[:2] == 'E_') 
-          and (item.suffix == '.mp4')}
-        fileset_webm = {item.stem for item in fileset if (item.name[:2] == 'E_') 
-          and (item.suffix == '.webm')}
-        self.fileset = fileset_jpg & fileset_mp4
-        self.fileset_all = fileset_jpg | fileset_mp4 | fileset_webm
-        mydbset = await filterlinesdict(event, 
-          {'videoclip__startswith' : 'E_',}, 
-          ['videoclip', 'start', ])
-        self.dbset = set()
-        self.dbtimedict = {}
-        for item in mydbset:
-          self.dbset.add(item['videoclip'])
-          self.dbtimedict[item['videoclip']] = item['start']
-        outlist['data'] = {
-          'jpg' : len(fileset_jpg),
-          'mp4' : len(fileset_mp4),
-          'webm' : len(fileset_webm),
-          'temp' : len(self.fileset_c),
-          'correct' : len(self.fileset & self.dbset),
-          'missingdb' : len(self.fileset_all - self.dbset),
-          'missingfiles' : len(self.dbset - self.fileset),
-        }
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with check_rec_lock:
+          check_rec_proc = Process(target=checkrecordings, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          result = check_rec_pipe[IN].recv()
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          self.fileset_c = result['temp']
+          self.rec_missingdb = result['missingdb']
+          self.rec_missingfiles = result['missingfiles']
+          self.dbtimedict = result['dbtimedict']
+          outlist['data'] = {
+            'jpg' : result['jpg'],
+            'mp4' : result['mp4'],
+            'webm' : result['webm'],
+            'temp' : len(self.fileset_c),
+            'correct' : result['correct'],
+            'missingdb' : len(self.rec_missingdb),
+            'missingfiles' : len(self.rec_missingfiles),
+          }
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixtemp_rec':	
-        for item in (self.fileset_c):
-          if (recordingspath / item).exists():
-            (recordingspath / item).unlink()
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with check_rec_lock:
+          check_rec_proc = Process(target=fixtemp_rec, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          check_rec_pipe[OUT].send(self.fileset_c)
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingdb_rec':	
-        for item in (self.fileset_all - self.dbset):
-          for ext in ['.jpg', '.mp4', '.webm']:
-            delpath = recordingspath / (item+ext)
-            if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
-              delpath.unlink()
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with check_rec_lock:
+          check_rec_proc = Process(target=fixmissingdb_rec, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          check_rec_pipe[OUT].send(self.rec_missingdb)
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingfiles_rec':	
-        for item in (self.dbset - self.fileset):
-          if self.dbtimedict[item].timestamp()  < (time() - 1800):
-            await updatefilter(event, {'videoclip' : item, }, {'videoclip' : '', }) 
-            for ext in ['.jpg', '.mp4', '.webm']:
-              delpath = recordingspath / (item+ext)
-              if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
-                delpath.unlink()
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with check_rec_lock:
+          check_rec_proc = Process(target=fixmissingfiles_rec, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          check_rec_pipe[OUT].send(self.rec_missingfiles)
+          check_rec_pipe[OUT].send(self.dbtimedict)
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'checkevents':
-        self.eventframeset = await filterlinesdict(event_frame, None, ['event'])
-        self.eventframeset = {item['event'] for item in self.eventframeset}
-        self.eventset = await filterlinesdict(event, None, ['id'])
-        self.eventset = {item['id'] for item in self.eventset}
-        outlist['data'] = {
-          'correct' : len(self.eventset & self.eventframeset),
-          'missingevents' : len(self.eventframeset - self.eventset),
-          'missingframes' : len(self.eventset - self.eventframeset),
-        }
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with check_rec_lock:
+          check_rec_proc = Process(target=checkevents, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          result = check_rec_pipe[IN].recv()
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          #self.missingevents = result['missingevents'] 
+          self.missingframes = result['missingframes'] 
+          outlist['data'] = {
+            'correct' : result['correct'],
+            'missingevents' : 0,
+            'missingframes' : len(self.missingframes),
+          }
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingevents':	
         #not implemented. This case is not possible because of database logic
@@ -243,66 +428,63 @@ class health(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(dumps(outlist))	
 
-      elif params['command'] == 'fixmissingframes':	
-        for item in (self.eventset - self.eventframeset):
-          try:
-            eventdict = await getonelinedict(
-              event, {'id' : item, }, 
-              ['videoclip', 'start', ]) 
-            if ((len(eventdict['videoclip']) < 3) 
-                and (eventdict['start'].timestamp()  < (time() - 1800))):
-              await deletefilter(event, {'id' : item, })
-            else:
-              await updatefilter(event, {'id' : item, }, {'numframes' : 0, })
-          except event.DoesNotExist:
-            pass
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+      elif params['command'] == 'fixmissingframes':		
+        with check_rec_lock:
+          check_rec_proc = Process(target=fixmissingframes, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          check_rec_pipe[OUT].send(self.missingframes)
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'checkframes':
-        self.framefileset = {item.relative_to(schoolframespath).as_posix() 
-          for item in schoolframespath.rglob('*.bmp')}
-        self.framedbset = await filterlinesdict(event_frame, None, ['name'])
-        self.framedbset = {item['name'] for item in self.framedbset}
+        with check_rec_lock:
+          check_rec_proc = Process(target=checkframes, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          result = check_rec_pipe[IN].recv()
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+        self.missingdblines = result['missingdblines']
+        self.missingfiles = result['missingfiles']
         outlist['data'] = {
-          'correct' : len(self.framefileset & self.framedbset),
-          'missingdblines' : len(self.framefileset - self.framedbset),
-          'missingfiles' : len(self.framedbset - self.framefileset),
+          'correct' : result['correct'],
+          'missingdblines' : len(self.missingdblines),
+          'missingfiles' : len(self.missingfiles),
         }
         logger.debug('--> ' + str(outlist))
         await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingframesdb':	
-        for item in (self.framefileset - self.framedbset):
-          delpath = schoolframespath / item
-          if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
-            delpath.unlink()
-            countpath = delpath.parent
-            myindex = countpath.parent.name+'_'+countpath.name
-            if myindex in self.countdict:
-              self.countdict[myindex] -= 1
-              mycount = self.countdict[myindex]
-            else:
-              mycount = len(list(countpath.iterdir()))
-              self.countdict[myindex] = mycount
-            if mycount == 0:
-              countpath.rmdir()
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with check_rec_lock:
+          check_rec_proc = Process(target=fixmissingframesdb, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          check_rec_pipe[OUT].send(self.missingdblines)
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
       elif params['command'] == 'fixmissingframesfiles':	
-        for item in (self.framedbset - self.framefileset):
-          try:
-            framedict = await getonelinedict(event_frame, {'name' : item, }, ['time', ]) 
-            if framedict['time'].timestamp()  < (time() - 1800):
-              await deletefilter(event_frame, {'name' : item, })
-          except event.DoesNotExist:
-            pass
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        with check_rec_lock:
+          check_rec_proc = Process(target=fixmissingframesfiles, )
+          check_rec_pipe = Pipe()
+          check_rec_proc.start()
+          check_rec_pipe[OUT].send(self.missingfiles)
+          check_rec_proc.join()
+          check_rec_pipe = None
+          check_rec_proc = None
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
 
     else:
       await self.close()
@@ -373,7 +555,7 @@ class admintools(AsyncWebsocketConsumer):
       return(schoolcount < limit)  
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
 
@@ -445,7 +627,7 @@ class admintools(AsyncWebsocketConsumer):
                   checkresult ['urlscheme'] = (leftpart + params['ip'] + rightpart)
                 contactlist.append(checkresult)
       outlist['data'] = contactlist
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
 
     elif params['command'] == 'installcam':
@@ -486,13 +668,17 @@ class admintools(AsyncWebsocketConsumer):
     elif params['command'] == 'makeschool':
       if not await self.check_create_school_priv():
         await self.close()
-      if using_websocket:
+      if using_websocket or remote_trainer:
         from websocket import WebSocket
       newschool = school()
       newschool.name = params['name']
       newschool.creator = self.scope['user']
       await savedbline(newschool)
-      if using_websocket:
+      if using_websocket or remote_trainer:
+        if remote_trainer:
+          trainer_type = 2
+        else:
+          trainer_type = 3  
         school_dict = await getonelinedict(school, 
           {'id': newschool.id, }, 
           ['tf_worker', 'e_school', 'trainer'])
@@ -502,7 +688,7 @@ class admintools(AsyncWebsocketConsumer):
         await updatefilter(trainer, 
           {'id': school_dict['trainer'], }, 
           {
-            't_type' : 3,
+            't_type' : trainer_type,
             'wsserver' : worker_dict['wsserver'], 
             'wsname' : worker_dict['wsname'], 
             'wspass' : worker_dict['wspass'], 
@@ -527,7 +713,7 @@ class admintools(AsyncWebsocketConsumer):
         makedirs(schooldir+'model')
       except FileExistsError:
         logger.warning('Dir already exists: '+schooldir+'model')
-      if using_websocket:
+      if using_websocket or remote_trainer:
         ws = WebSocket()
         ws.connect(worker_dict['wsserver'] + 'ws/schoolutil/')
         outdict = {
@@ -539,10 +725,13 @@ class admintools(AsyncWebsocketConsumer):
         ws.send(json.dumps(outdict), opcode=1) #1 = Text
         resultdict = json.loads(ws.recv())
         ws.close()
-      else:
+      if not using_websocket:
+        print(schoolsdir, schooldir)
+        print('copy', schoolsdir + 'model1/model/' + model_type + '.h5', 
+          schooldir + 'model/' + model_type + '.h5')
         copyfile(schoolsdir + 'model1/model/' + model_type + '.h5', 
           schooldir + 'model/' + model_type + '.h5')
-      if using_websocket:
+      if using_websocket or remote_trainer:
         if resultdict['status'] == 'OK':
           await updatefilter(school, 
             {'id' : newschool.id, }, 
@@ -553,7 +742,7 @@ class admintools(AsyncWebsocketConsumer):
             'wsname' : worker_dict['wsname'], 
             'wspass' : worker_dict['wspass'], 
             'active' : True, 
-            't_type' : 3,
+            't_type' : trainer_type,
             })
       else:
         resultdict = {'status' : 'OK', }
@@ -587,17 +776,19 @@ class admintools(AsyncWebsocketConsumer):
         'user' : params['user'],
         'pass' : params['pass'],
       }
+      print(outdict)
       ws.send(json.dumps({
         'tracker' : 0, 
         'data' : outdict, 
       }), opcode=1) #1 = Text
       resultdict = json.loads(ws.recv())
+      print(resultdict)
       ws.close()
-      if resultdict['data']['status'] == 'new':
+      if resultdict['data']['status'] == 'new': 
         await updatefilter(worker, {'id' : params['workernr'], }, {
           'active' : True,
           'gpu_sim' : -1,
-          'use_websocket' : True,
+          'use_websocket' : using_websocket,
           'wsserver' : params['server'],
           'wsname' : resultdict['data']['user'],
           'wspass' : params['pass'],
@@ -607,7 +798,7 @@ class admintools(AsyncWebsocketConsumer):
           sleep(long_brake)
         redis.set_start_worker_busy(params['workernr'])
         schooldict = await filterlinesdict(school, 
-          {'tf_worker' : 1, }, 
+          {'tf_worker' : params['workernr'], }, 
           ['id', ],
         )
         streamlist = []
@@ -629,7 +820,7 @@ class admintools(AsyncWebsocketConsumer):
     elif params['command'] == 'checkserver':
       outlist['data'] = {} 
       if not self.scope['user'].is_superuser:
-        await self.close()
+        await self.close() 
       from websocket import WebSocket
       from websocket._exceptions import WebSocketAddressException
       ws = WebSocket()
@@ -638,6 +829,7 @@ class admintools(AsyncWebsocketConsumer):
         outdict = {
           'command' : 'getinfo',
         }
+        print(outdict)
         ws.send(json.dumps({
           'tracker' : 0, 
           'data' : outdict, 
@@ -670,7 +862,7 @@ class admintools(AsyncWebsocketConsumer):
           outlist['data']['status'] = 'noauth'
       else:
         outlist['data']['status'] = 'missing'
-      logger.dbug('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	
       
     elif params['command'] == 'getinfo':

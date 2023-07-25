@@ -358,7 +358,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           if eventdict['done']:
             await updatefilter(trainframe, {'id' : item['trainframe'], }, updatedict)
           else:
-            if not reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, 400, 500):
+            if not reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, 500, 500):
               copy(schoolframespath + item['name'], modelpath + 'frames/' + newname)
             t = trainframe(made=item['time'],
               school=schoolnr,

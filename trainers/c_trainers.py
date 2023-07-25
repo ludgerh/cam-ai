@@ -191,7 +191,7 @@ class trainer():
               gpu_process.start()
               gpu_process.join()
               trainresult = (gpu_process.exitcode)
-            elif (self.dbline.t_type == 3):
+            elif (self.dbline.t_type in {2, 3}):
               trainresult = train_once_remote(
                 myschool, 
                 myfit, 

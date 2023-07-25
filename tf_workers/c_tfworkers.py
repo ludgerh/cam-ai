@@ -49,11 +49,13 @@ from tools.l_tools import displaybytes
 tf_workers = {}
 for item in school.objects.filter(active=True):
   if not item.dir:
-    item.dir = (djconf.getconfig('schools_dir', 'data/schools/') 
+    item.dir = (djconf.getconfig('schools_dir', 'data/schools/model') 
       + str(item.id) + '/')
     item.save(update_fields=['dir',]) 
   if not path.exists(item.dir):
     makedirs(item.dir + 'model')
+  if not path.exists(item.dir + 'frames'):
+    makedirs(item.dir + 'frames')
 taglist = get_taglist(1)
 
 #***************************************************************************
