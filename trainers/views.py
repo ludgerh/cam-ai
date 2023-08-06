@@ -15,11 +15,12 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.template import loader
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from access.c_access import access
 from tf_workers.models import school
 from schools.c_schools import get_taglist
 from tools.l_tools import djconf
+from tools.tokens import checktoken
 from .models import fit
 
 @login_required
@@ -73,3 +74,13 @@ def dashboard(request, schoolnr):
     return(HttpResponse(template.render(context)))
   else:
     return(HttpResponse('No Access'))
+    
+def downmodel(request, schoolnr, tokennr, token): 
+  if checktoken((tokennr, token), 'MOD', schoolnr):
+    myschool = school.objects.get(pk = schoolnr)
+    filename = myschool.dir + 'model/' + myschool.model_type + '.h5'
+    modelfile = open(filename, 'rb')
+    return FileResponse(modelfile)
+  else:
+    return(HttpResponse('No Access.'))
+

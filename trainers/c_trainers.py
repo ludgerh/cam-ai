@@ -198,7 +198,9 @@ class trainer():
                 self.dbline.wsserver, 
                 self.dbline.wsname, 
                 self.dbline.wspass, 
-                self.logger).run()
+                self.dbline.t_type,
+                self.logger,
+              ).run()
             if  not trainresult:
               filterdict = {
                 'school' : myschool.id,

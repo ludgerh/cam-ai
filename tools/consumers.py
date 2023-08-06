@@ -126,7 +126,7 @@ def fixmissingdb(myschool):
 def fixmissingfiles(myschool):
   set_to_delete = pipe_dict[myschool][IN].recv()
   for item in set_to_delete:
-    trainframe.objects.get(name=item).delete()
+    trainframe.objects.filter(name=item).delete()
     
 def checkrecordings():
   filelist = list(recordingspath.iterdir())
@@ -248,11 +248,12 @@ def fixmissingframesdb():
         countdict[myindex] = mycount
       if mycount == 0:
         countpath.rmdir()
-        pass
   
 def fixmissingframesfiles():
   list_to_delete = check_rec_pipe[IN].recv()
+  mylength = len(list_to_delete)
   for item in list_to_delete:
+    mylength -= 1
     try:
       frameline = event_frame.objects.get(name=item)
       if frameline.time.timestamp()  < (time() - 1800):
@@ -275,6 +276,9 @@ class health(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     global check_rec_proc
     global check_rec_pipe
+    global proc_dict
+    global pipe_dict
+    global lock_dict
     logger.debug('<-- ' + text_data)
     params = loads(text_data)['data']	
     outlist = {'tracker' : loads(text_data)['tracker']}	
@@ -829,7 +833,6 @@ class admintools(AsyncWebsocketConsumer):
         outdict = {
           'command' : 'getinfo',
         }
-        print(outdict)
         ws.send(json.dumps({
           'tracker' : 0, 
           'data' : outdict, 

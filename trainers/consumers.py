@@ -13,7 +13,7 @@
 
 import json
 from os import remove, path, makedirs
-from time import time
+from time import time, sleep
 from datetime import datetime
 from logging import getLogger
 from traceback import format_exc
@@ -27,6 +27,7 @@ from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, updatefilter, getoneline, 
   filterlinesdict, savedbline, deletefilter)
 from access.c_access import access
+from tools.tokens import maketoken
 from tf_workers.models import school, worker
 from .models import trainframe, fit, epoch, trainer as dbtrainer
 from .c_trainers import trainers
@@ -41,74 +42,98 @@ log_ini(logger, logname)
 
 class remotetrainer(AsyncWebsocketConsumer):
 
+  @database_sync_to_async
+  def checkfitdone(self, mode, schoolnr):
+    if mode == 'init':
+      fitline = fit.objects.filter(school = schoolnr).latest('id')
+      self.lastfit = fitline.id
+      model_type = school.objects.get(id=schoolnr).model_type
+      return(model_type)
+    elif mode == 'sync':
+      while True:
+        fitline = fit.objects.filter(school = schoolnr).latest('id')
+        if fitline.id > self.lastfit:
+          self.lastfit = fitline.id
+          break
+        else:
+          sleep(1.0)
+      mytoken = maketoken('MOD', schoolnr, 'Download School #'+str(schoolnr))
+      dlurl = djconf.getconfig('client_url', 'http://localhost:8000/')
+      dlurl += 'trainers/downmodel/'
+      dlurl += str(schoolnr) + '/' + str(mytoken[0]) + '/' + mytoken[1] +'/'
+      return(dlurl)
+    elif mode == 'check':
+      fitline = fit.objects.get(id=self.lastfit)
+      return(fitline.status =='Done')
+
   async def connect(self):
     self.frameinfo = {}
     await self.accept()
 
   async def receive(self, text_data =None, bytes_data=None):
-    try:
-      if bytes_data:
-        filepath = self.myschooldict['dir'] + 'frames/' + self.frameinfo['name']
-        mydir = path.split(filepath)[0]
-        if not path.exists(mydir):
-          makedirs(mydir)
-        with open(filepath, 'wb') as f:
-          f.write(bytes_data)
-        frameline = trainframe(
-          made = timezone.make_aware(datetime.fromtimestamp(time())),
-          school = self.myschooldict['id'],
-          name = self.frameinfo['name'],
-          code = 'NE',
-          c0 = self.frameinfo['tags'][0], c1 = self.frameinfo['tags'][1],
-          c2 = self.frameinfo['tags'][2], c3 = self.frameinfo['tags'][3],
-          c4 = self.frameinfo['tags'][4], c5 = self.frameinfo['tags'][5],
-          c6 = self.frameinfo['tags'][6], c7 = self.frameinfo['tags'][7],
-          c8 = self.frameinfo['tags'][8], c9 = self.frameinfo['tags'][9],
-          checked = 1,
-          train_status = 1,
-        )
-        await savedbline(frameline)
-        await self.send('OK')
-        return()
-      if text_data == 'Ping':
-        return()
-      logger.debug('<-- ' + text_data)
-      indict = json.loads(text_data)	
-      if indict['code'] == 'auth':
-        self.user = await getoneline(User, {'username' : indict['name'], })
-        if self.user.check_password(indict['pass']):
-          logger.debug('Success!')
-          self.authed = True
-        if not self.authed:
-          logger.debug('Failure!')
-          self.close() 
-      elif indict['code'] == 'namecheck':
-        self.myschooldict = await getonelinedict(school, 
-          {'id' : indict['school'], }, 
-          ['id', 'dir',], )
-        myframes = await filterlinesdict(trainframe, 
-          {'school' : indict['school'], }, 
-          ['name', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 
-            'c8', 'c9',], )
-        result = [(item['name'], seq_to_int((item['c0'], item['c1'], 
-            item['c2'], item['c3'], item['c4'], item['c5'], item['c6'], 
-            item['c7'], item['c8'], item['c9'])))
-          for item in myframes]
-        await self.send(json.dumps(result))
-      elif indict['code'] == 'send':
-        self.frameinfo['name'] = indict['name']
-        self.frameinfo['tags'] = indict['tags']
-      elif indict['code'] == 'delete':
-        await deletefilter(trainframe, {'name' : indict['name'], }, )
-        remove(self.myschooldict['dir'] + 'frames/' + indict['name'])
-        await self.send('OK')
-      elif indict['code'] == 'trainnow':
-        await updatefilter(school, 
-          {'id' : self.myschooldict['id'], }, 
-          {'extra_runs' : 1, })
-    except:
-      logger.error(format_exc())
-      logger.handlers.clear()
+    if bytes_data:
+      filepath = self.myschooldict['dir'] + 'frames/' + self.frameinfo['name']
+      mydir = path.split(filepath)[0]
+      if not path.exists(mydir):
+        makedirs(mydir)
+      with open(filepath, 'wb') as f:
+        f.write(bytes_data)
+      frameline = trainframe(
+        made = timezone.make_aware(datetime.fromtimestamp(time())),
+        school = self.myschooldict['id'],
+        name = self.frameinfo['name'],
+        code = 'NE',
+        c0 = self.frameinfo['tags'][0], c1 = self.frameinfo['tags'][1],
+        c2 = self.frameinfo['tags'][2], c3 = self.frameinfo['tags'][3],
+        c4 = self.frameinfo['tags'][4], c5 = self.frameinfo['tags'][5],
+        c6 = self.frameinfo['tags'][6], c7 = self.frameinfo['tags'][7],
+        c8 = self.frameinfo['tags'][8], c9 = self.frameinfo['tags'][9],
+        checked = 1,
+        train_status = 1,
+      )
+      await savedbline(frameline)
+      await self.send('OK')
+      return()
+    if text_data == 'Ping':
+      return()
+    logger.debug('<-- ' + text_data)
+    indict = json.loads(text_data)	
+    if indict['code'] == 'auth':
+      self.user = await getoneline(User, {'username' : indict['name'], })
+      if self.user.check_password(indict['pass']):
+        logger.debug('Success!')
+        self.authed = True
+      if not self.authed:
+        logger.debug('Failure!')
+        self.close() 
+    elif indict['code'] == 'namecheck':
+      self.myschooldict = await getonelinedict(school, 
+        {'id' : indict['school'], }, 
+        ['id', 'dir',], )
+      myframes = await filterlinesdict(trainframe, 
+        {'school' : indict['school'], }, 
+        ['name', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 
+          'c8', 'c9',], )
+      result = [(item['name'], seq_to_int((item['c0'], item['c1'], 
+          item['c2'], item['c3'], item['c4'], item['c5'], item['c6'], 
+          item['c7'], item['c8'], item['c9'])))
+        for item in myframes]
+      await self.send(json.dumps(result))
+    elif indict['code'] == 'send':
+      self.frameinfo['name'] = indict['name']
+      self.frameinfo['tags'] = indict['tags']
+    elif indict['code'] == 'delete':
+      await deletefilter(trainframe, {'name' : indict['name'], }, )
+      remove(self.myschooldict['dir'] + 'frames/' + indict['name'])
+      await self.send('OK')
+    elif indict['code'] == 'trainnow':
+      await updatefilter(school, 
+        {'id' : self.myschooldict['id'], }, 
+        {'extra_runs' : 1, })
+    elif indict['code'] == 'checkfitdone':
+      result = await self.checkfitdone(indict['mode'], indict['school'])
+      logger.debug('--> ' + str(result))
+      await self.send(json.dumps(result))	
 
   async def disconnect(self, code):
     logger.debug('Disconnected, Code:'+ str(code))
@@ -141,7 +166,7 @@ class trainerutil(AsyncWebsocketConsumer):
     if self.trainernr is not None:
       if self.didrunout:
         trainers[self.trainernr].stop_out(self.schoolnr)
-      if self.dblinedict['t_type'] == 3:
+      if self.dblinedict['t_type'] in {2, 3}:
         self.ws.close()
     logger.debug('Disconnected, Code:'+ str(code))
 
@@ -203,7 +228,7 @@ class trainerutil(AsyncWebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
     if params['command'] == 'getschoolinfo':
-      if self.dblinedict['t_type'] == 3:
+      if self.dblinedict['t_type'] in {2, 3}:
         infolocal = await self.getschoolinfo(params['school'])
         temp = json.loads(text_data)
         temp['data']['school']=self.schoollinedict['e_school']
@@ -218,7 +243,7 @@ class trainerutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))				
 
     elif params['command'] == 'getfitinfo':
-      if self.dblinedict['t_type'] == 3:
+      if self.dblinedict['t_type'] in {2, 3}:
         temp = json.loads(text_data)
         temp['data']['school']=self.schoollinedict['e_school']
         self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -226,10 +251,19 @@ class trainerutil(AsyncWebsocketConsumer):
       else:
         outlist['data'] = await self.getfitinfo(params['school'])
       logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))					
+
+    elif params['command'] == 'checkfitdone':
+      if self.dblinedict['t_type'] in {2, 3}:
+        self.ws.send(text_data, opcode=1) #1 = Text
+        outlist['data'] = json.loads(self.ws.recv())['data']
+      else:
+        outlist['data'] = await self.checkfitdone(params['fitnr'])
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))						
 
     elif params['command'] == 'getepochsinfo':
-      if self.dblinedict['t_type'] == 3:
+      if self.dblinedict['t_type'] in {2, 3}:
         temp = json.loads(text_data)
         self.ws.send(json.dumps(temp), opcode=1) #1 = Text
         outlist['data'] = json.loads(self.ws.recv())['data']
@@ -239,7 +273,7 @@ class trainerutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))								
 
     elif params['command'] == 'getparams':
-      if self.dblinedict['t_type'] == 3:
+      if self.dblinedict['t_type'] in {2, 3}:
         temp = json.loads(text_data)
         self.ws.send(json.dumps(temp), opcode=1) #1 = Text
         outlist['data'] = json.loads(self.ws.recv())['data']
@@ -276,7 +310,7 @@ class trainerutil(AsyncWebsocketConsumer):
         self.dblinedict = await getonelinedict(dbtrainer, 
           {'id' : self.trainernr, }, 
           ['t_type', 'wsserver', ], )
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           from websocket import WebSocket #, enableTrace
           #enableTrace(True)
           self.ws_ts = time()
@@ -304,7 +338,7 @@ class trainerutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))						
 
     elif params['command'] == 'getqueueinfo':
-      if self.dblinedict['t_type'] == 3:
+      if self.dblinedict['t_type'] in {2, 3}:
         temp = json.loads(text_data)
         temp['data']['school']=self.schoollinedict['e_school']
         self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -410,7 +444,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'trigger' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -427,7 +461,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'patience' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -444,7 +478,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'weight_max' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -461,7 +495,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'weight_min' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -478,7 +512,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'weight_boost' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -495,7 +529,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'l_rate_min' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -512,7 +546,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'l_rate_max' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -529,7 +563,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'ignore_checked' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text
@@ -546,7 +580,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
           {'donate_pics' : params['value'], }) 
-        if self.dblinedict['t_type'] == 3:
+        if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
           self.ws.send(json.dumps(temp), opcode=1) #1 = Text

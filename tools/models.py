@@ -33,6 +33,10 @@ class token(models.Model):
   made = models.DateTimeField()
   cat = models.CharField(max_length=3, default='NON')
   #'EVR' = Eventer read (from email)
+  #'CAR' = Camera view read
+  #'DER' = Detector view read
+  #'ETR' = Eventer view read
+  #'MOD' = Model file download
   idx = models.IntegerField(default=0)
   info = models.CharField(max_length=255, default='...')
   count = models.IntegerField(default=0)

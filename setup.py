@@ -10,13 +10,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 import subprocess
 import os
 import stat
 from django.core.management.utils import get_random_secret_key
 
 print('CAM-AI server setup tool')
-print('v 0.9.12')
+print('v 0.9.18')
 print()
 
 print('Stopping c_server and nginx processes...')
@@ -24,6 +25,9 @@ print()
 subprocess.call(['sudo', 'systemctl', 'stop', 'c_server']) 
 subprocess.call(['sudo', 'systemctl', 'stop', 'nginx']) 
 
+print('What is your database server password? (required)')
+dbpass = input(": ")
+print()
 print('Do you want to use the server from localhost? (y/N)')
 uselocal = input(": ")
 uselocal = (uselocal in {'y', 'Y', 'yes', 'Yes', 'YES'})
@@ -44,11 +48,20 @@ mydomain = input(": ")
 if not mydomain:
   print('We WILL NOT use external domain,')
 print()
+print('Do you want to use autostart? (y/N)')
+autostart = input(": ")
+autostart = (autostart in {'y', 'Y', 'yes', 'Yes', 'YES'})
+if autostart:
+  print('We WILL activate autostart.')
+else:
+  print('We WILL NOT activate autostart')
+print()
 
-print('Modifying and activating Nginx...')
 if mydomain:
+  print('Modifying and activating Nginx...')
   print('We get the HTTPS-Certificate from Letsencrypt for '+mydomain+'...')
-  subprocess.call(['sudo', 'certbot', 'certonly', '--rsa-key-size', '2048', '--standalone', '--agree-tos', '-d', mydomain])
+  subprocess.call(['sudo', 'certbot', 'certonly', '--rsa-key-size', '2048', 
+    '--standalone', '--agree-tos', '-d', mydomain])
   print()
   subprocess.call(['sudo', 'chown', '-R', 'cam_ai',  '/etc/nginx/sites-available'])
   subprocess.call(['sudo', 'chown', '-R', 'cam_ai',  '/etc/nginx/sites-enabled'])
@@ -67,18 +80,20 @@ if mydomain:
   os.remove('/etc/nginx/sites-available/cam-ai')
   os.rename('/etc/nginx/sites-available/cam-ai-new', '/etc/nginx/sites-available/cam-ai')
   subprocess.call(['sudo', 'rm', '/etc/nginx/sites-enabled/cam-ai'])
-  subprocess.call(['sudo', 'ln', '-s', '/etc/nginx/sites-available/cam-ai',  '/etc/nginx/sites-enabled/'])
+  subprocess.call(['sudo', 'ln', '-s', '/etc/nginx/sites-available/cam-ai', 
+    '/etc/nginx/sites-enabled/'])
   subprocess.call(['sudo', 'chown', '-R', 'root',  '/etc/nginx/sites-available'])
   subprocess.call(['sudo', 'chown', '-R', 'root',  '/etc/nginx/sites-enabled'])
-else:
-  subprocess.call(['sudo', 'rm', '/etc/nginx/sites-enabled/cam-ai'])
-if myip:
-  subprocess.call(['sudo', 'ln', '-s', '/etc/nginx/sites-available/default',  '/etc/nginx/sites-enabled/'])
-else:
-  subprocess.call(['sudo', 'rm', '/etc/nginx/sites-enabled/cam-ai'])
-subprocess.call(['sudo', 'systemctl', 'enable', 'nginx'])
-print()
-subprocess.call(['sudo', 'systemctl', 'enable', 'c_server']) 
+  if myip:
+    subprocess.call(['sudo', 'ln', '-s', '/etc/nginx/sites-available/default', 
+      '/etc/nginx/sites-enabled/'])
+  else:
+    subprocess.call(['sudo', 'rm', '/etc/nginx/sites-enabled/cam-ai'])
+  subprocess.call(['sudo', 'systemctl', 'enable', 'nginx'])
+  print()
+  
+if autostart:
+  subprocess.call(['sudo', 'systemctl', 'enable', 'c_server']) 
   
 print('Modifying ~/cam-ai/passwords.py...')
 sourcefile = open('/home/cam_ai/cam-ai/camai/passwords.py', 'r')
@@ -92,6 +107,8 @@ for line in sourcefile:
       line = 'mydomain = "' + mydomain + '"\n'
   if line.startswith('myip = '):
       line = 'myip = "' + myip + '"\n'
+  if line.startswith('db_password = '):
+      line = 'db_password = "' + dbpass + '"\n'
   targetfile.write(line)
 sourcefile.close()
 targetfile.close()
@@ -100,6 +117,9 @@ os.rename('/home/cam_ai/cam-ai/camai/passwords.py-new',
   '/home/cam_ai/cam-ai/camai/passwords.py')
 print()
 
-input('Push return key to reboot the system')
-os.system('sudo reboot now')
+print('Would you like to reboot the system? (y/N)')
+reboot = input(": ")
+reboot = (reboot in {'y', 'Y', 'yes', 'Yes', 'YES'})
+if reboot:
+  os.system('sudo reboot now')
 

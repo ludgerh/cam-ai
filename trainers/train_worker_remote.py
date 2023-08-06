@@ -12,17 +12,20 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
+import requests
 from time import sleep, time
 from multitimer import MultiTimer
 from traceback import format_exc
+from django.utils import timezone
 from tools.l_tools import djconf, seq_to_int
 from .models import trainframe
 
 class train_once_remote():
 
-  def __init__(self, myschool, myfit, wsserver, wsname, wspass, logger):
+  def __init__(self, myschool, myfit, wsserver, wsname, wspass, t_type, logger):
     self.myschool = myschool
     self.myfit = myfit
+    self.t_type = t_type
     self.logger = logger
     self.wsurl = wsserver+'ws/remotetrainer/'
     self.wsname = wsname
@@ -121,12 +124,50 @@ class train_once_remote():
         with open(filepath, "rb") as f:
           self.ws.send_binary(f.read())
         self.ws.recv()
+      if self.t_type == 2:
+        outdict = {
+          'code' : 'checkfitdone',
+          'mode' : 'init',
+          'school' : self.myschool.e_school,
+        }
+        self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+        model_type = json.loads(self.ws.recv())
       outdict = {
         'code' : 'trainnow',
       } 
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
       self.logger.info('Sent trigger for train_now... ')
+      if self.t_type == 2:
+        outdict = {
+          'code' : 'checkfitdone',
+          'mode' : 'sync',
+          'school' : self.myschool.e_school,
+        }
+        self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+        dlurl = json.loads(self.ws.recv())
+        self.logger.info('DL Url: ' + dlurl)
+        outdict = {
+          'code' : 'checkfitdone',
+          'mode' : 'check',
+          'school' : self.myschool.e_school,
+        }
+        while True:
+          self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+          result = json.loads(self.ws.recv())
+          if result:
+            break
+          else:
+            sleep(10.0)
+        r = requests.get(dlurl, allow_redirects=True)
+        dlfile = djconf.getconfig('schools_dir', 'data/schools/')
+        dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.h5'
+        self.logger.info('DL Model: ' + dlfile)
+        open(dlfile, 'wb').write(r.content)
+        self.myschool.lastmodelfile = timezone.now()
+        self.myschool.save(update_fields=["lastmodelfile"])
+        self.logger.info('Done...')
       self.ws.close()
+      
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()

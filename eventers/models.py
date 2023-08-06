@@ -47,6 +47,11 @@ class event_frame(models.Model):
   event = models.ForeignKey(event, on_delete=models.CASCADE, default=1)
   trainframe = models.BigIntegerField(default=0)
   hasarchive = models.BooleanField(default=False)
+  
+  class Meta:
+    indexes = [
+      models.Index(fields=["name"], name="name_idx"),
+    ]
 
   def __str__(self):
     return('event_frames model (TBD ...)')
