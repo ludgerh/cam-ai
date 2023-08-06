@@ -62,6 +62,7 @@ class c_device():
     self.run_process.start()
 
   def runner(self):
+    print('+++++', self.type)
     self.dbline = stream.objects.get(id=self.id)
     Thread(target=self.in_queue_thread, name='InQueueThread').start()
     signal(SIGINT, sigint_handler)

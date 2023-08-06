@@ -9,7 +9,7 @@ def fill_table_setting(apps, schema_editor):
     Setting.objects.create(setting='emulatestatic', value='0', comment='None')
     Setting.objects.create(setting='version', value='0.0.0', comment='None')
     Setting.objects.create(setting='local_trainer', value='0', comment='None')
-    Setting.objects.create(setting='smtp_account', value='heo@tester.de', comment='None')
+    Setting.objects.create(setting='smtp_account', value='theo@tester.de', comment='None')
     Setting.objects.create(setting='smtp_password', value='yourpassword', comment='None')
     Setting.objects.create(setting='smtp_server', value='smtp.provider.com', comment='None')
     Setting.objects.create(setting='smtp_port', value='465', comment='None')
@@ -21,7 +21,7 @@ def fill_table_setting(apps, schema_editor):
 def fill_table_url(apps, schema_editor):
   Setting = apps.get_model("tools", "camurl")
   if not Setting.objects.all().count():
-    Setting.objects.create(type='Reolink RLC-410W', url='/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={password}')
+    Setting.objects.create(type='Reolink RLC-410W', url='/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
 
 
 class Migration(migrations.Migration):

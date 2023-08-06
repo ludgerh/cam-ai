@@ -335,6 +335,7 @@ class c_eventer(c_device):
       self.logger.handlers.clear()
 
   def make_webm(self):
+    setproctitle('CAM-AI-Eventer(WEBM) #'+str(self.dbline.id))
     while True:
       with self.webm_lock:
         the_start = self.redis.get('webm_queue:' + str(self.id) + ':start')

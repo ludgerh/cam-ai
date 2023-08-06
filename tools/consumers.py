@@ -570,10 +570,11 @@ class admintools(AsyncWebsocketConsumer):
     if params['command'] == 'scanoneip':
       if not await self.check_create_stream_priv():
         await self.close()
-      if self.mycam.get_user(name=params['user']):
-        self.mycam.set_users(name=params['user'], passwd=params['pass'])
-      else:
-        self.mycam.create_users(name=params['user'], passwd=params['pass'])
+      if params['onvif']:
+        if self.mycam.get_user(name=params['user']):
+          self.mycam.set_users(name=params['user'], passwd=params['pass'])
+        else:
+          self.mycam.create_users(name=params['user'], passwd=params['pass'])
       cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
         '-show_streams', params['camurl']]
       p = Popen(cmds, stdout=PIPE)
