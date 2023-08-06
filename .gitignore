@@ -8,6 +8,7 @@ __pycache__/
 *.html~
 *.css~
 *.js~
+*.sh~
 .gitignore~
 /camai/passwords.py
 /camai/changed_files.txt~
