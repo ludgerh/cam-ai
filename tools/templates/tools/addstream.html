@@ -164,7 +164,7 @@ $(document).ready(function() {
         'command' : 'scanoneip',
         'camurl' : $('#camurl').val(),
         'portaddr' : portaddr,
-        'onvif' : 0,
+        'onvif' : false,
       })  
       .then((result) => {
         if(Object.keys(result).length === 0) {

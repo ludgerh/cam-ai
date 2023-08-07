@@ -60,7 +60,6 @@ class archive():
         targetname1 = uniquename(targetdir, eventline.videoclip, 'mp4')
         targetname = targetname1.split('.')[0]
         targetname2 = targetname + '.jpg'
-        print(sourcedir, sourcename1, sourcename2, targetdir, targetname1, targetname2)
         copy(sourcedir+sourcename1, targetdir+targetname1)
         copy(sourcedir+sourcename2, targetdir+targetname2)
         archiveline = dbarchive(

@@ -97,13 +97,13 @@ let yresolutions;
 
 let urlscheme = '?';
 
+let cam_index;
+
 $(document).ready(function() {
   $('#portinput').val(8000);
   $('#userinput').change(function() {
-    console.log('Klick');
     $('#codecdiv').addClass("d-none");
     urlstring = urlscheme.replace('{user}', $('#userinput').val()).replace('{pass}', $('#passinput').val());
-    console.log(urlstring);
     $('#camurl').val(urlstring);
   });
   $('#userinput').trigger("change");
@@ -145,13 +145,14 @@ $(document).ready(function() {
               newcard += '<h6 class="card-subtitle mb-2">Firmware: <b>'+item.FirmwareVersion+'</b></h6>';
               newcard += '<h6 class="card-subtitle mb-2">Serial: <b>'+item.SerialNumber+'</b></h6>';
               newcard += '<h6 class="card-subtitle mb-2">HardwareID: <b>'+item.HardwareId+'</b></h6>';
-              newcard += '<button class="btn btn-primary m-2 select-button" ip="'+item.ip+'" model="'+item.Model+'" scheme="'+item.urlscheme+'" type="button">Select this</button>';
+              newcard += '<button class="btn btn-primary m-2 select-button" idx="'+item.idx+'" ip="'+item.ip+'" model="'+item.Model+'" scheme="'+item.urlscheme+'" type="button">Select this</button>';
             newcard += '</div>';
           newcard += '</div>';
           $('#netlist').append(newcard);
         };
         $('.select-button').click(function() {
           $('#netlist').empty();
+          cam_index = parseInt($(this).attr('idx'));
           $('#userinput').val('CAM_AI');
           $('#passinput').val('easy123');
           $('#typespan').text($(this).attr('model'));
@@ -169,10 +170,11 @@ $(document).ready(function() {
       $('#codecdiv').addClass("d-none");
       admintoolsSocket.sendandwait({
         'command' : 'scanoneip',
+        'idx' : cam_index,
         'camurl' : $('#camurl').val(),
         'user' : $('#userinput').val(),
         'pass' : $('#passinput').val(),
-        'onvif' : 1,
+        'onvif' : true,
       })  
       .then((result) => {
         $('.check-button').removeClass('btn-warning');

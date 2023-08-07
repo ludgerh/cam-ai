@@ -571,6 +571,7 @@ class admintools(AsyncWebsocketConsumer):
       if not await self.check_create_stream_priv():
         await self.close()
       if params['onvif']:
+        self.mycam = self.camlist[params['idx']]
         if self.mycam.get_user(name=params['user']):
           self.mycam.set_users(name=params['user'], passwd=params['pass'])
         else:
@@ -600,37 +601,36 @@ class admintools(AsyncWebsocketConsumer):
 
     elif params['command'] == 'scanonvif':
       contactlist = []
+      self.camlist = []
       if self.scope['user'].is_superuser:
         portlist = [params['portaddr'], ]
         if params['ip']:
           iplist = (params['ip'], )
         else:
           iplist = my_net.hosts()
-        print(iplist)
         for item in iplist:        
           if item != my_ip:
             if (checkresult := scanoneip(str(item), portlist)):
-              self.mycam = c_camera(
+              temp_cam = c_camera(
                 onvif_ip=checkresult['ip'], 
                 onvif_port=params['portaddr'], 
                 admin_user=params['admin'], 
                 admin_passwd=params['pass'],
               )
-              if self.mycam.status == 'OK':
-                for item in self.mycam.deviceinfo:
-                  checkresult[item] = self.mycam.deviceinfo[item]
+              if temp_cam.status == 'OK':
+                for item in temp_cam.deviceinfo:
+                  checkresult[item] = temp_cam.deviceinfo[item]
                 if is_valid_IP_Address(params['ip']):
-                  checkresult['urlscheme'] = self.mycam.urlscheme 
+                  checkresult['urlscheme'] = temp_cam.urlscheme 
                 else:
-                  partitioned = self.mycam.urlscheme.partition('@')
-                  print(partitioned)
+                  partitioned = temp_cam.urlscheme.partition('@')
                   leftpart = partitioned[0] + partitioned[1]
-                  print(leftpart)
                   partitioned = partitioned[2].partition(':')
-                  print(partitioned)
                   rightpart = partitioned[1] + partitioned[2]
-                  checkresult ['urlscheme'] = (leftpart + params['ip'] + rightpart)
+                  checkresult['urlscheme'] = (leftpart + checkresult['ip'] + rightpart)
+                checkresult['idx'] = len(contactlist)
                 contactlist.append(checkresult)
+                self.camlist.append(temp_cam)
       outlist['data'] = contactlist
       logger.debug('--> ' + str(outlist))
       await self.send(dumps(outlist))	

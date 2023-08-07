@@ -12,14 +12,16 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django_tables2 import Table, Column, A
+from django.utils.html import format_html
 from .models import archive
 
 class archivetable(Table):
+  nix = Column(empty_values=())
 
   class Meta:
     model = archive
     template_name = "django_tables2/bootstrap4.html"
-    fields = ("name", "typecode", "made", )
+    fields = ("nix", "name", "typecode", "made", )
 
   def render_typecode(self, value):
     if value == 0:
@@ -28,4 +30,12 @@ class archivetable(Table):
       return('Video')
     else:
       return('???')
+
+  def render_name(self, value):
+    print('*****', value)
+    return format_html('<b>{}</b>', value)
+
+  def render_nix(self, value):
+    print('*****')
+    return('nix1213')
 
