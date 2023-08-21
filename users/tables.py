@@ -11,17 +11,20 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-from django_tables2 import Table, Column, A
+from django_tables2 import Table, Column, DateTimeColumn
 from django.utils.html import format_html
 from .models import archive
 
 class archivetable(Table):
-  nix = Column(empty_values=())
+  image = Column(empty_values=())
+  made = DateTimeColumn(format ='d. m. Y, H:i')
+  typecode = Column(verbose_name='Type' )
+  action = Column(empty_values=())
 
   class Meta:
     model = archive
     template_name = "django_tables2/bootstrap4.html"
-    fields = ("nix", "name", "typecode", "made", )
+    fields = ("image", "name", "typecode", "made", "action")
 
   def render_typecode(self, value):
     if value == 0:
@@ -31,11 +34,26 @@ class archivetable(Table):
     else:
       return('???')
 
+  def render_image(self, value, record):
+    if record.typecode == 0:
+      htmlline = '<a href="/schools/getbigbmp/2/' + str(record.id) + '/" target="_blank">'
+      htmlline += ('<img style="width: 210px; height: 210px; object-fit: contain" src="'
+        + '/schools/getbmp/2/' + str(record.id) + '/3/1/210/210/">')
+    elif record.typecode == 1:  
+      htmlline = '<a href="/schools/getbigmp4/' + str(record.id) + '/video.html" target="_blank">'
+      htmlline += ('<img style="width: 210px; height: 210px; object-fit: contain" src="'
+        + '/schools/getbmp/3/' + str(record.id) + '/3/1/210/210/">')
+    htmlline +=  '</a><br>' 
+    return(format_html(htmlline))
+
   def render_name(self, value):
-    print('*****', value)
     return format_html('<b>{}</b>', value)
 
-  def render_nix(self, value):
-    print('*****')
-    return('nix1213')
-
+  def render_action(self, value, record):
+    htmlline = '<div>'
+    htmlline += '<button type="button" class="btn btn-primary m-2 delbtn" data-bs-toggle="modal" data-bs-target="#deleteModal" idx="' + str(record.id) + '" style="width: 120px;">Delete</button>'
+    htmlline += '</div>'
+    htmlline += '<div>'
+    htmlline += '<button type="button" class="btn btn-primary m-2 dldbtn" idx="' + str(record.id) + '" style="width: 120px;">Download</button>'
+    htmlline += '</div>'
+    return format_html(htmlline)

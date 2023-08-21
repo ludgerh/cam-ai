@@ -21,7 +21,10 @@ def fill_table_setting(apps, schema_editor):
 def fill_table_url(apps, schema_editor):
   Setting = apps.get_model("tools", "camurl")
   if not Setting.objects.all().count():
-    Setting.objects.create(type='Reolink RLC-410W', url='/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
+    Setting.objects.create(type='levelone FCS-5201', 
+      url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
+    Setting.objects.create(type='Reolink RLC-410W', 
+      url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
 
 
 class Migration(migrations.Migration):

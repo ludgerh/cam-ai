@@ -18,11 +18,11 @@
 {% load static %}
 <script src="{% static 'camai/git/js/wstools.js' %}"></script>
 <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
-<link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
+<link rel="stylesheet" href="{% static 'camai/git/css/camai.css' %}">
 {% else %}
 <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
 <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
-<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
 {% endif %}
 <div class="h1">Images for training: {{ schoolname }}</div>
 <h2>
@@ -265,7 +265,6 @@ function getimages() {
           + ' style="border: 1; width: 212px; height: auto;" done=0>' + frames[frame_processing].made
             + '<a href="/schools/getbigbmp/1/'+frames[frame_processing].id+'/" target="_blank">'
             + '<img idx='+frames[frame_processing].id+' style="width: 210px; height: 210px; object-fit: contain" src="'
-            + window.location.protocol + '//' +  window.location.host
             + '/schools/getbmp/1/'
             + frames[frame_processing].id +'/3/1/210/210/"></a><br>'
             newaddition += '<div class="checklist h4">';
@@ -280,13 +279,13 @@ function getimages() {
   {% endif %}
               if (predictions[0][i] >= 0.5) {
                 if (frames[frame_processing].cs[i] < 0.5) {
-                  newaddition += '<span class="blue">';
+                  newaddition += '<span class="bluegrey">';
                 } else {
                   newaddition += '<span>';
                 };
               } else {
                 if (frames[frame_processing].cs[i] >= 0.5) {
-                  newaddition += '<span class="blue">';
+                  newaddition += '<span class="bluegrey">';
                 } else {
                   newaddition += '<span>';
                 };
@@ -333,9 +332,9 @@ function tagcheck_changed(event) {
     if (result === 'OK') {
       mylabel = checkbox.next();
       if (mylabel.attr('class')) {
-        mylabel.removeClass('blue');
+        mylabel.removeClass('bluegrey');
       } else {
-        mylabel.addClass('blue');
+        mylabel.addClass('bluegrey');
       };
     };
   })

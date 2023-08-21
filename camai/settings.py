@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'daphne',
     'channels',
     'django_tables2',
+    'django_htmx',
     'django.contrib.admin',
     'django.contrib.auth',
     'django_registration',
@@ -70,6 +71,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'crispy_forms',
+    'crispy_bootstrap4',
     'accounts',
     'tools',
     'l_buffer',
@@ -97,6 +100,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',
 ]
 
 ROOT_URLCONF = 'camai.urls'
@@ -182,6 +186,9 @@ STATIC_ROOT = str(BASE_DIR)+'/data/static'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ACCOUNT_ACTIVATION_DAYS = 7 # One-week activation window
 DEFAULT_FROM_EMAIL = smtp_email
+
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
 EMAIL_HOST = smtp_server
 EMAIL_HOST_PASSWORD = smtp_password
 EMAIL_HOST_USER = smtp_account

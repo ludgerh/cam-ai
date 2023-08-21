@@ -13,6 +13,7 @@
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth.models import User as dbuser
 from .models import access_control
 
 
@@ -29,8 +30,12 @@ class c_access():
     self.checklist = list(access_control.objects.all())
 
   def check(self, type, id, user, mode):
-    if user.is_superuser:
-      return(True)
+    while True:
+      try:
+        if user.is_superuser:
+          return(True)
+      except AttributeError:  
+        user = dbuser.objects.get(id=user) 
     if (user is None) or (user.id is None):
       userid = -1
     else:

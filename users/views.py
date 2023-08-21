@@ -12,21 +12,22 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.conf import settings
-from django.http import HttpResponse
-from django_tables2 import SingleTableView
+from django.http import HttpResponse, FileResponse
+from django_tables2 import SingleTableMixin
 from access.c_access import access
 from tools.l_tools import djconf
 from tf_workers.models import school
+from tools.tokens import checktoken
+from .filters import archivefilter, myFilterView
 from .models import archive as dbarchive
 from .tables import archivetable
 
-from traceback import format_exc
 
-
-class archive(SingleTableView):
-  model = dbarchive
+class archive(SingleTableMixin, myFilterView):
   table_class = archivetable
-  template_name = 'users/archive.html'
+  queryset = dbarchive.objects.all()
+  filterset_class = archivefilter
+  paginate_by = 15
   
   def get(self, request, *args, **kwargs):
     self.request = request
@@ -48,3 +49,22 @@ class archive(SingleTableView):
       'user' : self.request.user,
     })
     return context
+
+  def get_template_names(self):
+    if self.request.htmx:
+      template_name = "users/archive_table_partial.html"
+    else:
+      template_name = "users/archive_table_htmx.html"
+    return template_name
+    
+def downarchive(request, line_nr, tokennr, token): 
+  if checktoken((tokennr, token), 'ADL', line_nr):
+    archiveline = dbarchive.objects.get(id = line_nr)
+    if archiveline.typecode == 0:
+      filename = djconf.getconfig('archivepath', 'data/archive/') + 'frames/' + archiveline.name
+    elif archiveline.typecode == 1:
+      filename = djconf.getconfig('archivepath', 'data/archive/') + 'videos/' + archiveline.name + '.mp4'
+    sourcefile = open(filename, 'rb')
+    return FileResponse(sourcefile)
+  else:
+    return(HttpResponse('No Access.'))

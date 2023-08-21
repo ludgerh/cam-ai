@@ -13,9 +13,11 @@
 
 from django.urls import path
 
-from .views import archive
+from .views import archive, downarchive
 
 urlpatterns = [
 	path('archive/<int:schoolnr>/', archive.as_view(), name='archive'),
+	path('downarchive/<int:line_nr>/<int:tokennr>/<str:token>/image.bmp', downarchive, name='downmodelbmp'),
+	path('downarchive/<int:line_nr>/<int:tokennr>/<str:token>/video.mp4', downarchive, name='downmodelmp4'),
 ]
 

@@ -1,0 +1,24 @@
+.bluegrey {
+	background: #90B0D0;
+	color: #000;
+}
+
+button {
+	margin:20px;
+}
+
+td {
+	vertical-align: top;
+  border: 0px solid grey;
+  border-collapse: separate;
+  padding: 3px;
+}
+
+td.noline {
+  border: none;
+}
+
+.pointer {
+	cursor: pointer;
+}
+

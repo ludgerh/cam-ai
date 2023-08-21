@@ -1,5 +1,5 @@
 /data/
-static/
+/camai/static/camai/nogit/
 __pycache__/
 *.py~
 *.md~
@@ -9,9 +9,9 @@ __pycache__/
 *.css~
 *.js~
 *.sh~
+*.txt~
 .gitignore~
 /camai/passwords.py
-/camai/changed_files.txt~
 /camai/systemlist.ods
 /env/
 

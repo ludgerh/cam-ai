@@ -103,10 +103,10 @@ let yresolutions;
 $(document).ready(function() {
   $('#ipaddress').change(function() {
     $('#codecdiv').addClass("d-none");
-    urlstr = portstrings[portaddr] + '://';
-    urlstr += $('#ipaddress').val();
-    tempstr = $('#urlselect').val().replace('{user}', $('#userinput').val()).replace('{pass}', $('#passinput').val());
-    urlstr += tempstr;
+    //urlstr = portstrings[portaddr] + '://';
+    //urlstr += $('#ipaddress').val();
+    tempstr = $('#urlselect').val().replace('{user}', $('#userinput').val()).replace('{pass}', $('#passinput').val()).replace('{address}', $('#ipaddress').val());
+    urlstr = tempstr;
     $('#camurl').val(urlstr);
   });
   $('#ipaddress').trigger( "change" );
@@ -128,7 +128,7 @@ $(document).ready(function() {
     admintoolsSocket = result;
     $('.btn-check').click(function(){
       portaddr = parseInt($(".btn-check:checked").val());
-      $('.scan-button').trigger( "click" );
+      //$('.scan-button').trigger( "click" );
     });
     $('.scan-button').click(function() {
       $('#netlist').empty();

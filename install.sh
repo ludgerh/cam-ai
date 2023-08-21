@@ -23,24 +23,7 @@ echo "#save 60 10000" | sudo tee -a /etc/redis/redis.conf
 python3 -m venv env
 source env/bin/activate
 pip install --upgrade pip
-pip install django
-pip install -U channels["daphne"]
-pip install mysqlclient
-pip install pillow
-pip install opencv-contrib-python
-pip install requests
-pip install multitimer
-pip install shapely
-pip install django_tables2
-pip install setproctitle
-pip install websocket-client
-pip install redis
-pip install psutil
-pip install ua-parser
-pip install passlib
-pip install django-registration
-pip install zeep
-pip install --upgrade onvif_zeep
+pip install -r requirements.txt
 cp ~/cam-ai/camai/passwords.py.example ~/cam-ai/camai/passwords.py
 python setup.py
 python manage.py migrate

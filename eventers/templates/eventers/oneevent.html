@@ -64,13 +64,13 @@
       <div class="accordion-body">
 {% if event.videoclip %}
         <div class="row" id="crd{{ event.id }}" dtype="1">
-          <video width="50" height="auto" id="video" poster="/eventers/eventjpg/{{ event.id }}/" controls>
+          <video width="50" height="auto" id="video" poster="/eventers/eventjpg/{{ event.id }}/video.jpg" controls>
             {% if is_android %}
-              <source src="/eventers/eventwebm/{{ event.id }}/video.webm" type="video/webm"/>
-              <source src="/eventers/eventmp4/{{ event.id }}/video.mp4" type="video/mp4"/>
+              <source src="/eventers/eventwebm/0/{{ event.id }}/video.webm" type="video/webm"/>
+              <source src="/eventers/eventmp4/0/{{ event.id }}/video.mp4" type="video/mp4"/>
             {% else %}
-              <source src="/eventers/eventmp4/{{ event.id }}/video.mp4" type="video/mp4"/>
-              <source src="/eventers/eventwebm/{{ event.id }}/video.webm" type="video/webm"/>
+              <source src="/eventers/eventmp4/0/{{ event.id }}/video.mp4" type="video/mp4"/>
+              <source src="/eventers/eventwebm/0/{{ event.id }}/video.webm" type="video/webm"/>
             {% endif %}
             Your browser does not support the video tag.
           </video>

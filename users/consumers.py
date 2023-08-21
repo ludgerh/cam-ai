@@ -19,10 +19,12 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password,  check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from tools.l_tools import djconf
 from tools.c_logger import log_ini
+from tools.tokens import maketoken
 from tools.djangodbasync import getonelinedict, savedbline, getoneline
 from users.archive import myarchive, uniquename
-from .models import userinfo
+from .models import userinfo, archive as dbarchive
 
 logname = 'ws_usersconsumers'
 logger = getLogger(logname)
@@ -39,11 +41,28 @@ class archiveConsumer(AsyncWebsocketConsumer):
 
   @database_sync_to_async
   def to_archive(self, mytype, mynumber):
-    myarchive.to_archive(mytype, mynumber, self.scope['user'].id)
+    myarchive.to_archive(mytype, mynumber, self.scope['user'])
 
   @database_sync_to_async
   def check_archive(self, mytype, mynumber):
-    return(myarchive.check_archive(mytype, mynumber, self.scope['user'].id))
+    return(myarchive.check_archive(mytype, mynumber, self.scope['user']))
+
+  @database_sync_to_async
+  def del_archive(self, mynumber):
+    myarchive.del_archive(mynumber, self.scope['user'])
+
+  @database_sync_to_async
+  def get_dl_url(self, mynumber):
+    archiveline = dbarchive.objects.get(id=mynumber)
+    mytoken = maketoken('ADL', mynumber, 'Download from Archive #'+str(mynumber))
+    dlurl = djconf.getconfig('client_url', 'http://localhost:8000/')
+    dlurl += 'users/downarchive/'
+    dlurl += str(mynumber) + '/' + str(mytoken[0]) + '/' + mytoken[1] +'/'
+    if archiveline.typecode == 0:
+      dlurl += 'image.bmp'
+    elif archiveline.typecode == 1:
+      dlurl += 'video.mp4'
+    return(dlurl)
 
   async def receive(self, text_data=None, bytes_data=None):
     logger.debug('<-- ' + str(text_data))
@@ -57,6 +76,15 @@ class archiveConsumer(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))
     elif params['command'] == 'check_arch':
       outlist['data'] = await self.check_archive(params['type'], int(params['frame_nr']))
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))
+    elif params['command'] == 'del_arch':
+      await self.del_archive(params['line_nr'])
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))
+    elif params['command'] == 'get_dl_url':
+      outlist['data'] = await self.get_dl_url(params['line_nr'])
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
       

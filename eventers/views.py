@@ -14,6 +14,7 @@
 from ua_parser import user_agent_parser
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
@@ -22,7 +23,10 @@ from access.c_access import access
 from tools.l_tools import djconf
 from tools.tokens import checktoken
 from tf_workers.models import school
+from users.models import archive
 from .models import event, event_frame
+
+archivepath = djconf.getconfig('archivepath', 'data/archive/')
 
 @login_required
 def events(request, schoolnr):
@@ -96,38 +100,58 @@ def eventjpg(request, eventnr, tokennr=None, token=None):
   with open(filepath, "rb") as f:
     return HttpResponse(f.read(), content_type="image/jpeg")
 
-def eventmp4(request, eventnr, tokennr=None, token=None):
-  myevent = event.objects.get(id=eventnr)
-  if request.user.id is None:
-    if (tokennr and token):
-      go_on = checktoken((tokennr, token), 'EVR', eventnr)
+def eventmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
+  if eventnr:
+    myevent = event.objects.get(id=eventnr)
+    if request.user.id is None:
+      if (tokennr and token):
+        go_on = checktoken((tokennr, token), 'EVR', eventnr)
+      else:
+        go_on = False
     else:
-      go_on = False
+      myschool = myevent.school.id
+      go_on = access.check('S', myschool, request.user, 'R')
+  elif archivenr:
+    archiveline = archive.objects.get(id = archivenr)
+    userset = set(dbuser.objects.filter(archive=archiveline))
+    go_on = (request.user in userset)
   else:
-    myschool = myevent.school.id
-    go_on = access.check('S', myschool, request.user, 'R')
+    go_on = False    
   if not go_on:
     return(HttpResponse('No Access'))
-  filename = (myevent.videoclip + '.mp4')
-  filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+  if eventnr:  
+    filename = (myevent.videoclip + '.mp4')
+    filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+  elif archivenr:
+    filepath = (archivepath + 'videos/' + archiveline.name + '.mp4')
   with open(filepath, "rb") as f:
     result = HttpResponse(f.read(), content_type="video/mp4")
     return(result)
 
-def eventwebm(request, eventnr, tokennr=None, token=None):
-  myevent = event.objects.get(id=eventnr)
-  if request.user.id is None:
-    if (tokennr and token):
-      go_on = checktoken((tokennr, token), 'EVR', eventnr)
+def eventwebm(request, archivenr=0, eventnr=0, tokennr=None, token=None):
+  if eventnr:
+    myevent = event.objects.get(id=eventnr)
+    if request.user.id is None:
+      if (tokennr and token):
+        go_on = checktoken((tokennr, token), 'EVR', eventnr)
+      else:
+        go_on = False
     else:
-      go_on = False
+      myschool = myevent.school.id
+      go_on = access.check('S', myschool, request.user, 'R')
+  elif archivenr:
+    archiveline = archive.objects.get(id = archivenr)
+    userset = set(dbuser.objects.filter(archive=archiveline))
+    go_on = (request.user in userset)
   else:
-    myschool = myevent.school.id
-    go_on = access.check('S', myschool, request.user, 'R')
+    go_on = False    
   if not go_on:
     return(HttpResponse('No Access'))
-  filename = (myevent.videoclip + '.webm')
-  filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+  if eventnr:  
+    filename = (myevent.videoclip + '.webm')
+    filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+  elif archivenr:
+    filepath = (archivepath + 'videos/' + archiveline.name + '.webm')
   with open(filepath, "rb") as f:
     result = HttpResponse(f.read(), content_type="video/webm")
     return(result)

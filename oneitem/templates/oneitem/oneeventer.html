@@ -17,13 +17,13 @@
   {% load static %}
   <script src="{% static 'camai/git/js/wstools.js' %}"></script>
   <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
-	<link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
+	<link rel="stylesheet" href="{% static 'camai/git/css/camai.css' %}">
 {% else %}
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
     </script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
     </script>
-	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
 {% endif %}
 
@@ -43,7 +43,7 @@
 
 {% if may_write %}
   <div class="container-fluid float-left" id="conditions">
-	  <div class="row my-1 blue">
+	  <div class="row my-1 bluegrey">
 		  <div class="col-auto my-2">General settings</div>
 	  </div>
 	  <div class="row my-1 d-none">
@@ -88,7 +88,7 @@
 		  </form>
 	  </div>
     {% for i in '12345'|make_list %}
-	  <div class="row my-1 blue" rea="{{ i }}">
+	  <div class="row my-1 bluegrey" rea="{{ i }}">
 		  <div class="col-auto my-2" rea="{{ i }}">
     {% if i == '1' %}
       Conditions for showing event frame..
@@ -414,7 +414,7 @@ $(document).ready(function() {
 		})
 		.then((result) => {
 			if (result === 'OK') {
-				$(evt.target).addClass('blue');
+				$(evt.target).addClass('bluegrey');
 			};
 		})
 		.catch(err => {console.log(err);});

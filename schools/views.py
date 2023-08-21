@@ -15,6 +15,7 @@
 from ua_parser import user_agent_parser
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
@@ -24,9 +25,12 @@ from tools.c_tools import c_convert
 from tools.tokens import checktoken
 from streams.models import stream
 from tf_workers.models import school
-from users.models import userinfo
+from users.models import userinfo, archive
 from eventers.models import event, event_frame
 from trainers.models import trainframe
+
+schoolframespath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
+archivepath = djconf.getconfig('archivepath', 'data/archive/')
 
 @login_required
 def images(request, schoolnr):
@@ -65,17 +69,26 @@ def classroom(request, schoolnr):
   else:
     return(HttpResponse('No Access'))
 
-#schoolnr = 0 --> from classroom directory
+#mode == 0: Classroom Dir, mode == 1: Model Dir
+#mode == 2: Archive Image, mode == 3: Archive video 
 def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, token=None): 
   if mode == 0:
     frameline = event_frame.objects.get(id = framenr)
     eventline = frameline.event
     schoolline = eventline.school
-    filepath = djconf.getconfig('schoolframespath', 'data/schoolframes/') + frameline.name
-  else:
+    filepath = schoolframespath + frameline.name
+  elif mode == 1:
     frameline = trainframe.objects.get(id = framenr)
     schoolline = school.objects.get(id = frameline.school)
     filepath = schoolline.dir + 'frames/' + frameline.name
+  elif mode == 2:
+    frameline = archive.objects.get(id = framenr)
+    filepath = archivepath + 'frames/' + frameline.name
+    userset = set(dbuser.objects.filter(archive=frameline))
+  elif mode == 3:
+    frameline = archive.objects.get(id = framenr)
+    filepath = archivepath + 'videos/' + frameline.name + '.jpg'
+    userset = set(dbuser.objects.filter(archive=frameline))
   if request.user.id is None:
     if mode == 0:
       if (tokennr and token):
@@ -85,12 +98,15 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
     else:
       go_on = False
   else:
-    go_on = access.check('S', schoolline.id, request.user, 'R')
+    if mode in {0, 1}:
+      go_on = access.check('S', schoolline.id, request.user, 'R')
+    else:
+      go_on = (request.user in userset)
   if not go_on:
     return(HttpResponse('No Access'))
-
   with open(filepath, "rb") as f:
-    myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, xout=x, yout=y)
+    myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, 
+      xout=x, yout=y)
   return HttpResponse(myframe, content_type="image/jpeg")
 
 #schoolnr = 0 --> from classroom directory
@@ -99,9 +115,12 @@ def getbigbmp(request, mode, framenr, tokennr=0, token=''):
     frameline = event_frame.objects.get(id = framenr)
     eventline = frameline.event
     schoolline = eventline.school
-  else:
+  elif mode == 1:
     frameline = trainframe.objects.get(id = framenr)
     schoolline = school.objects.get(id = frameline.school)
+  elif mode in {2, 3}:
+    frameline = archive.objects.get(id = framenr)
+    userset = set(dbuser.objects.filter(archive=frameline))
   if request.user.id is None:
     if mode == 0:
       if (tokennr and token):
@@ -111,7 +130,10 @@ def getbigbmp(request, mode, framenr, tokennr=0, token=''):
     else:
       go_on = False
   else:
-    go_on = access.check('S', schoolline.id, request.user, 'R')
+    if mode in {0, 1}:
+      go_on = access.check('S', schoolline.id, request.user, 'R')
+    elif mode in {2, 3}:
+      go_on = (request.user in userset)
   if not go_on:
     return(HttpResponse('No Access'))
   template = loader.get_template('schools/bigbmp.html')
@@ -123,16 +145,21 @@ def getbigbmp(request, mode, framenr, tokennr=0, token=''):
   }
   return(HttpResponse(template.render(context)))
 
-def getbigmp4(request, eventnr, tokennr=None, token=None):
-  myevent = event.objects.get(id=eventnr)
-  if request.user.id is None:
+def getbigmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
+  if eventnr:
+    myevent = event.objects.get(id=eventnr)
     if (tokennr and token):
       go_on = checktoken((tokennr, token), 'EVR', eventnr)
     else:
       go_on = False
+    linenr = eventnr  
+  elif archivenr:
+    archiveline = archive.objects.get(id = archivenr)
+    userset = set(dbuser.objects.filter(archive=archiveline))
+    go_on = (request.user in userset)
+    linenr = archivenr
   else:
-    myschool = myevent.school.id
-    go_on = access.check('S', myschool, request.user, 'R')
+    go_on = False    
   if not go_on:
     return(HttpResponse('No Access'))
   useragent = user_agent_parser.Parse(request.META['HTTP_USER_AGENT'])
@@ -145,7 +172,7 @@ def getbigmp4(request, eventnr, tokennr=None, token=None):
     'uastring' : useragent['string'],
     'os' : useragent['os']['family'],
     'browser' : useragent['user_agent']['family'],
-    'eventnr' : eventnr,
+    'linenr' : linenr,
     'tokennr' : tokennr,
     'token' : token,
   }
