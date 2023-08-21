@@ -23,6 +23,7 @@ echo "#save 60 10000" | sudo tee -a /etc/redis/redis.conf
 python3 -m venv env
 source env/bin/activate
 pip install --upgrade pip
+cp requirements.$1 requirements.txt
 pip install -r requirements.txt
 cp ~/cam-ai/camai/passwords.py.example ~/cam-ai/camai/passwords.py
 python setup.py
