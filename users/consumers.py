@@ -15,11 +15,11 @@ import json
 from string import ascii_letters, punctuation
 from random import choice
 from logging import getLogger
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password,  check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from tools.l_tools import djconf
 from tools.c_logger import log_ini
 from tools.tokens import maketoken
 from tools.djangodbasync import getonelinedict, savedbline, getoneline
@@ -55,7 +55,7 @@ class archiveConsumer(AsyncWebsocketConsumer):
   def get_dl_url(self, mynumber):
     archiveline = dbarchive.objects.get(id=mynumber)
     mytoken = maketoken('ADL', mynumber, 'Download from Archive #'+str(mynumber))
-    dlurl = djconf.getconfig('client_url', 'http://localhost:8000/')
+    dlurl = settings.CLIENT_URL
     dlurl += 'users/downarchive/'
     dlurl += str(mynumber) + '/' + str(mytoken[0]) + '/' + mytoken[1] +'/'
     if archiveline.typecode == 0:

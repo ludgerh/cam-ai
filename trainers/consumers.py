@@ -18,6 +18,7 @@ from datetime import datetime
 from logging import getLogger
 from traceback import format_exc
 from django.core import serializers
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import WebsocketConsumer, AsyncWebsocketConsumer
@@ -58,7 +59,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         else:
           sleep(1.0)
       mytoken = maketoken('MOD', schoolnr, 'Download School #'+str(schoolnr))
-      dlurl = djconf.getconfig('client_url', 'http://localhost:8000/')
+      dlurl = settings.CLIENT_URL
       dlurl += 'trainers/downmodel/'
       dlurl += str(schoolnr) + '/' + str(mytoken[0]) + '/' + mytoken[1] +'/'
       return(dlurl)

@@ -23,6 +23,7 @@ from threading import Thread
 from collections import OrderedDict
 from traceback import format_exc
 from django.db import connection
+from django.conf import settings
 from django.utils import timezone
 from django.db.utils import OperationalError
 from .models import event, event_frame, school
@@ -32,7 +33,7 @@ from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 
 schoolpath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
-clienturl = djconf.getconfig('client_url', 'http://localhost:8000/')
+clienturl = settings.CLIENT_URL
 if not path.exists(schoolpath):
   makedirs(schoolpath)
 

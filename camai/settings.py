@@ -25,7 +25,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from .passwords import (db_password, security_key, localaccess, mydomain, myip, 
+from .passwords import (db_password, security_key, localaccess, mydomain, myip, httpsport,
   smtp_account, smtp_password, smtp_server, smtp_port, smtp_email, smtp_use_ssl)
 try:  
   from .passwords import httpsport
@@ -48,13 +48,16 @@ DEBUG = False
 ALLOWED_HOSTS = []
 if localaccess:
   ALLOWED_HOSTS =  ['127.0.0.1', 'localhost']
+  CLIENT_URL = 'http://localhost:8000/'
 if myip:
   ALLOWED_HOSTS.append(myip)
+  CLIENT_URL = 'http://' + myip + ':8000/'
 if mydomain:
   ALLOWED_HOSTS.append(mydomain.split(':')[0])
   trustedorigin = 'https://'+mydomain
   if httpsport:
     trustedorigin += (':'+httpsport)
+  CLIENT_URL = trustedorigin + '/'
   CSRF_TRUSTED_ORIGINS = [trustedorigin]
 
 # Application definition
