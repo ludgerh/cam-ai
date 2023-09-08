@@ -22,9 +22,6 @@ from .filters import archivefilter, myFilterView
 from .models import archive as dbarchive
 from .tables import archivetable
 
-print('**********', settings.CLIENT_URL)
-
-
 class archive(SingleTableMixin, myFilterView):
   table_class = archivetable
   queryset = dbarchive.objects.all()

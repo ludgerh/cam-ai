@@ -59,7 +59,7 @@ class school(models.Model):
   weight_max = models.FloatField(default=2.0)
   weight_min = models.FloatField(default=1.0)
   weight_boost = models.FloatField(default=8.0)
-  patience = models.IntegerField(default=6)
+  patience = models.IntegerField(default=10)
 
   def __str__(self):
     return(self.name)

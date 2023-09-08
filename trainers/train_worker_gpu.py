@@ -13,7 +13,7 @@
 
 from os import path, rename, environ
 from sys import platform
-from random import seed, uniform, shuffle
+from random import seed, uniform, shuffle, random
 from shutil import copyfile
 from time import time
 import numpy as np
@@ -26,9 +26,12 @@ from django.db import connection as sqlconnection
 from tensorflow.keras.utils import Sequence
 from tensorflow.keras.callbacks import (EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, 
   Callback)
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import (InputLayer, RandomBrightness, RandomFlip, 
+  RandomRotation, RandomTranslation, RandomZoom, RandomContrast)
+#from keras_cv.layers import RandomShear, RandAugment 
 from tensorflow.keras import backend as K
 from tensorflow.keras.optimizers import Adam
-import tensorflow_addons as tfa
 from tools.l_tools import djconf
 from tools.c_tools import cmetrics, hit100
 from tools.c_logger import log_ini
@@ -39,39 +42,31 @@ from .hwcheck import getcputemp, getcpufan1, getcpufan2, getgputemp, getgpufan
 global_load_model = None
 global_tf = None
 
+DO_AUGMENTATION = True
+
+RAND_AUGMENT_MAGNITUDE = None #not working yet
+
+BRIGHTNESS_RANGE = 0.5
+CONTRAST_RANGE = 0.5
+HORIZONTAL_FLIP = True
+VERTICAL_FLIP = False
+ROTATION_RANGE = 5.0
+WIDTH_SHIFT_RANGE = 0.2
+HEIGHT_SHIFT_RANGE = 0.2
+ZOOM_RANGE = 0.25
+
 class sql_sequence(Sequence):
   def __init__(self, sqlresult, xdim, ydim, myschool, 
-      normalisation=None,
       batch_size=32, 
       class_weights=None, 
       model=None,
-      save_to_dir=None,
-      save_prefix="",
-      rotation_range=0,
-      width_shift_range=0,
-      height_shift_range=0,
-      brightness_range=0,
-      shear_range=0,
-      zoom_range=None,
-      horizontal_flip=False,
-      vertical_flip=False,):
+    ):
     self.sqlresult = sqlresult
     self.batch_size = batch_size
     self.xdim = xdim
     self.ydim = ydim
-    self.normalisation = normalisation
     self.class_weights = class_weights
     self.model = model
-    self.save_to_dir=save_to_dir
-    self.save_prefix=save_prefix
-    self.rotation_range=rotation_range
-    self.width_shift_range=width_shift_range
-    self.height_shift_range=height_shift_range
-    self.brightness_range=brightness_range
-    self.shear_range=shear_range
-    self.zoom_range=zoom_range
-    self.horizontal_flip=horizontal_flip
-    self.vertical_flip=vertical_flip
     self.classes_list = get_tagnamelist(1)
     self.myschool = myschool
 
@@ -82,40 +77,15 @@ class sql_sequence(Sequence):
     batch_slice = self.sqlresult[idx*self.batch_size:(idx + 1)*self.batch_size]
     xdata = []
     ydata = np.empty(shape=(len(batch_slice), len(self.classes_list)))
-
-    if (self.rotation_range or self.width_shift_range or self.height_shift_range 
-      or self.shear_range or self.zoom_range):
-      averages = []
-    else:
-      averages = None
     for i in range(len(batch_slice)):
       bmpdata = global_tf.io.read_file(batch_slice[i][1])
       bmpdata = global_tf.io.decode_bmp(bmpdata, channels=3)
       bmpdata = global_tf.image.resize(bmpdata, [self.xdim,self.ydim])
-      if self.normalisation:
-        bmpdata = global_tf.math.truediv(bmpdata, self.normalisation)
-      if self.brightness_range > 0:
-        bmpdata = global_tf.image.random_brightness(bmpdata, self.brightness_range)
-      if self.normalisation:
-        bmpdata = global_tf.clip_by_value(bmpdata, 0.00001, 255 / self.normalisation)
-      else:
-        bmpdata = global_tf.clip_by_value(bmpdata, 0.00001, 255)
-      if averages is not None:
-        average = global_tf.math.reduce_mean(bmpdata, (0, 1))
-        average = [average] * self.ydim
-        average = global_tf.stack(average)
-        average = [average] * self.xdim
-        average = global_tf.stack(average)
-        averages.append(average)
       xdata.append(bmpdata)
       for j in range(len(self.classes_list)):
         ydata[i][j] = batch_slice[i][j+2]
     xdata = global_tf.stack(xdata)
     ydata = global_tf.convert_to_tensor(ydata)
-    if averages is not None:
-      averagedata = global_tf.stack(averages)
-    else:
-      averagedata = None
 
     if self.class_weights is not None:
       wdata = np.zeros(shape=(len(batch_slice)))
@@ -135,62 +105,7 @@ class sql_sequence(Sequence):
         for j in range(len(self.classes_list)):
           if round(predictions[i][j]) != ydata[i][j]:
             wdata[i] += self.myschool.weight_boost;
-
-    if self.horizontal_flip:
-      xdata = global_tf.image.random_flip_left_right(xdata)
-    if self.vertical_flip:
-      xdata = global_tf.image.random_flip_up_down(xdata)
-    if self.rotation_range > 0:
-      angles = [uniform(self.rotation_range*-1,self.rotation_range) * pi / 180 
-        for x in range(len(batch_slice))]
-      xdata = tfa.image.rotate(xdata, angles)
-    if (self.width_shift_range > 0) or (self.height_shift_range > 0):
-      matrixes = []
-      for x in range(len(batch_slice)):
-        xshift = uniform(self.width_shift_range*-1,
-	        self.width_shift_range)*self.xdim
-        yshift = uniform(self.height_shift_range*-1,
-	        self.height_shift_range)*self.ydim
-        matrix = [1,0,xshift,0,1,yshift,0,0]
-        matrixes.append(matrix)
-      matrixes = global_tf.convert_to_tensor(matrixes)
-      xdata = tfa.image.transform(xdata, matrixes)
-    if self.shear_range > 0:
-      matrixes = []
-      for x in range(len(batch_slice)):
-        shear_lambda = self.shear_range / 45
-        shear_lambda = uniform(shear_lambda*-1,shear_lambda)
-        matrix = [1.0,shear_lambda,0,0,1.0,0,0,0]
-        matrixes.append(matrix)
-      matrixes = global_tf.convert_to_tensor(matrixes)
-      xdata = tfa.image.transform(xdata, matrixes)
-    if self.zoom_range is not None:
-      matrixes = []
-      for x in range(len(batch_slice)):
-        xyfactor = 1/uniform(self.zoom_range[0],self.zoom_range[1])
-        xshift = round(self.xdim * (1 / xyfactor - 1) * 0.5 * xyfactor)
-        yshift = round(self.ydim * (1 / xyfactor - 1) * 0.5 * xyfactor)
-        matrix = [xyfactor,0,xshift,0,xyfactor,yshift,0,0]
-        matrixes.append(matrix)
-      matrixes = global_tf.convert_to_tensor(matrixes)
-      xdata = tfa.image.transform(xdata, matrixes)
-    if averagedata is not None:
-      xdata = global_tf.where(global_tf.equal(xdata, 0), averagedata, xdata)
-    del averagedata
-
-    if self.save_to_dir is not None:
-      for i in range(len(batch_slice)):
-        if self.normalisation:
-          stored = global_tf.math.multiply(xdata[i], self.normalisation)
-        else:
-          stored = xdata[i]
-        stored = global_tf.dtypes.cast(stored,global_tf.uint8)
-        stored = global_tf.io.encode_jpeg(stored)
-        print(self.save_to_dir+self.save_prefix+ts2filename(time())+'.jpg')
-        global_tf.io.write_file(self.save_to_dir+self.save_prefix
-	        +ts2filename(time())+'.jpg', stored)
-        del stored
-
+            
     if self.class_weights is None:
       return(xdata, ydata)
     else:
@@ -201,10 +116,11 @@ class sql_sequence(Sequence):
       shuffle(self.sqlresult)
 
 class MyCallback(Callback):
-  def __init__(self, myfit, logger):
+  def __init__(self, myfit, logger, model):
     super().__init__()
     self.myfit = myfit
     self.logger = logger
+    self.model = model
 
   def on_epoch_begin(self, myepoch, logs=None):
     self.starttime = time()
@@ -346,15 +262,69 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
   logger.info('*** Loading model '+myschool.dir+'...');
   model = global_load_model(myschool.dir+'model/'+model_name+'.h5', 
     custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+  l_rate = model.optimizer.learning_rate.numpy()
   xdim = model.layers[0].input_shape[1]
   ydim = model.layers[0].input_shape[2]
+  do_compile = False
+  lcopy = [item for item in model.layers]
+  for item in model.layers:
+    if item.name == model_name:
+      break
+    else:
+      lcopy.pop(0)
+      do_compile = True
+  model = Sequential(lcopy)
+    
+  if DO_AUGMENTATION:
+    layers = [item for item in model.layers]
+    if RAND_AUGMENT_MAGNITUDE:
+      layers.insert(0, RandAugment(
+        magnitude = RAND_AUGMENT_MAGNITUDE,
+        value_range = [0,255],
+        ))
+    else:
+      if ZOOM_RANGE:
+        layers.insert(0, RandomZoom(
+          height_factor = (-1 * ZOOM_RANGE, ZOOM_RANGE), 
+          width_factor = (-1 * ZOOM_RANGE, ZOOM_RANGE), 
+        ))
+      if (WIDTH_SHIFT_RANGE or HEIGHT_SHIFT_RANGE):
+        layers.insert(0, RandomTranslation(
+          height_factor = HEIGHT_SHIFT_RANGE,
+          width_factor = WIDTH_SHIFT_RANGE,
+        ))
+      if ROTATION_RANGE:
+        absolute = ROTATION_RANGE * pi / 180
+        layers.insert(0, RandomRotation(factor=(absolute * -1, absolute)))
+      if (HORIZONTAL_FLIP or VERTICAL_FLIP):
+        if HORIZONTAL_FLIP:
+          if VERTICAL_FLIP:
+            mode = 'horizontal_and_vertical'
+          else:  
+            mode = 'horizontal'
+        else:
+          mode = 'vertical'
+        layers.insert(0, RandomFlip(mode=mode))
+      if BRIGHTNESS_RANGE:
+        layers.insert(0, RandomBrightness(factor = BRIGHTNESS_RANGE))
+      if CONTRAST_RANGE:
+        layers.insert(0, RandomContrast(factor = CONTRAST_RANGE))
+    layers.insert(0, InputLayer(
+      input_shape = (model.layers[0].input_shape[1:]), 
+    ))
+           
+    model = Sequential(layers)
+    do_compile = True
+  if do_compile:
+    model.compile(loss='binary_crossentropy',
+	    optimizer=Adam(learning_rate=l_rate),
+	    metrics=[hit100, cmetrics])
   description = "min. l_rate: " + myschool.l_rate_min
   description += "  max. l_rate: " + myschool.l_rate_max 
   description += "  patience: " + str(mypatience) + "\n" 
   description += "weight_min: " + str(myschool.weight_min)
   description += "  weight_max: " + str(myschool.weight_max) 
   description += "  weight_boost: " + str(myschool.weight_boost) + "\n" 
-  l_rate = model.optimizer.learning_rate.numpy()
   logger.info('>>> Learning rate from the model: '+str(l_rate))
   l_rate = max(l_rate, float(myschool.l_rate_min))
   if float(myschool.l_rate_max) > 0:
@@ -388,40 +358,11 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
     + "\n")
 
   train_sequence = sql_sequence(trlist, xdim, ydim, myschool,
-    normalisation = None,
     batch_size=batchsize, 
     class_weights=class_weights, 
     model=model,
-    #save_to_dir='/home/ludger/temp/',
-    #save_prefix='test'
-    rotation_range=5,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    brightness_range=0.5,
-    shear_range=0.2,
-    zoom_range=(0.75, 1.25),
-    horizontal_flip=True,
-    vertical_flip=False,
   )
 
-  description += """
-*** Image Augmentation ***
-train_sequence = sql_sequence(trlist, xdim, ydim, myschool,
-  normalisation = None,
-  batch_size=batchsize, 
-  class_weights=class_weights, 
-  model=model,
-  #save_to_dir='/home/ludger/temp/',
-  #save_prefix='test',
-  rotation_range=5,
-  width_shift_range=0.2,
-  height_shift_range=0.2,
-  brightness_range=0.5,
-  shear_range=0.2,
-  zoom_range=(0.75, 1.25),
-  horizontal_flip=True,
-  vertical_flip=False,)
-"""
   logger.info(description)
 
   vali_sequence = sql_sequence(valist, xdim, ydim, myschool,
@@ -433,7 +374,7 @@ train_sequence = sql_sequence(trlist, xdim, ydim, myschool,
 	  monitor='val_loss', mode='min', verbose=0, save_best_only=True)
   reduce_lr = ReduceLROnPlateau(monitor='val_loss', mode='min', factor=sqrt(0.1),
 	  patience=3, min_lr=0.0000001, min_delta=0.00001, verbose=0)
-  cb = MyCallback(myfit, logger)
+  cb = MyCallback(myfit, logger, model)
 
   sqlconnection.close()
 
@@ -464,8 +405,7 @@ train_sequence = sql_sequence(trlist, xdim, ydim, myschool,
   rename(myschool.dir+'model/'+model_name+'_temp.h5', 
 	  myschool.dir+'model/'+model_name+'.h5')
   model = global_load_model(myschool.dir+'model/'+model_name+'.h5', 
-	  custom_objects={'cmetrics': cmetrics,
-		  'hit100': hit100,})
+	  custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
 
   myschool.lastmodelfile = timezone.now()
   myschool.save(update_fields=["lastmodelfile"])

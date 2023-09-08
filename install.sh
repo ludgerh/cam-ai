@@ -10,6 +10,7 @@ sudo apt -y install build-essential
 sudo apt -y install ffmpeg
 sudo apt -y install libgeos-dev
 sudo apt -y install redis
+sudo apt -y install pkg-config
 echo "#***** CAM-AI setting" | sudo tee -a /etc/dhcp/dhclient.conf
 echo "timeout 180;" | sudo tee -a /etc/dhcp/dhclient.conf
 echo "#***** CAM-AI setting" | sudo tee -a /etc/sysctl.conf

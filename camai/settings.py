@@ -47,7 +47,7 @@ DEBUG = False
 
 ALLOWED_HOSTS = []
 if localaccess:
-  ALLOWED_HOSTS =  ['127.0.0.1', 'localhost']
+  ALLOWED_HOSTS =  ['127.0.0.1', 'localhost', '192.168.126.25']
   CLIENT_URL = 'http://localhost:8000/'
 if myip:
   ALLOWED_HOSTS.append(myip)
