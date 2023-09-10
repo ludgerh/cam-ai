@@ -227,7 +227,7 @@ class tf_worker():
       while self.do_run:
         try:
           if opcode:
-            self.ws.send(payload, opcode=1) # 1 = Text
+            self.ws.send(payload, opcode = 1) # 1 = Text
             frameinfo = getframeinfo(currentframe())
           else:
             self.ws.send_binary(payload) # 0 = Bytes

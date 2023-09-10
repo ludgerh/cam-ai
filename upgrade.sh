@@ -13,4 +13,4 @@ pip install -r requirements.txt
 python manage.py migrate
 cd ..
 echo Upgrade is done
-fi  
+
