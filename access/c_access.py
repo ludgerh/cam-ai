@@ -34,8 +34,11 @@ class c_access():
       try:
         if user.is_superuser:
           return(True)
-      except AttributeError:  
+        else:
+          break  
+      except AttributeError: 
         user = dbuser.objects.get(id=user) 
+        break
     if (user is None) or (user.id is None):
       userid = -1
     else:

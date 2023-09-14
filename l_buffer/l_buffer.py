@@ -91,8 +91,10 @@ class l_buffer:
           3,
         )
         self.first_time = False
+      while (redis_result := self.redis.get(self.storage[0])) is None:
+        sleep(1.0)
       result = (
-        int(self.redis.get(self.storage[0])),
+        int(redis_result),
         np.frombuffer(
           self.redis.get(self.storage[1]), 
           dtype=np.uint8).reshape(self.shape

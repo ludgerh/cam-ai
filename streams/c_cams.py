@@ -323,7 +323,10 @@ class c_cam(c_device):
       self.video_codec_name = probe['streams'][self.video_codec]['codec_name']
       self.cam_fps = (
         probe['streams'][self.video_codec]['r_frame_rate'].split('/'))
-      self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
+      try:
+        self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
+      except ZeroDivisionError:
+        self.cam_fps = 0.0 
       self.real_fps = (
         probe['streams'][self.video_codec]['avg_frame_rate'].split('/'))
       if (self.real_fps[0] == '0') or (self.real_fps[1] == '0'):
