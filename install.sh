@@ -2,8 +2,10 @@
 validate() {
     grep -F -q -x "$1" <<EOF
 raspi11
+raspi
 debian10
 debian12
+debian
 EOF
 }
 

@@ -268,6 +268,8 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
   do_compile = False
   lcopy = [item for item in model.layers]
   for item in model.layers:
+    if item.name == 'efficientnetv2b0':
+      item.name = 'efficientnetv2-b0'
     if item.name == model_name:
       break
     else:
