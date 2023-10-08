@@ -331,7 +331,10 @@ class tf_worker():
       setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
       if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
         environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        environ["CUDA_VISIBLE_DEVICES"]=str(self.dbline.gpu_nr)
+        if self.dbline.gpu_nr == -1:
+          environ["CUDA_VISIBLE_DEVICES"] = ''
+        else:  
+          environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
         import tensorflow as tf
         gpus = tf.config.list_physical_devices('GPU')
         if gpus:

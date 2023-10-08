@@ -51,6 +51,8 @@ classes_list = get_taglist(1)
 schoolframespath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
 recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
 schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
+school_x_max = djconf.getconfigint('school_x_max', 500)
+school_y_max = djconf.getconfigint('school_y_max', 500)
 
 #*****************************************************************************
 # SchoolDBUtil
@@ -358,7 +360,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           if eventdict['done']:
             await updatefilter(trainframe, {'id' : item['trainframe'], }, updatedict)
           else:
-            if not reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, 500, 500):
+            if not reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, school_x_max, school_y_max):
               copy(schoolframespath + item['name'], modelpath + 'frames/' + newname)
             t = trainframe(made=item['time'],
               school=schoolnr,

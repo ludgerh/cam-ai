@@ -153,11 +153,19 @@ def hit100(y_true, y_pred):
   ones = tf.ones_like(maxline)
   return tf.abs(maxline - ones)
   
-def reduce_image(infile, outfile, x, y):
+def image_size(infile):
   myimage = cv.imread(infile)
   xin = myimage.shape[1]
   yin = myimage.shape[0]
-  #print('In:', myimage.shape) 
+  return(xin, yin)
+  
+def reduce_image(infile, outfile, x, y):
+  if outfile is None:
+    outfile = infile
+  myimage = cv.imread(infile)
+  xin = myimage.shape[1]
+  yin = myimage.shape[0]
+  print('In:', myimage.shape, x, y) 
   if (xin > x) or (yin > y):
     if (x / xin) > (y / yin):
       scale = x / xin
@@ -165,7 +173,7 @@ def reduce_image(infile, outfile, x, y):
       scale = y / yin
     myimage = cv.resize(myimage, (round(xin * scale), round(yin * scale)))  
     cv.imwrite(outfile, myimage)
-    #print('Out:', myimage.shape) 
+    print('Out:', myimage.shape) 
     return(True)
   else:
     return(False)

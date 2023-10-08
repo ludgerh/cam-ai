@@ -155,10 +155,13 @@ def gpu_init(gpu_nr, gpu_mem_limit, logger):
     global global_load_model
     global global_tf
     environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-    environ["CUDA_VISIBLE_DEVICES"]=str(gpu_nr)
+    if gpu_nr == -1:
+      environ["CUDA_VISIBLE_DEVICES"] = ''
+    else:  
+      environ["CUDA_VISIBLE_DEVICES"]=str(gpu_nr)
     import tensorflow as tf
     global_tf = tf
-    if gpu_mem_limit:
+    if (gpu_mem_limit) and (gpu_nr >= 0):
       gpus = tf.config.list_physical_devices('GPU')
       for gpu in gpus:
         tf.config.set_logical_device_configuration(
@@ -268,8 +271,8 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
   do_compile = False
   lcopy = [item for item in model.layers]
   for item in model.layers:
-    if item.name == 'efficientnetv2b0':
-      item.name = 'efficientnetv2-b0'
+    #if item.name == 'efficientnetv2b0':
+    #  item.name = 'efficientnetv2-b0'
     if item.name == model_name:
       break
     else:

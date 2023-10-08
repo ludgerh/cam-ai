@@ -12,7 +12,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.urls import path
-from .views import health, addstream, addonvif, addschool, linkworkers
+from .views import health, addstream, addonvif, addschool, linkworkers, dbcompression
 
 app_name = 'tools'
 
@@ -22,5 +22,6 @@ urlpatterns = [
 	path('addonvif/', addonvif.as_view(), name='addonvif'),
 	path('addschool/', addschool.as_view(), name='addschool'),
 	path('linkworkers/', linkworkers.as_view(), name='linkworkers'),
+	path('dbcompression/', dbcompression.as_view(), name='dbcompression'),
 ]
 

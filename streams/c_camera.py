@@ -40,6 +40,7 @@ class c_camera():
   
   def __init__(self, onvif_ip=None, onvif_port=None, admin_user=None, admin_passwd=None, 
       profilenr=0, url=None, logger=None):
+    print(onvif_ip, onvif_port, admin_user, admin_passwd, profilenr, url, logger) 
     self.status = 'OK'
     self.online = False
     self.onvif_ip = onvif_ip
@@ -67,8 +68,8 @@ class c_camera():
         }
         params['ProfileToken'] = self.onvif_profile.token
         urlstart = media_service.GetStreamUri(params)['Uri']
-      except exceptions.ONVIFError:
-        self.status = 'ONVIF: No Connection'
+      #except exceptions.ONVIFError:
+      #  self.status = 'ONVIF: No Connection'
       except IndexError:
         self.status = 'ONVIF: Profile ' + str(profilenr) + ' does not exist'
       if self.status == 'OK':

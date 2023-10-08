@@ -16,8 +16,9 @@
 import json
 from pathlib import Path
 from os import makedirs, path as ospath
-from shutil import copyfile
+from shutil import copyfile, move
 from time import time, sleep
+from random import randint
 from json import loads, dumps
 from subprocess import Popen, PIPE
 from multiprocessing import Process, Pipe, Lock
@@ -26,8 +27,11 @@ from traceback import format_exc
 from ipaddress import ip_network, ip_address
 from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
   gaierror, inet_aton)
+from psutil import net_if_addrs
 from passlib.hash import phpass
 from django.contrib.auth.models import User
+from django.db import connection
+from django.db.utils import OperationalError
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from camai.passwords import db_password
@@ -35,8 +39,9 @@ from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
   updatefilter, savedbline, getexists, createuser, countfilter)
 from tools.l_tools import djconf, displaybytes
-from tf_workers.models import school, worker
 from tools.c_redis import myredis
+from tools.c_tools import image_size, reduce_image
+from tf_workers.models import school, worker
 from trainers.models import trainframe, trainer
 from eventers.models import event, event_frame
 from streams.c_streams import streams, c_stream
@@ -68,9 +73,10 @@ if not ospath.exists(textpath):
   makedirs(textpath)
 schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
+school_x_max = djconf.getconfigint('school_x_max', 500)
+school_y_max = djconf.getconfigint('school_y_max', 500)
 
 s = socket(AF_INET, SOCK_DGRAM)
-subnetmask = '255.255.255.0'
 try:
   s.connect(('10.255.255.255', 1))
   my_ip = s.getsockname()[0]
@@ -78,6 +84,15 @@ except Exception:
   my_ip = '127.0.0.1'
 finally:
   s.close()
+do_break = False
+for interface in (mylist := net_if_addrs()):
+  for connection in mylist[interface]:
+    if connection.address == my_ip:
+      subnetmask = connection.netmask
+      do_break = True
+      break
+  if do_break:
+    break  
 my_net = ip_network(my_ip+'/'+subnetmask, strict=False)
 my_ip = ip_address(my_ip)
 
@@ -97,6 +112,10 @@ lock_dict = {}
 
 
 countdict = {}
+
+#*****************************************************************************
+# health
+#*****************************************************************************
 
 def checkschool(myschool):
   myschooldir = school.objects.get(id=myschool).dir
@@ -223,6 +242,12 @@ def checkframes():
   framefileset = {item.relative_to(schoolframespath).as_posix() 
     for item in schoolframespath.rglob('*.bmp')}
   framedbquery = event_frame.objects.all()
+  while True:
+    try:
+      framedbset = {item.name for item in framedbquery}
+      break
+    except OperationalError:
+      connection.close()
   framedbset = {item.name for item in framedbquery}
   result = {
     'correct' : len(framefileset & framedbset),
@@ -260,10 +285,6 @@ def fixmissingframesfiles():
         frameline.delete()
     except event_frame.DoesNotExist:
       pass
-
-#*****************************************************************************
-# health
-#*****************************************************************************
 
 class health(AsyncWebsocketConsumer):
 
@@ -493,6 +514,119 @@ class health(AsyncWebsocketConsumer):
     else:
       await self.close()
 
+
+#*****************************************************************************
+# dbcompress
+#*****************************************************************************
+
+def checkolddb(myschool):
+  myschooldir = school.objects.get(id=myschool).dir
+  dbsetquery = trainframe.objects.filter(school=myschool)
+  allset = {item.name for item in dbsetquery}
+  oldset = {item.name for item in dbsetquery if ((item.name[1] != '/') and (item.name[2] != '/'))}
+  bigset = set()
+  for item in dbsetquery:
+    filename = myschooldir + 'frames/' + item.name
+    mysize = image_size(filename)
+    if (mysize[0] > school_x_max) and (mysize[1] > school_y_max):
+      bigset.add(item.name)
+  result = {
+    'correct' : allset - oldset - bigset,
+    'old' : oldset,
+    'big' : bigset,
+  }
+  pipe_dict[myschool][OUT].send(result)
+  
+def fixbigimg(myschool):
+  myschooldir = school.objects.get(id=myschool).dir
+  set_to_fix = pipe_dict[myschool][IN].recv()
+  for item in set_to_fix:
+    #print(item)
+    reduce_image(myschooldir + 'frames/' + item, None, school_x_max, school_y_max)
+  
+def fixolddb(myschool):
+  myschooldir = school.objects.get(id=myschool).dir
+  set_to_fix = pipe_dict[myschool][IN].recv()
+  for item in set_to_fix:
+    #print(item)
+    pathadd = str(randint(0,99))+'/'
+    if not ospath.exists(myschooldir + 'frames/' + pathadd):
+      makedirs(myschooldir + 'frames/' + pathadd)
+    move(myschooldir + 'frames/' + item, myschooldir + 'frames/' + pathadd)  
+    frameline = trainframe.objects.get(name=item)
+    frameline.name = pathadd + frameline.name
+    frameline.save(update_fields=["name"])
+  
+class dbcompress(AsyncWebsocketConsumer):
+
+  async def connect(self):
+    if self.scope['user'].is_superuser:
+      self.olddbddict = {}
+      self.bigimgdict = {}
+      await self.accept()
+
+  async def receive(self, text_data):
+    global check_rec_proc
+    global check_rec_pipe
+    global proc_dict
+    global pipe_dict
+    global lock_dict
+    logger.debug('<-- ' + text_data)
+    params = loads(text_data)['data']	
+    outlist = {'tracker' : loads(text_data)['tracker']}	
+
+    if self.scope['user'].is_superuser:
+
+      if params['command'] == 'checkolddb':
+        if not (params['school'] in lock_dict):
+          lock_dict[params['school']] = Lock()
+        with lock_dict[params['school']]:
+          proc_dict[params['school']] = Process(target=checkolddb, args=(params['school'],))
+          pipe_dict[params['school']] = Pipe()
+          proc_dict[params['school']].start()
+          result = pipe_dict[params['school']][IN].recv()
+          proc_dict[params['school']].join()
+          del pipe_dict[params['school']]
+          del proc_dict[params['school']]
+          self.olddbddict[params['school']] = result['old']
+          self.bigimgdict[params['school']] = result['big']
+          outlist['data'] = {
+            'correct' : len(result['correct']),
+            'old' : len(result['old']),
+            'big' : len(result['big']),
+          }
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
+
+      elif params['command'] == 'fixbigimg':	
+        with lock_dict[params['school']]:
+          proc_dict[params['school']] = Process(target=fixbigimg, args=(params['school'],))
+          pipe_dict[params['school']] = Pipe()
+          proc_dict[params['school']].start()
+          pipe_dict[params['school']][OUT].send(self.bigimgdict[params['school']])
+          proc_dict[params['school']].join()
+          del pipe_dict[params['school']]
+          del proc_dict[params['school']]
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
+
+      elif params['command'] == 'fixolddb':	
+        with lock_dict[params['school']]:
+          proc_dict[params['school']] = Process(target=fixolddb, args=(params['school'],))
+          pipe_dict[params['school']] = Pipe()
+          proc_dict[params['school']].start()
+          pipe_dict[params['school']][OUT].send(self.olddbddict[params['school']])
+          proc_dict[params['school']].join()
+          del pipe_dict[params['school']]
+          del proc_dict[params['school']]
+          outlist['data'] = 'OK'
+          logger.debug('--> ' + str(outlist))
+          await self.send(dumps(outlist))	
+
+    else:
+      await self.close()
+
 #*****************************************************************************
 # admintools
 #*****************************************************************************
@@ -608,7 +742,7 @@ class admintools(AsyncWebsocketConsumer):
           iplist = (params['ip'], )
         else:
           iplist = my_net.hosts()
-        for item in iplist:        
+        for item in iplist:
           if item != my_ip:
             if (checkresult := scanoneip(str(item), portlist)):
               temp_cam = c_camera(
@@ -617,6 +751,7 @@ class admintools(AsyncWebsocketConsumer):
                 admin_user=params['admin'], 
                 admin_passwd=params['pass'],
               )
+              print(temp_cam.status)
               if temp_cam.status == 'OK':
                 for item in temp_cam.deviceinfo:
                   checkresult[item] = temp_cam.deviceinfo[item]
