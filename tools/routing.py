@@ -13,10 +13,11 @@
 
 from django.urls import re_path
 
-from . import consumers
+from . import consumers, consumer_caminst
 
 websocket_urlpatterns = [
   re_path(r'ws/health/$', consumers.health.as_asgi()),
   re_path(r'ws/dbcompress/$', consumers.dbcompress.as_asgi()),
   re_path(r'ws/admintools/$', consumers.admintools.as_asgi()),
+  re_path(r'ws/caminst/$', consumer_caminst.caminst.as_asgi()),
 ]

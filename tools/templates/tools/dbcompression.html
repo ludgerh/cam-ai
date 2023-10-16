@@ -89,6 +89,7 @@ $('.fixolddb').click(function(e) {
     'school' : parseInt(btn.attr('idx')),
   })
   .then((result) => {
+    console.log(result);
     if (result == 'OK') {
       updateschool(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');

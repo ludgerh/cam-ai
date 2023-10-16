@@ -27,7 +27,7 @@ from logging import getLogger
 from multitimer import MultiTimer
 from traceback import format_exc
 from glob import glob
-from threading import Thread
+#from threading import Thread
 from subprocess import Popen, PIPE, DEVNULL
 from django.db import connection
 from django.db.utils import OperationalError

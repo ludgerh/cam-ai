@@ -23,8 +23,8 @@ if validate $1; then
   cp requirements.$1 requirements.txt
   pip install -r requirements.txt
   python manage.py migrate
-  cp upgrade.sh ..
-  chmod u+x ../upgrade.sh
+  cp upgrade-conda.sh ..
+  chmod u+x ../upgrade-conda.sh
   cd ..
   echo Upgrade is done
 else

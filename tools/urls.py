@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -12,16 +12,17 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.urls import path
-from .views import health, addstream, addonvif, addschool, linkworkers, dbcompression
+from . import views
 
 app_name = 'tools'
 
 urlpatterns = [
-	path('health/', health.as_view(), name='health'),
-	path('addstream/', addstream.as_view(), name='addstream'),
-	path('addonvif/', addonvif.as_view(), name='addonvif'),
-	path('addschool/', addschool.as_view(), name='addschool'),
-	path('linkworkers/', linkworkers.as_view(), name='linkworkers'),
-	path('dbcompression/', dbcompression.as_view(), name='dbcompression'),
+	path('health/', views.health.as_view(), name='health'),
+	path('addstream/', views.addstream.as_view(), name='addstream'),
+	path('addonvif/', views.addonvif.as_view(), name='addonvif'),
+	path('addschool/', views.addschool.as_view(), name='addschool'),
+	path('linkworkers/', views.linkworkers.as_view(), name='linkworkers'),
+	path('dbcompression/', views.dbcompression.as_view(), name='dbcompression'),
+	path('scan_cams/', views.scan_cams.as_view(), name='scancams'),
 ]
 

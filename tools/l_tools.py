@@ -11,6 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+import asyncio
 import numpy as np
 from os import path, getpid
 from threading import Thread
@@ -273,3 +274,16 @@ def displaybytes(numberin):
     result /= 1000.0
     stringout = 'T'
   return(str(round(result, 3))+stringout)
+
+class async_timer:
+  def __init__(self, timeout, callback):
+    self._timeout = timeout
+    self._callback = callback
+    self._task = asyncio.ensure_future(self._job())
+
+  async def _job(self):
+    await asyncio.sleep(self._timeout)
+    await self._callback()
+
+  def cancel(self):
+    self._task.cancel()

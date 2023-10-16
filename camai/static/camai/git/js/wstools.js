@@ -17,9 +17,9 @@ function WSAsync(url) {
 				console.log('Websocket closed');
 			};
 			result.socket.onmessage = function(e) {
-				received = JSON.parse(e.data);
-				//console.log('Received:',received)
-				result.promiselist[received.tracker](received.data);
+			  received = JSON.parse(e.data);
+			  //console.log('Received:',received)
+			  result.promiselist[received.tracker](received.data);
 			};
 			result.sendandwait = ((data) => {
 				return new Promise((resolve, reject) => {

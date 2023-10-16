@@ -130,6 +130,33 @@ class addonvif(TemplateView):
     })
     return context
 
+class scan_cams(TemplateView):
+  template_name = 'tools/scan_cams.html'
+
+  def get_context_data(self, **kwargs):
+    streamlimit = userinfo.objects.get(user = self.request.user.id).allowed_streams
+    streamcount = stream.objects.filter(creator = self.request.user.id, active = True, ).count()
+    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
+    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
+    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
+    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'debug' : settings.DEBUG,
+      'camlist' : camlist,
+      'detectorlist' : detectorlist,
+      'eventerlist' : eventerlist,
+      'schoollist' : schoollist,
+      'camurls' : camurl.objects.all(),
+      'streamlimit' : streamlimit,
+      'streamcount' : streamcount,
+      'mayadd' : (streamlimit > streamcount),
+    })
+    return context
+
+
 class addschool(TemplateView):
   template_name = 'tools/addschool.html'
 

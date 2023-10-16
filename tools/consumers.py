@@ -14,12 +14,12 @@
 # /tools/consumers.py V0.9.15d 05.07.2023
 
 import json
+from asyncio import sleep as asleep
 from pathlib import Path
 from os import makedirs, path as ospath
 from shutil import copyfile, move
 from time import time, sleep
 from random import randint
-from json import loads, dumps
 from subprocess import Popen, PIPE
 from multiprocessing import Process, Pipe, Lock
 from logging import getLogger
@@ -104,20 +104,15 @@ def is_valid_IP_Address(ip_str):
     result = False
   return result
   
-outPipe, inPipe = Pipe()  
-
-proc_dict = {}
-pipe_dict = {}
 lock_dict = {}
-
-
 countdict = {}
+check_rec_lock = Lock()
 
 #*****************************************************************************
 # health
 #*****************************************************************************
 
-def checkschool(myschool):
+def checkschool(myschool, mypipe):
   myschooldir = school.objects.get(id=myschool).dir
   fileset = set()
   for item in (Path(myschooldir) / 'frames').iterdir():
@@ -134,20 +129,18 @@ def checkschool(myschool):
     'missingdb' : fileset - dbset,
     'missingfiles' : dbset - fileset,
   }
-  pipe_dict[myschool][OUT].send(result)
+  mypipe[OUT].send(result)
   
-def fixmissingdb(myschool):
+def fixmissingdb(myschool, set_to_delete):
   myschooldir = school.objects.get(id=myschool).dir
-  set_to_delete = pipe_dict[myschool][IN].recv()
   for item in set_to_delete:
     (Path(myschooldir) / 'frames' / item).unlink()
   
-def fixmissingfiles(myschool):
-  set_to_delete = pipe_dict[myschool][IN].recv()
+def fixmissingfiles(myschool, set_to_delete):
   for item in set_to_delete:
     trainframe.objects.filter(name=item).delete()
     
-def checkrecordings():
+def checkrecfiles(mypipe):
   filelist = list(recordingspath.iterdir())
   filelist_c = [item.name for item in filelist if (
     item.name[0] == 'C' 
@@ -182,25 +175,21 @@ def checkrecordings():
     'missingfiles' : missingfiles,
     'dbtimedict' : dbtimedict,  
   }
-  check_rec_pipe[OUT].send(result)
+  mypipe[OUT].send(result)
   
-def fixtemp_rec():
-  list_to_delete = check_rec_pipe[IN].recv()
+def fixtemp_rec(list_to_delete):
   for item in list_to_delete:
     if (recordingspath / item).exists():
       (recordingspath / item).unlink()
   
-def fixmissingdb_rec():
-  list_to_delete = check_rec_pipe[IN].recv()
+def fixmissingdb_rec(list_to_delete):
   for item in list_to_delete:
     for ext in ['.jpg', '.mp4', '.webm']:
       delpath = recordingspath / (item+ext)
       if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
         delpath.unlink()
   
-def fixmissingfiles_rec():
-  list_to_delete = check_rec_pipe[IN].recv()
-  dbtimedict = check_rec_pipe[IN].recv()
+def fixmissingfiles_rec(list_to_delete, dbtimedict):
   for item in list_to_delete:
     if dbtimedict[item].timestamp()  < (time() - 1800):
       event.objects.filter(videoclip=item).update(videoclip='')
@@ -208,12 +197,8 @@ def fixmissingfiles_rec():
         delpath = recordingspath / (item+ext)
         if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
           delpath.unlink()
-  
-check_rec_proc = None
-check_rec_pipe = None
-check_rec_lock = Lock()
     
-def checkevents():
+def checkevents(mypipe):
   eventframequery = event_frame.objects.all()
   eventframeset = {item.event.id for item in eventframequery}
   eventquery = event.objects.all()
@@ -223,10 +208,9 @@ def checkevents():
     #'missingevents' : (eventframeset - eventset),
     'missingframes' : (eventset - eventframeset),
   }
-  check_rec_pipe[OUT].send(result)
+  mypipe[OUT].send(result)
   
-def fixmissingframes():
-  list_to_delete = check_rec_pipe[IN].recv()
+def fixmissingframes(list_to_delete):
   for item in list_to_delete:
     try:
       eventline = event.objects.get(id=item)
@@ -238,7 +222,7 @@ def fixmissingframes():
     except event.DoesNotExist:
       pass
     
-def checkframes():
+def checkframes(mypipe):
   framefileset = {item.relative_to(schoolframespath).as_posix() 
     for item in schoolframespath.rglob('*.bmp')}
   framedbquery = event_frame.objects.all()
@@ -254,11 +238,10 @@ def checkframes():
     'missingdblines' : framefileset - framedbset,
     'missingfiles' : framedbset - framefileset,
   }
-  check_rec_pipe[OUT].send(result)
+  mypipe[OUT].send(result)
   
-def fixmissingframesdb():
+def fixmissingframesdb(list_to_delete):
   global countdict
-  list_to_delete = check_rec_pipe[IN].recv()
   for item in list_to_delete:
     delpath = schoolframespath / item
     if (delpath.exists() and  delpath.stat().st_mtime < (time() - 1800)):
@@ -274,8 +257,7 @@ def fixmissingframesdb():
       if mycount == 0:
         countpath.rmdir()
   
-def fixmissingframesfiles():
-  list_to_delete = check_rec_pipe[IN].recv()
+def fixmissingframesfiles(list_to_delete):
   mylength = len(list_to_delete)
   for item in list_to_delete:
     mylength -= 1
@@ -295,14 +277,10 @@ class health(AsyncWebsocketConsumer):
       await self.accept()
 
   async def receive(self, text_data):
-    global check_rec_proc
-    global check_rec_pipe
-    global proc_dict
-    global pipe_dict
     global lock_dict
     logger.debug('<-- ' + text_data)
-    params = loads(text_data)['data']	
-    outlist = {'tracker' : loads(text_data)['tracker']}	
+    params = json.loads(text_data)['data']	
+    outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
     if params['command'] == 'getdiscinfo':
       outlist['data'] = {
@@ -312,7 +290,7 @@ class health(AsyncWebsocketConsumer):
         'freestr' : displaybytes(freediscspace),
       }
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
     elif self.scope['user'].is_superuser:
 
@@ -320,161 +298,128 @@ class health(AsyncWebsocketConsumer):
         if not (params['school'] in lock_dict):
           lock_dict[params['school']] = Lock()
         with lock_dict[params['school']]:
-          proc_dict[params['school']] = Process(target=checkschool, args=(params['school'],))
-          pipe_dict[params['school']] = Pipe()
-          proc_dict[params['school']].start()
-          result = pipe_dict[params['school']][IN].recv()
-          proc_dict[params['school']].join()
-          del pipe_dict[params['school']]
-          del proc_dict[params['school']]
-          self.missingdbdict[params['school']] = result['missingdb']
-          self.missingfilesdict[params['school']] = result['missingfiles']
-          outlist['data'] = {
-            'correct' : len(result['correct']),
-            'missingdb' : len(result['missingdb']),
-            'missingfiles' : len(result['missingfiles']),
-          }
-          logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          mypipe = Pipe()
+          myproc = Process(target=checkschool, args=(params['school'], mypipe))
+          myproc.start()
+          result = mypipe[IN].recv()
+          myproc.join()
+        self.missingdbdict[params['school']] = result['missingdb']
+        self.missingfilesdict[params['school']] = result['missingfiles']
+        outlist['data'] = {
+          'correct' : len(result['correct']),
+          'missingdb' : len(result['missingdb']),
+          'missingfiles' : len(result['missingfiles']),
+        }
+        logger.debug('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingdb':	
         with lock_dict[params['school']]:
-          proc_dict[params['school']] = Process(target=fixmissingdb, args=(params['school'],))
-          pipe_dict[params['school']] = Pipe()
-          proc_dict[params['school']].start()
-          pipe_dict[params['school']][OUT].send(self.missingdbdict[params['school']])
-          proc_dict[params['school']].join()
-          del pipe_dict[params['school']]
-          del proc_dict[params['school']]
+          myproc = Process(target=fixmissingdb, args=(params['school'], self.missingdbdict[params['school']]))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingfiles':	
         with lock_dict[params['school']]:
-          proc_dict[params['school']] = Process(target=fixmissingfiles, args=(params['school'],))
-          pipe_dict[params['school']] = Pipe()
-          proc_dict[params['school']].start()
-          pipe_dict[params['school']][OUT].send(self.missingfilesdict[params['school']])
-          proc_dict[params['school']].join()
-          del pipe_dict[params['school']]
-          del proc_dict[params['school']]
+          myproc = Process(target=fixmissingfiles, args=(params['school'], self.missingfilesdict[params['school']]))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'checkrecfiles':
         with check_rec_lock:
-          check_rec_proc = Process(target=checkrecordings, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          result = check_rec_pipe[IN].recv()
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
-          self.fileset_c = result['temp']
-          self.rec_missingdb = result['missingdb']
-          self.rec_missingfiles = result['missingfiles']
-          self.dbtimedict = result['dbtimedict']
-          outlist['data'] = {
-            'jpg' : result['jpg'],
-            'mp4' : result['mp4'],
-            'webm' : result['webm'],
-            'temp' : len(self.fileset_c),
-            'correct' : result['correct'],
-            'missingdb' : len(self.rec_missingdb),
-            'missingfiles' : len(self.rec_missingfiles),
-          }
-          logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          mypipe = Pipe()
+          myproc = Process(target=checkrecfiles, args=(mypipe, ))
+          myproc.start()
+          result = mypipe[IN].recv()
+          myproc.join()
+        self.fileset_c = result['temp']
+        self.rec_missingdb = result['missingdb']
+        self.rec_missingfiles = result['missingfiles']
+        self.dbtimedict = result['dbtimedict']
+        outlist['data'] = {
+          'jpg' : result['jpg'],
+          'mp4' : result['mp4'],
+          'webm' : result['webm'],
+          'temp' : len(self.fileset_c),
+          'correct' : result['correct'],
+          'missingdb' : len(self.rec_missingdb),
+          'missingfiles' : len(self.rec_missingfiles),
+        }
+        logger.debug('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixtemp_rec':	
         with check_rec_lock:
-          check_rec_proc = Process(target=fixtemp_rec, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          check_rec_pipe[OUT].send(self.fileset_c)
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
+          myproc = Process(target=fixtemp_rec, args=(self.fileset_c, ))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingdb_rec':	
         with check_rec_lock:
-          check_rec_proc = Process(target=fixmissingdb_rec, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          check_rec_pipe[OUT].send(self.rec_missingdb)
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
+          myproc = Process(target=fixmissingdb_rec, args=(self.rec_missingdb, ))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingfiles_rec':	
         with check_rec_lock:
-          check_rec_proc = Process(target=fixmissingfiles_rec, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          check_rec_pipe[OUT].send(self.rec_missingfiles)
-          check_rec_pipe[OUT].send(self.dbtimedict)
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
+          myproc = Process(target=fixmissingfiles_rec, args=(self.rec_missingfiles, self.dbtimedict, ))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'checkevents':
         with check_rec_lock:
-          check_rec_proc = Process(target=checkevents, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          result = check_rec_pipe[IN].recv()
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
-          #self.missingevents = result['missingevents'] 
-          self.missingframes = result['missingframes'] 
-          outlist['data'] = {
-            'correct' : result['correct'],
-            'missingevents' : 0,
-            'missingframes' : len(self.missingframes),
-          }
-          logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          mypipe = Pipe()
+          myproc = Process(target=checkevents, args=(mypipe, ))
+          myproc.start()
+          result = mypipe[IN].recv()
+          myproc.join()
+        #self.missingevents = result['missingevents'] 
+        self.missingframes = result['missingframes'] 
+        outlist['data'] = {
+          'correct' : result['correct'],
+          'missingevents' : 0,
+          'missingframes' : len(self.missingframes),
+        }
+        logger.debug('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingevents':	
         #not implemented. This case is not possible because of database logic
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingframes':		
         with check_rec_lock:
-          check_rec_proc = Process(target=fixmissingframes, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          check_rec_pipe[OUT].send(self.missingframes)
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
+          myproc = Process(target=fixmissingframes, args=(self.missingframes, ))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'checkframes':
         with check_rec_lock:
-          check_rec_proc = Process(target=checkframes, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          result = check_rec_pipe[IN].recv()
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
+          mypipe = Pipe()
+          myproc = Process(target=checkframes, args=(mypipe, ))
+          myproc.start()
+          result = mypipe[IN].recv()
+          myproc.join()
         self.missingdblines = result['missingdblines']
         self.missingfiles = result['missingfiles']
         outlist['data'] = {
@@ -483,33 +428,25 @@ class health(AsyncWebsocketConsumer):
           'missingfiles' : len(self.missingfiles),
         }
         logger.debug('--> ' + str(outlist))
-        await self.send(dumps(outlist))	
+        await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingframesdb':	
         with check_rec_lock:
-          check_rec_proc = Process(target=fixmissingframesdb, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          check_rec_pipe[OUT].send(self.missingdblines)
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
+          myproc = Process(target=fixmissingframesdb, args=(self.missingdblines, ))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixmissingframesfiles':	
         with check_rec_lock:
-          check_rec_proc = Process(target=fixmissingframesfiles, )
-          check_rec_pipe = Pipe()
-          check_rec_proc.start()
-          check_rec_pipe[OUT].send(self.missingfiles)
-          check_rec_proc.join()
-          check_rec_pipe = None
-          check_rec_proc = None
+          myproc = Process(target=fixmissingframesfiles, args=(self.missingfiles, ))
+          myproc.start()
+          myproc.join()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
     else:
       await self.close()
@@ -519,13 +456,16 @@ class health(AsyncWebsocketConsumer):
 # dbcompress
 #*****************************************************************************
 
-def checkolddb(myschool):
+def checkolddb(myschool, mypipe):
   myschooldir = school.objects.get(id=myschool).dir
   dbsetquery = trainframe.objects.filter(school=myschool)
   allset = {item.name for item in dbsetquery}
   oldset = {item.name for item in dbsetquery if ((item.name[1] != '/') and (item.name[2] != '/'))}
   bigset = set()
+  i = 0
   for item in dbsetquery:
+    i += 1
+    print(i, item.name)
     filename = myschooldir + 'frames/' + item.name
     mysize = image_size(filename)
     if (mysize[0] > school_x_max) and (mysize[1] > school_y_max):
@@ -535,45 +475,47 @@ def checkolddb(myschool):
     'old' : oldset,
     'big' : bigset,
   }
-  pipe_dict[myschool][OUT].send(result)
+  mypipe[OUT].send(result)
   
-def fixbigimg(myschool):
+def fixbigimg(myschool, set_to_fix):
   myschooldir = school.objects.get(id=myschool).dir
-  set_to_fix = pipe_dict[myschool][IN].recv()
   for item in set_to_fix:
-    #print(item)
+    print(item)
     reduce_image(myschooldir + 'frames/' + item, None, school_x_max, school_y_max)
   
-def fixolddb(myschool):
+def fixolddb(myschool, set_to_fix):
   myschooldir = school.objects.get(id=myschool).dir
-  set_to_fix = pipe_dict[myschool][IN].recv()
   for item in set_to_fix:
-    #print(item)
+    print(item)
     pathadd = str(randint(0,99))+'/'
     if not ospath.exists(myschooldir + 'frames/' + pathadd):
       makedirs(myschooldir + 'frames/' + pathadd)
-    move(myschooldir + 'frames/' + item, myschooldir + 'frames/' + pathadd)  
-    frameline = trainframe.objects.get(name=item)
-    frameline.name = pathadd + frameline.name
-    frameline.save(update_fields=["name"])
+    if ospath.exists(myschooldir + 'frames/' + item):
+      move(myschooldir + 'frames/' + item, myschooldir + 'frames/' + pathadd)  
+      try:
+        frameline = trainframe.objects.get(name=item, school=myschool)
+      except trainframe.MultipleObjectsReturned:
+        frameline = trainframe.objects.filter(name=item, school=myschool).first()
+      frameline.name = pathadd + frameline.name
+      frameline.save(update_fields=["name"])
   
 class dbcompress(AsyncWebsocketConsumer):
 
   async def connect(self):
+    self.started = True
     if self.scope['user'].is_superuser:
       self.olddbddict = {}
       self.bigimgdict = {}
       await self.accept()
+  
+  async def disconnect(self, close_code):  
+    self.started = False
 
   async def receive(self, text_data):
-    global check_rec_proc
-    global check_rec_pipe
-    global proc_dict
-    global pipe_dict
     global lock_dict
     logger.debug('<-- ' + text_data)
-    params = loads(text_data)['data']	
-    outlist = {'tracker' : loads(text_data)['tracker']}	
+    params = json.loads(text_data)['data']	
+    outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
     if self.scope['user'].is_superuser:
 
@@ -581,13 +523,14 @@ class dbcompress(AsyncWebsocketConsumer):
         if not (params['school'] in lock_dict):
           lock_dict[params['school']] = Lock()
         with lock_dict[params['school']]:
-          proc_dict[params['school']] = Process(target=checkolddb, args=(params['school'],))
-          pipe_dict[params['school']] = Pipe()
-          proc_dict[params['school']].start()
-          result = pipe_dict[params['school']][IN].recv()
-          proc_dict[params['school']].join()
-          del pipe_dict[params['school']]
-          del proc_dict[params['school']]
+          mypipe = Pipe()
+          myproc = Process(target=checkolddb, args=(params['school'], mypipe))
+          myproc.start()
+          while (not mypipe[IN].poll()):
+            await asleep(1)
+          result = mypipe[IN].recv()
+          #while myproc.is_alive():
+          #  await asleep(1)
           self.olddbddict[params['school']] = result['old']
           self.bigimgdict[params['school']] = result['big']
           outlist['data'] = {
@@ -596,33 +539,27 @@ class dbcompress(AsyncWebsocketConsumer):
             'big' : len(result['big']),
           }
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixbigimg':	
         with lock_dict[params['school']]:
-          proc_dict[params['school']] = Process(target=fixbigimg, args=(params['school'],))
-          pipe_dict[params['school']] = Pipe()
-          proc_dict[params['school']].start()
-          pipe_dict[params['school']][OUT].send(self.bigimgdict[params['school']])
-          proc_dict[params['school']].join()
-          del pipe_dict[params['school']]
-          del proc_dict[params['school']]
+          myproc = Process(target=fixbigimg, args=(params['school'], self.bigimgdict[params['school']]))
+          myproc.start()
+          while myproc.is_alive():
+            await asleep(1)
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'fixolddb':	
         with lock_dict[params['school']]:
-          proc_dict[params['school']] = Process(target=fixolddb, args=(params['school'],))
-          pipe_dict[params['school']] = Pipe()
-          proc_dict[params['school']].start()
-          pipe_dict[params['school']][OUT].send(self.olddbddict[params['school']])
-          proc_dict[params['school']].join()
-          del pipe_dict[params['school']]
-          del proc_dict[params['school']]
+          myproc = Process(target=fixolddb, args=(params['school'], self.olddbddict[params['school']]))
+          myproc.start()
+          while myproc.is_alive():
+            await asleep(1)
           outlist['data'] = 'OK'
-          logger.debug('--> ' + str(outlist))
-          await self.send(dumps(outlist))	
+          logger.info('--> ' + str(outlist))
+          await self.send(json.dumps(outlist))	
 
     else:
       await self.close()
@@ -694,8 +631,8 @@ class admintools(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     logger.debug('<-- ' + text_data)
-    params = loads(text_data)['data']	
-    outlist = {'tracker' : loads(text_data)['tracker']}	
+    params = json.loads(text_data)['data']	
+    outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
 #*****************************************************************************
 # functions for the client
@@ -714,9 +651,9 @@ class admintools(AsyncWebsocketConsumer):
         '-show_streams', params['camurl']]
       p = Popen(cmds, stdout=PIPE)
       output, _ = p.communicate()
-      outlist['data'] = loads(output)
+      outlist['data'] =json. loads(output)
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'scanips':
       contactlist = []
@@ -731,7 +668,7 @@ class admintools(AsyncWebsocketConsumer):
               contactlist.append(checkresult)
       outlist['data'] = contactlist
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'scanonvif':
       contactlist = []
@@ -768,7 +705,7 @@ class admintools(AsyncWebsocketConsumer):
                 self.camlist.append(temp_cam)
       outlist['data'] = contactlist
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'installcam':
       if not await self.check_create_stream_priv():
@@ -803,7 +740,7 @@ class admintools(AsyncWebsocketConsumer):
         sleep(long_brake)
       outlist['data'] = {'id' : newstream.id, }
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'makeschool':
       if not await self.check_create_school_priv():
@@ -903,7 +840,7 @@ class admintools(AsyncWebsocketConsumer):
           {'active' : False, })
       outlist['data'] = resultdict
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'linkworker':
       if not self.scope['user'].is_superuser:
@@ -955,7 +892,7 @@ class admintools(AsyncWebsocketConsumer):
           redis.set_start_stream_busy(i)
       outlist['data'] = resultdict['data']['status'] 
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
       
     elif params['command'] == 'checkserver':
       outlist['data'] = {} 
@@ -980,7 +917,7 @@ class admintools(AsyncWebsocketConsumer):
       except (WebSocketAddressException, OSError):
         outlist['data']['status'] = 'noanswer'
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
 #*****************************************************************************
 # functions for the server
@@ -1002,7 +939,7 @@ class admintools(AsyncWebsocketConsumer):
       else:
         outlist['data']['status'] = 'missing'
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
       
     elif params['command'] == 'getinfo':
       filename = textpath+'serverinfo.html'
@@ -1013,5 +950,5 @@ class admintools(AsyncWebsocketConsumer):
         result = 'No Info: ' + textpath + 'serverinfo.html does not exist...'
       outlist['data'] = result
       logger.debug('--> ' + str(outlist))
-      await self.send(dumps(outlist))	
+      await self.send(json.dumps(outlist))	
 
