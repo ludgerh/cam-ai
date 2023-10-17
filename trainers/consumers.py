@@ -83,7 +83,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         made = timezone.make_aware(datetime.fromtimestamp(time())),
         school = self.myschooldict['id'],
         name = self.frameinfo['name'],
-        code = 'NE',
+        code = self.frameinfo['code'],
         c0 = self.frameinfo['tags'][0], c1 = self.frameinfo['tags'][1],
         c2 = self.frameinfo['tags'][2], c3 = self.frameinfo['tags'][3],
         c4 = self.frameinfo['tags'][4], c5 = self.frameinfo['tags'][5],
@@ -123,6 +123,7 @@ class remotetrainer(AsyncWebsocketConsumer):
     elif indict['code'] == 'send':
       self.frameinfo['name'] = indict['name']
       self.frameinfo['tags'] = indict['tags']
+      self.frameinfo['code'] = indict['framecode']
     elif indict['code'] == 'delete':
       await deletefilter(trainframe, {'name' : indict['name'], }, )
       remove(self.myschooldict['dir'] + 'frames/' + indict['name'])

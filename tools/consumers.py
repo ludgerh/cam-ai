@@ -462,14 +462,14 @@ def checkolddb(myschool, mypipe):
   allset = {item.name for item in dbsetquery}
   oldset = {item.name for item in dbsetquery if ((item.name[1] != '/') and (item.name[2] != '/'))}
   bigset = set()
-  i = 0
+  i = dbsetquery.count()
   for item in dbsetquery:
-    i += 1
-    print(i, item.name)
+    print(i, ':', item.name)
     filename = myschooldir + 'frames/' + item.name
     mysize = image_size(filename)
     if (mysize[0] > school_x_max) and (mysize[1] > school_y_max):
       bigset.add(item.name)
+    i -= 1
   result = {
     'correct' : allset - oldset - bigset,
     'old' : oldset,
@@ -479,14 +479,17 @@ def checkolddb(myschool, mypipe):
   
 def fixbigimg(myschool, set_to_fix):
   myschooldir = school.objects.get(id=myschool).dir
+  i = len(set_to_fix)
   for item in set_to_fix:
-    print(item)
+    print(i, ':', item)
     reduce_image(myschooldir + 'frames/' + item, None, school_x_max, school_y_max)
+    i -= 1
   
 def fixolddb(myschool, set_to_fix):
   myschooldir = school.objects.get(id=myschool).dir
+  i = len(set_to_fix)
   for item in set_to_fix:
-    print(item)
+    print(i, ':', item)
     pathadd = str(randint(0,99))+'/'
     if not ospath.exists(myschooldir + 'frames/' + pathadd):
       makedirs(myschooldir + 'frames/' + pathadd)
@@ -498,6 +501,7 @@ def fixolddb(myschool, set_to_fix):
         frameline = trainframe.objects.filter(name=item, school=myschool).first()
       frameline.name = pathadd + frameline.name
       frameline.save(update_fields=["name"])
+    i -= 1
   
 class dbcompress(AsyncWebsocketConsumer):
 

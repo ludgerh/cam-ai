@@ -165,7 +165,7 @@ def reduce_image(infile, outfile, x, y):
   myimage = cv.imread(infile)
   xin = myimage.shape[1]
   yin = myimage.shape[0]
-  print('In:', myimage.shape, x, y) 
+  #print('In:', myimage.shape, x, y) 
   if (xin > x) or (yin > y):
     if (x / xin) > (y / yin):
       scale = x / xin
@@ -173,7 +173,7 @@ def reduce_image(infile, outfile, x, y):
       scale = y / yin
     myimage = cv.resize(myimage, (round(xin * scale), round(yin * scale)))  
     cv.imwrite(outfile, myimage)
-    print('Out:', myimage.shape) 
+    #print('Out:', myimage.shape) 
     return(True)
   else:
     return(False)

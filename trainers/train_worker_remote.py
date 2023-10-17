@@ -93,8 +93,10 @@ class train_once_remote():
         localdict[item.name] = [item.c0, item.c1, item.c2, item.c3, item.c4, 
           item.c5, item.c6, item.c7, item.c8, item.c9, ]
         localdict[item.name] += [seq_to_int(localdict[item.name])]
+        localdict[item.name] += [item.code]
         localset.add(item.name)
       pingproc.stop()
+      count = len(remoteset & localset)
       for item in (remoteset & localset):
         if remotedict[item] != localdict[item][10]:
           outdict = {
@@ -102,28 +104,40 @@ class train_once_remote():
             'name' : item,
           }
           self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-          self.logger.info('Changed, deleting: ' + item)
+          self.logger.info('(' + str(count) + ') Changed, deleting: ' + item)
           remoteset.remove(item)
+        count -= 1  
+      count = len(remoteset - localset)
       for item in (remoteset - localset):
+        self.logger.info('(' + str(count) + ') Deleting: ' + item)
         outdict = {
           'code' : 'delete',
           'name' : item,
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        self.logger.info('Deleting: ' + item)
-        self.ws.recv()
+        i = 0
+        while i < 20:
+          try:
+            self.ws.recv()
+            break
+          except TimeoutError:
+            i += 1
+        count -= 1  
+      count = len(localset - remoteset)
       for item in (localset - remoteset):
+        self.logger.info('(' + str(count) + ') Sending: ' + item)
         outdict = {
           'code' : 'send',
           'name' : item,
-          'tags' : localdict[item][:10]
+          'tags' : localdict[item][:10],
+          'framecode' : localdict[item][11],
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        #self.logger.info('Sending: ' + item)
         filepath = self.myschool.dir + 'frames/' + item
         with open(filepath, "rb") as f:
           self.ws.send_binary(f.read())
         self.ws.recv()
+        count -= 1  
       if self.t_type == 2:
         outdict = {
           'code' : 'checkfitdone',

@@ -80,7 +80,7 @@ class trainer():
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
-  def job_queue_tread(self):
+  def job_queue_thread(self):
     try:
       while self.do_run:
         schoollines = school.objects.filter(
@@ -169,7 +169,7 @@ class trainer():
       setproctitle('CAM-AI-Trainer #'+str(self.dbline.id))
       self.finished = False
       self.job_queue = threadqueue()
-      Thread(target=self.job_queue_tread, name='Trainer_JobQueueThread').start()
+      Thread(target=self.job_queue_thread, name='Trainer_JobQueueThread').start()
       while self.do_run:
         while True:
           try:
