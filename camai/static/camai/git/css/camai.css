@@ -3,6 +3,11 @@
 	color: #000;
 }
 
+.noselect  {
+  user-select: none;
+}
+
+
 button {
 	margin:20px;
 }

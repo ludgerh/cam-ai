@@ -11,6 +11,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+import json
 from datetime import datetime
 from redis import Redis
 from redis.exceptions import ConnectionError
@@ -121,3 +122,18 @@ class myredis(saferedis):
     
   def get_start_trainer_busy(self):
     return(int(self.get('start_trainer_busy'))) 
+    
+  def set_ptz(self, idx, value):
+    self.set('C:'+str(idx)+':ptz', str(json.dumps(value)))
+    
+  def get_ptz_json(self, idx):
+    return(self.get('C:'+str(idx)+':ptz'))  
+    
+  def get_ptz(self, idx):
+    return(json.loads(self.get_ptz_json(idx)))
+    
+  def set_ptz_pos(self, idx, value):
+    self.set('C:'+str(idx)+':ptzpos', str(json.dumps(value)))
+    
+  def get_ptz_pos(self, idx):
+    return(json.loads(self.get('C:'+str(idx)+':ptzpos')))  

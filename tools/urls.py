@@ -18,11 +18,10 @@ app_name = 'tools'
 
 urlpatterns = [
 	path('health/', views.health.as_view(), name='health'),
-	path('addstream/', views.addstream.as_view(), name='addstream'),
-	path('addonvif/', views.addonvif.as_view(), name='addonvif'),
 	path('addschool/', views.addschool.as_view(), name='addschool'),
 	path('linkworkers/', views.linkworkers.as_view(), name='linkworkers'),
 	path('dbcompression/', views.dbcompression.as_view(), name='dbcompression'),
 	path('scan_cams/', views.scan_cams.as_view(), name='scancams'),
+	path('inst_cam/<str:ip>/<str:ports>/', views.inst_cam.as_view(), name='instcam'),
 ]
 

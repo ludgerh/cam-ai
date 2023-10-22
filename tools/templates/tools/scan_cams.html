@@ -145,8 +145,15 @@ $(document).ready(function() {
               };  
               if (item.isapi) {
                 newcard += '<h6 class="card-subtitle mb-2">ISAPI on Port ' + (item.isapi.port) + '</h6>';
+                if (item.isapi.activated) {
+                  newcard += '<h6 class="card-subtitle mb-2">ISAPI is activated</h6>';
+                } else {
+                  newcard += '<h6 class="card-subtitle mb-2">ISAPI is not activated</h6>';
+                };
               };  
-              newcard += '<button class="btn btn-primary m-2 select-button" ip="'+item.ip+'" type="button">Select this</button>';
+              newcard += '<a href="/tools/inst_cam/' + item.address.ip + '/' + JSON.stringify(item.address.ports) + '/" >';
+              newcard += '<button class="btn btn-primary m-2 select-button" ip="'+item.address.ip+'" type="button">Install this one</button>';
+              newcard += '</a>';
             newcard += '</div>';
           newcard += '</div>';
           $('#netlist').append(newcard);

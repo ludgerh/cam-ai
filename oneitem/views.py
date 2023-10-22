@@ -41,12 +41,12 @@ def onecam(request, camnr, tokennr=0, token=None):
   if request.method == 'POST':
     form = CamForm(request.POST)
     if form.is_valid():
-      streams[camnr].dbline.cam_pause = form.cleaned_data['cam_pause']
-      streams[camnr].dbline.cam_url = form.cleaned_data['cam_url']
-      streams[camnr].dbline.cam_fpslimit = form.cleaned_data['cam_fpslimit']
-      streams[camnr].dbline.cam_feed_type = form.cleaned_data['cam_feed_type']
-      streams[camnr].dbline.cam_url = form.cleaned_data['cam_url']
-      streams[camnr].dbline.save(update_fields=[
+      dbline.name = form.cleaned_data['name']
+      dbline.cam_pause = form.cleaned_data['cam_pause']
+      dbline.cam_url = form.cleaned_data['cam_url']
+      dbline.cam_fpslimit = form.cleaned_data['cam_fpslimit']
+      dbline.cam_feed_type = form.cleaned_data['cam_feed_type']
+      dbline.save(update_fields=[
         'name',
         'cam_pause',
         'cam_fpslimit', 

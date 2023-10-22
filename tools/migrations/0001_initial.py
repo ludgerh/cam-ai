@@ -21,6 +21,8 @@ def fill_table_setting(apps, schema_editor):
 def fill_table_url(apps, schema_editor):
   Setting = apps.get_model("tools", "camurl")
   if not Setting.objects.all().count():
+    Setting.objects.create(type='levelone FCS-4051', 
+      url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
     Setting.objects.create(type='levelone FCS-5201', 
       url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
     Setting.objects.create(type='Reolink RLC-410W', 

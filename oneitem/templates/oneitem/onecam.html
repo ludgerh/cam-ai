@@ -11,20 +11,27 @@
 {# along with this program; if not, write to the Free Software #}
 {# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
 
+{# onecam.html V1.0.5 20.10.2023 #}
+
 {% extends 'main/basis.html' %}
 {% block content %}
 {% if emulatestatic %}{{ emulestatic }}
   {% load static %}
   <script src="{% static 'camai/git/js/wstools.js' %}"></script>
   <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+  <script src="{% static 'camai/nogit/js/jquery.mousewheel.js' %}"></script>
 	<link rel="stylesheet" href="{% static 'camai/git/css/camai.css' %}">
 {% else %}
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
   </script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
   </script>
-	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery.mousewheel.js">
+  </script>
+	<link rel="stylesheet" 
+	 href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
 {% endif %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
 
 <!-- Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" 
@@ -57,10 +64,62 @@
         <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
           fps = <span id="fpstag">?</span>, 
           views = <span id="vnrtag">?</span></h5>
-        <img id="imagespace" />
+        <img class="noselect" id="imagespace" />
       </div>
 		</div>
 	</div>
+</div>
+
+<div class="container-fluid float-left d-none" id="ptz-control">
+  <div class="row d-flex justify-content-center">
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-up-left"><i class="bi bi-arrow-up-left"></i></button>
+    </div>
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-up"><i class="bi bi-arrow-up"></i></button>
+    </div>
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-up-right"><i class="bi bi-arrow-up-right"></i></button>
+    </div>
+    <div class="col-2 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="faster">Faster</button>
+    </div>
+    <div class="col-2 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="zoomplus">Zoom+</button>
+    </div>
+  </div>
+  <div class="row d-flex justify-content-center">
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-left"><i class="bi bi-arrow-left"></i></button>
+    </div>
+    <div class="col-1"></div>
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-right"><i class="bi bi-arrow-right"></i></button>
+    </div>
+    <div class="col-2 d-flex align-items-center justify-content-center">
+      <input type="number" size="5" min="1" max="500" id="speedinput">
+    </div>
+    <div class="col-2 d-flex align-items-center justify-content-center">
+      <input type="number" size="5" id="zoominput">
+    </div>
+  </div>
+  <div class="row d-flex justify-content-center">
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-down-left"><i class="bi bi-arrow-down-left"></i></button>
+    </div>
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-down"><i class="bi bi-arrow-down"></i></button>
+    </div>
+    <div class="col-1 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="arrow-down-right"><i class="bi bi-arrow-down-right"></i></button>
+    </div>
+    <div class="col-2 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="slower">Slower</button>
+    </div>
+    <div class="col-2 d-flex align-items-center justify-content-center">
+      <button type="button" class="btn btn-primary my-1" id="zoomminus">Zoom-</button>
+    </div>
+  </div>
 </div>
 
 {% if may_write %}
@@ -99,7 +158,7 @@
 			  </div>
 		  </form>
 	  </div>
-	  <div class="row my-1 bluegrey" rea="0"js unpack zlib blob>
+	  <div class="row my-1 bluegrey" rea="0">
 		  <div class="col-auto my-2" rea="0">Mask settings</div>
 	  </div>
 	  <div class="row my-1 d-none" id="cam_c_boxes">
@@ -122,9 +181,12 @@
 <script>
 
 let displaywidth = Math.round($(window).width() * 0.97);
-let displayheight = Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }});
+let displayheight 
+  = Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }});
 let xinput;
 let yinput;
+let ptz_data;
+let ptz_active;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let c_view_Socket;
 let trigger_Socket;
@@ -270,16 +332,166 @@ $(document).ready(function() {
       })
       .catch(err => {console.log(err);});
     });
-    
-    
-		oneitemSocket.sendandwait({
+		return(oneitemSocket.sendandwait({
 			'command' : 'setmyitem',
 			'mode' : 'C',
 			'itemid' : {{ dbline.id }},
       'scaling' : displaywidth / {{ dbline.cam_xres }}
-		})
+		}))
 	})
-	.then(() => {
+	.then((result) => {
+	  ptz_data = result.ptz;
+	  ptz_active = Object.keys(ptz_data).length > 0;
+	  if (ptz_active) {
+	    $('#ptz-control').removeClass('d-none');
+	    $('#speedinput').val(200);
+      oneitemSocket.sendandwait({
+	      'command' : 'getptz',
+      })
+      .then((result) => {
+        $('#zoominput').val(result[2]);
+      })
+	    .catch(err => {console.log(err);});
+	    $('#zoominput').attr({
+        'max' : ptz_data.zoom.max, 
+        'min' : ptz_data.zoom.min,
+      });
+	    $('#faster').click(function() {
+	      if ($('#speedinput').val() < parseInt($('#speedinput').attr('max'))) {
+	        $('#speedinput').get(0).value++;
+	      };  
+	    });
+	    $('#slower').click(function() {
+	      if ($('#speedinput').val() > parseInt($('#speedinput').attr('min'))) {
+	        $('#speedinput').get(0).value--;
+	      };  
+	    });
+	    $('#zoomplus').click(function() {
+	      if ($('#zoominput').val() < parseInt($('#zoominput').attr('max'))) {
+	        $('#zoominput').get(0).value++;
+	      };  
+		    oneitemSocket.sendandwait({
+			    'command' : 'zoom_abs',
+			    'y' : parseInt($('#zoominput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#zoomminus').click(function() {
+	      if ($('#zoominput').val() > parseInt($('#zoominput').attr('min'))) {
+	        $('#zoominput').get(0).value--;
+	      };  
+		    oneitemSocket.sendandwait({
+			    'command' : 'zoom_abs',
+			    'y' : parseInt($('#zoominput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#zoominput').change(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'zoom_abs',
+			    'y' : parseInt($('#zoominput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-up-left').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : parseInt($('#speedinput').val()),
+			    'y' : parseInt($('#speedinput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-up').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : 0,
+			    'y' : parseInt($('#speedinput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-up-right').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : 0 - parseInt($('#speedinput').val()),
+			    'y' : parseInt($('#speedinput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-down-left').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : parseInt($('#speedinput').val()),
+			    'y' : 0 - parseInt($('#speedinput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-down').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : 0,
+			    'y' : 0 - parseInt($('#speedinput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-down-right').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : 0 - parseInt($('#speedinput').val()),
+			    'y' : 0 - parseInt($('#speedinput').val()),
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-left').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : parseInt($('#speedinput').val()),
+			    'y' : 0,
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	    $('#arrow-right').click(function() {
+		    oneitemSocket.sendandwait({
+			    'command' : 'pos_rel',
+			    'x' : 0 - parseInt($('#speedinput').val()),
+			    'y' : 0,
+		    })
+		    .catch(err => {console.log(err);});
+	    });
+	  };
+    $(document).on('keydown',((e)=>{
+      switch(e.originalEvent.keyCode) {
+        case 37 : //Arrow left
+          $('#arrow-left').trigger('click');
+          break;
+        case 38 : //Arrow up
+          $('#arrow-up').trigger('click');
+          break;
+        case 39 : //Arrow right
+          $('#arrow-right').trigger('click');
+          break;
+        case 40 : //Arrow down
+          $('#arrow-down').trigger('click');
+          break;
+        case 107 : //Plus
+        case 171 : //The other Plus
+          newvalue = parseInt($('#speedinput').val()) + 20;
+	        if (newvalue <= parseInt($('#speedinput').attr('max'))) {
+	          $('#speedinput').val(newvalue)
+	        } else {
+	          $('#speedinput').val(parseInt($('#speedinput').attr('max')))
+	        };  
+          break;
+        case 109 : //Minus
+        case 173 : //The other Minus
+          newvalue = parseInt($('#speedinput').val()) - 20;
+	        if (newvalue >= parseInt($('#speedinput').attr('min'))) {
+	          $('#speedinput').val(newvalue)
+	        } else {
+	          $('#speedinput').val(parseInt($('#speedinput').attr('min')))
+	        };  
+          break;
+      };    
+    }));
 		oneitemSocket.sendandwait({
 			'command' : 'setcbstatus',
 			'ch_show' : $('#ch_show').prop('checked'),
@@ -294,19 +506,17 @@ $(document).ready(function() {
 		myimage.attr('draggable', false);
 		let overimage = false;
 		myimage.mousedown((evt) => {
-			if($('#ch_edit').prop('checked')) {
-				let x = evt.originalEvent.pageX - myimage.offset().left;
-				let y = evt.originalEvent.pageY - myimage.offset().top;
-				oneitemSocket.sendandwait({
-					'command' : 'mousedown',
-					'x' : x,
-					'y' : y,
-				})
-				.catch(err => {console.log(err);});
-				overimage = true;
-			};
+			let x = evt.originalEvent.pageX - myimage.offset().left;
+			let y = evt.originalEvent.pageY - myimage.offset().top;
+			oneitemSocket.sendandwait({
+				'command' : 'mousedown',
+				'x' : x,
+				'y' : y,
+			})
+			.catch(err => {console.log(err);});
+			overimage = true;
 		});
-		$( document.body ).mouseup((evt) => {
+		myimage.mouseup((evt) => {
 			if (overimage) {
 				let x = evt.originalEvent.pageX - myimage.offset().left;
 				let y = evt.originalEvent.pageY - myimage.offset().top;
@@ -319,17 +529,19 @@ $(document).ready(function() {
 				overimage = false;
 			};
 		});
-		$( document.body ).mousemove((evt) => {
-			if (overimage) {
-				let x = evt.originalEvent.pageX - myimage.offset().left;
-				let y = evt.originalEvent.pageY - myimage.offset().top;
-				oneitemSocket.sendandwait({
-					'command' : 'mousemove',
-					'x' : x,
-					'y' : y,
-				})
-				.catch(err => {console.log(err);});
-			};
+		myimage.mousemove((evt) => {
+			if($('#ch_edit').prop('checked')) {
+			  if (overimage) {
+				  let x = evt.originalEvent.pageX - myimage.offset().left;
+				  let y = evt.originalEvent.pageY - myimage.offset().top;
+				  oneitemSocket.sendandwait({
+					  'command' : 'mousemove',
+					  'x' : x,
+					  'y' : y,
+				  })
+				  .catch(err => {console.log(err);});
+			  };
+			};  
 		});
 		myimage.dblclick((evt) => {
 			if($('#ch_edit').prop('checked')) {
@@ -343,6 +555,25 @@ $(document).ready(function() {
 			  .catch(err => {console.log(err);});
 			};
 		});
+		if (ptz_active) {
+      myimage.mousewheel(function(event) {
+			  if(!($('#ch_edit').prop('checked'))) {
+			    oneitemSocket.sendandwait({
+				    'command' : 'mousewheel',
+				    'y' : event.deltaY,
+			    })
+          .then(() => {
+			      return(oneitemSocket.sendandwait({
+				      'command' : 'getptz',
+			      }))
+          })
+          .then((result) => {
+            $('#zoominput').val(result[2]);
+          })
+			    .catch(err => {console.log(err);});
+        };  
+      });
+    };  
 {% endif %}
     setInterval(() => {
       c_view_Socket.sendandwait({

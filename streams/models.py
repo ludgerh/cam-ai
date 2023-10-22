@@ -45,10 +45,11 @@ class stream(models.Model):
   cam_video_codec = models.IntegerField(default=-1)
   cam_audio_codec = models.IntegerField(default=-1)
   cam_pause = models.BooleanField(default=False)
-  cam_onvif_ip = models.CharField(max_length=256, default='')
-  cam_onvif_port = models.IntegerField(default=0)
-  cam_onvif_adminuser = models.CharField(max_length=256, default='')
-  cam_onvif_adminpasswd = models.CharField(max_length=256, default='')
+  cam_control_mode = models.IntegerField(choices=((0, 'Url'), (1, 'ISAPI'), (2, 'ONVIF')), default=0)
+  cam_control_ip = models.CharField(max_length=256, default='')
+  cam_control_port = models.IntegerField(default=0)
+  cam_control_user = models.CharField(max_length=256, default='')
+  cam_control_passwd = models.CharField(max_length=256, default='')
  
   det_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  

@@ -20,32 +20,22 @@ from os import makedirs, path as ospath
 from shutil import copyfile, move
 from time import time, sleep
 from random import randint
-from subprocess import Popen, PIPE
 from multiprocessing import Process, Pipe, Lock
 from logging import getLogger
-from traceback import format_exc
 from ipaddress import ip_network, ip_address
-from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
-  gaierror, inet_aton)
-from psutil import net_if_addrs
-from passlib.hash import phpass
 from django.contrib.auth.models import User
 from django.db import connection
 from django.db.utils import OperationalError
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
-from camai.passwords import db_password
 from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
-  updatefilter, savedbline, getexists, createuser, countfilter)
+  updatefilter, savedbline, countfilter)
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tools.c_tools import image_size, reduce_image
 from tf_workers.models import school, worker
 from trainers.models import trainframe, trainer
 from eventers.models import event, event_frame
-from streams.c_streams import streams, c_stream
-from streams.c_camera import c_camera
 from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
@@ -75,34 +65,6 @@ schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 school_x_max = djconf.getconfigint('school_x_max', 500)
 school_y_max = djconf.getconfigint('school_y_max', 500)
-
-s = socket(AF_INET, SOCK_DGRAM)
-try:
-  s.connect(('10.255.255.255', 1))
-  my_ip = s.getsockname()[0]
-except Exception:
-  my_ip = '127.0.0.1'
-finally:
-  s.close()
-do_break = False
-for interface in (mylist := net_if_addrs()):
-  for connection in mylist[interface]:
-    if connection.address == my_ip:
-      subnetmask = connection.netmask
-      do_break = True
-      break
-  if do_break:
-    break  
-my_net = ip_network(my_ip+'/'+subnetmask, strict=False)
-my_ip = ip_address(my_ip)
-
-def is_valid_IP_Address(ip_str):
-  result = True
-  try:
-    inet_aton(ip_str)
-  except OSError:
-    result = False
-  return result
   
 lock_dict = {}
 countdict = {}
@@ -572,50 +534,10 @@ class dbcompress(AsyncWebsocketConsumer):
 # admintools
 #*****************************************************************************
 
-def scanoneip(ipstring, myports):
-  portlist = []
-  for port in myports:
-    s = socket(AF_INET, SOCK_STREAM)
-    s.settimeout(0.2)
-    try:
-      result = s.connect_ex((ipstring, port))
-    except gaierror:
-      return(None)
-    s.close()
-    if result == 0:
-      portlist.append(port)
-  if portlist:
-    result = {}
-    result['ip'] = ipstring
-    try:
-      result['name'] = gethostbyaddr(ipstring)[0]
-    except herror:
-      result['name'] = 'name unknown'
-    result['ports'] = portlist
-    return(result)
-  else:
-    return(None)  
-
 class admintools(AsyncWebsocketConsumer):
 
   async def connect(self):
     await self.accept()
-    
-  async def check_create_stream_priv(self):
-    if self.scope['user'].is_superuser:
-      return(True)
-    else:
-      limit = await getonelinedict(
-        userinfo, 
-        {'user' : self.scope['user'].id, }, 
-        ['allowed_streams',]
-      )
-      limit = limit['allowed_streams']
-      streamcount = await countfilter(
-        dbstream, 
-        {'creator' : self.scope['user'].id, 'active' : True,},
-      )
-      return(streamcount < limit)  
     
   async def check_create_school_priv(self):
     if self.scope['user'].is_superuser:
@@ -642,111 +564,7 @@ class admintools(AsyncWebsocketConsumer):
 # functions for the client
 #*****************************************************************************
 
-    if params['command'] == 'scanoneip':
-      if not await self.check_create_stream_priv():
-        await self.close()
-      if params['onvif']:
-        self.mycam = self.camlist[params['idx']]
-        if self.mycam.get_user(name=params['user']):
-          self.mycam.set_users(name=params['user'], passwd=params['pass'])
-        else:
-          self.mycam.create_users(name=params['user'], passwd=params['pass'])
-      cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
-        '-show_streams', params['camurl']]
-      p = Popen(cmds, stdout=PIPE)
-      output, _ = p.communicate()
-      outlist['data'] =json. loads(output)
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
-
-    elif params['command'] == 'scanips':
-      contactlist = []
-      if self.scope['user'].is_superuser:
-        if params['portaddr']:
-          portlist = [params['portaddr'], ]
-        else:
-          portlist = [80, 443, 554, 1935, ]
-        for item in my_net.hosts():        
-          if item != my_ip:
-            if (checkresult := scanoneip(str(item), portlist)):
-              contactlist.append(checkresult)
-      outlist['data'] = contactlist
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
-
-    elif params['command'] == 'scanonvif':
-      contactlist = []
-      self.camlist = []
-      if self.scope['user'].is_superuser:
-        portlist = [params['portaddr'], ]
-        if params['ip']:
-          iplist = (params['ip'], )
-        else:
-          iplist = my_net.hosts()
-        for item in iplist:
-          if item != my_ip:
-            if (checkresult := scanoneip(str(item), portlist)):
-              temp_cam = c_camera(
-                onvif_ip=checkresult['ip'], 
-                onvif_port=params['portaddr'], 
-                admin_user=params['admin'], 
-                admin_passwd=params['pass'],
-              )
-              print(temp_cam.status)
-              if temp_cam.status == 'OK':
-                for item in temp_cam.deviceinfo:
-                  checkresult[item] = temp_cam.deviceinfo[item]
-                if is_valid_IP_Address(params['ip']):
-                  checkresult['urlscheme'] = temp_cam.urlscheme 
-                else:
-                  partitioned = temp_cam.urlscheme.partition('@')
-                  leftpart = partitioned[0] + partitioned[1]
-                  partitioned = partitioned[2].partition(':')
-                  rightpart = partitioned[1] + partitioned[2]
-                  checkresult['urlscheme'] = (leftpart + checkresult['ip'] + rightpart)
-                checkresult['idx'] = len(contactlist)
-                contactlist.append(checkresult)
-                self.camlist.append(temp_cam)
-      outlist['data'] = contactlist
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
-
-    elif params['command'] == 'installcam':
-      if not await self.check_create_stream_priv():
-        await self.close()
-      myschools = await filterlinesdict(school, {'active' : True, }, ['id', ])
-      myschool = myschools[0]['id']
-      newstream = dbstream()
-      if 'name' in params:
-        newstream.name = params['name']
-      newstream.cam_url = params['camurl']
-      newstream.cam_video_codec = params['videocodec']
-      if params['audiocodec'] is None:
-        newstream.cam_audio_codec = -1
-      else:  
-        newstream.cam_audio_codec = params['audiocodec']
-      newstream.cam_xres = params['xresolution']
-      newstream.cam_yres = params['yresolution']
-      newstream.eve_school_id = myschool
-      newstream.creator = self.scope['user']
-      newlineid = await savedbline(newstream)
-      if not self.scope['user'].is_superuser:
-        myaccess = access_control()
-        myaccess.vtype = 'X'
-        myaccess.vid = newlineid
-        myaccess.u_g_nr = self.scope['user'].id
-        myaccess.r_w = 'W'
-        await savedbline(myaccess)
-      while redis.get_start_stream_busy():
-        sleep(long_brake)
-      redis.set_start_stream_busy(newstream.id)
-      while (not (newstream.id in  streams)):
-        sleep(long_brake)
-      outlist['data'] = {'id' : newstream.id, }
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
-
-    elif params['command'] == 'makeschool':
+    if params['command'] == 'makeschool':
       if not await self.check_create_school_priv():
         await self.close()
       if using_websocket or remote_trainer:

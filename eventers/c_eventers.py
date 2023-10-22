@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -128,7 +128,7 @@ class c_eventer(c_device):
           self.vid_deque.append(received[1:])
           #self.logger.info('comparing: ' + str(time()) + ' ' + str(self.vid_deque[0][2]) + ' ' + str(time() - self.vid_deque[0][2]))
           while True:
-            if (time() - self.vid_deque[0][2]) > 300:
+            if self.vid_deque and (time() - self.vid_deque[0][2]) > 300:
               listitem = self.vid_deque.popleft()
               try:
                 #self.logger.info('removing: ' + self.recordingspath + listitem[1])

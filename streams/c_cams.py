@@ -54,6 +54,7 @@ class c_cam(c_device):
     self.recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
     self.framewait = 0.0
     self.checkmp4busy = False
+    self.mycam = None
     
     if not path.exists(self.recordingspath):
       makedirs(self.recordingspath)
@@ -74,10 +75,27 @@ class c_cam(c_device):
     if super().in_queue_handler(received):
       return(True)
     else:
+      #print(received)
       if (received[0] == 'reset_cam'):
         self.reset_cam()
       elif (received[0] == 'pause'):
         self.dbline.cam_pause = received[1]
+      elif (received[0] == 'ptz_mdown'):
+        self.mousex = received[1]
+        self.mousey = received[2]
+      elif (received[0] == 'ptz_mup'):
+        ptz_pos = self.mycam.myptz.abs_pos
+        xdiff = 0 - round((received[1] - self.mousex) / 3.0)
+        ydiff = 0 - round((received[2] - self.mousey) / 3.0)
+        self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
+      elif (received[0] == 'ptz_zoom'):
+        self.mycam.myptz.goto_rel(zin= 0-received[1])
+      elif (received[0] == 'zoom_abs'):
+        self.mycam.myptz.goto_abs(z = received[1])
+      elif (received[0] == 'pos_rel'):
+        xdiff = 0 - received[1]
+        ydiff = 0 - received[2]
+        self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
       else:
         return(False)
       return(True)
@@ -199,22 +217,15 @@ class c_cam(c_device):
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Cam #'+str(self.dbline.id))
       logger_init(self.logger)
-      if (self.dbline.cam_onvif_ip and self.dbline.cam_onvif_port):
-        self.mycam = c_camera(
-          onvif_ip=self.dbline.cam_onvif_ip, 
-          onvif_port=self.dbline.cam_onvif_port, 
-          admin_user=self.dbline.cam_onvif_adminuser, 
-          admin_passwd=self.dbline.cam_onvif_adminpasswd, 
-          url=self.dbline.cam_url,
-        )
-        if self.mycam.status == 'OK':
-          print(self.mycam.deviceinfo)
-          print(self.mycam.url)
-          print(self.mycam.urlscheme)
-          print(self.mycam.adminurl)
-      else:
-        self.mycam = c_camera(url=self.dbline.cam_url)
-        #print(self.mycam.url)
+      self.mycam = c_camera(
+        self.id,
+        control_mode = self.dbline.cam_control_mode,
+        control_ip=self.dbline.cam_control_ip, 
+        control_port=self.dbline.cam_control_port, 
+        control_user=self.dbline.cam_control_user, 
+        control_pass=self.dbline.cam_control_passwd, 
+        url=self.dbline.cam_url,
+      )
       self.mp4timestamp = 0.0
       self.wd_ts = time()
       self.wd_proc = MultiTimer(interval=10, function=self.watchdog, 

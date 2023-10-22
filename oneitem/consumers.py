@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# oneitem/consumers.py V1.0.5 20.10.2023
+
 import json
 from logging import getLogger
 from traceback import format_exc
@@ -21,6 +23,7 @@ from channels.db import database_sync_to_async
 from access.c_access import access
 from tools.djangodbasync import getoneline, savedbline, deletefilter, updatefilter
 from tools.c_logger import log_ini
+from tools.c_redis import myredis
 from tf_workers.models import school
 from streams.models import stream
 from eventers.models import evt_condition
@@ -30,6 +33,8 @@ from drawpad.models import mask
 logname = 'ws_oneitemconsumers'
 logger = getLogger(logname)
 log_ini(logger, logname)
+
+redis = myredis()
 
 class oneitemConsumer(AsyncWebsocketConsumer):
 
@@ -55,6 +60,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       if access.check(params['mode'], params['itemid'], self.scope['user'], 'R'):
         self.mode = params['mode']
         self.idx = params['itemid']
+        self.mycamitem = streams[params['itemid']].mycam
         if self.mode == 'C':
           self.myitem = streams[params['itemid']].mycam
           self.mydrawpad = self.myitem.viewer.drawpad
@@ -63,9 +69,14 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.myitem = streams[params['itemid']].mydetector
         elif self.mode == 'E':
           self.myitem = streams[params['itemid']].mydetector.myeventer
-        self.may_write = access.check(params['mode'], int(params['itemid']), self.scope['user'], 'W')
+        self.may_write = access.check(
+          params['mode'], 
+          int(params['itemid']), 
+          self.scope['user'], 'W'
+        )
         self.scaling = params['scaling']
-        outlist['data'] = 'OK'
+        outlist['data'] = {}
+        outlist['data']['ptz'] = redis.get_ptz(self.idx)
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
       else:
@@ -171,7 +182,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.mydetectordrawpad.screen = self.mydetectordrawpad.make_screen()
           self.mydetectordrawpad.ringlist = self.mydetectordrawpad.reduce_rings_size()
           self.mydetectordrawpad.mask = self.mydetectordrawpad.mask_from_polygons()
-          self.myitem.mydetector.inqueue.put(('set_mask', self.mydetectordrawpad.ringlist))
+          self.myitem.mydetector.inqueue.put((
+            'set_mask', 
+            self.mydetectordrawpad.ringlist
+          ))
           await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'C', })
           await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'D', })
           for ring in self.mydetectordrawpad.ringlist:
@@ -187,39 +201,74 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'mousedown':
-      if self.may_write:
-        self.myitem.viewer.drawpad.mousedownhandler(params['x']/self.scaling, params['y'] / self.scaling)
+      if self.myitem.viewer.drawpad.edit_active:
+        if self.may_write:
+          self.myitem.viewer.drawpad.mousedownhandler(
+            params['x']/self.scaling, params['y'] / self.scaling)
+      else:
+        self.mycamitem.inqueue.put(('ptz_mdown', params['x']/self.scaling, params['y']/self.scaling))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'mouseup':
-      if self.may_write:
-       await self.myitem.viewer.drawpad.mouseuphandler(params['x']/self.scaling, params['y'] / self.scaling)
-       self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
+      if self.myitem.viewer.drawpad.edit_active:
+        if self.may_write:
+         await self.myitem.viewer.drawpad.mouseuphandler(
+          params['x']/self.scaling, params['y'] / self.scaling)
+         self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
+      else:
+        self.mycamitem.inqueue.put(('ptz_mup', params['x']/self.scaling, params['y']/self.scaling))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'mousemove':
-      if self.may_write:
-        self.myitem.viewer.drawpad.mousemovehandler(params['x']/self.scaling, params['y'] / self.scaling)
+      if self.myitem.viewer.drawpad.edit_active:
+        if self.may_write:
+          self.myitem.viewer.drawpad.mousemovehandler(
+            params['x']/self.scaling, params['y'] / self.scaling)
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'dblclick':
       if self.may_write:
-       await self.myitem.viewer.drawpad.dblclickhandler(params['x']/self.scaling, params['y'] / self.scaling)
+       await self.myitem.viewer.drawpad.dblclickhandler(
+        params['x']/self.scaling, params['y'] / self.scaling)
        self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
       outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'mousewheel':
+      self.mycamitem.inqueue.put(('ptz_zoom', params['y']))
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'zoom_abs':
+      self.mycamitem.inqueue.put(('zoom_abs', params['y']))
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'pos_rel':
+      self.mycamitem.inqueue.put(('pos_rel', params['x'], params['y']))
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'getptz':
+      outlist['data'] = redis.get_ptz_pos(self.idx)
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'delcondition': #xxx
       if self.may_write:
         await deletefilter(evt_condition, {'id' : params['c_nr']})
-        self.myitem.inqueue.put(('del_condition', int(params['reaction']), int(params['c_nr'])))
+        self.myitem.inqueue.put(
+          ('del_condition', int(params['reaction']), int(params['c_nr'])))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
@@ -278,8 +327,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'newcondition': #xxx
       if self.may_write:
-        dbline = evt_condition(and_or=int(params['and_or']), reaction=int(params['reaction']), 
-        eventer_id=self.myitem.dbline.id)
+        dbline = evt_condition(
+          and_or=int(params['and_or']), 
+          reaction=int(params['reaction']), 
+          eventer_id=self.myitem.dbline.id)
         await savedbline(dbline)
         newitem = model_to_dict(dbline)
         self.myitem.inqueue.put(('new_condition', int(params['reaction']), newitem))
@@ -291,9 +342,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'save_conditions':
       if self.may_write:
-        self.myitem.inqueue.put(('save_conditions', params['reaction'], params['conditions']))
+        self.myitem.inqueue.put((
+          'save_conditions', params['reaction'], params['conditions']))
         cond_dict = json.loads(params['conditions'])
-        await deletefilter(evt_condition, {'eventer_id' : self.myitem.dbline.id, 'reaction' : params['reaction'], }, )
+        await deletefilter(
+          evt_condition, 
+          {'eventer_id' : self.myitem.dbline.id, 'reaction' : params['reaction'], }, )
         for item in cond_dict:
           db_line = evt_condition(
             eventer_id = self.myitem.dbline.id,
