@@ -86,7 +86,7 @@ class caminst(AsyncWebsocketConsumer):
         upass = mypass,
         ports=params['portaddr'], 
         url=params['camaddress'], 
-        max_workers=100,
+        max_workers=4,
       )
       #pprint(e.all_results)
       outlist['data'] = e.all_results

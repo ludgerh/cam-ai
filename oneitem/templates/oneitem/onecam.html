@@ -345,13 +345,14 @@ $(document).ready(function() {
 	  if (ptz_active) {
 	    $('#ptz-control').removeClass('d-none');
 	    $('#speedinput').val(200);
-      oneitemSocket.sendandwait({
-	      'command' : 'getptz',
-      })
-      .then((result) => {
-        $('#zoominput').val(result[2]);
-      })
-	    .catch(err => {console.log(err);});
+      //oneitemSocket.sendandwait({
+	    //  'command' : 'getptz',
+      //})
+      //.then((result) => {
+      //  $('#zoominput').val(result[2]);
+      //})
+	    //.catch(err => {console.log(err);});
+      $('#zoominput').val(10);
 	    $('#zoominput').attr({
         'max' : ptz_data.zoom.max, 
         'min' : ptz_data.zoom.min,
