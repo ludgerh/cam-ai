@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
       fields=[
         ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
         ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-        ('allowed_schools', models.IntegerField(default=1)),
+        ('allowed_schools', models.IntegerField(default=2)),
         ('allowed_streams', models.IntegerField(default=1)),
         ('deadline', models.DateTimeField(default=datetime.datetime(2100, 1, 1, 0, 0, tzinfo=utc))),
         ('made', models.DateTimeField(default=now)),

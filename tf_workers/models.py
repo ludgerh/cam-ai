@@ -29,7 +29,7 @@ class worker(models.Model):
   gpu_nr = models.IntegerField(default=0)
   savestats = models.FloatField(default=0.0)
   use_websocket = models.BooleanField(default=True)
-  remote_trainer = models.BooleanField(default=True)
+  remote_trainer = models.BooleanField(default=False)
   wsserver = models.CharField(max_length=255, default='wss://django.cam-ai.eu/')
   wsid = models.IntegerField(default=0)
   wsname = models.CharField(max_length=50, default='')
