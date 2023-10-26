@@ -16,7 +16,7 @@
 import json
 from asyncio import sleep as asleep
 from pathlib import Path
-from os import makedirs, path as ospath
+from os import makedirs, path as ospath, system as ossystem
 from shutil import copyfile, move
 from time import time, sleep
 from random import randint
@@ -771,6 +771,14 @@ class admintools(AsyncWebsocketConsumer):
       except FileNotFoundError:
         result = 'No Info: ' + textpath + 'serverinfo.html does not exist...'
       outlist['data'] = result
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      
+    elif params['command'] == 'shutdown':
+      if not self.scope['user'].is_superuser:
+        await self.close()
+      ossystem('sudo shutdown now')
+      outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 

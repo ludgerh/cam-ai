@@ -172,7 +172,10 @@
 			  <label for="ch_white">White Marks</label>
 			  <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
 			  <button class="me-3" type="button" id="bt_new">New Masked Area</button>
-			  <button type="button" id="bt_move">Move to Detector</button>
+			  <select class="me-3" id="mask_select">
+          <option value="C" selected>Edit Camera Mask</option>
+          <option value="X">Edit Detector Mask</option>
+        </select>
 		  </div>
 	  </div>
   </div>
@@ -197,6 +200,7 @@ let wait = 0;
 let imageElement = document.getElementById("imagespace");
 
 $(document).ready(function() {
+	$('#mask_select').val('C');
   $('#imagespace').attr('width', displaywidth+'px');
   $('#imagespace').attr('height', displayheight+'px');
 {% if may_write %}
@@ -228,17 +232,25 @@ $(document).ready(function() {
 		})
 		.catch(err => {console.log(err);});
 	});
+	$('#mask_select').change((evt) => {
+	  if ($('#mask_select').val() == 'C') {
+	    $('#ch_show').prop("disabled", false);
+	    $('#ch_apply').prop("disabled", false);
+	  };
+	  if ($('#mask_select').val() == 'X') {
+	    $('#ch_show').prop("disabled", true);
+	    $('#ch_apply').prop("disabled", true);
+	  };
+		oneitemSocket.sendandwait({
+			'command' : 'm_select_change',
+			'new_val' : $('#mask_select').val(),
+		})
+		.catch(err => {console.log(err);});
+	});
 	$('#bt_new').click((evt) => {
 		oneitemSocket.sendandwait({
 			'command' : 'setbtevent',
 			'bt_new' : 'click',
-		})
-		.catch(err => {console.log(err);});
-	});
-	$('#bt_move').click((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setbtevent',
-			'bt_move' : 'click',
 		})
 		.catch(err => {console.log(err);});
 	});
@@ -499,6 +511,12 @@ $(document).ready(function() {
 			'ch_apply' : $('#ch_apply').prop('checked'),
 			'ch_edit' : $('#ch_edit').prop('checked'),
 		})
+	  .catch(err => {console.log(err);});
+		oneitemSocket.sendandwait({
+			'command' : 'm_select_change',
+			'new_val' : $('#mask_select').val(),
+		})
+		.catch(err => {console.log(err);});
 {% endif %}
 	})
 	.then(() => {

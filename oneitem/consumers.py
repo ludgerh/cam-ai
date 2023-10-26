@@ -45,11 +45,31 @@ class oneitemConsumer(AsyncWebsocketConsumer):
   async def connect(self):
     await self.accept()
     self.myitem = None
+    self.detectormask_changed = False
 
   async def disconnect(self, close_code):
     if self.myitem is not None:
       self.myitem.nr_of_cond_ed = 0
       self.myitem.last_cond_ed = 0
+    if self.detectormask_changed:
+      self.mydetectordrawpad.ringlist = self.mydrawpad.ringlist
+      self.mydetectordrawpad.make_screen()
+      self.mydetectordrawpad.reduce_rings_size()
+      self.mydetectordrawpad.mask_from_polygons()
+      self.myitem.mydetector.inqueue.put((
+        'set_mask', 
+        self.mydetectordrawpad.ringlist
+      ))
+      await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'D', })
+      for ring in self.mydetectordrawpad.ringlist:
+        m = mask(
+          name='New Ring',
+          definition=json.dumps(ring),
+          stream_id=self.idx,
+          mtype='D',
+        )
+        await savedbline(m)
+      
 
   async def receive(self, text_data):
     logger.debug('<-- ' + str(text_data))
@@ -67,6 +87,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.mydetectordrawpad = self.myitem.mydetector.viewer.drawpad
         elif self.mode == 'D':
           self.myitem = streams[params['itemid']].mydetector
+          self.mydrawpad = self.myitem.viewer.drawpad
         elif self.mode == 'E':
           self.myitem = streams[params['itemid']].mydetector.myeventer
         self.may_write = access.check(
@@ -150,20 +171,31 @@ class oneitemConsumer(AsyncWebsocketConsumer):
     elif params['command'] == 'setcbstatus':
       if self.may_write:
         if 'ch_show' in params:
-          self.myitem.viewer.drawpad.show_mask = params['ch_show']
+          if self.mydrawpad.mtype == 'C':
+            self.myitem.viewer.drawpad.show_mask = params['ch_show']
         if 'ch_edit' in params:
           self.myitem.viewer.drawpad.edit_active = params['ch_edit']
         if 'ch_apply' in params:
-          self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
-          myline = await getoneline(stream, {'id' : self.myitem.dbline.id, })
-          if self.mode == 'C':
-            myline.cam_apply_mask = params['ch_apply']
-            await savedbline(myline, ["cam_apply_mask"])
-          elif self.mode == 'D':
-            myline.det_apply_mask = params['ch_apply']
-            await savedbline(myline, ["det_apply_mask"])
+          if self.mydrawpad.mtype == 'C':
+            self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
+            myline = await getoneline(stream, {'id' : self.myitem.dbline.id, })
+            if self.mode == 'C':
+              myline.cam_apply_mask = params['ch_apply']
+              await savedbline(myline, ["cam_apply_mask"])
+            elif self.mode == 'D':
+              myline.det_apply_mask = params['ch_apply']
+              await savedbline(myline, ["det_apply_mask"])
         if 'ch_white' in params:
           self.myitem.viewer.drawpad.whitemarks = params['ch_white']
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'm_select_change':
+      if self.may_write:
+        self.mydrawpad.mtype = params['new_val']
+        await self.mydrawpad.load_ringlist()
+        self.mydrawpad.make_screen()
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
@@ -172,30 +204,22 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       if self.may_write:
         if 'bt_new' in params:
           self.mydrawpad.new_ring()
-          self.mydrawpad.screen = self.mydrawpad.make_screen()
-          self.mydrawpad.mask = self.mydrawpad.mask_from_polygons()
-        if 'bt_move' in params:
-          self.mydetectordrawpad.ringlist = self.mydrawpad.ringlist
-          self.mydrawpad.ringlist = []
-          self.mydrawpad.screen = self.mydrawpad.make_screen()
-          self.mydrawpad.mask = self.mydrawpad.mask_from_polygons()
-          self.mydetectordrawpad.screen = self.mydetectordrawpad.make_screen()
-          self.mydetectordrawpad.ringlist = self.mydetectordrawpad.reduce_rings_size()
-          self.mydetectordrawpad.mask = self.mydetectordrawpad.mask_from_polygons()
-          self.myitem.mydetector.inqueue.put((
-            'set_mask', 
-            self.mydetectordrawpad.ringlist
-          ))
-          await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'C', })
-          await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'D', })
-          for ring in self.mydetectordrawpad.ringlist:
+          self.mydrawpad.make_screen()
+          self.mydrawpad.mask_from_polygons()
+          await deletefilter(mask, {
+            'stream_id' : self.idx,
+            'mtype' : self.mydrawpad.mtype,
+          })
+          for ring in self.mydrawpad.ringlist:
             m = mask(
               name='New Ring',
               definition=json.dumps(ring),
               stream_id=self.idx,
-              mtype='D',
+              mtype=self.mydrawpad.mtype,
             )
             await savedbline(m)
+          if self.mydrawpad.mtype == 'X':
+            self.detectormask_changed = True
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
@@ -214,9 +238,11 @@ class oneitemConsumer(AsyncWebsocketConsumer):
     elif params['command'] == 'mouseup':
       if self.myitem.viewer.drawpad.edit_active:
         if self.may_write:
-         await self.myitem.viewer.drawpad.mouseuphandler(
-          params['x']/self.scaling, params['y'] / self.scaling)
-         self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
+          await self.myitem.viewer.drawpad.mouseuphandler(
+            params['x']/self.scaling, params['y'] / self.scaling)
+          self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
+          if self.mydrawpad.mtype == 'X':
+            self.detectormask_changed = True
       else:
         self.mycamitem.inqueue.put(('ptz_mup', params['x']/self.scaling, params['y']/self.scaling))
       outlist['data'] = 'OK'
@@ -234,9 +260,11 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'dblclick':
       if self.may_write:
-       await self.myitem.viewer.drawpad.dblclickhandler(
-        params['x']/self.scaling, params['y'] / self.scaling)
-       self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
+        await self.myitem.viewer.drawpad.dblclickhandler(
+          params['x']/self.scaling, params['y'] / self.scaling)
+        self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
+        if self.mydrawpad.mtype == 'X':
+          self.detectormask_changed = True
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	

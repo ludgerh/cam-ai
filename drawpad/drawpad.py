@@ -16,7 +16,7 @@ import cv2 as cv
 from json import dumps, loads
 from time import time
 from shapely.geometry import Point, LinearRing
-from tools.djangodbasync import savedbline, deletefilter
+from tools.djangodbasync import savedbline, deletefilter, filterlinesdict
 from .models import mask
 
 class drawpad():
@@ -39,24 +39,30 @@ class drawpad():
     self.radius = 20
     self.xdim = self.parent.parent.dbline.cam_xres
     self.ydim = self.parent.parent.dbline.cam_yres
+    self.mtype = 'C'
     self.ringlist = []
-    for item in mask.objects.filter(stream_id=self.myid, mtype=self.parent.parent.type):
+    for item in mask.objects.filter(stream_id=self.myid, mtype=self.mtype):
       self.ringlist.append(loads(item.definition))
     self.parent.parent.inqueue.put(('set_mask', self.ringlist))
-    self.screen = self.make_screen()
-    self.mask = self.mask_from_polygons()
+    self.make_screen()
+    self.mask_from_polygons()
     self.mypoint = None
+    
+  async def load_ringlist(self):
+    self.ringlist = []
+    for item in await filterlinesdict(mask, {'stream_id' : self.myid, 'mtype' : self.mtype, }, ['definition', ]):
+      self.ringlist.append(loads(item['definition']))
 
-  def draw_rings(self, drawpad, radius=None, colour=None):
+  def draw_rings(self, radius=None, colour=None):
     if radius is None:
       radius = self.radius
     if colour is None:
       colour = self.foregr
     for ring in self.ringlist:
       pts = np.array(ring, np.int32)
-      cv.polylines(drawpad, [pts], True, colour, 2) 
+      cv.polylines(self.screen, [pts], True, colour, 2) 
       for item in ring:
-        cv.circle(drawpad,(round(item[0]), round(item[1])), radius, colour, -1)
+        cv.circle(self.screen,(round(item[0]), round(item[1])), radius, colour, -1)
 
   def make_screen(self, x=None, y=None, radius=None):
     if x is None:
@@ -66,11 +72,10 @@ class drawpad():
     if radius is None:
       radius = self.radius
     if self.scaledown == 1:
-      result = np.full((y, x, 3), self.backgr, np.uint8)
+      self.screen = np.full((y, x, 3), self.backgr, np.uint8)
     else:
-      result = np.full((y // self.scaledown, x // self.scaledown, 3), self.backgr, np.uint8)
-    self.draw_rings(result, radius)
-    return(result)
+      self.screen = np.full((y // self.scaledown, x // self.scaledown, 3), self.backgr, np.uint8)
+    self.draw_rings(radius)
 
   def new_ring(self):
     size = 100
@@ -96,7 +101,7 @@ class drawpad():
     for ring in self.ringlist:
       pts = np.array(ring).round().astype(np.int32)
       cv.fillPoly(result, [pts], foregr)
-    return(result)
+    self.mask = result
     
   def reduce_rings_size(self):  
     if self.scaledown == 1:
@@ -109,7 +114,7 @@ class drawpad():
           newpoint = [point[0] // self.scaledown, point[1] // self.scaledown] 
           newring.append(newpoint)
         result.append(newring)   
-    return(result)  
+    self.ringlist = result 
 
   def point_clicked(self, x, y):
     click_point = Point(x,y) 
@@ -125,12 +130,12 @@ class drawpad():
 
   def move_point(self, x, y):
     buffer = self.ringlist[self.mypoint[0]][self.mypoint[1]]
-    self.draw_rings(self.screen, colour=self.backgr)
+    self.draw_rings(colour=self.backgr)
     self.ringlist[self.mypoint[0]][self.mypoint[1]] = (round(x), round(y))
     testring = LinearRing(self.ringlist[self.mypoint[0]])
     if (not testring.is_valid) or (not testring.is_simple):
       self.ringlist[self.mypoint[0]][self.mypoint[1]] = buffer
-    self.draw_rings(self.screen)
+    self.draw_rings()
 
   def mousemovehandler(self, x, y):
     if self.mypoint is not None:
@@ -140,17 +145,17 @@ class drawpad():
   async def mouseuphandler(self, x, y):
     if self.mypoint is not None:
       self.mousemovehandler(x, y)
-      self.mask = self.mask_from_polygons()
+      self.mask_from_polygons()
       await deletefilter(mask, {
         'stream_id' : self.myid,
-        'mtype' : self.parent.parent.type,
+        'mtype' : self.mtype,
       })
       for ring in self.ringlist:
         m = mask(
           name='New Ring',
           definition=dumps(ring),
           stream_id=self.myid,
-          mtype=self.parent.parent.type
+          mtype=self.mtype
         )
         await savedbline(m)
       self.mypoint = None
@@ -159,16 +164,18 @@ class drawpad():
     self.mypoint = self.point_clicked(x, y) 
     if self.mypoint is not None:
       del self.ringlist[self.mypoint[0]]
-      self.mask = self.mask_from_polygons()
+      self.mask_from_polygons()
+      self.make_screen()
       await deletefilter(mask, {
         'stream_id' : self.myid,
-        'mtype' : self.parent.parent.type,
+        'mtype' : self.mtype,
       })
       for ring in self.ringlist:
         m = mask(
           name='New Ring',
           definition=dumps(ring),
           stream_id=self.myid,
-          mtype=self.parent.parent.type
+          mtype=self.mtype
         )
         await savedbline(m)
+      self.draw_rings()

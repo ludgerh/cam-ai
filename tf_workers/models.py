@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -49,7 +49,7 @@ class school(models.Model):
   l_rate_min = models.CharField(max_length=20, default = '1e-6')
   l_rate_max = models.CharField(max_length=20, default = '1e-6')
   e_school = models.IntegerField(default=1)
-  model_type = models.CharField(max_length=50, default = 'efficientnetv2b0')
+  model_type = models.CharField(max_length=50, default = 'efficientnetv2-b0')
   tf_worker = models.ForeignKey(worker, on_delete=models.SET_DEFAULT, default=1)
   trainer = models.ForeignKey(
     trainermod, on_delete=models.SET_DEFAULT, default=1)

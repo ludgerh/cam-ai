@@ -23,5 +23,6 @@ urlpatterns = [
 	path('dbcompression/', views.dbcompression.as_view(), name='dbcompression'),
 	path('scan_cams/', views.scan_cams.as_view(), name='scancams'),
 	path('inst_cam/<str:ip>/<str:ports>/', views.inst_cam.as_view(), name='instcam'),
+	path('shutdown/', views.shutdown.as_view(), name='shutdown'),
 ]
 

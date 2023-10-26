@@ -84,7 +84,7 @@ class search_executor(ThreadPoolExecutor):
       self.iplist = self.net.hosts()
     self.all_results = []
     for item in self.iplist:
-      if item != self.ip:
+      if str(item) != self.ip:
         f = self.submit(self.scan_one, item)
         f.add_done_callback(self.callback)
     self.shutdown()
@@ -153,7 +153,8 @@ class search_executor(ThreadPoolExecutor):
             myresult['onvif']['pass'] = self.upass
             break
           except:
-            pass
+            pass 
+               
       for port in myresult['address']['ports']:
         if port in {80, 8000}:
           url = 'http://'+myresult['address']['ip'] + ':' + str(port) + '/SDK/activateStatus'

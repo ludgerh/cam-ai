@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -18,7 +18,7 @@ from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from access.c_access import access
 from streams.models import stream
-from tf_workers.models import school
+from tf_workers.models import school, worker
 from tools.l_tools import djconf
 
 
@@ -27,7 +27,11 @@ def index(request, mode='C'):
   camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', request.user, 'R')
   detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', request.user, 'R')
   eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', request.user, 'R')
-  schoollist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
+  templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
+  schoollist = []
+  for item in templist:
+    if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      schoollist.append(item)
   template = loader.get_template('index/index.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),

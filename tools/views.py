@@ -30,7 +30,11 @@ class health(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    schoollist = []
+    for item in templist:
+      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -58,7 +62,11 @@ class dbcompression(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    schoollist = []
+    for item in templist:
+      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -88,7 +96,11 @@ class scan_cams(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    schoollist = []
+    for item in templist:
+      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -113,7 +125,11 @@ class inst_cam(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    schoollist = []
+    for item in templist:
+      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -142,7 +158,11 @@ class addschool(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    schoollist = []
+    for item in templist:
+      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -165,7 +185,11 @@ class linkworkers(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    schoollist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
+    schoollist = []
+    for item in templist:
+      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -176,6 +200,23 @@ class linkworkers(TemplateView):
       'eventerlist' : eventerlist,
       'schoollist' : schoollist,
       'workerlist' : worker.objects.all(),
+    })
+    return context
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))
+
+class shutdown(TemplateView):
+  template_name = 'tools/shutdown.html'
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
     })
     return context
 

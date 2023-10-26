@@ -89,10 +89,10 @@
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Someone else is using the same dashboard!</h5>
+        <h5 class="modal-title">?</h5>
       </div>
       <div class="modal-body">
-        <p>Only one writing user at a time per school. Refresh your browser to try again...</p>
+        <p>?</p>
       </div>
     </div>
   </div>
@@ -104,6 +104,7 @@
 let trainerutilSocket;
 let trainnowstarted = false;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let modal_visible = false;
 
 function refresh_all() {
   trainerutilSocket.sendandwait({
@@ -114,6 +115,10 @@ function refresh_all() {
 {% if may_write %}
       trainnowstarted = false;
       $('#train_button').prop("disabled",true);
+      if (modal_visible) {
+        $('#mymodal').modal('hide');
+        modal_visible = false;
+      };  
 {% endif %}
       if (result.pos > 1) {
         $('#queue_status').text('Queuing');
@@ -153,7 +158,10 @@ $(document).ready(function() {
     if (result == 'OK') {
 {% if may_write %}
       $('#train_button').click(function() {
-        trainnowstarted = true;
+        modal_visible = true;
+        $('.modal-title').text('Synchronizing the Training Data');
+        $('.modal-body').text('Depending on the amount of new data this may take some minutes...');
+        $('#mymodal').modal('show');
         $('#train_button').prop("disabled",true);
         $('#train_button').addClass('btn-warning');
         trainerutilSocket.sendandwait({
@@ -170,7 +178,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#trigger').val(result);
         $('#trigger').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'settrigger',
             'value' : $('#trigger').val(),
@@ -183,7 +190,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#patience').val(result);
         $('#patience').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setpatience',
             'value' : $('#patience').val(),
@@ -197,7 +203,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#maxweight').val(result);
         $('#maxweight').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setmaxweight',
             'value' : $('#maxweight').val(),
@@ -211,7 +216,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#minweight').val(result);
         $('#minweight').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setminweight',
             'value' : $('#minweight').val(),
@@ -225,7 +229,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#weightboost').val(result);
         $('#weightboost').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setweightboost',
             'value' : $('#weightboost').val(),
@@ -239,7 +242,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#min_lr').val(result);
         $('#min_lr').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setminlr',
             'value' : $('#min_lr').val(),
@@ -253,7 +255,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#max_lr').val(result);
         $('#max_lr').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setmaxlr',
             'value' : $('#max_lr').val(),
@@ -267,7 +268,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#cbignorecheck').prop('checked', result);
         $('#cbignorecheck').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setignorecheck',
             'value' : $('#cbignorecheck').prop('checked'),
@@ -281,7 +281,6 @@ $(document).ready(function() {
       .then((result) => {
         $('#cbdonate').prop('checked', result);
         $('#cbdonate').change(function() {
-          console.log('change');
           trainerutilSocket.sendandwait({
             'command' : 'setdonate',
             'value' : $('#cbdonate').prop('checked'),
@@ -292,6 +291,8 @@ $(document).ready(function() {
 {% endif %}
       refresh_all();
     } else {
+      $('.modal-title').text('Someone else is using the same dashboard!');
+      $('.modal-body').text('Only one writing user at a time per school. Refresh your browser to try again...');
       $('#mymodal').modal('show');
     };
   })

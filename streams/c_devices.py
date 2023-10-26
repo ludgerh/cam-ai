@@ -73,8 +73,8 @@ class c_device():
       if self.viewer:
         mydrawpad = self.viewer.drawpad
         mydrawpad.ringlist = received[1]
-        mydrawpad.screen = mydrawpad.make_screen()
-        mydrawpad.mask = mydrawpad.mask_from_polygons()
+        mydrawpad.make_screen()
+        mydrawpad.mask_from_polygons()
     elif (received[0] == 'set_apply_mask'):
       if self.type == 'C':
         self.dbline.cam_apply_mask = received[1]

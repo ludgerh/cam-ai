@@ -252,7 +252,9 @@ class ONVIFCamera(object):
         self.dt_diff = None
         self.devicemgmt  = self.create_devicemgmt_service()
         if self.adjust_time :
-            cdate = self.devicemgmt.GetSystemDateAndTime().UTCDateTime
+            cdate = self.devicemgmt.GetSystemDateAndTime()
+            cdate = cdate.UTCDateTime
+            #cdate = self.devicemgmt.GetSystemDateAndTime().UTCDateTime
             cam_date = dt.datetime(cdate.Date.Year, cdate.Date.Month, cdate.Date.Day, cdate.Time.Hour, cdate.Time.Minute, cdate.Time.Second)
             self.dt_diff = cam_date - dt.datetime.utcnow()
             self.devicemgmt.dt_diff = self.dt_diff

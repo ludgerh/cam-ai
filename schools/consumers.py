@@ -536,6 +536,7 @@ class schoolutil(AsyncWebsocketConsumer):
         makedirs(schooldir+'model')
       except FileExistsError:
         logger.warning('Dir already exists: '+schooldir+'model')
+      print(schoolsdir + 'model1/model/' + newschool.model_type + '.h5', '>>>', schooldir + 'model/' + newschool.model_type + '.h5')  
       copy(schoolsdir + 'model1/model/' + newschool.model_type + '.h5',
         schooldir + 'model/' + newschool.model_type + '.h5')
       await updatefilter(school, 

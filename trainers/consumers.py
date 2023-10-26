@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -36,6 +36,8 @@ from .c_trainers import trainers
 logname = 'ws_trainerconsumers'
 logger = getLogger(logname)
 log_ini(logger, logname)
+default_modeltype = djconf.getconfig('default_modeltype', 'efficientnetv2-b0')
+medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
 
 #*****************************************************************************
 # RemoteTrainer
@@ -46,15 +48,22 @@ class remotetrainer(AsyncWebsocketConsumer):
   @database_sync_to_async
   def checkfitdone(self, mode, schoolnr):
     if mode == 'init':
-      fitline = fit.objects.filter(school = schoolnr).latest('id')
-      self.lastfit = fitline.id
-      model_type = school.objects.get(id=schoolnr).model_type
+      try:    
+        fitline = fit.objects.filter(school = schoolnr).latest('id')
+        self.lastfit = fitline.id
+        model_type = school.objects.get(id=schoolnr).model_type
+      except fit.DoesNotExist:
+        self.lastfit = 0
+        model_type = default_modeltype
       return(model_type)
     elif mode == 'sync':
       while True:
-        fitline = fit.objects.filter(school = schoolnr).latest('id')
-        if fitline.id > self.lastfit:
-          self.lastfit = fitline.id
+        try:
+          fitline = fit.objects.filter(school = schoolnr).latest('id').id
+        except fit.DoesNotExist:
+          fitline = 0
+        if fitline > self.lastfit:
+          self.lastfit = fitline
           break
         else:
           sleep(1.0)
@@ -157,7 +166,7 @@ class trainerutil(AsyncWebsocketConsumer):
           break
         except BrokenPipeError:
           self.logger.warning('Socket error while pinging training server')
-          sleep(djconf.getconfigfloat('medium_brake', 0.1))
+          sleep(medium_brake)
 
   async def connect(self):
     self.ws_ts = None

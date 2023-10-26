@@ -67,8 +67,8 @@ class caminst(AsyncWebsocketConsumer):
         mynet = ip_network(params['network'])
       else:
         mynet = None  
-      if 'ipaddress' in params:
-        myip = ip_network(params['ipaddress'])
+      if 'ipaddr' in params:
+        myip = params['ipaddr']
       else:
         myip = None  
       if 'uname' in params:
@@ -86,7 +86,7 @@ class caminst(AsyncWebsocketConsumer):
         upass = mypass,
         ports=params['portaddr'], 
         url=params['camaddress'], 
-        max_workers=4,
+        max_workers=20,
       )
       #pprint(e.all_results)
       outlist['data'] = e.all_results
