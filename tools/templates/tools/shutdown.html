@@ -40,7 +40,7 @@
   The server is terminating and then being shut down. Please wait...
 </div>  
 <div class="h2 d-none" id="line3">
-  We are done. Now you me take the power from the server. Goodbye!
+  We are done. Once the servers network LED stopped blinking, you can take the power from the server. Goodbye!
 </div>  
   
 <script>
@@ -57,19 +57,17 @@ $(document).ready(function() {
   .then((result) => {
     admintoolsSocket = result;
     $('#continue-button').click(function() {
-        $('#continue-button').prop('disabled', true)
-        $('#line2').removeClass("d-none");
-        admintoolsSocket.sendandwait({
-          'command' : 'shutdown',
-        })
-        .then((result) => {
-          admintoolsSocket.onclose = function(e) {
-            console.log('Disconnected!');
-            setTimeout(function () {
-              $('#line3').removeClass("d-none");
-            }, 120000);
-          };
-        })
+      $('#continue-button').prop('disabled', true);
+      $('#line2').removeClass("d-none");
+      admintoolsSocket.socket.onclose = function(e) {
+        setTimeout(function () {
+          $('#line3').removeClass("d-none");
+        }, 60000);
+      };
+      admintoolsSocket.sendandwait({
+        'command' : 'shutdown',
+      })
+      .catch(err => {console.log(err);});
     });
   })
   .catch(err => {console.log(err);});
