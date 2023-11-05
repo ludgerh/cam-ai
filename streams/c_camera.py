@@ -391,6 +391,8 @@ class c_camera():
     self.url = url
     self.redis = myredis()
     self.ptz = {}
+    if control_mode == 0:
+      self.myptz = {}
     if control_mode == 1:
       url = 'http://' + self.control_ip + ':' + str(self.control_port) + '/ISAPI/System/deviceInfo'
       auth = HTTPDigestAuth(self.control_user, self.control_pass)

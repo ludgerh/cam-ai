@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -41,7 +41,7 @@ class drawpad():
     self.ydim = self.parent.parent.dbline.cam_yres
     self.mtype = 'C'
     self.ringlist = []
-    for item in mask.objects.filter(stream_id=self.myid, mtype=self.mtype):
+    for item in mask.objects.filter(stream_id=self.myid, mtype=self.parent.parent.type):
       self.ringlist.append(loads(item.definition))
     self.parent.parent.inqueue.put(('set_mask', self.ringlist))
     self.make_screen()

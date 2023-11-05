@@ -535,32 +535,32 @@ $(document).ready(function() {
 			.catch(err => {console.log(err);});
 			overimage = true;
 		});
-		myimage.mouseup((evt) => {
-			if (overimage) {
-				let x = evt.originalEvent.pageX - myimage.offset().left;
-				let y = evt.originalEvent.pageY - myimage.offset().top;
-				oneitemSocket.sendandwait({
-					'command' : 'mouseup',
-					'x' : x,
-					'y' : y,
-				})
-				.catch(err => {console.log(err);});
-				overimage = false;
-			};
+		$(document).mouseup((evt) => {
+			//if (overimage) {
+      let x = evt.originalEvent.pageX - myimage.offset().left;
+      let y = evt.originalEvent.pageY - myimage.offset().top;
+      oneitemSocket.sendandwait({
+	      'command' : 'mouseup',
+	      'x' : x,
+	      'y' : y,
+      })
+      .catch(err => {console.log(err);});
+			//};
+			overimage = false;
 		});
-		myimage.mousemove((evt) => {
-			if($('#ch_edit').prop('checked')) {
-			  if (overimage) {
-				  let x = evt.originalEvent.pageX - myimage.offset().left;
-				  let y = evt.originalEvent.pageY - myimage.offset().top;
-				  oneitemSocket.sendandwait({
-					  'command' : 'mousemove',
-					  'x' : x,
-					  'y' : y,
-				  })
-				  .catch(err => {console.log(err);});
-			  };
-			};  
+		$(document).mousemove((evt) => {
+      if($('#ch_edit').prop('checked')) {
+        //if (overimage) {
+        let x = evt.originalEvent.pageX - myimage.offset().left;
+        let y = evt.originalEvent.pageY - myimage.offset().top;
+        oneitemSocket.sendandwait({
+          'command' : 'mousemove',
+          'x' : x,
+          'y' : y,
+        })
+        .catch(err => {console.log(err);});
+        //};
+      };  
 		});
 		myimage.dblclick((evt) => {
 			if($('#ch_edit').prop('checked')) {

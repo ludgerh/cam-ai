@@ -176,15 +176,20 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         if 'ch_edit' in params:
           self.myitem.viewer.drawpad.edit_active = params['ch_edit']
         if 'ch_apply' in params:
-          if self.mydrawpad.mtype == 'C':
-            self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
-            myline = await getoneline(stream, {'id' : self.myitem.dbline.id, })
-            if self.mode == 'C':
+          myline = await getoneline(stream, {'id' : self.myitem.dbline.id, })
+          if self.mode == 'C':
+            if self.mydrawpad.mtype == 'C':
+              self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
+            if self.mydrawpad.mtype == 'C':
               myline.cam_apply_mask = params['ch_apply']
               await savedbline(myline, ["cam_apply_mask"])
-            elif self.mode == 'D':
+            elif self.mydrawpad.mtype == 'D':
               myline.det_apply_mask = params['ch_apply']
               await savedbline(myline, ["det_apply_mask"])
+          elif self.mode == 'D':
+            self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
+            myline.det_apply_mask = params['ch_apply']
+            await savedbline(myline, ["det_apply_mask"])
         if 'ch_white' in params:
           self.myitem.viewer.drawpad.whitemarks = params['ch_white']
       outlist['data'] = 'OK'
@@ -230,7 +235,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.myitem.viewer.drawpad.mousedownhandler(
             params['x']/self.scaling, params['y'] / self.scaling)
       else:
-        self.mycamitem.inqueue.put(('ptz_mdown', params['x']/self.scaling, params['y']/self.scaling))
+        if self.mycamitem.mycam and self.mycamitem.mycam.myptz:
+          self.mycamitem.inqueue.put(('ptz_mdown', params['x']/self.scaling, params['y']/self.scaling))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
@@ -244,7 +250,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           if self.mydrawpad.mtype == 'X':
             self.detectormask_changed = True
       else:
-        self.mycamitem.inqueue.put(('ptz_mup', params['x']/self.scaling, params['y']/self.scaling))
+        if self.mycamitem.mycam and self.mycamitem.mycam.myptz:
+          self.mycamitem.inqueue.put(('ptz_mup', params['x']/self.scaling, params['y']/self.scaling))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	

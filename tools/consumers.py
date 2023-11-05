@@ -75,7 +75,12 @@ check_rec_lock = Lock()
 #*****************************************************************************
 
 def checkschool(myschool, mypipe):
-  myschooldir = school.objects.get(id=myschool).dir
+  while True:
+    try:
+      myschooldir = school.objects.get(id=myschool).dir
+      break
+    except OperationalError:
+      connection.close()
   fileset = set()
   for item in (Path(myschooldir) / 'frames').iterdir():
     if item.is_file():
