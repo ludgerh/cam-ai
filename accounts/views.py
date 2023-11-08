@@ -11,7 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-from django_registration.backends.activation.views import ActivationView
+from django.conf import settings
+from django_registration.backends.activation.views import ActivationView, RegistrationView
 from django.views.generic.base import TemplateView
 from django.contrib.auth.models import User
 from users.models import userinfo
@@ -23,6 +24,15 @@ class MyActivationView(ActivationView):
     myuserinfo = userinfo(user=myuser)
     myuserinfo.save()
     return(username)
+    
+class MyRegistrationView(RegistrationView):
+
+  def get_email_context(self, activation_key):
+    return {
+      "activation_key": activation_key,
+      "expiration_days": settings.ACCOUNT_ACTIVATION_DAYS,
+      "site": settings.CLIENT_URL[:-1],
+    }
     
 class TermsView(TemplateView):
   template_name = 'django_registration/terms.html'

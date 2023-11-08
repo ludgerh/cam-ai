@@ -78,9 +78,13 @@ class sql_sequence(Sequence):
     xdata = []
     ydata = np.empty(shape=(len(batch_slice), len(self.classes_list)))
     for i in range(len(batch_slice)):
-      bmpdata = global_tf.io.read_file(batch_slice[i][1])
-      bmpdata = global_tf.io.decode_bmp(bmpdata, channels=3)
-      bmpdata = global_tf.image.resize(bmpdata, [self.xdim,self.ydim])
+      try:
+        bmpdata = global_tf.io.read_file(batch_slice[i][1])
+        bmpdata = global_tf.io.decode_bmp(bmpdata, channels=3)
+        bmpdata = global_tf.image.resize(bmpdata, [self.xdim,self.ydim])
+      except:
+        print('***** Error in decoding:', batch_slice[i][1])
+        exit(1)
       xdata.append(bmpdata)
       for j in range(len(self.classes_list)):
         ydata[i][j] = batch_slice[i][j+2]

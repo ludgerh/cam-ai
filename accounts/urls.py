@@ -12,16 +12,16 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.urls import path
-from django_registration.backends.activation.views import RegistrationView, ActivationView
+#from django_registration.backends.activation.views import RegistrationView, ActivationView
 from django.views.generic.base import TemplateView
-from .views import MyActivationView, TermsView
+from .views import MyActivationView, MyRegistrationView, TermsView
 from .forms import MyRegistrationFormUniqueEmail
 
 app_name = 'accounts'
 
 urlpatterns = [
   path("register/", 
-    RegistrationView.as_view(form_class=MyRegistrationFormUniqueEmail),
+    MyRegistrationView.as_view(form_class=MyRegistrationFormUniqueEmail),
     name="django_registration_register",
   ),
   path("terms/", 

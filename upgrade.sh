@@ -2,7 +2,7 @@
 validate() {
     grep -F -q -x "$1" <<EOF
 raspi11
-raspi
+raspi12
 debian10
 debian12
 debian
@@ -28,5 +28,5 @@ if validate $1; then
   echo Upgrade is done
 else
   echo "Usage: upgrade [OSTYPE]"
-  echo "OSTYPE in raspi11, debian10, debian12"  
+  echo "OSTYPE in raspi11, raspi12, debian10, debian12"  
 fi  

@@ -2,10 +2,9 @@
 validate() {
     grep -F -q -x "$1" <<EOF
 raspi11
-raspi
+raspi12
 debian10
 debian12
-debian
 EOF
 }
 
@@ -42,5 +41,5 @@ if validate $1; then
   python manage.py migrate
 else
   echo "Usage: install [OSTYPE]"
-  echo "OSTYPE in raspi11, debian10, debian12"  
+  echo "OSTYPE in raspi11, raspi12, debian10, debian12"  
 fi  

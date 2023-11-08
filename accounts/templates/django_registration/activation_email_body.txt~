@@ -1,4 +1,4 @@
 Dear new user,
 to activate your new account with CAM-AI, please click on this link:
-{{ request.scheme }}://{{ request.get_host }}:{{ request.get_port }}{% url 'django_registration_activate' activation_key %}
+{{ scheme }}://{{ site }}{% url 'django_registration_activate' activation_key %}
 ...
