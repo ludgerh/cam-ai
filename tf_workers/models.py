@@ -11,6 +11,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+
+from math import sqrt
 from django.db import models
 from django.utils import timezone
 from datetime import datetime
@@ -40,26 +42,36 @@ class worker(models.Model):
 
 class school(models.Model):
   name =  models.CharField(max_length=100)
-  creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_DEFAULT, default=1)
+  creator = models.ForeignKey(settings.AUTH_USER_MODEL, 
+    on_delete=models.SET_DEFAULT, default=1)
   dir = models.CharField(max_length=256, default='')
   trigger = models.IntegerField(default=500)
   lastmodelfile = models.DateTimeField(
     default=timezone.make_aware(datetime(1900, 1, 1)))
   active = models.IntegerField(default=1)
-  l_rate_min = models.CharField(max_length=20, default = '1e-6')
-  l_rate_max = models.CharField(max_length=20, default = '1e-6')
   e_school = models.IntegerField(default=1)
-  model_type = models.CharField(max_length=50, default = 'efficientnetv2-b0')
   tf_worker = models.ForeignKey(worker, on_delete=models.SET_DEFAULT, default=1)
   trainer = models.ForeignKey(
     trainermod, on_delete=models.SET_DEFAULT, default=1)
   ignore_checked = models.BooleanField(default=True)
   extra_runs = models.IntegerField(default=0)
   donate_pics = models.BooleanField(default=False)
-  weight_max = models.FloatField(default=2.0)
+  save_new_model = models.BooleanField(default=True)
+  model_type = models.CharField(max_length=50, default='efficientnetv2-b0')
+  model_image_augmentation = models.FloatField(default=0.5)
+  model_weight_decay = models.FloatField(default=0.01)
+  model_weight_constraint = models.FloatField(default=0.0)
+  model_dropout = models.FloatField(default=0.0)
+  l_rate_start = models.CharField(max_length=20, default='1e-6')
+  l_rate_stop = models.CharField(max_length=20, default='1e-7')
+  l_rate_delta_min = models.FloatField(default=0.00001)
+  l_rate_patience = models.IntegerField(default=3)
+  l_rate_decrement = models.FloatField(default=sqrt(0.1))
   weight_min = models.FloatField(default=1.0)
+  weight_max = models.FloatField(default=2.0)
   weight_boost = models.FloatField(default=8.0)
-  patience = models.IntegerField(default=10)
+  early_stop_delta_min = models.FloatField(default=0.00001)
+  early_stop_patience = models.IntegerField(default=10)
 
   def __str__(self):
     return(self.name)

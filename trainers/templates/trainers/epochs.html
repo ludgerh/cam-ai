@@ -1,4 +1,4 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -47,7 +47,7 @@
   <table class="table">
     <thead>
       <tr>
-        <th>ID</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>H100</th>
+        <th>#</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>H100</th>
         <th>Cmet</th><th>val_Loss</th><th>val_H100</th><th>val_Cmet</th>
       </tr>
     </thead>
@@ -56,14 +56,79 @@
     </tbody>
   </table>
 </div>
-<div class="container-fluid float-left">
-  <div class="h2 m-10">Training parameters</div>
+<div class="h2">
+  Model Settings:
 </div>
 <div class="container-fluid float-left">
-  <div class="m-10" id="params">123</div>
+  <div class="row">
+    <div class="col-sm-auto h4">
+      Model Type: <span id="model_type">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Image Augmentation: <span id="model_image_augmentation">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Weight Constraint: <span id="model_weight_constraint">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Weight Decay: <span id="model_weight_decay">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Dropout: <span id="model_dropout">?</span>
+    </div>  
+  </div>  
 </div>
-</body>
-</html>
+<div class="h2">
+  Weight Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      Min. weight: <span id="weight_min">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Max. weight: <span id="weight_max">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Weight boost: <span id="weight_boost">?</span>
+    </div>  
+  </div>  
+</div>
+<div class="h2">
+  Learning Rate Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      Starting Rate: <span id="l_rate_start">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Stopping Rate: <span id="l_rate_stop">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Patience: <span id="l_rate_patience">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Min. Delta: <span id="l_rate_delta_min">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Decrement: <span id="l_rate_decrement">?</span>
+    </div>  
+  </div>  
+</div>
+<div class="h2">
+  Stopping Condition Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      Patience: <span id="early_stop_patience">?</span>
+    </div>  
+    <div class="col-sm-auto h4">
+      Min. Delta: <span id="early_stop_delta_min">?</span>
+    </div>  
+  </div>  
+</div>
 
 
 <script>
@@ -124,12 +189,14 @@ function refresh_all() {
       graph_data.datasets[0].data.length = 0;
       graph_data.datasets[1].data.length = 0;
       newaddition = '';
+      counter = 0;
       result.forEach(function(item, index) {
+        counter += 1;
         graph_labels.push(item.pk);
         graph_data.datasets[0].data.push(item.fields.val_cmetrics);
         graph_data.datasets[1].data.push(item.fields.val_hit100);
         newaddition += '<tr>';
-        newaddition += '<td>'+item.pk+'</td>';
+        newaddition += '<td>'+counter+'</td>';
         newaddition += '<td>'+Math.round(item.fields.seconds)+'</td>';
         newaddition += '<td>'+item.fields.learning_rate.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.fields.loss.toPrecision(4)+'</td>';
@@ -176,7 +243,9 @@ $(document).ready(function() {
         'fitnr' : {{ fitnr }},
       })
       .then((result) => {
-        console.log(result);
+        for (const [key, value] of Object.entries(result)) {
+          $('#'+key).text(value);
+        };
         $('#params').html(result);
         refresh_all();
       })
@@ -187,3 +256,5 @@ $(document).ready(function() {
 });
 
 </script>
+</body>
+</html>

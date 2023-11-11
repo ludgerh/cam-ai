@@ -123,23 +123,7 @@ class trainer():
                   epoch.objects.filter(fit=fititem).delete()
                 fitstodelete.delete()
                 myfit = fit(made=timezone.now(), 
-	                minutes = 0.0, 
 	                school = item.id, 
-	                epochs = 0, 
-	                nr_tr = 0,
-	                nr_va = 0,
-	                loss = 0.0, 
-	                cmetrics = 0.0, 
-	                hit100 = 0.0, 
-	                val_loss = 0.0, 
-	                val_cmetrics = 0.0, 
-	                val_hit100 = 0.0, 
-	                cputemp = 0.0, 
-	                cpufan1 = 0.0, 
-	                cpufan2 = 0.0, 
-	                gputemp = 0.0, 
-	                gpufan = 0.0, 
-	                description = '',
                   status = 'Queuing',
                 )
                 myfit.save()

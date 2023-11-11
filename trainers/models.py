@@ -57,23 +57,32 @@ class trainframe(models.Model):
 
 class fit(models.Model):
   made = models.DateTimeField()
-  minutes = models.FloatField()
+  minutes = models.FloatField(default=0)
   school = models.IntegerField()
-  epochs = models.IntegerField()
-  nr_tr = models.IntegerField()
-  nr_va = models.IntegerField()
-  loss = models.FloatField()
-  cmetrics = models.FloatField()
+  epochs = models.IntegerField(default=0)
+  nr_tr = models.IntegerField(default=0)
+  nr_va = models.IntegerField(default=0)
+  loss = models.FloatField(default=0)
+  cmetrics = models.FloatField(default=0)
   hit100 = models.FloatField(default=0)
-  val_loss = models.FloatField()
-  val_cmetrics = models.FloatField()
+  val_loss = models.FloatField(default=0)
+  val_cmetrics = models.FloatField(default=0)
   val_hit100 = models.FloatField(default=0)
-  cputemp = models.FloatField()
-  cpufan1 = models.FloatField()
-  cpufan2 = models.FloatField()
-  gputemp = models.FloatField()
-  gpufan = models.FloatField()
-  description = models.TextField()
+  model_type = models.CharField(max_length=50, default='')
+  model_image_augmentation = models.FloatField(default=0.0)
+  model_weight_decay = models.FloatField(default=0.0)
+  model_weight_constraint = models.FloatField(default=0.0)
+  model_dropout = models.FloatField(default=0.0)
+  l_rate_start = models.CharField(max_length=20, default='0')
+  l_rate_stop = models.CharField(max_length=20, default='0')
+  l_rate_delta_min = models.FloatField(default=0.0)
+  l_rate_patience = models.IntegerField(default=0)
+  l_rate_decrement = models.FloatField(default=0.0)
+  weight_min = models.FloatField(default=0.0)
+  weight_max = models.FloatField(default=0.0)
+  weight_boost = models.FloatField(default=0.0)
+  early_stop_delta_min = models.FloatField(default=0.0)
+  early_stop_patience = models.IntegerField(default=0)
   status = models.CharField(max_length=10, default='Done')
 
   def __str__(self):
@@ -92,3 +101,9 @@ class epoch(models.Model):
 
   def __str__(self):
     return('epoch model (TBD ...)')
+    
+class model_type(models.Model):
+  name =  models.CharField(max_length=50, default = 'efficientnetv2-b0')   
+
+  def __str__(self):
+    return('model_type, Name = '+self.name)

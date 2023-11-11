@@ -1,4 +1,4 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -93,10 +93,9 @@
   <table class="table">
     <thead>
       <tr>
-        <th>Made</th><th>Samples</th><th>Min</th><th>CPU°C</th>
-        <th>Fan1</th><th>Fan2</th><th>GPU°C</th><th>Fan</th>
-        <th>Epochs</th><th>Loss</th><th>H100</th><th>Cmet</th>
-        <th>val_Loss</th><th>val_H100</th><th>val_Cmet</th><th>Status</th>
+        <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>Loss</th>
+        <th>H100</th><th>Cmet</th><th>val_Loss</th><th>val_H100</th><th>val_Cmet</th>
+        <th>Status</th>
       </tr>
     </thead>
     <tbody>
@@ -199,11 +198,6 @@ function refresh_all() {
         newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
         newaddition += '<td>'+(parseInt(item.fields.nr_tr)+parseInt(item.fields.nr_va))+'</td>';
         newaddition += '<td>'+Math.round(item.fields.minutes)+'</td>';
-        newaddition += '<td>'+item.fields.cputemp+'</td>';
-        newaddition += '<td>'+item.fields.cpufan1+'</td>';
-        newaddition += '<td>'+item.fields.cpufan2+'</td>';
-        newaddition += '<td>'+item.fields.gputemp+'</td>';
-        newaddition += '<td>'+item.fields.gpufan+'</td>';
         newaddition += '<td>'+item.fields.epochs+'</td>';
         newaddition += '<td>'+item.fields.loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.fields.hit100.toPrecision(4)+'</td>';

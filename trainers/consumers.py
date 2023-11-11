@@ -172,6 +172,7 @@ class trainerutil(AsyncWebsocketConsumer):
     self.ws_ts = None
     await self.accept()
     self.trainernr = None
+    self.fit_list_len = 0
 
   async def disconnect(self, code):
     if self.trainernr is not None:
@@ -206,15 +207,19 @@ class trainerutil(AsyncWebsocketConsumer):
 
   @database_sync_to_async
   def getfitinfo(self, schoolnr):
+    all_fits = list(fit.objects.filter(school=schoolnr))
+    result = all_fits[self.fit_list_len:]
+    self.fit_list_len = len(all_fits)
     result = serializers.serialize(
       'json', 
-      list(fit.objects.filter(school=schoolnr)), 
+      result, 
       fields=(
-        'made', 'nr_tr', 'nr_va', 'minutes', 
-        'epochs', 'loss', 'cmetrics', 'val_loss', 
-        'val_cmetrics', 'cputemp', 'cpufan1', 'cpufan2',
-        'gputemp','gpufan', 'hit100', 'val_hit100',
-        'status',
+        'made', 'nr_tr', 'nr_va', 'minutes', 'epochs', 'loss', 'cmetrics', 'val_loss', 
+        'val_cmetrics', 'hit100', 'val_hit100', 'status', 'model_type', 
+        'model_image_augmentation', 'model_weight_decay','model_weight_constraint', 
+        'model_dropout', 'l_rate_start', 'l_rate_stop', 'l_rate_delta_min', 
+        'l_rate_patience', 'l_rate_decrement', 'weight_min', 'weight_max', 
+        'weight_boost', 'early_stop_delta_min', 'early_stop_patience', 
       ),
     )
     return(result)
@@ -285,16 +290,17 @@ class trainerutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'getparams':
       if self.dblinedict['t_type'] in {2, 3}:
-        temp = json.loads(text_data)
-        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
+        self.ws.send(text_data, opcode=1) #1 = Text
         outlist['data'] = json.loads(self.ws.recv())['data']
       else:
         paramline = await getonelinedict(fit, 
           {'id' : params['fitnr'], }, 
-          ['description', ])
-        paramline = paramline['description']
-        paramline = '<br>'.join(paramline.splitlines())
-        #paramline = paramline.replace('<br><br>', '<br>')
+          ['model_type', 'model_image_augmentation', 'model_weight_decay', 
+            'model_weight_constraint', 'model_dropout', 'l_rate_start', 
+            'l_rate_stop', 'l_rate_delta_min', 'l_rate_patience', 
+            'l_rate_decrement', 'weight_min', 'weight_max', 
+            'weight_boost', 'early_stop_delta_min', 'early_stop_patience', 
+          ])
         outlist['data'] = paramline
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))							
@@ -376,85 +382,21 @@ class trainerutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
       else:
-        self.close()			
-
-    elif params['command'] == 'gettrigger':
+        self.close()		
+        
+    elif params['command'] == 'get_for_dashboard':  	
       schooldict = await getonelinedict(school, 
         {'id' : self.schoolnr, }, 
-        ['trigger']) 
-      outlist['data'] = schooldict['trigger']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))				
-
-    elif params['command'] == 'getpatience':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['patience']) 
-      outlist['data'] = schooldict['patience']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))					
-
-    elif params['command'] == 'getmaxweight':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['weight_max']) 
-      outlist['data'] = schooldict['weight_max']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))					
-
-    elif params['command'] == 'getminweight':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['weight_min']) 
-      outlist['data'] = schooldict['weight_min']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))					
-
-    elif params['command'] == 'getweightboost':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['weight_boost']) 
-      outlist['data'] = schooldict['weight_boost']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))				
-
-    elif params['command'] == 'getminlr':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['l_rate_min']) 
-      outlist['data'] = schooldict['l_rate_min']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))					
-
-    elif params['command'] == 'getmaxlr':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['l_rate_max']) 
-      outlist['data'] = schooldict['l_rate_max']
+        [params['item']]) 
+      outlist['data'] = schooldict[params['item']]
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))						
 
-    elif params['command'] == 'getignorecheck':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['ignore_checked']) 
-      outlist['data'] = schooldict['ignore_checked']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))								
-
-    elif params['command'] == 'getdonate':
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        ['donate_pics']) 
-      outlist['data'] = schooldict['donate_pics']
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))					
-
-    elif params['command'] == 'settrigger':
+    elif params['command'] == 'set_from_dashboard':
       if self.maywrite:
         await updatefilter(school, 
           {'id' : self.schoolnr, }, 
-          {'trigger' : params['value'], }) 
+          {params['item'] : params['value'], }) 
         if self.dblinedict['t_type'] in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoollinedict['e_school']
@@ -465,140 +407,5 @@ class trainerutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
       else:
-        self.close()															
+        self.close()		
 
-    elif params['command'] == 'setpatience':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'patience' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-      else:
-        self.close()												
-
-    elif params['command'] == 'setmaxweight':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'weight_max' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-      else:
-        self.close()															
-
-    elif params['command'] == 'setminweight':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'weight_min' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-      else:
-        self.close()															
-
-    elif params['command'] == 'setweightboost':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'weight_boost' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-      else:
-        self.close()								
-
-    elif params['command'] == 'setminlr':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'l_rate_min' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-      else:
-        self.close()								
-
-    elif params['command'] == 'setmaxlr':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'l_rate_max' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))		
-      else:
-        self.close()								
-
-    elif params['command'] == 'setignorecheck':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'ignore_checked' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-      else:
-        self.close()										
-
-    elif params['command'] == 'setdonate':
-      if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'donate_pics' : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))		
-      else:
-        self.close()	

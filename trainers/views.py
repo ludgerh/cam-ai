@@ -21,7 +21,7 @@ from tf_workers.models import school
 from schools.c_schools import get_taglist
 from tools.l_tools import djconf
 from tools.tokens import checktoken
-from .models import fit
+from .models import fit, model_type
 
 @login_required
 def trainer(request, schoolnr):
@@ -69,6 +69,7 @@ def dashboard(request, schoolnr):
       'debug' : settings.DEBUG,
       'school' : myschool,
       'schoolnr' : schoolnr,
+      'model_types' : model_type.objects.all(),
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
     }
     return(HttpResponse(template.render(context)))

@@ -30,60 +30,133 @@
 <div class="h2">
   <button type="button" id="train_button" class="btn btn-primary m-2" style="width: 120px;">Train Now!</button>
 </div>
-<table class="h2">
-  <tr>
-    <td><label style="padding:10px" for="trigger">Trigger:</label></td>
-    <td><input type="number" id="trigger" name="triggerinput" size="10" min="0" step="100"></td>
-  </tr>
-  <tr>
-    <td><label style="padding:10px" for="trigger">Patience:</label></td>
-    <td><input type="number" id="patience" name="patienceinput" size="10" min="3" step="1"></td>
-  </tr>
-  <tr>
-    <td><label style="padding:10px" for="trigger">Max. weight:</label></td>
-    <td><input type="number" id="maxweight" name="maxweightinput" size="10" min="0.0" max="10.0" step="0.01"></td>
-  </tr>
-  <tr>
-    <td><label style="padding:10px" for="trigger">Min. weight:</label></td>
-    <td><input type="number" id="minweight" name="maxweightinput" size="10" min="0.ü" max="10.0" step="0.01"></td>
-  </tr>
-  <tr>
-    <td><label style="padding:10px" for="trigger">Weight boost</label></td>
-    <td><input type="number" id="weightboost" name="weightboostinput" size="10" min="0.0" max="10.0" step="0.01"></td>
-  </tr>
-  <tr>
-    <td><label style="padding:10px" for="min_lr">Min. learning rate:</label></td>
-    <td>
-      <select id="min_lr" name="min_lr" value="-1">
-        <option value="-1">None</option>
+<div class="h2">
+  School Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="trigger">Trigger:</label>
+      <input class="m-2" type="number" id="trigger" size="10" min="0" step="100">
+    </div>  
+    <div class="col-sm-auto h4">
+      <input style="width: 24px; height: 24px;" type="checkbox" id="cbignorecheck" class="m-2">
+      <label class="m-2" for="cbignorecheck">Ignore check-in</label>
+    </div>  
+    <div class="col-sm-auto h4">
+      <input style="width: 24px; height: 24px;" type="checkbox" id="cbdonate" class="m-2">
+      <label class="m-2" for="cbdonate">Donate images and tagging</label>
+    </div>  
+    <div class="col-sm-auto h4">
+      <input style="width: 24px; height: 24px;" type="checkbox" id="save_new_model" class="m-2">
+      <label class="m-2" for="save_new_model">Save new Model</label>
+    </div>  
+  </div>  
+</div>
+<div class="h2">
+  Model Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="model_type">Model Type:</label>
+      <select id="model_type">
+      {% for item in model_types %}
+          <option value={{ item.name }}>{{ item.name }}</option>
+      {% endfor %}    
+      </select>
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="image_augmentation">Image Augmentation:</label>
+      <input class="m-2" type="number" id="image_augmentation" size="10" min="0.0" max="1.0" step="0.01">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="weight_constraint">Weight Constraint:</label>
+      <input class="m-2" type="number" id="weight_constraint" size="10" min="0.0" max="5.0" step="0.01">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="weight_decay">Weight Decay:</label>
+      <input class="m-2" type="number" id="weight_decay" size="10" min="0.0" max="1.0" step="0.01">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="dropout">Dropout:</label>
+      <input class="m-2" type="number" id="dropout" size="10" min="0.0" max="0.5" step="0.01">
+    </div>  
+  </div>  
+</div>
+<div class="h2">
+  Weight Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="minweight">Min. weight:</label>
+      <input class="m-2" type="number" id="minweight" size="10" min="0.ü" max="10.0" step="0.01">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="maxweight">Max. weight:</label>
+      <input class="m-2" type="number" id="maxweight" size="10" min="0.0" max="10.0" step="0.01">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="weightboost">Weight boost</label>
+      <input class="m-2" type="number" id="weightboost" size="10" min="0.0" max="10.0" step="0.01">
+    </div>  
+  </div>  
+</div>
+<div class="h2">
+  Learning Rate Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="start_lr">Starting Rate:</label>
+      <select id="start_lr" value="1e-6">
         <option value="1e-3">1e-3 (0.001)</option>
         <option value="1e-4">1e-4 (0.0001)</option>
         <option value="1e-5">1e-5 (0.00001)</option>
         <option value="1e-6">1e-6 (0.000001)</option>
         <option value="1e-7">1e-7 (0.0000001)</option>
       </select>
-    </td>
-  </tr>
-  <tr>
-    <td><label style="padding:10px" for="max_lr">Max. learning rate:</label></td>
-    <td>
-      <select id="max_lr" name="max_lr" value="-1">
-        <option value="-1">None</option>
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="stop_lr">Stopping Rate:</label>
+      <select id="stop_lr" value="1e-6">
         <option value="1e-3">1e-3 (0.001)</option>
         <option value="1e-4">1e-4 (0.0001)</option>
         <option value="1e-5">1e-5 (0.00001)</option>
         <option value="1e-6">1e-6 (0.000001)</option>
         <option value="1e-7">1e-7 (0.0000001)</option>
       </select>
-    </td>
-  </tr>
-</table>
-<h2>
-  <input style="width: 24px; height: 24px;" type="checkbox" id="cbignorecheck" class="m-2">Ignore check-in
-</h2>
-<h2>
-  <input style="width: 24px; height: 24px;" type="checkbox" id="cbdonate" class="m-2">Donate images and tagging
-</h2>
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="l_rate_patience">Patience</label>
+      <input class="m-2" type="number" id="l_rate_patience" size="10" min="3" max="1000" step="1">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="l_rate_delta_min">Min. Delta</label>
+      <input class="m-2" type="number" id="l_rate_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="l_rate_decrement">Decrement</label>
+      <input class="m-2" type="number" id="l_rate_decrement" size="10" min="0.01" max="0.99" step="0.00001">
+    </div>  
+  </div>  
+</div>
+<div class="h2">
+  Stopping Condition Settings:
+</div>
+<div class="container-fluid float-left">
+  <div class="row">
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="early_stop_patience">Patience</label>
+      <input class="m-2" type="number" id="early_stop_patience" size="10" min="3" max="1000" step="1">
+    </div>  
+    <div class="col-sm-auto h4">
+      <label class="m-2" for="early_stop_delta_min">Min. Delta</label>
+      <input class="m-2" type="number" id="early_stop_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
+    </div>  
+  </div>  
+</div>
 
 <div id="mymodal" class="modal" tabindex="-1" role="dialog">
   <div class="modal-dialog" role="document">
@@ -97,6 +170,22 @@
     </div>
   </div>
 </div>
+<div class="container-fluid float-left">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>MWD</th><th>MWC</th>
+        <th>MDr</th><th>LR0</th><th>LR1</th><th>LDM</th><th>LPa</th><th>LDe</th>
+        <th>WMi</th><th>WMa</th><th>WBo</th><th>ESD</th><th>ESP</th><th>Min</th>
+        <th>Epochs</th><th>Loss</th><th>H100</th><th>Cmet</th><th>val_L</th>
+        <th>val_H</th><th>val_C</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tbody id="tablebody">
+    </tbody>
+  </table>
+</div>
 {% endif %}
 
 <script >
@@ -105,6 +194,41 @@ let trainerutilSocket;
 let trainnowstarted = false;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let modal_visible = false;
+let item_save;
+
+function init_var(menu_item, code_string) {
+  trainerutilSocket.sendandwait({
+    'command' : 'get_for_dashboard',
+    'item' : code_string,
+  })
+  .then((result) => {
+    $(menu_item).val(result);
+    $(menu_item).change(function() {
+      trainerutilSocket.sendandwait({
+        'command' : 'set_from_dashboard',
+        'item' : code_string,
+        'value' : $(menu_item).val(),
+      })
+    });
+  })
+};
+
+function init_bool_var(menu_item, code_string) {
+  trainerutilSocket.sendandwait({
+    'command' : 'get_for_dashboard',
+    'item' : code_string,
+  })
+  .then((result) => {
+    $(menu_item).prop('checked', result);
+    $(menu_item).change(function() {
+      trainerutilSocket.sendandwait({
+        'command' : 'set_from_dashboard',
+        'item' : code_string,
+        'value' : $(menu_item).prop('checked'),
+      })
+    });
+  })
+};
 
 function refresh_all() {
   trainerutilSocket.sendandwait({
@@ -135,6 +259,49 @@ function refresh_all() {
       $('#queue_status').text('Idle');
       $('#queue_pos').text('0/'+result.len);
     };
+    return(trainerutilSocket.sendandwait({
+      'command' : 'getfitinfo',
+      'school' : {{ school.id }},
+    }))
+  })
+  .then((result) => {
+    result = JSON.parse(result);
+    if ($('#tablebody tr').length && result.length) {
+      $('td:last').html('<a href="/trainers/epochs/{{ school.id }}/'+item_save+'/" target="_blank">Done</a>');
+    };
+    result.forEach(function(item, index) {
+      datestring = item.fields.made;
+      newaddition = '<tr>';
+      newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
+      newaddition += '<td>'+(parseInt(item.fields.nr_tr)+parseInt(item.fields.nr_va))+'</td>';
+      newaddition += '<td>'+item.fields.model_type+'</td>';
+      newaddition += '<td>'+item.fields.model_image_augmentation.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.model_weight_decay.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.model_weight_constraint.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.model_dropout.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.l_rate_start+'</td>';
+      newaddition += '<td>'+item.fields.l_rate_stop+'</td>';
+      newaddition += '<td>'+item.fields.l_rate_delta_min.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.l_rate_patience.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.l_rate_decrement.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.weight_min.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.weight_max.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.weight_boost.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.early_stop_delta_min.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.fields.early_stop_patience.toPrecision(2)+'</td>';
+      newaddition += '<td>'+Math.round(item.fields.minutes)+'</td>';
+      newaddition += '<td>'+item.fields.epochs+'</td>';
+      newaddition += '<td>'+item.fields.loss.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.fields.hit100.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.fields.cmetrics.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.fields.val_loss.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.fields.val_hit100.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.fields.val_cmetrics.toPrecision(3)+'</td>';
+      newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/'+item.pk+'/" target="_blank">'+item.fields.status+'</a></td>';
+      item_save = item.pk;
+      newaddition += '</tr>';
+      $('#tablebody').append(newaddition);
+    });
     setTimeout(refresh_all, 10000);
   })
   .catch(err => {console.log(err);});
@@ -172,122 +339,27 @@ $(document).ready(function() {
         })
         .catch(err => {console.log(err);});
       });
-      trainerutilSocket.sendandwait({
-        'command' : 'gettrigger',
-      })
-      .then((result) => {
-        $('#trigger').val(result);
-        $('#trigger').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'settrigger',
-            'value' : $('#trigger').val(),
-          })
-        });
-      })
-      trainerutilSocket.sendandwait({
-        'command' : 'getpatience',
-      })
-      .then((result) => {
-        $('#patience').val(result);
-        $('#patience').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setpatience',
-            'value' : $('#patience').val(),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
-      trainerutilSocket.sendandwait({
-        'command' : 'getmaxweight',
-      })
-      .then((result) => {
-        $('#maxweight').val(result);
-        $('#maxweight').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setmaxweight',
-            'value' : $('#maxweight').val(),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
-      trainerutilSocket.sendandwait({
-        'command' : 'getminweight',
-      })
-      .then((result) => {
-        $('#minweight').val(result);
-        $('#minweight').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setminweight',
-            'value' : $('#minweight').val(),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
-      trainerutilSocket.sendandwait({
-        'command' : 'getweightboost',
-      })
-      .then((result) => {
-        $('#weightboost').val(result);
-        $('#weightboost').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setweightboost',
-            'value' : $('#weightboost').val(),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
-      trainerutilSocket.sendandwait({
-        'command' : 'getminlr',
-      })
-      .then((result) => {
-        $('#min_lr').val(result);
-        $('#min_lr').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setminlr',
-            'value' : $('#min_lr').val(),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
-      trainerutilSocket.sendandwait({
-        'command' : 'getmaxlr',
-      })
-      .then((result) => {
-        $('#max_lr').val(result);
-        $('#max_lr').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setmaxlr',
-            'value' : $('#max_lr').val(),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
-      trainerutilSocket.sendandwait({
-        'command' : 'getignorecheck',
-      })
-      .then((result) => {
-        $('#cbignorecheck').prop('checked', result);
-        $('#cbignorecheck').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setignorecheck',
-            'value' : $('#cbignorecheck').prop('checked'),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
-      trainerutilSocket.sendandwait({
-        'command' : 'getdonate',
-      })
-      .then((result) => {
-        $('#cbdonate').prop('checked', result);
-        $('#cbdonate').change(function() {
-          trainerutilSocket.sendandwait({
-            'command' : 'setdonate',
-            'value' : $('#cbdonate').prop('checked'),
-          })
-        });
-      })
-      .catch(err => {console.log(err);});
+      init_var('#trigger', 'trigger');
+      init_bool_var('#cbignorecheck', 'ignore_checked');
+      init_bool_var('#cbdonate', 'donate_pics');
+      init_bool_var('#save_new_model', 'save_new_model');
+      init_var('#model_type', 'model_type');
+      init_var('#image_augmentation', 'model_image_augmentation');
+      init_var('#weight_constraint', 'model_weight_constraint');
+      init_var('#weight_decay', 'model_weight_decay');
+      init_var('#dropout', 'model_dropout');
+      init_var('#model_type', 'model_type');
+      init_var('#patience', 'early_stop_patience');
+      init_var('#maxweight', 'weight_max');
+      init_var('#minweight', 'weight_min');
+      init_var('#weightboost', 'weight_boost');
+      init_var('#start_lr', 'l_rate_start');
+      init_var('#stop_lr', 'l_rate_stop');
+      init_var('#l_rate_patience', 'l_rate_patience');
+      init_var('#l_rate_delta_min', 'l_rate_delta_min');
+      init_var('#l_rate_decrement', 'l_rate_decrement');
+      init_var('#early_stop_patience', 'early_stop_patience');
+      init_var('#early_stop_delta_min', 'early_stop_delta_min');
 {% endif %}
       refresh_all();
     } else {
