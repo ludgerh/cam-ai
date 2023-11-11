@@ -172,7 +172,8 @@ class trainerutil(AsyncWebsocketConsumer):
     self.ws_ts = None
     await self.accept()
     self.trainernr = None
-    self.fit_list_len = 0
+    self.fit_list_done = 0
+    self.one_more = False
 
   async def disconnect(self, code):
     if self.trainernr is not None:
@@ -208,8 +209,19 @@ class trainerutil(AsyncWebsocketConsumer):
   @database_sync_to_async
   def getfitinfo(self, schoolnr):
     all_fits = list(fit.objects.filter(school=schoolnr))
-    result = all_fits[self.fit_list_len:]
-    self.fit_list_len = len(all_fits)
+    if len(all_fits):
+      self.working = (all_fits[-1].status != 'Done')
+      if (not self.working) and (not self.one_more):
+        result = all_fits[self.fit_list_done:]
+        added_one = False
+      else:  
+        result = all_fits[self.fit_list_done - 1:]
+        self.one_more = self.working
+        added_one = True
+      self.fit_list_done = len(all_fits)
+    else:
+      result = []  
+      added_one = False
     result = serializers.serialize(
       'json', 
       result, 
@@ -222,7 +234,7 @@ class trainerutil(AsyncWebsocketConsumer):
         'weight_boost', 'early_stop_delta_min', 'early_stop_patience', 
       ),
     )
-    return(result)
+    return((result, added_one))
 
   @database_sync_to_async
   def getepochsinfo(self, fitnr):

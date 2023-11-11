@@ -329,7 +329,12 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
       break
     else:
       lcopy.pop(0)
-  lcopy = [item for item in lcopy if ((item.name == model_name) or (item.name[:6] == 'CAM-AI'))]
+  count = 0    
+  for item in lcopy:
+    if item.name[:6] == 'CAM-AI':
+      count += 1
+  if count == 4: 
+    lcopy = [item for item in lcopy if ((item.name == model_name) or (item.name[:6] == 'CAM-AI'))]
   if myschool.model_weight_decay:
     lcopy[2].kernel_regularizer = l2(myschool.model_weight_decay)
     lcopy[2].bias_regularizer = l2(myschool.model_weight_decay)

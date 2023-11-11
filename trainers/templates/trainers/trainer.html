@@ -181,7 +181,7 @@ function refresh_all() {
     }));
   })
   .then((result) => {
-    result = JSON.parse(result);
+    result = JSON.parse(result[0]);
     if ((result.length != fit_length) || (last_status != result[result.length - 1].fields.status)) {
       graph_labels.length = 0;
       graph_data.datasets[0].data.length = 0;
@@ -219,7 +219,7 @@ function refresh_all() {
 
       fit_length = result.length;
     };
-    setTimeout(refresh_all, 10000);
+    //setTimeout(refresh_all, 10000);
   })
   .catch(err => {console.log(err);});
 };

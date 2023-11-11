@@ -265,9 +265,10 @@ function refresh_all() {
     }))
   })
   .then((result) => {
-    result = JSON.parse(result);
-    if ($('#tablebody tr').length && result.length) {
-      $('td:last').html('<a href="/trainers/epochs/{{ school.id }}/'+item_save+'/" target="_blank">Done</a>');
+    added_one = result[1]
+    result = JSON.parse(result[0]);
+    if (added_one) {
+      $('#tablebody tr:last').remove();
     };
     result.forEach(function(item, index) {
       datestring = item.fields.made;
@@ -301,6 +302,7 @@ function refresh_all() {
       item_save = item.pk;
       newaddition += '</tr>';
       $('#tablebody').append(newaddition);
+      $(document).scrollTop($(document).height()); 
     });
     setTimeout(refresh_all, 10000);
   })
