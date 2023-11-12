@@ -215,7 +215,10 @@ class trainerutil(AsyncWebsocketConsumer):
         result = all_fits[self.fit_list_done:]
         added_one = False
       else:  
-        result = all_fits[self.fit_list_done - 1:]
+        if self.fit_list_done:
+          result = all_fits[self.fit_list_done - 1:]
+        else:
+          result = all_fits[self.fit_list_done:]
         self.one_more = self.working
         added_one = True
       self.fit_list_done = len(all_fits)

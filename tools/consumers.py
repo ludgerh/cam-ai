@@ -610,7 +610,7 @@ class admintools(AsyncWebsocketConsumer):
           }, )
       while redis.get_start_trainer_busy():
         sleep(long_brake)
-      redis.set_start_trainer_busy(params['workernr'])
+      redis.set_start_trainer_busy(school_dict['trainer'])
       schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
       try:
         makedirs(schooldir+'frames')
