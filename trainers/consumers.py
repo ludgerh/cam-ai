@@ -12,7 +12,9 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
-from os import remove, path, makedirs
+import cv2 as cv
+import numpy as np
+from os import remove, path, makedirs, rename
 from time import time, sleep
 from datetime import datetime
 from logging import getLogger
@@ -23,7 +25,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import WebsocketConsumer, AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from tools.l_tools import djconf, seq_to_int
+from tools.l_tools import djconf, seq_to_int, version_flat
 from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, updatefilter, getoneline, 
   filterlinesdict, savedbline, deletefilter)
@@ -78,16 +80,38 @@ class remotetrainer(AsyncWebsocketConsumer):
 
   async def connect(self):
     self.frameinfo = {}
+    self.client_soft_version = None
     await self.accept()
 
   async def receive(self, text_data =None, bytes_data=None):
-    if bytes_data:
-      filepath = self.myschooldict['dir'] + 'frames/' + self.frameinfo['name']
-      mydir = path.split(filepath)[0]
-      if not path.exists(mydir):
-        makedirs(mydir)
-      with open(filepath, 'wb') as f:
-        f.write(bytes_data)
+    if bytes_data: 
+      if self.client_soft_version >= version_flat('1.0.10'):
+        filepath = (self.myschooldict['dir'] 
+          + 'coded/' 
+          + str(self.myschooldict['model_xin']) 
+          + 'x' + str(self.myschooldict['model_yin']) 
+          + '/' + self.frameinfo['name'][:-4]+'.jpg')
+        codpath = filepath[:-4]+'.cod'
+        mydir = path.dirname(filepath) 
+        if not path.exists(mydir):
+          makedirs(mydir)
+        imgdata = cv.imdecode(np.frombuffer(bytes_data, dtype=np.uint8), (cv.IMREAD_COLOR))
+        if (imgdata.shape[1] != self.myschooldict['model_xin'] 
+            or  imgdata.shape[0] != self.myschooldict['model_xin']):
+          imgdata = cv.resize(imgdata, (self.myschooldict['model_xin'], 
+            self.myschooldict['model_xin']))
+          cv.imwrite(filepath, imgdata)
+          rename(filepath, codpath)
+        else:
+          with open(codpath, 'wb') as f:
+            f.write(bytes_data)
+      else:
+        filepath = self.myschooldict['dir'] + 'frames/' + self.frameinfo['name']
+        mydir = path.dirname(filepath) 
+        if not path.exists(mydir):
+          makedirs(mydir)
+        with open(filepath, 'wb') as f:
+          f.write(bytes_data)
       frameline = trainframe(
         made = timezone.make_aware(datetime.fromtimestamp(time())),
         school = self.myschooldict['id'],
@@ -119,7 +143,7 @@ class remotetrainer(AsyncWebsocketConsumer):
     elif indict['code'] == 'namecheck':
       self.myschooldict = await getonelinedict(school, 
         {'id' : indict['school'], }, 
-        ['id', 'dir',], )
+        ['id', 'dir', 'model_xin', 'model_yin'], ) 
       myframes = await filterlinesdict(trainframe, 
         {'school' : indict['school'], }, 
         ['name', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 
@@ -127,7 +151,11 @@ class remotetrainer(AsyncWebsocketConsumer):
       result = [(item['name'], seq_to_int((item['c0'], item['c1'], 
           item['c2'], item['c3'], item['c4'], item['c5'], item['c6'], 
           item['c7'], item['c8'], item['c9'])))
-        for item in myframes]
+        for item in myframes]  
+      await self.send(json.dumps(result))
+    elif indict['code'] == 'setversion':
+      self.client_soft_version = version_flat(indict['version'])
+      result = (self.myschooldict['model_xin'], self.myschooldict['model_yin'])
       await self.send(json.dumps(result))
     elif indict['code'] == 'send':
       self.frameinfo['name'] = indict['name']
@@ -135,7 +163,16 @@ class remotetrainer(AsyncWebsocketConsumer):
       self.frameinfo['code'] = indict['framecode']
     elif indict['code'] == 'delete':
       await deletefilter(trainframe, {'name' : indict['name'], }, )
-      remove(self.myschooldict['dir'] + 'frames/' + indict['name'])
+      bmppath = self.myschooldict['dir'] + 'frames/' + indict['name']
+      if path.exists(bmppath):
+        remove(bmppath)
+      codpath = (self.myschooldict['dir'] 
+        + 'coded/' 
+        + str(self.myschooldict['model_xin']) 
+        + 'x' + str(self.myschooldict['model_yin']) 
+        + '/' + indict['name'][:-4]+'.cod')
+      if path.exists(codpath):
+        remove(codpath)
       await self.send('OK')
     elif indict['code'] == 'trainnow':
       await updatefilter(school, 
@@ -217,10 +254,11 @@ class trainerutil(AsyncWebsocketConsumer):
       else:  
         if self.fit_list_done:
           result = all_fits[self.fit_list_done - 1:]
+          added_one = True
         else:
           result = all_fits[self.fit_list_done:]
+          added_one = False
         self.one_more = self.working
-        added_one = True
       self.fit_list_done = len(all_fits)
     else:
       result = []  
@@ -400,10 +438,20 @@ class trainerutil(AsyncWebsocketConsumer):
         self.close()		
         
     elif params['command'] == 'get_for_dashboard':  	
-      schooldict = await getonelinedict(school, 
-        {'id' : self.schoolnr, }, 
-        [params['item']]) 
-      outlist['data'] = schooldict[params['item']]
+      if self.dblinedict['t_type'] in {2, 3}:
+        temp = json.loads(text_data)
+        temp['data']['school']=self.schoollinedict['e_school']
+        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
+        answer = json.loads(self.ws.recv())['data']
+        await updatefilter(school, 
+          {'id' : self.schoolnr, }, 
+          {params['item'] : answer, }) 
+        outlist['data'] = answer
+      else:  
+        schooldict = await getonelinedict(school, 
+          {'id' : self.schoolnr, }, 
+          [params['item']]) 
+        outlist['data'] = schooldict[params['item']]
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))						
 

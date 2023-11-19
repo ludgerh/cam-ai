@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -468,14 +468,12 @@ class c_cam(c_device):
       outparams1 += ' -pix_fmt bgr24'
       outparams1 += ' -r ' + str(frame_rate)
       outparams1 += ' -vsync cfr'
-      # Replacement for -vsync with new ffmpeg:
-      #outparams1 += ' -fps_mode cfr'
       outparams1 += ' pipe:1'
       inparams = ' -i "' + source_string + '"'
-      if self.video_codec_name == 'h264':
-        generalparams = ' -v fatal'
-        #generalparams += ' -hwaccel auto'
-        #generalparams += ' -codec:v h264_v4l2m2m'
+      generalparams = ' -v fatal'
+      generalparams += ' -fflags nobuffer'
+      generalparams += ' -flags low_delay'
+      if self.video_codec_name in {'h264', 'hevc'}:
         if filepath:
           outparams2 = ' -c copy'
           outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
@@ -485,10 +483,7 @@ class c_cam(c_device):
         else:
           outparams2 =''
       else:
-        generalparams = ' -v fatal'
         generalparams += ' -use_wallclock_as_timestamps 1'
-        #generalparams += ' -hwaccel auto'
-        #generalparams += ' -codec:v h264_v4l2m2m'
         if filepath:
           outparams2 = ' -c libx264'
           if self.dbline.cam_ffmpeg_fps:

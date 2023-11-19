@@ -73,6 +73,7 @@ class fit(models.Model):
   model_weight_decay = models.FloatField(default=0.0)
   model_weight_constraint = models.FloatField(default=0.0)
   model_dropout = models.FloatField(default=0.0)
+  model_stop_overfit = models.BooleanField(default=True)
   l_rate_start = models.CharField(max_length=20, default='0')
   l_rate_stop = models.CharField(max_length=20, default='0')
   l_rate_delta_min = models.FloatField(default=0.0)
@@ -103,7 +104,31 @@ class epoch(models.Model):
     return('epoch model (TBD ...)')
     
 class model_type(models.Model):
-  name =  models.CharField(max_length=50, default = 'efficientnetv2-b0')   
+  name =  models.CharField(max_length=50, default = 'efficientnetv2-b0')  
+  x_in_default = models.IntegerField(default=224)
+  y_in_default = models.IntegerField(default=224)
 
   def __str__(self):
     return('model_type, Name = '+self.name)
+    
+if not model_type.objects.filter(name='efficientnetv2-b0'):
+  newtype = model_type(name='efficientnetv2-b0', x_in_default=224, y_in_default=224)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b1'):
+  newtype = model_type(name='efficientnetv2-b1', x_in_default=240, y_in_default=240)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b2'):
+  newtype = model_type(name='efficientnetv2-b2', x_in_default=260, y_in_default=260)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b3'):
+  newtype = model_type(name='efficientnetv2-b3', x_in_default=300, y_in_default=300)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-s'):
+  newtype = model_type(name='efficientnetv2-s', x_in_default=384, y_in_default=384)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-m'):
+  newtype = model_type(name='efficientnetv2-m', x_in_default=480, y_in_default=480)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-l'):
+  newtype = model_type(name='efficientnetv2-l', x_in_default=480, y_in_default=480)
+  newtype.save()

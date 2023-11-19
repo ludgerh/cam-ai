@@ -72,9 +72,8 @@ class sql_sequence(Sequence):
     ydata = np.empty(shape=(len(batch_slice), len(self.classes_list)))
     for i in range(len(batch_slice)):
       bmp_file_path = batch_slice[i][1]
-      cod_file_path = (bmp_file_path[:-4]+'.cod').replace('/frames/', '/coded/')
+      cod_file_path = (bmp_file_path[:-4]+'.cod').replace('/frames/', '/coded/'+str(self.xdim)+'x'+str(self.ydim)+'/')
       ram_cod_id = batch_slice[i][0]
-      #self.logger.info('+++++ '+str(ram_cod_id)+' ---> '+cod_file_path)
       done = False
       try:
         if ram_cod_id in self.ram_buffer:
@@ -158,6 +157,7 @@ class MyCallback(Callback):
     self.myfit.model_weight_decay = myschool.model_weight_decay
     self.myfit.model_weight_constraint = myschool.model_weight_constraint
     self.myfit.model_dropout = myschool.model_dropout
+    self.myfit.model_stop_overfit = myschool.model_stop_overfit
     self.myfit.save()
 
   def on_epoch_begin(self, myepoch, logs=None):
@@ -197,6 +197,9 @@ class MyCallback(Callback):
     self.myfit.epochs = self.epoch_count
     self.myfit.save()
     sqlconnection.close()
+    if self.myfit.model_stop_overfit and logs['loss'] < logs['val_loss']:
+      self.logger.info('*** Epoch ' + str(self.epoch_count) + ': Stopping overfitting...')
+      self.model.stop_training = True
 
 def gpu_init(gpu_nr, gpu_mem_limit, logger):
   try:
@@ -273,8 +276,6 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
   logger.info('***Launching GPU#' + str(gpu_nr) + ', MemLimit: ' + str(gpu_mem_limit))
   gpu_init(gpu_nr, gpu_mem_limit, logger)
   seed()
-  if not(path.exists(myschool.dir+'coded')):
-    makedirs(myschool.dir+'coded')
   epochs = djconf.getconfigint('tr_epochs', 1000)
   batchsize = djconf.getconfigint('tr_batchsize', 32)
   val_split = djconf.getconfigfloat('validatiothn_split', 0.33333333)
@@ -299,21 +300,26 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
 
   model_name = myschool.model_type
   modelpath = myschool.dir + 'model/'
-  if path.exists(modelpath + model_name + '.h5'):
-    if myschool.save_new_model:
-      if sqlfit.objects.filter(school=myschool.id).exists():
-        fitnr = sqlfit.objects.filter(school=myschool.id).latest('id').id
-      else:
-        fitnr = -1
-      copyfile(modelpath + model_name + '.h5', 
-        modelpath + model_name + '_' + str(fitnr) + '.h5')
-    model_to_load = modelpath + model_name + '.h5'
-  else:
-    school1model = djconf.getconfig('schools_dir', 'data/schools/') + 'model1/model/' + model_name + '.h5'
-    if (myschool.id != 1) and path.exists(school1model):
-      model_to_load = school1model
+  if path.exists(modelpath + model_name + '.extra.h5'):
+    extra_model_found = True
+    model_to_load = modelpath + model_name + '.extra.h5'
+  else:  
+    extra_model_found = False
+    if path.exists(modelpath + model_name + '.h5'):
+      if myschool.save_new_model:
+        if sqlfit.objects.filter(school=myschool.id).exists():
+          fitnr = sqlfit.objects.filter(school=myschool.id).latest('id').id
+        else:
+          fitnr = -1
+        copyfile(modelpath + model_name + '.h5', 
+          modelpath + model_name + '_' + str(fitnr) + '.h5')
+      model_to_load = modelpath + model_name + '.h5'
     else:
-      model_to_load = None
+      school1model = djconf.getconfig('schools_dir', 'data/schools/') + 'model1/model/' + model_name + '.h5'
+      if (myschool.id != 1) and path.exists(school1model):
+        model_to_load = school1model
+      else:
+        model_to_load = None
   if model_to_load:     
     logger.info('*** Loading model ' + model_to_load);
     model = load_model(model_to_load, 
@@ -372,12 +378,14 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
     ))
            
     model = Sequential(layers)
+  if not(path.exists(myschool.dir+'coded/'+str(xdim)+'x'+str(ydim))):
+    makedirs(myschool.dir+'coded/'+str(xdim)+'x'+str(ydim))
   l_rate = float(myschool.l_rate_start)
   logger.info('>>> New learning rate: '+str(l_rate))
   model.compile(loss='binary_crossentropy',
     optimizer=Adam(learning_rate=l_rate),
     metrics=[hit100, cmetrics])
-  model.summary()
+  model.summary(print_fn=lambda x: logger.info(x))
   for item in trlist:
     found_class = False
     for count in range(len(classes_list)):
@@ -421,9 +429,12 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
     callbacks=[es, mc, reduce_lr, cb,],
     )
 
-  if myschool.save_new_model:
+  if (myschool.save_new_model or extra_model_found):
     rename(myschool.dir+'model/'+model_name+'_temp.h5', 
       myschool.dir+'model/'+model_name+'.h5')
+  if extra_model_found:
+    rename(myschool.dir+'model/'+model_name+'.extra.h5', 
+      myschool.dir+'model/'+model_name+'.old_extra.h5')
 
   myschool.lastmodelfile = timezone.now()
   myschool.save(update_fields=["lastmodelfile"])

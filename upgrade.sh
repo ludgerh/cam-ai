@@ -25,7 +25,7 @@ if validate $1; then
   cp upgrade.sh ..
   chmod u+x ../upgrade.sh
   cd ..
-  echo Upgrade is done
+  echo "Upgrade is done"
 else
   echo "Usage: upgrade [OSTYPE]"
   echo "OSTYPE in raspi11, raspi12, debian10, debian12"  

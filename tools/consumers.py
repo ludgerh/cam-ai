@@ -124,11 +124,16 @@ def checkrecfiles(mypipe):
   fileset = fileset_jpg & fileset_mp4
   fileset_all = fileset_jpg | fileset_mp4 | fileset_webm
   mydbset = event.objects.filter(videoclip__startswith='E_')
-  dbset = set()
-  dbtimedict = {}
-  for item in mydbset:
-    dbset.add(item.videoclip)
-    dbtimedict[item.videoclip] = item.start
+  while True:
+    try:
+      dbset = set()
+      dbtimedict = {}
+      for item in mydbset:
+        dbset.add(item.videoclip)
+        dbtimedict[item.videoclip] = item.start
+      break
+    except OperationalError:
+      connection.close()
   correct = fileset & dbset
   missingdb = fileset_all - dbset
   missingfiles = dbset - fileset
@@ -529,7 +534,7 @@ class dbcompress(AsyncWebsocketConsumer):
           while myproc.is_alive():
             await asleep(1)
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
     else:

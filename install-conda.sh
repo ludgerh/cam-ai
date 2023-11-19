@@ -39,6 +39,7 @@ if validate $1; then
   cp ~/cam-ai/camai/passwords.py.example ~/cam-ai/camai/passwords.py
   python setup.py
   python manage.py migrate
+  echo "Installation is done."
 else
   echo "Usage: install [OSTYPE]"
   echo "OSTYPE in raspi11, raspi12, debian10, debian12"  
