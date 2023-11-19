@@ -110,25 +110,3 @@ class model_type(models.Model):
 
   def __str__(self):
     return('model_type, Name = '+self.name)
-    
-if not model_type.objects.filter(name='efficientnetv2-b0'):
-  newtype = model_type(name='efficientnetv2-b0', x_in_default=224, y_in_default=224)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-b1'):
-  newtype = model_type(name='efficientnetv2-b1', x_in_default=240, y_in_default=240)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-b2'):
-  newtype = model_type(name='efficientnetv2-b2', x_in_default=260, y_in_default=260)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-b3'):
-  newtype = model_type(name='efficientnetv2-b3', x_in_default=300, y_in_default=300)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-s'):
-  newtype = model_type(name='efficientnetv2-s', x_in_default=384, y_in_default=384)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-m'):
-  newtype = model_type(name='efficientnetv2-m', x_in_default=480, y_in_default=480)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-l'):
-  newtype = model_type(name='efficientnetv2-l', x_in_default=480, y_in_default=480)
-  newtype.save()

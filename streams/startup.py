@@ -23,13 +23,35 @@ print('***** Software-Version: ', software_version, '*****')
 djconf.setconfig('version', software_version)
 from tf_workers.models import worker
 from tf_workers.c_tfworkers import tf_workers, tf_worker
-from trainers.models import trainer as trainerdb
+from trainers.models import model_type, trainer as trainerdb
 from trainers.c_trainers import trainers, trainer
 from tools.health import stop as stophealth
 from .models import stream
 from .c_streams import streams, c_stream
 
 #from threading import enumerate
+    
+if not model_type.objects.filter(name='efficientnetv2-b0'):
+  newtype = model_type(name='efficientnetv2-b0', x_in_default=224, y_in_default=224)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b1'):
+  newtype = model_type(name='efficientnetv2-b1', x_in_default=240, y_in_default=240)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b2'):
+  newtype = model_type(name='efficientnetv2-b2', x_in_default=260, y_in_default=260)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b3'):
+  newtype = model_type(name='efficientnetv2-b3', x_in_default=300, y_in_default=300)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-s'):
+  newtype = model_type(name='efficientnetv2-s', x_in_default=384, y_in_default=384)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-m'):
+  newtype = model_type(name='efficientnetv2-m', x_in_default=480, y_in_default=480)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-l'):
+  newtype = model_type(name='efficientnetv2-l', x_in_default=480, y_in_default=480)
+  newtype.save()
 
 check_timer = None
 redis = myredis()
