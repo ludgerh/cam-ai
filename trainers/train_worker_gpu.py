@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -315,7 +316,9 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
           modelpath + model_name + '_' + str(fitnr) + '.h5')
       model_to_load = modelpath + model_name + '.h5'
     else:
-      school1model = djconf.getconfig('schools_dir', 'data/schools/') + 'model1/model/' + model_name + '.h5'
+      datapath = djconf.getconfig('datapath', 'data/')
+      school1model = (djconf.getconfig('schools_dir', datapath + 'schools/') 
+        + 'model1/model/' + model_name + '.h5')
       if (myschool.id != 1) and path.exists(school1model):
         model_to_load = school1model
       else:

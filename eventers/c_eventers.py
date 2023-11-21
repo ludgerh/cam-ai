@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -67,7 +68,8 @@ class c_eventer(c_device):
     self.nr_of_cond_ed = 0
     self.read_conditions()
     self.tag_list = get_taglist(self.dbline.eve_school.id)
-    self.recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
+    datapath = djconf.getconfig('datapath', 'data/')
+    self.recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
     self.last_display = 0
 
   def runner(self):

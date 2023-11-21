@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -16,13 +17,17 @@
 import json
 from asyncio import sleep as asleep
 from pathlib import Path
-from os import makedirs, path as ospath, system as ossystem
-from shutil import copyfile, move
+from glob import glob
+from os import makedirs, path as ospath, system as ossystem, getcwd, chdir
+from shutil import copyfile, move, rmtree, copytree
+from subprocess import check_output, STDOUT
 from time import time, sleep
 from random import randint
 from multiprocessing import Process, Pipe, Lock
 from logging import getLogger
 from ipaddress import ip_network, ip_address
+from requests import get as rget
+from zipfile import ZipFile
 from django.contrib.auth.models import User
 from django.db import connection
 from django.db.utils import OperationalError
@@ -30,6 +35,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
   updatefilter, savedbline, countfilter)
+from camai.passwords import os_type, env_type  
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tools.c_tools import image_size, reduce_image
@@ -56,12 +62,13 @@ redis = myredis()
 logname = 'ws_toolsconsumers'
 logger = getLogger(logname)
 log_ini(logger, logname)
-recordingspath = Path(djconf.getconfig('recordingspath', 'data/recordings/'))
-schoolframespath = Path(djconf.getconfig('schoolframespath', 'data/schoolframes/'))
-textpath = djconf.getconfig('textpath', 'data/texts/')
+datapath = djconf.getconfig('datapath', 'data/')
+recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
+schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
+textpath = djconf.getconfig('textpath', datapath + 'texts/')
 if not ospath.exists(textpath):
   makedirs(textpath)
-schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
+schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 school_x_max = djconf.getconfigint('school_x_max', 500)
 school_y_max = djconf.getconfigint('school_y_max', 500)
@@ -688,13 +695,11 @@ class admintools(AsyncWebsocketConsumer):
         'user' : params['user'],
         'pass' : params['pass'],
       }
-      print(outdict)
       ws.send(json.dumps({
         'tracker' : 0, 
         'data' : outdict, 
       }), opcode=1) #1 = Text
       resultdict = json.loads(ws.recv())
-      print(resultdict)
       ws.close()
       if resultdict['data']['status'] == 'new': 
         await updatefilter(worker, {'id' : params['workernr'], }, {
@@ -791,6 +796,48 @@ class admintools(AsyncWebsocketConsumer):
       if not self.scope['user'].is_superuser:
         await self.close()
       ossystem('sudo shutdown now')
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      
+    elif params['command'] == 'upgrade':
+      if not self.scope['user'].is_superuser:
+        await self.close()
+      print('&&&&&', params['url'])
+      basepath = getcwd() 
+      chdir('..')
+      if not ospath.exists('temp'):
+        makedirs('temp')
+      if ospath.exists('temp/backup'):
+        rmtree('temp/backup')
+      move(basepath, 'temp/backup')  
+      response = rget(params['url'], stream=True)
+      zip_path = "temp/cam-ai-upgrade.zip"
+      with open(zip_path, mode="wb") as file:
+        for chunk in response.iter_content(chunk_size=10 * 1024):
+          file.write(chunk)    
+      with ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall('.')  
+      zipresult = glob('ludgerh-cam-ai-*')[0]
+      print('*****', basepath)
+      move(zipresult, basepath)
+      move('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
+      move('temp/backup/' + datapath, basepath + '/' + datapath)
+      if env_type == 'venv':
+        move('temp/backup/env', basepath + '/env')
+      chdir(basepath)
+      if env_type == 'venv':
+        cmd = 'source env/bin/activate; '
+      else: #conda
+        cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
+        cmd += 'conda activate tf; '
+      cmd += 'pip install --upgrade pip; '
+      cmd += 'pip install -r requirements.' + os_type + '; '
+      cmd += 'python manage.py migrate; '
+      result = check_output(cmd, shell=True, executable='/bin/bash').decode()
+      for line in result.split('\n'):
+        logger.info(line);
+      #ossystem('sudo shutdown now')
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	

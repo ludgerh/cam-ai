@@ -44,16 +44,4 @@ class token(models.Model):
 
   def __str__(self):
     return('Token: ' + self.passwd)
-    
-if not  camurl.objects.filter(type='levelone FCS-4051'):
-  newcam = camurl(type='levelone FCS-4051', 
-    url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
-  newcam.save()
-if not  camurl.objects.filter(type='levelone FCS-5201'):
-  newcam = camurl(type='levelone FCS-5201', 
-    url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
-  newcam.save()
-if not  camurl.objects.filter(type='Reolink RLC-410W'):
-  newcam = camurl(type='Reolink RLC-410W', 
-    url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
-  newcam.save()
+

@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -48,9 +49,10 @@ logname = 'ws_schoolsconsumers'
 logger = getLogger(logname)
 log_ini(logger, logname)
 classes_list = get_taglist(1)
-schoolframespath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
-recordingspath = djconf.getconfig('recordingspath', 'data/recordings/')
-schoolsdir = djconf.getconfig('schools_dir', 'data/schools/')
+datapath = djconf.getconfig('datapath', 'data/')
+schoolframespath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
+recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
+schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
 school_x_max = djconf.getconfigint('school_x_max', 500)
 school_y_max = djconf.getconfigint('school_y_max', 500)
 

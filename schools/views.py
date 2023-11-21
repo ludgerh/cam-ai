@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -29,8 +30,10 @@ from users.models import userinfo, archive
 from eventers.models import event, event_frame
 from trainers.models import trainframe
 
-schoolframespath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
-archivepath = djconf.getconfig('archivepath', 'data/archive/')
+
+datapath = djconf.getconfig('datapath', 'data/')
+schoolframespath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
+archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
 
 @login_required
 def images(request, schoolnr):

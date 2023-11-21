@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -26,7 +27,8 @@ from tf_workers.models import school
 from users.models import archive
 from .models import event, event_frame
 
-archivepath = djconf.getconfig('archivepath', 'data/archive/')
+datapath = djconf.getconfig('datapath', 'data/')
+archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
 
 @login_required
 def events(request, schoolnr):
@@ -96,7 +98,7 @@ def eventjpg(request, eventnr, tokennr=None, token=None):
   if not go_on:
     return(HttpResponse('No Access'))
   filename = (myevent.videoclip + '.jpg')
-  filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+  filepath = djconf.getconfig('recordingspath', datapath + 'recordings/') + filename
   with open(filepath, "rb") as f:
     return HttpResponse(f.read(), content_type="image/jpeg")
 
@@ -121,7 +123,7 @@ def eventmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
     return(HttpResponse('No Access'))
   if eventnr:  
     filename = (myevent.videoclip + '.mp4')
-    filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+    filepath = djconf.getconfig('recordingspath', datapath + 'recordings/') + filename
   elif archivenr:
     filepath = (archivepath + 'videos/' + archiveline.name + '.mp4')
   with open(filepath, "rb") as f:
@@ -149,7 +151,7 @@ def eventwebm(request, archivenr=0, eventnr=0, tokennr=None, token=None):
     return(HttpResponse('No Access'))
   if eventnr:  
     filename = (myevent.videoclip + '.webm')
-    filepath = djconf.getconfig('recordingspath', 'data/recordings/') + filename
+    filepath = djconf.getconfig('recordingspath', datapath + 'recordings/') + filename
   elif archivenr:
     filepath = (archivepath + 'videos/' + archiveline.name + '.webm')
   with open(filepath, "rb") as f:

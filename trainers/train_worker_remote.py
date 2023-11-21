@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -182,7 +183,8 @@ class train_once_remote():
           else:
             sleep(10.0)
         r = requests.get(dlurl, allow_redirects=True)
-        dlfile = djconf.getconfig('schools_dir', 'data/schools/')
+        datapath = djconf.getconfig('datapath', 'data/')
+        dlfile = djconf.getconfig('schools_dir', datapath + 'schools/')
         dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.h5'
         self.logger.info('DL Model: ' + dlfile)
         open(dlfile, 'wb').write(r.content)

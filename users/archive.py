@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -20,7 +21,8 @@ from access.c_access import access
 
 class archive():
   def __init__(self):
-    self.archivepath = djconf.getconfig('archivepath', 'data/archive/')
+    datapath = djconf.getconfig('datapath', 'data/')
+    self.archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
     if not path.exists(self.archivepath+'frames/'):
       makedirs(self.archivepath+'frames/')
     if not path.exists(self.archivepath+'videos/'):
@@ -33,7 +35,8 @@ class archive():
         if frameline.hasarchive:
           archiveline = dbarchive.objects.get(typecode=0, number = mynumber)
         else:
-          sourcedir = djconf.getconfig('schoolframespath', 'data/schoolframes/')
+          datapath = djconf.getconfig('datapath', 'data/')
+          sourcedir = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
           targetdir = self.archivepath + 'frames/'
           targetname = frameline.name.split('/')[-1]
           targetname = uniquename(targetdir, targetname.split('.')[0], targetname.split('.')[1])
@@ -56,7 +59,8 @@ class archive():
         if eventline.hasarchive:
           archiveline = dbarchive.objects.get(typecode=1, number = mynumber)
         else:
-          sourcedir = djconf.getconfig('recordingspath', 'data/recordings/')
+          datapath = djconf.getconfig('datapath', 'data/')
+          sourcedir = djconf.getconfig('recordingspath', datapath + 'recordings/')
           sourcename1 = eventline.videoclip + '.mp4'
           sourcename2 = eventline.videoclip + '.jpg'
           sourcename3 = eventline.videoclip + '.webm'
