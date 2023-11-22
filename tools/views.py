@@ -1,6 +1,5 @@
 # Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
 # More information and komplete source: https://github.com/ludgerh/cam-ai
-# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -242,7 +241,6 @@ class upgrade(TemplateView):
     response = rget(url)
     if response.status_code == 200:
       response = json.loads(response.text)
-      new_version = response['tag_name']
     context = super().get_context_data(**kwargs)
     context.update({
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
