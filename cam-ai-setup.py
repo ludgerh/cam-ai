@@ -14,9 +14,11 @@
 
 import subprocess
 import os
+import stat
 #import stat
 import requests
 import json
+from time import sleep
 from shutil import move, rmtree
 from zipfile import ZipFile
 from glob import glob
@@ -24,10 +26,15 @@ from getpass import getpass
 import platform
 
 installdir = 'cam-ai'
+root_db_pass = None
+cam_ai_db_pass = None
+
+def sql_query(command):
+  subprocess.call(['mariadb', '-u', 'root', '-p'+root_db_pass, '-e', command]) 
 
 print('CAM-AI server setup tool')
 
-print('Just for in case: Stopping c_server process...')
+print('Just for in case: Stopping c_server process (red failure message should be OK)...')
 subprocess.call(['sudo', 'systemctl', 'stop', 'c_server']) 
 print()
 
@@ -35,11 +42,12 @@ os_code = platform.release()
 if os_code == '6.1.0-13-amd64':
   os_code = 'debian12'
   env_type = 'conda'
-elif os_code == '6.1.0-rpi6-rpi-v8':
+elif (os_code == '6.1.0-rpi4-rpi-v8'
+  or os_code == '6.1.0-rpi6-rpi-v8'):
   os_code = 'raspi12'
   env_type = 'venv'
 else:
-  print('Unknown OS code:', oscode) 
+  print('Unknown OS code:', os_code) 
   exit(1)
 print('Detected OS:', os_code)
 print('Environment Type:', env_type)
@@ -55,17 +63,6 @@ response = json.loads(response.text)
 new_version = response['tag_name']
 zip_url = response['zipball_url']
 print('Installing ', new_version)
-print()
-
-dbpass = None
-while not dbpass:
-  dbpass1 = (getpass(prompt='Please choose a database server password? (required): '))
-  dbpass2 = (getpass(prompt='Please repeat: '))
-  if dbpass1 and dbpass1 == dbpass2:
-    dbpass = dbpass1
-  else:
-    print('The passwords did not match, try again.')  
-    print()
 print()
 
 selected = False
@@ -96,8 +93,51 @@ while not selected:
     print('You need to choose at least one item, try again.')  
     print()
 
+while not root_db_pass:
+  dbpass1 = (getpass(prompt='Please choose a database root password (required): '))
+  dbpass2 = (getpass(prompt='Please repeat: '))
+  if dbpass1 and dbpass1 == dbpass2:
+    root_db_pass = dbpass1
+  else:
+    print('The passwords did not match, try again.')  
+    print()
+print()
+
+while not cam_ai_db_pass:
+  dbpass1 = (getpass(prompt='Please choose a database password for the user CAM-AI (required): '))
+  dbpass2 = (getpass(prompt='Please repeat: '))
+  if dbpass1 and dbpass1 == dbpass2:
+    cam_ai_db_pass = dbpass1
+  else:
+    print('The passwords did not match, try again.')  
+    print()
+print()
+
+print('*******************************************')
+print('*                                         *')
+print('*  This will take a couple of minutes.    *')
+print('*  Lean back, have a coffee and watch...  *')
+print('*                                         *')
+print('*******************************************')
+print()
+sleep(10.0)
+    
+print('>>>>> Installing MariaDB and database...')   
+subprocess.call(['sudo', 'apt', 'update']) 
+subprocess.call(['sudo', 'apt', '-y', 'upgrade']) 
+subprocess.call(['sudo', 'apt', '-y', 'install', 'mariadb-server']) 
+subprocess.call(['sudo', 'mariadb-admin', '-u', 'root', 'password', root_db_pass])
+sql_query("drop user if exists ''@'localhost';")
+sql_query("drop user if exists ''@'%';")
+sql_query("drop user if exists 'root'@'%';")
+sql_query("drop database if exists test;")
+sql_query("drop database if exists `CAM-AI`;")
+sql_query("grant all on *.* to 'CAM-AI'@'localhost' identified by '" + cam_ai_db_pass + "' with grant option;")
+sql_query("create database `CAM-AI`")
+print() 
+
 if True:
-  print('Getting and unpacking ZIP...')
+  print('>>>>> Getting and unpacking ZIP...')
   if not os.path.exists('temp'):
     os.makedirs('temp')  
   zip_path = "temp/cam-ai-upgrade.zip"
@@ -122,9 +162,7 @@ if True:
   print()
 
 if True:
-  print('Installing reqired packages...')
-  subprocess.call(['sudo', 'apt', 'update']) 
-  subprocess.call(['sudo', 'apt', '-y', 'upgrade']) 
+  print('>>>>> Installing reqired packages...')
   subprocess.call(['sudo', 'apt', '-y', 'install', 'python3-dev']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'default-libmysqlclient-dev']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'build-essential']) 
@@ -138,7 +176,7 @@ if True:
     pass #Conda  
   print()
     
-  print('Modifying system config...')
+  print('>>>>> Modifying system config...')
   subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^timeout/d', '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , '/etc/dhcp/dhclient.conf']) 
@@ -160,7 +198,7 @@ if True:
 
 os.chdir(installdir)
 
-print('Setting up Python environment...')
+print('>>>>> Setting up Python environment...')
 if env_type == 'venv':
   if not os.path.exists('env'):
     subprocess.call(['python', '-m', 'venv', 'env']) 
@@ -175,7 +213,7 @@ result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode
 for line in result.split('\n'):
   print(line); 
   
-print('Modifying ' + installdir + '/passwords.py...')
+print('>>>>> Modifying ' + installdir + '/passwords.py...')
 if env_type == 'venv':
   cmd = 'source env/bin/activate; '
 else: #conda
@@ -199,7 +237,7 @@ for line in sourcefile:
   if line.startswith('myip = '):
       line = 'myip = "' + myip + '"\n'
   if line.startswith('db_password = '):
-      line = 'db_password = "' + dbpass + '"\n'
+      line = 'db_password = "' + cam_ai_db_pass + '"\n'
   if line.startswith('os_type = '):
       line = 'os_type = "' + os_code + '"\n'
   if line.startswith('env_type = '):
@@ -213,7 +251,7 @@ os.rename('/home/cam_ai/cam-ai/camai/passwords.py-new',
   '/home/cam_ai/cam-ai/camai/passwords.py')
 print()
 
-print('Migrating the database...')
+print('>>>>> Migrating the database...')
 if env_type == 'venv':
   cmd = 'source env/bin/activate; '
 else: #conda
@@ -223,6 +261,29 @@ cmd += 'python manage.py migrate; '
 result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
 for line in result.split('\n'):
   print(line); 
+os.chdir('..')
+runserverfile = 'runserver.sh'
+targetfile = open(runserverfile, 'w')  
+targetfile.write('#!/bin/bash\n') 
+targetfile.write('cd ' + installdir + '\n') 
+targetfile.write('source env/bin/activate\n') 
+targetfile.write('python manage.py runserver 0.0.0.0:8000 --noreload\n')
+targetfile.close()
+st = os.stat(runserverfile)
+os.chmod(runserverfile, st.st_mode | stat.S_IEXEC)
 print()
+print('*************************************************')
+print('*                                               *')
+print('*  Congratulations! Your installation is done.  *')
+print('*                                               *')
+print('*************************************************')
+print()
+print('You can now start the server by entering this:')
+print('./runserver.sh')
+print()
+print('And then surf to your new server in the browser using:')
+print('http://cam-ai-raspi:8000/')
+print()
+print('Have a nice day...')
 
 
