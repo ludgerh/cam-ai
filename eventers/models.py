@@ -80,3 +80,15 @@ class evt_condition(models.Model):
 
   def __str__(self):
     return('evt_conditions model (TBD ...)')
+    
+class alarm(models.Model):
+  action_type = models.IntegerField("action_type", choices=(
+    (1, 'action1'),
+    (2, 'action2'),
+    (3, 'action3'),
+  ), default=0)
+  action_param1 = models.CharField(max_length=20)
+  action_param2 = models.CharField(max_length=20)
+  
+  def __str__(self):
+    return('alarm model (TBD ...)')

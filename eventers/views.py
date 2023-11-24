@@ -25,6 +25,7 @@ from tools.tokens import checktoken
 from tf_workers.models import school
 from users.models import archive
 from .models import event, event_frame
+from .models import alarm as dbalarm
 
 archivepath = djconf.getconfig('archivepath', 'data/archive/')
 
@@ -82,7 +83,22 @@ def oneevent(request, schoolnr, eventnr):
     return(HttpResponse(template.render(context)))
   else:
     return(HttpResponse('No Access'))
-
+    
+@login_required
+def alarm(request, schoolnr):
+  myparam = dbalarm.objects.get(id=1).action_param1
+  template = loader.get_template('eventers/alarm.html')
+  context = {
+    'version' : djconf.getconfig('version', 'X.Y.Z'),
+    'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+    'debug' : settings.DEBUG,
+    'may_write' : access.check('S', schoolnr, request.user, 'W'),
+    'school' : school.objects.get(id=schoolnr),
+    'user' : request.user,
+    'myparam' : myparam,
+  }
+  return(HttpResponse(template.render(context)))
+    
 def eventjpg(request, eventnr, tokennr=None, token=None):
   myevent = event.objects.get(id=eventnr)
   if request.user.id is None:

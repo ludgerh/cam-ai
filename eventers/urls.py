@@ -13,7 +13,7 @@
 
 from django.urls import path
 
-from .views import events, oneevent, eventjpg, eventmp4, eventwebm
+from .views import events, oneevent, eventjpg, eventmp4, eventwebm, alarm
 
 urlpatterns = [
 	path('events/<int:schoolnr>/', events, name='events'),
@@ -26,5 +26,6 @@ urlpatterns = [
 	path('eventwebm/<int:archivenr>/video.webm', eventwebm, name='eventwebm'),
 	path('eventwebm/<int:archivenr>/<int:eventnr>/video.webm', eventwebm, name='eventwebmevent'),
 	path('eventwebm/<int:eventnr>/<int:tokennr>/<str:token>/video.webm', eventwebm, name='eventwebmtoken'),
+	path('alarm/<int:schoolnr>/', alarm, name='alarm'),
 ]
 
