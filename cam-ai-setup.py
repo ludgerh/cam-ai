@@ -14,12 +14,10 @@
 
 import subprocess
 import os
-import stat
-#import stat
 import requests
 import json
 from time import sleep
-from shutil import move, rmtree
+from shutil import move, rmtree, copy
 from zipfile import ZipFile
 from glob import glob
 from getpass import getpass
@@ -193,7 +191,13 @@ if True:
   subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI disabled saving' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 900 1' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 300 10' , '/etc/redis/redis.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$a#save 60 10000' , '/etc/redis/redis.conf'])  
+  subprocess.call(['sudo', 'sed', '-i', '$a#save 60 10000' , '/etc/redis/redis.conf']) 
+  
+  #subprocess.call(['sudo', 'touch', '/etc/sudoers.d/010_CAM-AI_reboot_privilege']) 
+  #subprocess.call(['sudo', 'sed', '-i', '$acam_ai ALL=(root) NOPASSWD: /sbin/reboot' , '/etc/sudoers.d/010_CAM-AI_reboot_privilege']) 
+  #cmd = 'echo "cam_ai ALL=(root) NOPASSWD: /sbin/reboot" | sudo tee -a /etc/sudoers.d/010_CAM-AI_reboot_privilege'
+  #subprocess.call(cmd) 
+  
   print()
 
 os.chdir(installdir)
@@ -208,7 +212,6 @@ else: #conda
   cmd += 'conda activate tf; '
 cmd += 'pip install --upgrade pip; '
 cmd += 'pip install -r requirements.' + os_code + '; '
-# cmd += 'python manage.py migrate; '
 result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
 for line in result.split('\n'):
   print(line); 
@@ -261,16 +264,10 @@ cmd += 'python manage.py migrate; '
 result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
 for line in result.split('\n'):
   print(line); 
-os.chdir('..')
 runserverfile = 'runserver.sh'
-targetfile = open(runserverfile, 'w')  
-targetfile.write('#!/bin/bash\n') 
-targetfile.write('cd ' + installdir + '\n') 
-targetfile.write('source env/bin/activate\n') 
-targetfile.write('python manage.py runserver 0.0.0.0:8000 --noreload\n')
-targetfile.close()
-st = os.stat(runserverfile)
-os.chmod(runserverfile, st.st_mode | stat.S_IEXEC)
+#copy(runserverfile, '..')
+os.chdir('..')
+os.chmod(runserverfile, 0o744)
 print()
 print('*************************************************')
 print('*                                               *')

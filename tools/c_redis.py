@@ -114,6 +114,9 @@ class myredis(saferedis):
   def set_start_trainer_busy(self, value):
     self.set('start_trainer_busy', str(value)) 
     
+  def set_watch_status(self, value):
+    self.set('watch_status', value)   
+    
   def get_start_worker_busy(self):
     return(int(self.get('start_worker_busy')))  
     
@@ -122,6 +125,9 @@ class myredis(saferedis):
     
   def get_start_trainer_busy(self):
     return(int(self.get('start_trainer_busy'))) 
+    
+  def get_watch_status(self):
+    return(int(self.get('watch_status'))) 
     
   def set_ptz(self, idx, value):
     self.set('C:'+str(idx)+':ptz', str(json.dumps(value)))
