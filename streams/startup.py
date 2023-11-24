@@ -21,15 +21,55 @@ from tools.c_redis import myredis
 from camai.version import version as software_version
 print('***** Software-Version: ', software_version, '*****')
 djconf.setconfig('version', software_version)
+from camai.passwords import data_path, db_database
+print('***** DataPath: ', data_path, '*****')
+djconf.setconfig('datapath', data_path)
+print('***** Database: ', db_database, '*****')
 from tf_workers.models import worker
 from tf_workers.c_tfworkers import tf_workers, tf_worker
-from trainers.models import trainer as trainerdb
+from trainers.models import model_type, trainer as trainerdb
 from trainers.c_trainers import trainers, trainer
+from tools.models import camurl
 from tools.health import stop as stophealth
 from .models import stream
 from .c_streams import streams, c_stream
 
 #from threading import enumerate
+    
+if not model_type.objects.filter(name='efficientnetv2-b0'):
+  newtype = model_type(name='efficientnetv2-b0', x_in_default=224, y_in_default=224)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b1'):
+  newtype = model_type(name='efficientnetv2-b1', x_in_default=240, y_in_default=240)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b2'):
+  newtype = model_type(name='efficientnetv2-b2', x_in_default=260, y_in_default=260)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-b3'):
+  newtype = model_type(name='efficientnetv2-b3', x_in_default=300, y_in_default=300)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-s'):
+  newtype = model_type(name='efficientnetv2-s', x_in_default=384, y_in_default=384)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-m'):
+  newtype = model_type(name='efficientnetv2-m', x_in_default=480, y_in_default=480)
+  newtype.save()
+if not model_type.objects.filter(name='efficientnetv2-l'):
+  newtype = model_type(name='efficientnetv2-l', x_in_default=480, y_in_default=480)
+  newtype.save()
+    
+if not  camurl.objects.filter(type='levelone FCS-4051'):
+  newcam = camurl(type='levelone FCS-4051', 
+    url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
+  newcam.save()
+if not  camurl.objects.filter(type='levelone FCS-5201'):
+  newcam = camurl(type='levelone FCS-5201', 
+    url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
+  newcam.save()
+if not  camurl.objects.filter(type='Reolink RLC-410W'):
+  newcam = camurl(type='Reolink RLC-410W', 
+    url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
+  newcam.save()
 
 check_timer = None
 redis = myredis()

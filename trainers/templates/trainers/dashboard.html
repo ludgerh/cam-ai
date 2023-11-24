@@ -62,7 +62,7 @@
       <label class="m-2" for="model_type">Model Type:</label>
       <select id="model_type">
       {% for item in model_types %}
-          <option value={{ item.name }}>{{ item.name }}</option>
+          <option value={{ item.name }}>{{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})</option>
       {% endfor %}    
       </select>
     </div>  
@@ -81,6 +81,10 @@
     <div class="col-sm-auto h4">
       <label class="m-2" for="dropout">Dropout:</label>
       <input class="m-2" type="number" id="dropout" size="10" min="0.0" max="0.5" step="0.01">
+    </div>  
+    <div class="col-sm-auto h4">
+      <input style="width: 24px; height: 24px;" type="checkbox" id="stop_overfit" class="m-2">
+      <label class="m-2" for="stop_overfit">Stop Overfit</label>
     </div>  
   </div>  
 </div>
@@ -196,6 +200,12 @@ let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let modal_visible = false;
 let item_save;
 
+let model_types_dict = {
+{% for item in model_types %}
+  "{{ item.name }}" : [{{ item.x_in_default }}, {{ item.y_in_default }}],
+{% endfor %}   
+}; 
+
 function init_var(menu_item, code_string) {
   trainerutilSocket.sendandwait({
     'command' : 'get_for_dashboard',
@@ -208,7 +218,19 @@ function init_var(menu_item, code_string) {
         'command' : 'set_from_dashboard',
         'item' : code_string,
         'value' : $(menu_item).val(),
-      })
+      });
+      if (code_string == 'model_type') {
+        trainerutilSocket.sendandwait({
+          'command' : 'set_from_dashboard',
+          'item' : 'model_xin',
+          'value' : model_types_dict[$(menu_item).val()][0],
+        });
+        trainerutilSocket.sendandwait({
+          'command' : 'set_from_dashboard',
+          'item' : 'model_yin',
+          'value' : model_types_dict[$(menu_item).val()][0],
+        });
+      };
     });
   })
 };
@@ -266,12 +288,18 @@ function refresh_all() {
   })
   .then((result) => {
     added_one = result[1]
+    old_epoch = 0;
     result = JSON.parse(result[0]);
     if (added_one) {
       $('#tablebody tr:last').remove();
     };
+    new_epoch = false;
     result.forEach(function(item, index) {
       datestring = item.fields.made;
+      if (item.fields.epochs > old_epoch) {
+        old_epoch = item.fields.epochs;
+        new_epoch = true;
+      }
       newaddition = '<tr>';
       newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
       newaddition += '<td>'+(parseInt(item.fields.nr_tr)+parseInt(item.fields.nr_va))+'</td>';
@@ -302,8 +330,10 @@ function refresh_all() {
       item_save = item.pk;
       newaddition += '</tr>';
       $('#tablebody').append(newaddition);
-      $(document).scrollTop($(document).height()); 
     });
+    if (new_epoch) {
+      $(document).scrollTop($(document).height()); 
+    };  
     setTimeout(refresh_all, 10000);
   })
   .catch(err => {console.log(err);});
@@ -350,6 +380,7 @@ $(document).ready(function() {
       init_var('#weight_constraint', 'model_weight_constraint');
       init_var('#weight_decay', 'model_weight_decay');
       init_var('#dropout', 'model_dropout');
+      init_bool_var('#stop_overfit', 'model_stop_overfit');
       init_var('#model_type', 'model_type');
       init_var('#patience', 'early_stop_patience');
       init_var('#maxweight', 'weight_max');

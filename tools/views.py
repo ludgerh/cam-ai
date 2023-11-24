@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -12,6 +13,8 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
+#from pprint import pprint
+from requests import get as rget
 from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
@@ -36,6 +39,7 @@ class health(TemplateView):
       if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
+    datapath = djconf.getconfig('datapath', 'data/')
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
@@ -44,8 +48,9 @@ class health(TemplateView):
       'detectorlist' : detectorlist,
       'eventerlist' : eventerlist,
       'schoollist' : schoollist,
-      'recordingspath' : djconf.getconfig('recordingspath', 'data/recordings/'),
-      'schoolframespath' : djconf.getconfig('schoolframespath', 'data/schoolframes/')
+      'recordingspath' : djconf.getconfig('recordingspath', datapath + 'recordings/'),
+      'schoolframespath' : djconf.getconfig('schoolframespath', 
+        datapath + 'schoolframes/')
     })
     return context
 
@@ -68,6 +73,7 @@ class dbcompression(TemplateView):
       if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
+    datapath = djconf.getconfig('datapath', 'data/')
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
@@ -76,8 +82,9 @@ class dbcompression(TemplateView):
       'detectorlist' : detectorlist,
       'eventerlist' : eventerlist,
       'schoollist' : schoollist,
-      'recordingspath' : djconf.getconfig('recordingspath', 'data/recordings/'),
-      'schoolframespath' : djconf.getconfig('schoolframespath', 'data/schoolframes/')
+      'recordingspath' : djconf.getconfig('recordingspath', datapath + 'recordings/'),
+      'schoolframespath' : djconf.getconfig('schoolframespath', 
+        datapath + 'schoolframes/')
     })
     return context
 
@@ -217,6 +224,29 @@ class shutdown(TemplateView):
     context.update({
       'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
       'version' : djconf.getconfig('version', 'X.Y.Z'),
+    })
+    return context
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))
+      
+class upgrade(TemplateView):
+  template_name = 'tools/upgrade.html'
+
+  def get_context_data(self, **kwargs):
+    url = 'https://api.github.com/repos/ludgerh/cam-ai/releases/latest'
+    response = rget(url)
+    if response.status_code == 200:
+      response = json.loads(response.text)
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'new_version' : response['tag_name'],
+      'zip_url' : response['zipball_url']
     })
     return context
 

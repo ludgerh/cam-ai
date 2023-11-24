@@ -2,18 +2,6 @@
 
 from django.db import migrations, models
 
-def fill_table_model_type(apps, schema_editor):
-  Setting = apps.get_model("trainers", "model_type")
-  if not Setting.objects.all().count():
-    Setting.objects.create(name='efficientnetv2-b0')
-    Setting.objects.create(name='efficientnetv2-b1')
-    Setting.objects.create(name='efficientnetv2-b2')
-    Setting.objects.create(name='efficientnetv2-b3')
-    Setting.objects.create(name='efficientnetv2-s')
-    Setting.objects.create(name='efficientnetv2-m')
-    Setting.objects.create(name='efficientnetv2-l')
-
-
 class Migration(migrations.Migration):
 
   dependencies = [
@@ -28,5 +16,4 @@ class Migration(migrations.Migration):
         ('name', models.CharField(default='efficientnetv2-b0', max_length=50)),
       ],
     ),
-    migrations.RunPython(fill_table_model_type),
   ]

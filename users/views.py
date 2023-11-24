@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -59,10 +60,11 @@ class archive(SingleTableMixin, myFilterView):
 def downarchive(request, line_nr, tokennr, token): 
   if checktoken((tokennr, token), 'ADL', line_nr):
     archiveline = dbarchive.objects.get(id = line_nr)
+    datapath = djconf.getconfig('datapath', 'data/')
     if archiveline.typecode == 0:
-      filename = djconf.getconfig('archivepath', 'data/archive/') + 'frames/' + archiveline.name
+      filename = djconf.getconfig('archivepath', datapath + 'archive/') + 'frames/' + archiveline.name
     elif archiveline.typecode == 1:
-      filename = djconf.getconfig('archivepath', 'data/archive/') + 'videos/' + archiveline.name + '.mp4'
+      filename = djconf.getconfig('archivepath', datapath + 'archive/') + 'videos/' + archiveline.name + '.mp4'
     sourcefile = open(filename, 'rb')
     return FileResponse(sourcefile)
   else:

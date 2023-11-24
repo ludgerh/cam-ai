@@ -17,7 +17,8 @@ from os import path, makedirs
 
 def log_ini(logger, logname):
   logger.setLevel(DEBUG)
-  logpath = djconf.getconfig('logdir', default='data/logs/')
+  datapath = djconf.getconfig('datapath', 'data/')
+  logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
   if not path.exists(logpath):
     makedirs(logpath)
   loglevelstring = djconf.getconfig('loglevel', default='INFO')

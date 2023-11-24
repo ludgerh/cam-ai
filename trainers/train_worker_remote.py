@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -13,10 +14,12 @@
 
 import json
 import requests
+import cv2 as cv
 from time import sleep, time
 from multitimer import MultiTimer
 from traceback import format_exc
 from django.utils import timezone
+from camai.version import version as software_version
 from tools.l_tools import djconf, seq_to_int
 from .models import trainframe
 
@@ -65,14 +68,19 @@ class train_once_remote():
           self.logger.warning('Socket error while pushing initialization data '
             + 'to training server')
           sleep(djconf.getconfigfloat('medium_brake', 0.1))
-
-
       outdict = {
         'code' : 'namecheck',
         'school' : self.myschool.e_school,
       } 
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
       remotesearch = json.loads(self.ws.recv())
+      outdict = {
+        'code' : 'setversion',
+        'school' : self.myschool.e_school,
+        'version' : software_version,
+      } 
+      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      model_in_dims = json.loads(self.ws.recv())
       self.ws_ts = time()
       pingproc = MultiTimer(interval=2, 
         function=self.send_ping, 
@@ -133,9 +141,11 @@ class train_once_remote():
           'framecode' : localdict[item][11],
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        filepath = self.myschool.dir + 'frames/' + item
-        with open(filepath, "rb") as f:
-          self.ws.send_binary(f.read())
+        imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
+        if (imagedata.shape[1] > model_in_dims[0]) or (imagedata.shape[0] > model_in_dims[1]):
+          imagedata = cv.resize(imagedata, model_in_dims)
+        imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
+        self.ws.send_binary(imagedata)
         self.ws.recv()
         count -= 1  
       if self.t_type == 2:
@@ -173,7 +183,8 @@ class train_once_remote():
           else:
             sleep(10.0)
         r = requests.get(dlurl, allow_redirects=True)
-        dlfile = djconf.getconfig('schools_dir', 'data/schools/')
+        datapath = djconf.getconfig('datapath', 'data/')
+        dlfile = djconf.getconfig('schools_dir', datapath + 'schools/')
         dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.h5'
         self.logger.info('DL Model: ' + dlfile)
         open(dlfile, 'wb').write(r.content)

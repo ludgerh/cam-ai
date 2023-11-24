@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -25,8 +26,9 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from .passwords import (db_password, security_key, localaccess, mydomain, myip, httpsport,
-  smtp_account, smtp_password, smtp_server, smtp_port, smtp_email, smtp_use_ssl)
+from .passwords import (data_path, db_database, db_password, security_key, localaccess, 
+  mydomain, myip, httpsport, smtp_account, smtp_password, smtp_server, smtp_port, 
+  smtp_email, smtp_use_ssl)
 try:  
   from .passwords import httpsport
 except  ImportError:
@@ -134,7 +136,7 @@ ASGI_APPLICATION = 'camai.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'CAM-AI',
+        'NAME': db_database,
         'HOST': 'localhost',
         'PORT': '3306',
         'USER': 'CAM-AI',
@@ -181,7 +183,9 @@ USE_TZ = True
 STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
 #STATIC_URL = 'static/'
 #STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
-STATIC_ROOT = str(BASE_DIR)+'/data/static'
+#from tools.l_tools import djconf
+#datapath = djconf.getconfig('datapath', 'data/')
+STATIC_ROOT = str(BASE_DIR)+'/'+data_path+'static'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field

@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -32,7 +33,8 @@ from tools.l_smtp import l_smtp
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 
-schoolpath = djconf.getconfig('schoolframespath', 'data/schoolframes/')
+datapath = djconf.getconfig('datapath', 'data/')
+schoolpath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
 clienturl = settings.CLIENT_URL
 if not path.exists(schoolpath):
   makedirs(schoolpath)

@@ -287,3 +287,10 @@ class async_timer:
 
   def cancel(self):
     self._task.cancel()
+    
+def version_flat(string_in):
+  result = 0
+  for item in string_in.split('.'):
+    result += int(item)
+    result *= 1000
+  return(result // 1000)

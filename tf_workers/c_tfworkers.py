@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and komplete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -47,15 +48,6 @@ from psutil import virtual_memory
 from tools.l_tools import displaybytes
 
 tf_workers = {}
-for item in school.objects.filter(active=True):
-  if not item.dir:
-    item.dir = (djconf.getconfig('schools_dir', 'data/schools/model') 
-      + str(item.id) + '/')
-    item.save(update_fields=['dir',]) 
-  if not path.exists(item.dir):
-    makedirs(item.dir + 'model')
-  if not path.exists(item.dir + 'frames'):
-    makedirs(item.dir + 'frames')
 taglist = get_taglist(1)
 
 #***************************************************************************
