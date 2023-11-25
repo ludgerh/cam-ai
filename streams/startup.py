@@ -115,6 +115,7 @@ def newexit(eins, zwei):
   for i in trainers:
     print('Closing trainer #', i)
     trainers[i].stop()
+  redis.set_watch_status(0)  
   #for thread in enumerate(): 
   #  print(thread)
   sys.exit()
