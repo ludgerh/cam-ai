@@ -24,6 +24,7 @@ while(redis.get_watch_status()):
     redis.set_watch_status(1)
     call_pars = argv
     call_pars[0] = 'python'
+    print('Calling: python ' + ' '.join(argv[1:]))
     subprocess.call(call_pars) 
   sleep(10.0)
   print('-----', redis.get_watch_status())
