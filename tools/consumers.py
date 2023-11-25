@@ -822,6 +822,7 @@ class admintools(AsyncWebsocketConsumer):
       print('*****', basepath)
       move(zipresult, basepath)
       move('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
+      move('temp/backup/eventers/c_alarm.py', basepath + '/eventers/c_alarm.py')
       move('temp/backup/' + datapath, basepath + '/' + datapath)
       if env_type == 'venv':
         move('temp/backup/env', basepath + '/env')
