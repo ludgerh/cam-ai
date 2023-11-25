@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -79,6 +80,13 @@ redis.set_start_stream_busy(0)
 redis.set('KBInt', 0)
 
 def restartcheck_proc():
+  if (command := redis.get_shutdown_command()):
+    redis.set_shutdown_command(0)
+    if command == 1:
+      newexit()
+    elif command == 2:  
+      newexit(trigger_restart=True)
+    return()
   if (item := redis.get_start_trainer_busy()):
     if (item in trainers) and trainers[item].do_run:
       trainers[item].stop()
@@ -97,10 +105,9 @@ def restartcheck_proc():
       streams[item].stop()
     streams[item] = c_stream(dbline)
     streams[item].start()
-    redis.set_start_stream_busy(0)
-    
+    redis.set_start_stream_busy(0)    
 
-def newexit(eins, zwei):
+def newexit(*args, trigger_restart=False):
   redis.set('KBInt', 1)
   print ('Caught KeyboardInterrupt...')
   sleep(5.0)
@@ -115,7 +122,10 @@ def newexit(eins, zwei):
   for i in trainers:
     print('Closing trainer #', i)
     trainers[i].stop()
-  redis.set_watch_status(0)  
+  if trigger_restart: 
+    redis.set_watch_status(2) 
+  else:  
+    redis.set_watch_status(0)  
   #for thread in enumerate(): 
   #  print(thread)
   sys.exit()

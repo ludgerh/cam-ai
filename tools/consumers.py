@@ -1,5 +1,5 @@
 # Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
-# More information and komplete source: https://github.com/ludgerh/cam-ai
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -35,7 +35,11 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
   updatefilter, savedbline, countfilter)
-from camai.passwords import os_type, env_type  
+try:  
+  from camai.passwords import os_type, env_type 
+except  ImportError: # can be removed when everybody is up to date
+  os_type = 'raspi11'
+  env_type = 'venv'  
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tools.c_tools import image_size, reduce_image
@@ -795,6 +799,9 @@ class admintools(AsyncWebsocketConsumer):
     elif params['command'] == 'shutdown':
       if not self.scope['user'].is_superuser:
         await self.close()
+      redis.set_shutdown_command(1)
+      while redis.get_watch_status():
+        sleep(long_brake) 
       ossystem('sudo shutdown now')
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
@@ -806,11 +813,6 @@ class admintools(AsyncWebsocketConsumer):
       print('&&&&&', params['url'])
       basepath = getcwd() 
       chdir('..')
-      if not ospath.exists('temp'):
-        makedirs('temp')
-      if ospath.exists('temp/backup'):
-        rmtree('temp/backup')
-      move(basepath, 'temp/backup')  
       response = rget(params['url'], stream=True)
       zip_path = "temp/cam-ai-upgrade.zip"
       with open(zip_path, mode="wb") as file:
@@ -819,6 +821,11 @@ class admintools(AsyncWebsocketConsumer):
       with ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall('.')  
       zipresult = glob('ludgerh-cam-ai-*')[0]
+      if not ospath.exists('temp'):
+        makedirs('temp')
+      if ospath.exists('temp/backup'):
+        rmtree('temp/backup')
+      move(basepath, 'temp/backup')  
       print('*****', basepath)
       move(zipresult, basepath)
       move('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
@@ -838,7 +845,9 @@ class admintools(AsyncWebsocketConsumer):
       result = check_output(cmd, shell=True, executable='/bin/bash').decode()
       for line in result.split('\n'):
         logger.info(line);
-      #ossystem('sudo shutdown now')
+      redis.set_shutdown_command(2)
+      while redis.get_watch_status():
+        sleep(long_brake) 
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	

@@ -114,6 +114,12 @@ class myredis(saferedis):
   def set_start_trainer_busy(self, value):
     self.set('start_trainer_busy', str(value)) 
     
+  def set_watch_status(self, value): #0 : finish, 1 : wait, 2 : restart
+    self.set('watch_status', value)   
+    
+  def set_shutdown_command(self, value): #0 : nothing, 1 : stop CAM-AI, 2 : restart CAM-AI
+    self.set('shutdown_command', value)   
+    
   def set_watch_status(self, value):
     self.set('watch_status', value)   
     
@@ -126,8 +132,14 @@ class myredis(saferedis):
   def get_start_trainer_busy(self):
     return(int(self.get('start_trainer_busy'))) 
     
-  def get_watch_status(self):
+  def get_watch_status(self):  #0 : finish, 1 : wait, 2 : restart
     return(int(self.get('watch_status'))) 
+    
+  def get_shutdown_command(self): #0 : nothing, 1 : stop CAM-AI, 2 : restart CAM-AI
+    if (result := self.get('shutdown_command')) is None:
+      return(0)
+    else:  
+      return(int(result)) 
     
   def set_ptz(self, idx, value):
     self.set('C:'+str(idx)+':ptz', str(json.dumps(value)))

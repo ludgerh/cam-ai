@@ -1,5 +1,5 @@
 # Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
-# More information and komplete source: https://github.com/ludgerh/cam-ai
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -30,6 +30,14 @@ from .passwords import (data_path, db_database, db_password, security_key, local
   mydomain, myip, httpsport, smtp_account, smtp_password, smtp_server, smtp_port, 
   smtp_email, smtp_use_ssl)
 try:  
+  from .passwords import data_path
+except  ImportError: # can be removed when everybody is up to date
+  data_path = 'data/' 
+try:  
+  from .passwords import db_database
+except  ImportError: # can be removed when everybody is up to date
+  db_database = 'CAM-AI' 
+try:  
   from .passwords import httpsport
 except  ImportError:
   httpsport = '' 
@@ -45,7 +53,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = security_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = []
 if localaccess:
