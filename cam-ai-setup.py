@@ -268,7 +268,7 @@ result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode
 for line in result.split('\n'):
   print(line); 
 runserverfile = 'runserver.sh'
-#copy(runserverfile, '..')
+copy(runserverfile, '..')
 os.chdir('..')
 os.chmod(runserverfile, 0o744)
 print()

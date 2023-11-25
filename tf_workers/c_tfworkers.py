@@ -680,6 +680,10 @@ class tf_worker():
     for i in self.run_out_procs:
       if self.run_out_procs[i].is_alive():
         self.outqueues[i].put(('stop',))
+        print('Put Stop', i)
         self.run_out_procs[i].join()
+        print('Join', i)
     self.inqueue.put(('stop',))
+    print('Put Stop Inqueue')
     self.run_process.join()
+    print('Join Inqueue')
