@@ -13,6 +13,7 @@ setproctitle('CAM-AI-Server')
 signal(SIGINT, sigint_handler)
 signal(SIGTERM, sigint_handler)
 signal(SIGHUP, sigint_handler)
+basepath = getcwd() 
 print('***** CAM-AI server is running *****')
 print('Calling: python ' + ' '.join(argv[1:]))
 print()
@@ -25,6 +26,7 @@ while(redis.get_watch_status()):
     call_pars = argv
     call_pars[0] = 'python'
     print('Calling: python ' + ' '.join(argv[1:]))
+    chdir(basepath)
     subprocess.call(call_pars) 
   sleep(10.0)
   print('-----', redis.get_watch_status())
