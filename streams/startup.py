@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import sys
+import os
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
 from multitimer import MultiTimer
@@ -73,6 +74,7 @@ if not  camurl.objects.filter(type='Reolink RLC-410W'):
   newcam.save()
 
 check_timer = None
+restart_mode = 0
 redis = myredis()
 redis.set_start_trainer_busy(0)
 redis.set_start_worker_busy(0)
@@ -80,12 +82,15 @@ redis.set_start_stream_busy(0)
 redis.set('KBInt', 0)
 
 def restartcheck_proc():
+  global restart_mode
   if (command := redis.get_shutdown_command()):
     redis.set_shutdown_command(0)
     if command == 1:
+      restart_mode = 1
       newexit()
     elif command == 2:  
-      newexit(trigger_restart=True)
+      restart_mode = 2
+      newexit()
     return()
   if (item := redis.get_start_trainer_busy()):
     if (item in trainers) and trainers[item].do_run:
@@ -107,7 +112,8 @@ def restartcheck_proc():
     streams[item].start()
     redis.set_start_stream_busy(0)    
 
-def newexit(*args, trigger_restart=False):
+def newexit(*args):
+  global restart_mode
   redis.set('KBInt', 1)
   print ('Caught KeyboardInterrupt...')
   sleep(5.0)
@@ -122,10 +128,16 @@ def newexit(*args, trigger_restart=False):
   for i in trainers:
     print('Closing trainer #', i)
     trainers[i].stop()
-  if trigger_restart: 
+  print('*****', restart_mode)
+  if restart_mode in {0, 1}:
+    redis.set_watch_status(0) 
+    sys.exit(0)
+  elif restart_mode == 2:
+    restart_mode = 3
+    os.kill(os.getpid(), SIGINT)
+  elif restart_mode == 3:
     redis.set_watch_status(2) 
-  else:  
-    redis.set_watch_status(0)  
+    sys.exit(0)
   #for thread in enumerate(): 
   #  print(thread)
   sys.exit()

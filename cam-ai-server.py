@@ -25,5 +25,6 @@ while(redis.get_watch_status()):
     call_pars[0] = 'python'
     subprocess.call(call_pars) 
   sleep(10.0)
+  print('+++++', redis.get_watch_status())
 print('***** CAM-AI server is done *****')  
     
