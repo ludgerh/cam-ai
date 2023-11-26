@@ -47,7 +47,7 @@
   Downloading the new software. Please wait...
 </div>  
 <div class="h2 d-none" id="line3">
-  We are almost done. Refresh your browser window after 3 minutes. 
+  We are almost done. Refresh your browser window after one minute. 
 </div>  
   
 <script>
@@ -68,7 +68,7 @@ $(document).ready(function() {
       $('#line2').removeClass("d-none");
       admintoolsSocket.socket.onclose = function(e) {
         setTimeout(function () {
-          $('#line3').removeClass("d-none");
+          window.location.href = window.location.protocol + '//' + window.location.host;
         }, 60000);
       };
       admintoolsSocket.sendandwait({
