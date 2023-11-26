@@ -135,13 +135,13 @@
 {#              <li><a class="dropdown-item" href="/tools/dbcompression/">Compress Database</a></li> #}
               <li><a class="dropdown-item" href="/tools/upgrade/">Upgrade Server</a></li>
               <li><a class="dropdown-item" href="/tools/shutdown/">Shutdown Server</a></li>
-              {% spaceless %}
-                {% for item in schoollist %}
-                  {% if item.id != 1 or user.is_superuser %}
-                    <li><a class="dropdown-item" href="/eventers/alarm/{{ item.id }}/">alarm{{ item.name }}</a></li>
-                  {% endif %}
-                {% endfor %}
-              {% endspaceless %}
+{#              {% spaceless %} #}
+{#                {% for item in schoollist %} #}
+{#                  {% if item.id != 1 or user.is_superuser %} #}
+{#                    <li><a class="dropdown-item" href="/eventers/alarm/{{ item.id }}/">alarm{{ item.name }}</a></li> #}
+{#                  {% endif %} #}
+{#                {% endfor %} #}
+{#              {% endspaceless %} #}
 {% endif %}
               <li><a class="dropdown-item" href="{% url 'logout' %}">Log Out</a></li>
             </ul>

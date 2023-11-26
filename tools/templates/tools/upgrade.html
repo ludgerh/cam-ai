@@ -44,10 +44,10 @@
   <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
 </div> 
 <div class="h2 d-none" id="line2">
-  The server is terminating and then being shut down. Please wait...
+  Downloading the new software. Please wait...
 </div>  
 <div class="h2 d-none" id="line3">
-  We are done. Once the servers network LED stopped blinking, you can take the power from the server. Goodbye!
+  We are almost done. Refresh your browser window after 3 minutes. 
 </div>  
   
 <script>
@@ -74,6 +74,8 @@ $(document).ready(function() {
       admintoolsSocket.sendandwait({
         'command' : 'upgrade',
         'url' : '{{ zip_url }}',
+      })
+      .then((result) => {
       })
       .catch(err => {console.log(err);});
     });

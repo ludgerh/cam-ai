@@ -810,7 +810,6 @@ class admintools(AsyncWebsocketConsumer):
     elif params['command'] == 'upgrade':
       if not self.scope['user'].is_superuser:
         await self.close()
-      print('&&&&&', params['url'])
       basepath = getcwd() 
       chdir('..')
       response = rget(params['url'], stream=True)
@@ -825,8 +824,7 @@ class admintools(AsyncWebsocketConsumer):
         makedirs('temp')
       if ospath.exists('temp/backup'):
         rmtree('temp/backup')
-      move(basepath, 'temp/backup')  
-      print('*****', basepath)
+      move(basepath, 'temp/backup') 
       move(zipresult, basepath)
       move('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
       move('temp/backup/eventers/c_alarm.py', basepath + '/eventers/c_alarm.py')
