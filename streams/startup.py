@@ -23,7 +23,14 @@ from tools.c_redis import myredis
 from camai.version import version as software_version
 print('***** Software-Version: ', software_version, '*****')
 djconf.setconfig('version', software_version)
-from camai.passwords import data_path, db_database
+try:
+  from camai.passwords import data_path
+except  ImportError: # can be removed when everybody is up to date
+  data_path = 'data/' 
+try:  
+  from camai.passwords import db_database
+except  ImportError: # can be removed when everybody is up to date
+  db_database = 'CAM-AI' 
 print('***** DataPath: ', data_path, '*****')
 djconf.setconfig('datapath', data_path)
 print('***** Database: ', db_database, '*****')

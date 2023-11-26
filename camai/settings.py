@@ -26,7 +26,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from .passwords import (data_path, db_database, db_password, security_key, localaccess, 
+from .passwords import (db_password, security_key, localaccess, 
   mydomain, myip, httpsport, smtp_account, smtp_password, smtp_server, smtp_port, 
   smtp_email, smtp_use_ssl)
 try:  
