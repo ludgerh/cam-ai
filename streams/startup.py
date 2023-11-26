@@ -128,7 +128,6 @@ def newexit(*args):
   for i in trainers:
     print('Closing trainer #', i)
     trainers[i].stop()
-  print('*****', restart_mode)
   if restart_mode in {0, 1}:
     redis.set_watch_status(0) 
     sys.exit(0)
@@ -140,7 +139,6 @@ def newexit(*args):
     sys.exit(0)
   #for thread in enumerate(): 
   #  print(thread)
-  sys.exit()
 
 
 def run():

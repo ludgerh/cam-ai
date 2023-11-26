@@ -684,6 +684,4 @@ class tf_worker():
         self.run_out_procs[i].join()
         print('Join', i)
     self.inqueue.put(('stop',))
-    print('Put Stop Inqueue')
     self.run_process.join()
-    print('Join Inqueue')
