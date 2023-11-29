@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -25,5 +26,8 @@ urlpatterns = [
 	path('inst_cam/<str:ip>/<str:ports>/', views.inst_cam.as_view(), name='instcam'),
 	path('shutdown/', views.shutdown.as_view(), name='shutdown'),
 	path('upgrade/', views.upgrade.as_view(), name='upgrade'),
+	path('backup/', views.backup.as_view(), name='backup'),
+	path('restore/', views.restore.as_view(), name='restore'),
+	path('downbackup/backup.zip', views.downbackup, name='downbackup'),
 ]
 

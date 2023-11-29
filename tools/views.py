@@ -18,13 +18,15 @@ from requests import get as rget
 from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from streams.models import stream
 from users.models import userinfo
 from access.c_access import access
 from tf_workers.models import school, worker
 from tools.l_tools import djconf
 from .models import camurl
+
+from time import sleep
 
 class health(TemplateView):
   template_name = 'tools/health.html'
@@ -255,3 +257,45 @@ class upgrade(TemplateView):
       return(super().get(request, *args, **kwargs))
     else:
       return(HttpResponse('No Access'))
+      
+class backup(TemplateView):
+  template_name = 'tools/backup.html'
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
+    })
+    return context
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))
+      
+class restore(TemplateView):
+  template_name = 'tools/restore.html'
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
+    })
+    return context
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))
+    
+def downbackup(request): 
+  if request.user.is_superuser:
+    filename = '../temp/backup/backup.zip'
+    sourcefile = open(filename, 'rb')
+    return FileResponse(sourcefile)
+  else:
+    return(HttpResponse('No Access.'))

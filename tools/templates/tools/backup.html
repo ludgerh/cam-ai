@@ -29,23 +29,18 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>CAM-AI Server Upgrade</title>
+    <title>CAM-AI Server Backup</title>
   </head>
   <body>
   
 <div class="h2">
-  Your present version is: v{{ version }}
-</div> 
-<div class="h2">
-  The latest available version is: {{ new_version }}
-</div> 
-<div class="h2">
-  Are you sure you want to upgrade the CAM-AI-Server?
+  We are going to zip your database and your data directory for you. Do you want to proceed?
   <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
 </div> 
 <div class="h2 d-none" id="line2">
-  Downloading the new software. Please wait...
+  Preparing the download. Please wait...
 </div>  
+<div class="h2 d-none" id="line3">?</div>  
   
 <script>
 
@@ -63,14 +58,17 @@ $(document).ready(function() {
     $('#continue-button').click(function() {
       $('#continue-button').prop('disabled', true);
       $('#line2').removeClass("d-none");
-      admintoolsSocket.socket.onclose = function(e) {
-        setTimeout(function () {
-          window.location.href = window.location.protocol + '//' + window.location.host;
-        }, 60000);
-      };
+      $('#line3').removeClass("d-none");
+      mycallback = function (param) {
+        result = JSON.parse(param)
+        $('#line3').text(result.data);
+      }
       admintoolsSocket.sendandwait({
-        'command' : 'upgrade',
-        'url' : '{{ zip_url }}',
+        'command' : 'backup',
+      }, mycallback)
+      .then((result) => {
+        $('#line3').text('Starting download...');
+        window.location.href = window.location.protocol + '//' + window.location.host + '/tools/downbackup/backup.zip';
       })
       .catch(err => {console.log(err);});
     });

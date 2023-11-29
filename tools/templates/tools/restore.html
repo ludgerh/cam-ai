@@ -29,23 +29,23 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>CAM-AI Server Upgrade</title>
+    <title>CAM-AI Server Restore</title>
   </head>
   <body>
   
 <div class="h2">
-  Your present version is: v{{ version }}
+  Select the backup ZIP file you want to upload to this server.
 </div> 
-<div class="h2">
-  The latest available version is: {{ new_version }}
-</div> 
-<div class="h2">
-  Are you sure you want to upgrade the CAM-AI-Server?
-  <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
-</div> 
+<form>
+  <div class="form-group h2">
+    <input type="file" class="form-control-file" id="fileselector" accept=".zip">
+    <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
+  </div>
+</form>
 <div class="h2 d-none" id="line2">
-  Downloading the new software. Please wait...
+  Preparing the download. Please wait...
 </div>  
+<div class="h2 d-none" id="line3">?</div>  
   
 <script>
 
@@ -61,18 +61,7 @@ $(document).ready(function() {
   .then((result) => {
     admintoolsSocket = result;
     $('#continue-button').click(function() {
-      $('#continue-button').prop('disabled', true);
-      $('#line2').removeClass("d-none");
-      admintoolsSocket.socket.onclose = function(e) {
-        setTimeout(function () {
-          window.location.href = window.location.protocol + '//' + window.location.host;
-        }, 60000);
-      };
-      admintoolsSocket.sendandwait({
-        'command' : 'upgrade',
-        'url' : '{{ zip_url }}',
-      })
-      .catch(err => {console.log(err);});
+      console.log($('#fileselector').val());
     });
   })
   .catch(err => {console.log(err);});
@@ -81,4 +70,3 @@ $(document).ready(function() {
 </script>  
 
   </body>
-  

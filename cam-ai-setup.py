@@ -41,7 +41,9 @@ if os_code == '6.1.0-13-amd64':
   os_code = 'debian12'
   env_type = 'conda'
 elif (os_code == '6.1.0-rpi4-rpi-v8'
-  or os_code == '6.1.0-rpi6-rpi-v8'):
+  or os_code == '6.1.0-rpi6-rpi-v8'
+  or os_code == '6.1.0-rpi6-rpi-2712'
+  ):
   os_code = 'raspi12'
   env_type = 'venv'
 else:
@@ -212,9 +214,7 @@ else: #conda
   cmd += 'conda activate tf; '
 cmd += 'pip install --upgrade pip; '
 cmd += 'pip install -r requirements.' + os_code + '; '
-result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
-for line in result.split('\n'):
-  print(line); 
+result = subprocess.call(cmd, shell=True, executable='/bin/bash')
   
 print('>>>>> Modifying ' + installdir + '/passwords.py...')
 if env_type == 'venv':
@@ -264,9 +264,7 @@ else: #conda
   cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
   cmd += 'conda activate tf; '
 cmd += 'python manage.py migrate; '
-result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
-for line in result.split('\n'):
-  print(line); 
+result = subprocess.call(cmd, shell=True, executable='/bin/bash')
 runserverfile = 'runserver.sh'
 copy(runserverfile, '..')
 os.chdir('..')
