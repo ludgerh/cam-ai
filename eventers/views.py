@@ -88,16 +88,14 @@ def oneevent(request, schoolnr, eventnr):
     
 @login_required
 def alarm(request, schoolnr):
-  myparam = dbalarm.objects.get(id=1).action_param1
   template = loader.get_template('eventers/alarm.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
-    'debug' : settings.DEBUG,
     'may_write' : access.check('S', schoolnr, request.user, 'W'),
     'school' : school.objects.get(id=schoolnr),
     'user' : request.user,
-    'myparam' : myparam,
+    'alarms' : dbalarm.objects.all()
   }
   return(HttpResponse(template.render(context)))
     
