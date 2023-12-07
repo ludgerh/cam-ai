@@ -30,7 +30,13 @@ class trainer(models.Model):
 
   def __str__(self):
     return('Trainer, Name = '+self.name)
+    
+class img_size(models.Model):
+  x = models.IntegerField(default=0)
+  y = models.IntegerField(default=0) 
 
+  def __str__(self):
+    return('img_size, '+self.x+'x'+self.y)
 
 class trainframe(models.Model):
   made = models.DateTimeField()
@@ -51,6 +57,7 @@ class trainframe(models.Model):
   made_by = models.ForeignKey(settings.AUTH_USER_MODEL, default=None, 
     on_delete=models.SET_NULL, null=True)
   train_status = models.SmallIntegerField(default=0)
+  img_sizes = models.ManyToManyField(img_size)
 
   def __str__(self):
     return('Trainframe, Name = '+self.name)

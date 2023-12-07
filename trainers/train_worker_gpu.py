@@ -76,32 +76,32 @@ class sql_sequence(Sequence):
       cod_file_path = (bmp_file_path[:-4]+'.cod').replace('/frames/', '/coded/'+str(self.xdim)+'x'+str(self.ydim)+'/')
       ram_cod_id = batch_slice[i][0]
       done = False
-      try:
-        if ram_cod_id in self.ram_buffer:
-          imgdata = tf.convert_to_tensor(self.ram_buffer[ram_cod_id])
-          storedata = None
+      #try:
+      if ram_cod_id in self.ram_buffer:
+        imgdata = tf.convert_to_tensor(self.ram_buffer[ram_cod_id])
+        storedata = None
+        imgdata =  tf.io.decode_jpeg(imgdata);
+        done = True
+      else:
+        if path.exists(cod_file_path):
+          imgdata = tf.io.read_file(cod_file_path)
+          storedata = imgdata
           imgdata =  tf.io.decode_jpeg(imgdata);
           done = True
-        else:
-          if path.exists(cod_file_path):
-            imgdata = tf.io.read_file(cod_file_path)
-            storedata = imgdata
-            imgdata =  tf.io.decode_jpeg(imgdata);
-            done = True
-        if done and ((imgdata.shape[0] != self.xdim) or (imgdata.shape[1] != self.ydim)):
-          done = False
-        if not done:  
-          imgdata = tf.io.read_file(bmp_file_path)
-          imgdata = tf.io.decode_bmp(imgdata, channels=3)
-          imgdata = tf.image.resize(imgdata, [self.xdim,self.ydim], antialias=True)
-          imgdata = tf.cast(imgdata, tf.uint8)
-          storedata = tf.io.encode_jpeg(imgdata);
-          tf.io.write_file(cod_file_path, storedata)
-        if storedata:  
-          self.ram_buffer[ram_cod_id] = storedata.numpy()
-      except:
-        self.logger.info('***** Error in reading/decoding:'+batch_slice[i][1])
-        exit(1)
+      if done and ((imgdata.shape[0] != self.xdim) or (imgdata.shape[1] != self.ydim)):
+        done = False
+      if not done:  
+        imgdata = tf.io.read_file(bmp_file_path)
+        imgdata = tf.io.decode_bmp(imgdata, channels=3)
+        imgdata = tf.image.resize(imgdata, [self.xdim,self.ydim], antialias=True)
+        imgdata = tf.cast(imgdata, tf.uint8)
+        storedata = tf.io.encode_jpeg(imgdata);
+        tf.io.write_file(cod_file_path, storedata)
+      if storedata:  
+        self.ram_buffer[ram_cod_id] = storedata.numpy()
+      #except:
+      #  self.logger.info('***** Error in reading/decoding:'+batch_slice[i][1])
+      #  exit(1)
       xdata.append(imgdata)
       for j in range(len(self.classes_list)):
         ydata[i][j] = batch_slice[i][j+2]
@@ -153,7 +153,7 @@ class MyCallback(Callback):
     self.myfit.weight_min = myschool.weight_min
     self.myfit.weight_max = myschool.weight_max
     self.myfit.weight_boost = myschool.weight_boost
-    self.myfit.model_type = myschool.model_type
+    self.myfit.model_type = myschool.model_train_type
     self.myfit.model_image_augmentation = myschool.model_image_augmentation
     self.myfit.model_weight_decay = myschool.model_weight_decay
     self.myfit.model_weight_constraint = myschool.model_weight_constraint
@@ -299,7 +299,7 @@ def train_once_gpu(myschool, myfit, gpu_nr, gpu_mem_limit):
 
   weightarray = [0] * (len(classes_list) + 1)
 
-  model_name = myschool.model_type
+  model_name = myschool.model_train_type
   modelpath = myschool.dir + 'model/'
   if path.exists(modelpath + model_name + '.extra.h5'):
     extra_model_found = True

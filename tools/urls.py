@@ -27,7 +27,7 @@ urlpatterns = [
 	path('shutdown/', views.shutdown.as_view(), name='shutdown'),
 	path('upgrade/', views.upgrade.as_view(), name='upgrade'),
 	path('backup/', views.backup.as_view(), name='backup'),
-	path('restore/', views.restore.as_view(), name='restore'),
+	path('restore/', views.restore, name='restore'),
 	path('downbackup/backup.zip', views.downbackup, name='downbackup'),
 ]
 

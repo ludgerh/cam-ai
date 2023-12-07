@@ -42,7 +42,7 @@ from schools.c_schools import get_taglist, check_extratags_async
 from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school
 from eventers.models import event, event_frame
-from trainers.models import trainframe
+from trainers.models import trainframe, img_size
 from users.models import userinfo
 
 logname = 'ws_schoolsconsumers'
@@ -311,8 +311,8 @@ class schooldbutil(AsyncWebsocketConsumer):
                 c0 = item['c0'], c1 = item['c1'], c2 = item['c2'], c3 = item['c3'], 
                 c4 = item['c4'], c5 = item['c5'], c6 = item['c6'], c7 = item['c7'], 
                 c8 = item['c8'], c9 = item['c9'], 
-                checked = False,
-                made_by_id = item['made_by'],
+                checked = False, made_by_id = item['made_by'],
+                img_sizes = item['img_sizes'],
               )
               await savedbline(newitem)
         outlist['data'] = 'OK'
@@ -372,7 +372,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               made_by_id=self.user.id,
             );
             t.c0=params['cblist'][i][0]
-            t.c1=params['cblist'][i][1]
+            t.c1=params['cblist'][i][1] 
             t.c2=params['cblist'][i][2]
             t.c3=params['cblist'][i][3]
             t.c4=params['cblist'][i][4]
@@ -382,6 +382,13 @@ class schooldbutil(AsyncWebsocketConsumer):
             t.c8=params['cblist'][i][8]
             t.c9=params['cblist'][i][9]
             trainframenr = await savedbline(t)
+            try:
+              sizeline = await img_size.objects.aget(x=0, y=0)
+            except img_size.DoesNotExist:
+              sizeline = img_size(x=0, y=0)
+              await sizeline.asave()
+            await t.img_sizes.aadd(sizeline)
+            await t.asave()
             await updatefilter(event_frame, {'id' : item['id'], }, {'trainframe' : trainframenr, }) 
           i += 1
         await updatefilter(event, {'id' : eventdict['id'], }, {'done' : True, }) 
