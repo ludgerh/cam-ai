@@ -82,13 +82,15 @@ class evt_condition(models.Model):
     return('evt_conditions model (TBD ...)')
     
 class alarm(models.Model):
+  mendef = models.CharField(max_length=255, default="[]")
+  name = models.CharField(max_length=20, default="New Alarm")
   action_type = models.IntegerField("action_type", choices=(
-    (1, 'action1'),
-    (2, 'action2'),
+    (1, 'USB Relais'),
+    (2, 'Philips HUE'),
     (3, 'action3'),
   ), default=0)
   action_param1 = models.CharField(max_length=20)
   action_param2 = models.CharField(max_length=20)
   
   def __str__(self):
-    return('alarm model (TBD ...)')
+    return(self.name)

@@ -71,4 +71,4 @@ class EventerForm(forms.ModelForm):
 			'eve_event_time_gap' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 3600}), 
 			#'eve_school' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
 			'eve_alarm_email' : forms.TextInput(attrs={'size': 70}),
-		}
+		}		
