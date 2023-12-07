@@ -43,7 +43,7 @@ from tools.health import stop as stophealth
 from .models import stream
 from .c_streams import streams, c_stream
 
-from threading import enumerate
+#from threading import enumerate
     
 if not model_type.objects.filter(name='efficientnetv2-b0'):
   newtype = model_type(name='efficientnetv2-b0', x_in_default=224, y_in_default=224)
@@ -144,8 +144,8 @@ def newexit(*args):
     sys.exit(0)
   elif restart_mode == 2:
     redis.set_watch_status(2) 
-    for thread in enumerate(): 
-      print(thread)
+    #for thread in enumerate(): 
+    #  print(thread)
     os._exit(0)
     
 def run():
