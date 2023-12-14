@@ -16,8 +16,8 @@ import sys
 import os
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
-from multitimer import MultiTimer
 from time import sleep
+from threading import Thread
 from tools.l_tools import djconf
 from tools.c_redis import myredis
 from camai.version import version as software_version
@@ -80,52 +80,56 @@ if not  camurl.objects.filter(type='Reolink RLC-410W'):
     url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
   newcam.save()
 
-check_timer = None
 restart_mode = 0
+do_run = True
 redis = myredis()
 redis.set_start_trainer_busy(0)
 redis.set_start_worker_busy(0)
 redis.set_start_stream_busy(0)
+redis.set_shutdown_command(0)
 redis.set('KBInt', 0)
 
-def restartcheck_proc():
+def restartcheck_thread():
   global restart_mode
-  if (command := redis.get_shutdown_command()):
-    redis.set_shutdown_command(0)
-    if command == 1:
-      restart_mode = 1
-      newexit()
-    elif command == 2:  
-      restart_mode = 2
-      newexit()
-    return()
-  if (item := redis.get_start_trainer_busy()):
-    if (item in trainers) and trainers[item].do_run:
-      trainers[item].stop()
-    trainers[item] = trainer(item)
-    trainers[item].run()
-    redis.set_start_trainer_busy(0)
-  if (item := redis.get_start_worker_busy()):
-    if (item in tf_workers) and tf_workers[item].do_run:
-      tf_workers[item].stop()
-    tf_workers[item] = tf_worker(item)
-    tf_workers[item].run()
-    redis.set_start_worker_busy(0)
-  if (item := redis.get_start_stream_busy()):
-    dbline = stream.objects.get(id=item)
-    if item in streams:
-      streams[item].stop()
-    streams[item] = c_stream(dbline)
-    streams[item].start()
-    redis.set_start_stream_busy(0)    
+  while do_run:
+    if (command := redis.get_shutdown_command()):
+      redis.set_shutdown_command(0)
+      if command == 1:
+        restart_mode = 1
+      elif command == 2:  
+        restart_mode = 2
+      print('redis-command', restart_mode)
+      os.kill(os.getpid(), SIGINT)
+      return()
+    if (item := redis.get_start_trainer_busy()):
+      if (item in trainers) and trainers[item].do_run:
+        trainers[item].stop()
+      trainers[item] = trainer(item)
+      trainers[item].run()
+      redis.set_start_trainer_busy(0)
+    if (item := redis.get_start_worker_busy()):
+      if (item in tf_workers) and tf_workers[item].do_run:
+        tf_workers[item].stop()
+      tf_workers[item] = tf_worker(item)
+      tf_workers[item].run()
+      redis.set_start_worker_busy(0)
+    if (item := redis.get_start_stream_busy()):
+      dbline = stream.objects.get(id=item)
+      if item in streams:
+        streams[item].stop()
+      streams[item] = c_stream(dbline)
+      streams[item].start()
+      redis.set_start_stream_busy(0)    
+    sleep(10.0)
 
 def newexit(*args):
   global restart_mode
+  global do_run
   redis.set('KBInt', 1)
   print ('Caught KeyboardInterrupt...')
+  do_run = False
   sleep(5.0)
   stophealth()
-  check_timer.stop()
   for i in streams:
     print('Closing stream #', i)
     streams[i].stop()
@@ -134,22 +138,17 @@ def newexit(*args):
     tf_workers[i].stop()
   for i in trainers:
     print('Closing trainer #', i)
-    trainers[i].stop()
+    trainers[i].stop()  
   if restart_mode in {0, 1}:
     redis.set_watch_status(0) 
     sys.exit(0)
   elif restart_mode == 2:
-    restart_mode = 3
-    os.kill(os.getpid(), SIGINT)
-  elif restart_mode == 3:
     redis.set_watch_status(2) 
-    sys.exit(0)
-  #for thread in enumerate(): 
-  #  print(thread)
-
-
+    #for thread in enumerate(): 
+    #  print(thread)
+    os._exit(0)
+    
 def run():
-  global check_timer
   signal(SIGINT, newexit)
   signal(SIGTERM, newexit)
   signal(SIGHUP, newexit)
@@ -167,7 +166,6 @@ def run():
   for dbline in stream.objects.filter(active=True):
     streams[dbline.id] = c_stream(dbline)
     streams[dbline.id].start()
-
-  check_timer = MultiTimer(interval=10, function=restartcheck_proc, runonstart=False)
-  check_timer.start()
+    
+  check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
 

@@ -67,6 +67,14 @@
       </select>
     </div>  
     <div class="col-sm-auto h4">
+      <label class="m-2" for="model_train_type">Model Type for Training:</label>
+      <select id="model_train_type">
+      {% for item in model_types %}
+          <option value={{ item.name }}>{{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})</option>
+      {% endfor %}    
+      </select>
+    </div>  
+    <div class="col-sm-auto h4">
       <label class="m-2" for="image_augmentation">Image Augmentation:</label>
       <input class="m-2" type="number" id="image_augmentation" size="10" min="0.0" max="1.0" step="0.01">
     </div>  
@@ -219,7 +227,7 @@ function init_var(menu_item, code_string) {
         'item' : code_string,
         'value' : $(menu_item).val(),
       });
-      if (code_string == 'model_type') {
+      if (code_string == 'model_train_type') {
         trainerutilSocket.sendandwait({
           'command' : 'set_from_dashboard',
           'item' : 'model_xin',
@@ -228,7 +236,7 @@ function init_var(menu_item, code_string) {
         trainerutilSocket.sendandwait({
           'command' : 'set_from_dashboard',
           'item' : 'model_yin',
-          'value' : model_types_dict[$(menu_item).val()][0],
+          'value' : model_types_dict[$(menu_item).val()][1],
         });
       };
     });
@@ -376,12 +384,12 @@ $(document).ready(function() {
       init_bool_var('#cbdonate', 'donate_pics');
       init_bool_var('#save_new_model', 'save_new_model');
       init_var('#model_type', 'model_type');
+      init_var('#model_train_type', 'model_train_type');
       init_var('#image_augmentation', 'model_image_augmentation');
       init_var('#weight_constraint', 'model_weight_constraint');
       init_var('#weight_decay', 'model_weight_decay');
       init_var('#dropout', 'model_dropout');
       init_bool_var('#stop_overfit', 'model_stop_overfit');
-      init_var('#model_type', 'model_type');
       init_var('#patience', 'early_stop_patience');
       init_var('#maxweight', 'weight_max');
       init_var('#minweight', 'weight_min');

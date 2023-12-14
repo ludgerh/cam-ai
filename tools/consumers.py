@@ -576,7 +576,7 @@ class admintools(WebsocketConsumer):
       return(schoolcount < limit)  
 
   def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
 

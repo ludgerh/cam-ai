@@ -151,6 +151,20 @@ let graph_data = {
     label: 'val_Hit100',
     backgroundColor: 'rgb(0, 155, 0)',
     borderColor: 'rgb(0, 155, 0)',
+    yAxisID: 'A',
+    data: [],
+    },
+    {
+    label: 'loss',
+    backgroundColor: 'rgb(0, 0, 155)',
+    borderColor: 'rgb(0, 0, 155)',
+    yAxisID: 'B',
+    data: [],
+    },
+    {
+    label: 'val_Loss',
+    backgroundColor: 'rgb(200, 155, 0)',
+    borderColor: 'rgb(200, 155, 0)',
     yAxisID: 'B',
     data: [],
     },
@@ -189,6 +203,8 @@ function refresh_all() {
       graph_labels.length = 0;
       graph_data.datasets[0].data.length = 0;
       graph_data.datasets[1].data.length = 0;
+      graph_data.datasets[2].data.length = 0;
+      graph_data.datasets[3].data.length = 0;
       newaddition = '';
       counter = 0;
       result.forEach(function(item, index) {
@@ -196,6 +212,8 @@ function refresh_all() {
         graph_labels.push(item.pk);
         graph_data.datasets[0].data.push(item.fields.val_cmetrics);
         graph_data.datasets[1].data.push(item.fields.val_hit100);
+        graph_data.datasets[2].data.push(item.fields.loss);
+        graph_data.datasets[3].data.push(item.fields.val_loss);
         newaddition += '<tr>';
         newaddition += '<td>'+counter+'</td>';
         newaddition += '<td>'+Math.round(item.fields.seconds)+'</td>';

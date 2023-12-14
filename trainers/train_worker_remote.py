@@ -69,18 +69,18 @@ class train_once_remote():
             + 'to training server')
           sleep(djconf.getconfigfloat('medium_brake', 0.1))
       outdict = {
-        'code' : 'namecheck',
-        'school' : self.myschool.e_school,
-      } 
-      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      remotesearch = json.loads(self.ws.recv())
-      outdict = {
         'code' : 'setversion',
         'school' : self.myschool.e_school,
         'version' : software_version,
       } 
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
       model_in_dims = json.loads(self.ws.recv())
+      outdict = {
+        'code' : 'namecheck',
+        'school' : self.myschool.e_school,
+      } 
+      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      remotesearch = json.loads(self.ws.recv())
       self.ws_ts = time()
       pingproc = MultiTimer(interval=2, 
         function=self.send_ping, 

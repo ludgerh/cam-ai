@@ -18,15 +18,14 @@ from requests import get as rget
 from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, HttpResponseRedirect
 from streams.models import stream
 from users.models import userinfo
 from access.c_access import access
 from tf_workers.models import school, worker
 from tools.l_tools import djconf
 from .models import camurl
-
-from time import sleep
+from .forms import UploadFileForm
 
 class health(TemplateView):
   template_name = 'tools/health.html'
@@ -274,23 +273,6 @@ class backup(TemplateView):
       return(super().get(request, *args, **kwargs))
     else:
       return(HttpResponse('No Access'))
-      
-class restore(TemplateView):
-  template_name = 'tools/restore.html'
-
-  def get_context_data(self, **kwargs):
-    context = super().get_context_data(**kwargs)
-    context.update({
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
-    })
-    return context
-
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
     
 def downbackup(request): 
   if request.user.is_superuser:
@@ -299,3 +281,32 @@ def downbackup(request):
     return FileResponse(sourcefile)
   else:
     return(HttpResponse('No Access.'))
+      
+#class restore(TemplateView):
+#  template_name = 'tools/restore.html'
+
+#  def get_context_data(self, **kwargs):
+#    context = super().get_context_data(**kwargs)
+#    context.update({
+#      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+#      'version' : djconf.getconfig('version', 'X.Y.Z'),
+#    })
+#    return context
+
+ # def get(self, request, *args, **kwargs):
+ #   if self.request.user.is_superuser:
+ #     return(super().get(request, *args, **kwargs))
+ #   else:
+ #     return(HttpResponse('No Access'))
+      
+
+def restore(request):
+  if request.method == 'POST' and request.FILES['myfile']:
+    myfile = request.FILES['myfile']
+    fs = FileSystemStorage()
+    filename = fs.save(myfile.name, myfile)
+    uploaded_file_url = fs.url(filename)
+    return render(request, 'tools/restore.html', {
+        'uploaded_file_url': uploaded_file_url
+    })
+  return render(request, 'tools/restore.html')
