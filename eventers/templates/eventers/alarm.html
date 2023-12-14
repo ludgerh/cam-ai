@@ -57,17 +57,36 @@
         </h2>
         <div id="collapse{{ item.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ item.id }}" data-bs-parent="#accordionExample">
           <div class="accordion-body">
-            <div id="item{{ item.id }}">?</div>
+            <div id="item{{ item.id }}">
+              ?
+            </div>
           </div>
         </div>
       </div>
       {% endfor %}
     </div>
     <script>
-    {% for item in alarms %}
+    {% for djitem in alarms %}
     $(document).ready(function() {
-      $('#item{{ item.id }}').html('{{ item.mendef }}');
-      menuobject = JSON.parse('{{ item.mendef|safe }}');
+      menuobject = JSON.parse('{{ djitem.mendef|safe }}');
+      htmlstrg = '';
+      menuobject.forEach (function (item) {
+        htmlstrg += '<div class="col-sm-auto h4">';
+        if(item[0] == 's') {
+            htmlstrg += '<label class="m-2" for="lname{{ djitem.id }}">'+item[1]+' </label>';
+            htmlstrg += '<input class="m-2" type="text" id="lname{{ djitem.id }}">';
+        };
+        if(item[0] == 'b') {
+          htmlstrg += '<label class="m-2" for="scales{{ djitem.id }}">'+item[1]+'</label>';
+          htmlstrg += '<input style="width: 24px; height: 24px;" class="m-2" type="checkbox" id="scales{{ djitem.id }}" checked />';
+        };
+        if(item[0] == 'i') {
+          htmlstrg += '<label class="m-2" for="quantity{{ djitem.id }}">'+item[1]+'</label>';
+          htmlstrg += '<input class="m-2" type="number" id="quantity{{ djitem.id }}" min="'+item[2]+'" max="'+item[3]+'"> ';
+        };
+        htmlstrg += '</div>';
+      });
+      $('#item{{ djitem.id }}').html(htmlstrg);
       console.log(menuobject);
     });
     {% endfor %}
