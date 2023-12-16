@@ -1,4 +1,5 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de #}
+{# More information and complete source: https://github.com/ludgerh/cam-ai #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -31,8 +32,25 @@
   <span id="ipaddress">?</span>
 </div>
 </div><div class="h2 m-2">
-  <label for="ipaddress" class="form-label h3">Camera address (leave empty to scan your network):</label>
-  <input type="text" class="form-control" id="camaddress">
+  <label for="ipaddress" class="form-label h3">
+    {% if user.is_superuser %}
+      Camera address or domain (leave empty to scan your network):
+    {% elif is_public_server %}  
+      Camera domain:
+    {% else %}  
+       Camera address or domain:
+    {% endif %}  
+  </label>
+  <input type="text" class="form-control" id="camdomain">
+  <div class="h2 m-2">
+    {% if user.is_superuser %}
+      Examples: '', '192.168.1.13', 'mydomain.com'
+    {% elif is_public_server %}  
+      Example: 'mydomain.com'
+    {% else %}  
+      Examples: '192.168.1.13', 'mydomain.com'
+    {% endif %}  
+  </div>
 </div>
 <div class="h2 m-2">IPs scanned:</div>
 <div class="form-check h2 m-2">
@@ -48,7 +66,7 @@
   </label>
 </div>
 <div class="form-check h2 m-2">
-  <input class="form-check-input" type="checkbox" value="" id="checkbox443" port="554">
+  <input class="form-check-input" type="checkbox" value="" id="checkbox554" port="554">
   <label class="form-check-label" for="flexCheckDefault">
     554 (RTSP)
   </label>
@@ -66,10 +84,8 @@
   </label>
 </div>
 <div>
-{% if user.is_superuser %}
-<button class="btn btn-primary m-2" id="scan-button" type="button">Check (may take a while)</button>
+<button class="btn btn-primary m-2" id="scan-button" type="button" disabled>Check (may take a while)</button>
 </div>
-{% endif %}
 <div class="h2 m-2 d-none" id="please_wait">
 Scanning your network. Please wait a while...
 </div>
@@ -80,7 +96,11 @@ Scanning your network. Please wait a while...
 
 <script>
 
+{% if is_public_server %}  
+let ports = [80, 443, 554, 1935, 8000];
+{% else %}  
 let ports = [80, 8000];
+{% endif %}  
 
 let caminstSocket;
 let mynetwork;
@@ -121,13 +141,28 @@ $(document).ready(function() {
         };
       }); 
     });
+    $('#camdomain').change(function() {
+      caminstSocket.sendandwait({
+        'command' : 'validate_domain',
+        'domain' : $('#camdomain').val(),
+      })  
+      .then((result) => {
+        if (result) {
+          $('#scan-button').removeAttr('disabled');
+        } else {  
+          $('#scan-button').attr('disabled','disabled');
+        };  
+      })
+      .catch(err => {console.log(err);});
+    });
+    $('#camdomain').trigger('change');
     
     $('#scan-button').click(function() {
       $('#netlist').empty();
       $('#please_wait').removeClass("d-none");
       caminstSocket.sendandwait({
         'command' : 'scanips',
-        'camaddress' : $('#camaddress').val(),
+        'camaddress' : $('#camdomain').val(),
         'portaddr' : ports,
         'network' : mynetwork,
         'ipaddr' : myip,

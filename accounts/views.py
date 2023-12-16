@@ -21,7 +21,7 @@ class MyActivationView(ActivationView):
   def activate(self, *args, **kwargs):
     username = super().activate(*args, **kwargs)
     myuser = User.objects.get(username=username)
-    myuserinfo = userinfo(user=myuser)
+    myuserinfo = userinfo(user=myuser, allowed_schools=1, allowed_streams=1, pay_tokens=0)
     myuserinfo.save()
     return(username)
     

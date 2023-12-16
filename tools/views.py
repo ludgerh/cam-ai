@@ -121,6 +121,7 @@ class scan_cams(TemplateView):
       'streamlimit' : streamlimit,
       'streamcount' : streamcount,
       'mayadd' : (streamlimit > streamcount),
+      'is_public_server' : djconf.getconfigbool('is_public_server', False),
     })
     return context
 

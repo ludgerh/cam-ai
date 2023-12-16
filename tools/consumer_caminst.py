@@ -1,9 +1,25 @@
+# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 3
+# of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+# See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 import json
 #from pprint import pprint
 from logging import getLogger
 from ipaddress import ip_network, ip_address
 from subprocess import Popen, PIPE
 from time import sleep
+from validators.domain import domain
+from validators.ip_address import ipv4, ipv6
 from tools.djangodbasync import filterlinesdict, savedbline
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
@@ -23,6 +39,7 @@ log_ini(logger, logname)
 redis = myredis()
 
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
+is_public_server = djconf.getconfigbool('is_public_server', False)
 
 class caminst(AsyncWebsocketConsumer):
     
@@ -44,10 +61,9 @@ class caminst(AsyncWebsocketConsumer):
     
 
   async def connect(self):
-    if self.scope['user'].is_superuser:
-      self.myip = get_ip_address()
-      self.mynet = get_ip_network(self.myip)
-      await self.accept()
+    self.myip = get_ip_address()
+    self.mynet = get_ip_network(self.myip)
+    await self.accept()
 
   async def receive(self, text_data):
     logger.debug('<-- ' + text_data)
@@ -144,3 +160,16 @@ class caminst(AsyncWebsocketConsumer):
       outlist['data'] = {'id' : newstream.id, }
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'validate_domain':
+      if (params['domain'] == '') and self.scope['user'].is_superuser:
+        outlist['data'] = True #Admin may scan the network
+      elif domain(params['domain']):  
+        outlist['data'] = True #Anyone may check an external domain
+      elif ipv4(params['domain']) or ipv6(params['domain']):
+        outlist['data'] = not is_public_server #IPs permitted on Raspis, not Eygelshoven
+      else:
+        outlist['data'] = False #No correct IP nor domain
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      
