@@ -32,6 +32,7 @@ import ws_predictions.routing
 import users.routing
 import trainers.routing
 import tools.routing
+import eventers.routing
 # Insert new apps also below!!!
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'camai.settings')
@@ -47,6 +48,7 @@ application = ProtocolTypeRouter({
         + users.routing.websocket_urlpatterns
         + trainers.routing.websocket_urlpatterns
         + tools.routing.websocket_urlpatterns
+        + eventers.routing.websocket_urlpatterns
     )
   ),
 })
