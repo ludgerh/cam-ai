@@ -50,6 +50,7 @@ txaio==23.1.1
 typing_extensions==4.8.0
 ua-parser==0.18.0
 urllib3==2.0.7
+validators
 websocket-client==1.6.4
 zeep==4.2.1
 zope.interface==6.1

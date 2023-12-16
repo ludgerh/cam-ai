@@ -108,6 +108,7 @@ txaio==23.1.1
 typing_extensions==4.5.0
 ua-parser==0.18.0
 urllib3==1.26.16
+validators==0.22.0
 websocket-client==1.6.2
 Werkzeug==2.3.7
 wrapt==1.14.1
