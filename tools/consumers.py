@@ -592,9 +592,10 @@ class admintools(WebsocketConsumer):
       myschool = school()
       myschool.name = params['name']
       myschool.creator = self.scope['user']
-      myschool.save()
       myworker = myschool.tf_worker
       schooldir = schoolsdir + 'model' + str(myschool.id) + '/'
+      myschool.dir = schooldir
+      myschool.save()
       try:
         makedirs(schooldir+'frames')
       except FileExistsError:
@@ -652,7 +653,7 @@ class admintools(WebsocketConsumer):
         if not self.scope['user'].is_superuser:
           myaccess = access_control()
           myaccess.vtype = 'S'
-          myaccess.vid = newschool.id
+          myaccess.vid = myschool.id
           myaccess.u_g_nr = self.scope['user'].id
           myaccess.r_w = 'W'
           myaccess.save()
