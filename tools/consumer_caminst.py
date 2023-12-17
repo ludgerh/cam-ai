@@ -163,14 +163,20 @@ class caminst(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'validate_domain':
-      if (params['domain'] == '') and self.scope['user'].is_superuser:
-        outlist['data'] = True #Admin may scan the network
-      elif domain(params['domain']):  
-        outlist['data'] = True #Anyone may check an external domain
-      elif ipv4(params['domain']) or ipv6(params['domain']):
-        outlist['data'] = not is_public_server #IPs permitted on Raspis, not Eygelshoven
+      mydomain = params['domain']
+      if '//' in mydomain:
+        mydomain = mydomain.split('//')[1]
+      if '/' in mydomain:
+        mydomain = mydomain.split('/')[0]  
+      if (mydomain == '') and self.scope['user'].is_superuser:
+        result = True #Admin may scan the network
+      elif domain(mydomain):  
+        result = True #Anyone may check an external domain
+      elif ipv4(mydomain) or ipv6(mydomain):
+        result = not is_public_server #IPs permitted on Raspis, not Eygelshoven
       else:
-        outlist['data'] = False #No correct IP nor domain
+        result = False #No correct IP nor domain
+      outlist['data'] = {'result' : result, 'domain' : mydomain, } 
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
       

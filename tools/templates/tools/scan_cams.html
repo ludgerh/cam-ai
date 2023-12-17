@@ -147,7 +147,8 @@ $(document).ready(function() {
         'domain' : $('#camdomain').val(),
       })  
       .then((result) => {
-        if (result) {
+        $('#camdomain').val(result.domain);
+        if (result.result) {
           $('#scan-button').removeAttr('disabled');
         } else {  
           $('#scan-button').attr('disabled','disabled');
