@@ -50,6 +50,7 @@ from eventers.models import event, event_frame
 from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
+from access.c_access import access
 from .health import totaldiscspace, freediscspace
 
 OUT = 0
@@ -658,7 +659,7 @@ class admintools(WebsocketConsumer):
           myaccess.u_g_nr = self.scope['user'].id
           myaccess.r_w = 'W'
           myaccess.save()
-          myaccess.read_list()
+          access.read_list()
       else:
         myschool.active = False
         myschool.save(update_fields=('active', ))

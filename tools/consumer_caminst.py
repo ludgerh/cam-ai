@@ -31,6 +31,7 @@ from tf_workers.models import school
 from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
+from access.c_access import access
 
 
 logname = 'ws_caminst'
@@ -157,7 +158,7 @@ class caminst(AsyncWebsocketConsumer):
         myaccess.u_g_nr = self.scope['user'].id
         myaccess.r_w = 'W'
         await savedbline(myaccess)
-        myaccess.read_list()
+        await access.read_list_async()
       while redis.get_start_stream_busy():
         sleep(long_brake)
       redis.set_start_stream_busy(newstream.id)

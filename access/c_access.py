@@ -14,6 +14,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User as dbuser
+from channels.db import database_sync_to_async
 from .models import access_control
 
 
@@ -25,6 +26,13 @@ class c_access():
 
   def __init__(self):
     self.read_list()
+
+  def read_list(self):
+    self.checklist = list(access_control.objects.all())
+
+  @database_sync_to_async
+  def read_list_async(self):
+    self.checklist = list(access_control.objects.all())
 
   def read_list(self):
     self.checklist = list(access_control.objects.all())
