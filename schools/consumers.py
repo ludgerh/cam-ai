@@ -536,7 +536,7 @@ class schoolutil(AsyncWebsocketConsumer):
       newaccess.u_g_nr = indict['user']
       newaccess.r_w = 'W'
       await savedbline(newaccess)
-      newaccess.read_list()
+      await access.read_list_async()
       schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
       try:
         makedirs(schooldir+'frames')
