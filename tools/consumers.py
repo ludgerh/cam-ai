@@ -592,10 +592,11 @@ class admintools(WebsocketConsumer):
       myschool = school()
       myschool.name = params['name']
       myschool.creator = self.scope['user']
+      myschool.save()
       myworker = myschool.tf_worker
       schooldir = schoolsdir + 'model' + str(myschool.id) + '/'
       myschool.dir = schooldir
-      myschool.save()
+      myschool.save(update_fields=('dir', ))
       try:
         makedirs(schooldir+'frames')
       except FileExistsError:

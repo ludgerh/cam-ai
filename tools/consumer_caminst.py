@@ -130,11 +130,15 @@ class caminst(AsyncWebsocketConsumer):
       if 'name' in params:
         newstream.name = params['name']
       newstream.cam_url = params['camurl']
-      newstream.cam_video_codec = params['videocodec']
-      if params['audiocodec'] is None:
-        newstream.cam_audio_codec = -1
-      else:  
-        newstream.cam_audio_codec = params['audiocodec']
+      # cam_video_codec and cam_audio_codec are set to -1 (auto)
+      # should be put to values from params
+      newstream.cam_video_codec = -1
+      newstream.cam_audio_codec = -1
+      #newstream.cam_video_codec = params['videocodec']
+      #if params['audiocodec'] is None:
+      #  newstream.cam_audio_codec = -1
+      #else:  
+      #  newstream.cam_audio_codec = params['audiocodec']
       newstream.name = params['cam_name']
       newstream.cam_xres = params['xresolution']
       newstream.cam_yres = params['yresolution']
@@ -153,6 +157,7 @@ class caminst(AsyncWebsocketConsumer):
         myaccess.u_g_nr = self.scope['user'].id
         myaccess.r_w = 'W'
         await savedbline(myaccess)
+        myaccess.read_list()
       while redis.get_start_stream_busy():
         sleep(long_brake)
       redis.set_start_stream_busy(newstream.id)
