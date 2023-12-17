@@ -658,6 +658,7 @@ class admintools(WebsocketConsumer):
           myaccess.u_g_nr = self.scope['user'].id
           myaccess.r_w = 'W'
           myaccess.save()
+          myaccess.read_list()
       else:
         myschool.active = False
         myschool.save(update_fields=('active', ))
