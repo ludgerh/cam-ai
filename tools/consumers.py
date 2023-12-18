@@ -642,15 +642,15 @@ class admintools(WebsocketConsumer):
             'wspass',
             'active',
           ))
+          while redis.get_start_trainer_busy():
+            sleep(long_brake)
+          redis.set_start_trainer_busy(myschool.trainer.id)
       else:
         resultdict = {'status' : 'OK', }
         myschool.model_type = model_type
         myschool.save(update_fields=('model_type', ))
         mytrainer.t_type=1
         mytrainer.save(update_fields=('t_type', 'active', ))
-      while redis.get_start_trainer_busy():
-        sleep(long_brake)
-      redis.set_start_trainer_busy(myschool.trainer.id)
       if resultdict['status'] == 'OK':
         if not self.scope['user'].is_superuser:
           myaccess = access_control()

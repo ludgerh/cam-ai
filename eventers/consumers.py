@@ -14,7 +14,8 @@ class alarm(WebsocketConsumer):
     print(text_data)
 
     if params['command'] == 'write_db':
-      alarmline = dbalarm(name='test', mendef='text',action_type=1,action_param1='t',action_param2='t')
+      alarmline = dbalarm(name='test', mendef='text',action_type=1,action_param1='t',
+        action_param2='t')
       alarmline.save()
       outlist['data'] = 'OK'
       print('--> ' + str(outlist))
