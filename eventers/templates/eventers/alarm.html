@@ -109,6 +109,7 @@
 		    + '/ws/alarm/'
 	    )
 	    .then((result) => {
+	      console.log('*****');
 	      AlarmSocket =  result;
 	      AlarmSocket.sendandwait({
 			    'command' : 'write_db',
