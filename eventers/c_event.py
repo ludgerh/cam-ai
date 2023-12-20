@@ -306,7 +306,7 @@ class c_event(list):
 
   def smtp_send_mail(self, mysmtp, receiver):
     count = 0
-    while True:
+    while count < 5:
       count += 1
       try: 
         mysmtp.login(

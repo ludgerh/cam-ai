@@ -77,7 +77,7 @@ class stream(models.Model):
   eve_min_x_view = models.IntegerField(default=0)
   eve_max_x_view = models.IntegerField(default=0)
   eve_scale_x_view = models.FloatField(default=1.0)
-  eve_alarm_email = models.CharField("alarm email", max_length=255, default='theo@tester123.de')
+  eve_alarm_email = models.CharField("alarm email", max_length=255, default='')
   eve_event_time_gap = models.IntegerField("new event gap", default=60)
   eve_margin = models.IntegerField("frame margin", default=20)
   eve_school = models.ForeignKey(school, on_delete=models.SET_DEFAULT, default=1)
