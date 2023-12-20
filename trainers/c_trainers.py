@@ -30,7 +30,7 @@ from tools.c_logger import log_ini
 from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
 from tf_workers.models import school
 from .models import trainer as dbtrainer, trainframe, fit, epoch
-if djconf.getconfigbool('local_trainer', True):
+if djconf.getconfigbool('local_trainer', False):
   from .train_worker_gpu import train_once_gpu
 from .train_worker_remote import train_once_remote
 

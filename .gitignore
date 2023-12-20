@@ -1,5 +1,5 @@
 /data/
-/data2/
+/plugins/
 /camai/static/camai/nogit/
 __pycache__/
 *.py~

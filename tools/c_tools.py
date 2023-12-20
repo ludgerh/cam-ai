@@ -15,9 +15,6 @@ from time import time, sleep
 import cv2 as cv
 import numpy as np
 from tools.l_tools import djconf
-if djconf.getconfigbool('local_trainer', True):
-  #from tensorflow.keras import backend as K
-  import tensorflow as tf
 
 def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0):
 # Frame Types:
@@ -139,19 +136,6 @@ def hasoverlap(rect1, rect2) : # Rectangles in notation B
 		return(True)
 	else :
 		return(False)
-
-def cmetrics(y_true, y_pred):
-  y_true = tf.round(y_true)
-  y_pred = tf.round(y_pred)
-  ones = tf.ones_like(y_true)
-  return tf.reduce_mean(tf.abs(y_pred + y_true - ones), axis=-1)
-
-def hit100(y_true, y_pred):
-  y_true = tf.round(y_true)
-  y_pred = tf.round(y_pred)
-  maxline = tf.reduce_max(tf.abs(y_true - y_pred), axis=-1)
-  ones = tf.ones_like(maxline)
-  return tf.abs(maxline - ones)
   
 def image_size(infile):
   myimage = cv.imread(infile)

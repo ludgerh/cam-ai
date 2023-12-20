@@ -39,7 +39,8 @@ from websocket._exceptions import (WebSocketTimeoutException,
 from django.db.utils import OperationalError
 from django.db import connections, connection
 from tools.l_tools import QueueUnknownKeyword, djconf, get_proc_name
-from tools.c_tools import cmetrics, hit100
+if djconf.getconfigbool('local_trainer', False):
+  from tools.c_tools import cmetrics, hit100
 from tools.c_logger import log_ini
 from .models import school, worker
 from schools.c_schools import get_taglist
