@@ -5,6 +5,7 @@
 	background: #B4C2C8;
 	color: #000;
 	border-radius:9px;
+	margin:auto;
 }
 
 .rows {
@@ -12,11 +13,7 @@
 	width:90%;
 	margin:1%;
 	border-radius:15px;
-	padding-left: 3%;
-	padding-right:3%;
-	padding-top:1%;
-	padding-bottom:1%;
-	
+	padding:5px;
 }
 
 .noselect  {
@@ -42,5 +39,6 @@ td.noline {
 .pointer {
 	cursor: pointer;
 }
+
 
 
