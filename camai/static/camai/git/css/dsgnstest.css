@@ -1,22 +1,12 @@
-.img-rounded{
-	border-radius:2%;
-}
 .bluegrey {
 	background: #B4C2C8;
 	color: #000;
-	border-radius:9px;
-}
+}	
+
 
 .rows {
-	background:#475B63;
-	width:90%;
-	margin:1%;
-	border-radius:15px;
-	padding-left: 3%;
-	padding-right:3%;
-	padding-top:1%;
-	padding-bottom:1%;
-	
+  background: #597081;
+  border-radius:10px;
 }
 
 .noselect  {
@@ -24,7 +14,14 @@
 }
 
 
+.live {
+  border:2px;
+  border-radius:20px;
+}
+
+
 button {
+  background:#597081;
 	margin:20px;
 }
 
@@ -42,5 +39,4 @@ td.noline {
 .pointer {
 	cursor: pointer;
 }
-
 
