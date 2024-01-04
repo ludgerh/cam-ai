@@ -191,7 +191,12 @@ def fixmissingfiles_rec(list_to_delete, dbtimedict):
     
 def checkevents(mypipe):
   eventframequery = event_frame.objects.all()
-  eventframeset = {item.event.id for item in eventframequery}
+  while True:
+    try:
+      eventframeset = {item.event.id for item in eventframequery}
+      break
+    except OperationalError:
+      connection.close()
   eventquery = event.objects.all()
   eventset = {item.id for item in eventquery}
   result = {

@@ -40,7 +40,7 @@ from django.db.utils import OperationalError
 from django.db import connections, connection
 from tools.l_tools import QueueUnknownKeyword, djconf, get_proc_name
 if djconf.getconfigbool('local_trainer', False):
-  from tools.c_tools import cmetrics, hit100
+  from plugins.train_worker_gpu.train_gpu_tools import cmetrics, hit100
 from tools.c_logger import log_ini
 from .models import school, worker
 from schools.c_schools import get_taglist
@@ -399,7 +399,9 @@ class tf_worker():
       if schoolnr in self.allmodels:
         if ((myschool.lastmodelfile is not None)
             and	((self.allmodels[schoolnr]['time'] is None)
-            or (myschool.lastmodelfile > self.allmodels[schoolnr]['time']))):
+            or (myschool.lastmodelfile > self.allmodels[schoolnr]['time'])
+            or (myschool.model_type != self.allmodels[schoolnr]['model_type'])
+            )):
           del self.allmodels[schoolnr]
           del self.activemodels[schoolnr]
     if not (schoolnr in self.activemodels):
@@ -408,8 +410,10 @@ class tf_worker():
         self.allmodels[schoolnr] = {}
         if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket:
           self.allmodels[schoolnr]['time'] = time()
+          self.allmodels[schoolnr]['model_type'] = 'simulation'
         else:
           self.allmodels[schoolnr]['time'] = myschool.lastmodelfile
+          self.allmodels[schoolnr]['model_type'] = myschool.model_type
         if self.dbline.gpu_sim >= 0:
           self.allmodels[schoolnr]['xdim'] = 50
           self.allmodels[schoolnr]['ydim'] = 50
