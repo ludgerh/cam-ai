@@ -35,7 +35,7 @@ class event(models.Model):
 
   def __str__(self):
     return('event model, id = '+str(self.id))
-	
+		
 class event_frame(models.Model):
   time = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
   status = models.SmallIntegerField(default=0)
@@ -82,15 +82,15 @@ class evt_condition(models.Model):
     return('evt_conditions model (TBD ...)')
     
 class alarm(models.Model):
+  mystream = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)
   mendef = models.CharField(max_length=255, default="[]")
-  name = models.CharField(max_length=20, default="New Alarm")
-  action_type = models.IntegerField("action_type", choices=(
-    (1, 'USB Relais'),
-    (2, 'Philips HUE'),
-    (3, 'action3'),
-  ), default=0)
-  action_param1 = models.CharField(max_length=20)
-  action_param2 = models.CharField(max_length=20)
+  
+  def __str__(self):
+    return(self.name)
+  
+class alarmdevice(models.Model):
+  name = models.CharField(max_length=50, default="New device")
+  mendef = models.CharField(max_length=255, default="[]")
   
   def __str__(self):
     return(self.name)

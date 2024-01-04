@@ -75,20 +75,21 @@
     $(document).ready(function() {
       {% for djitem in alarms %}
       menuobject = JSON.parse('{{ djitem.mendef|safe }}');
+      console.log(menuobject);
       htmlstrg = '';
       menuobject.forEach (function (item) {
         htmlstrg += '<div class="col-sm-auto h4">';
-        if(item[0] == 's') {
-            htmlstrg += '<label class="m-2" for="lname{{ djitem.id }}">'+item[1]+' </label>';
+        if(item.type == 's') {
+            htmlstrg += '<label class="m-2" for="lname{{ djitem.id }}">'+item.label+' </label>';
             htmlstrg += '<input class="m-2 strinput" type="text" id="lname{{ djitem.id }}">';
         };
-        if(item[0] == 'b') {
-          htmlstrg += '<label class="m-2" for="scales{{ djitem.id }}">'+item[1]+'</label>';
+        if(item.type == 'b') {
+          htmlstrg += '<label class="m-2" for="scales{{ djitem.id }}">'+item.label+'</label>';
           htmlstrg += '<input style="width: 24px; height: 24px;" class="m-2 boolinput" type="checkbox" id="scales{{ djitem.id }}" checked />';
         };
-        if(item[0] == 'i') {
-          htmlstrg += '<label class="m-2" for="quantity{{ djitem.id }}">'+item[1]+'</label>';
-          htmlstrg += '<input class="m-2 intinput" type="number" id="quantity{{ djitem.id }}" min="'+item[2]+'" max="'+item[3]+'"> ';
+        if(item.type == 'i') {
+          htmlstrg += '<label class="m-2" for="quantity{{ djitem.id }}">'+item.label+'</label>';
+          htmlstrg += '<input class="m-2 intinput" type="number" id="quantity{{ djitem.id }}" min="'+item.min+'" max="'+item.max+'"> ';
         };
         htmlstrg += '</div>';
       });

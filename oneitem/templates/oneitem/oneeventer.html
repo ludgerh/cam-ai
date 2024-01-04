@@ -1,4 +1,4 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2022 The CAM-AI Team, info@cam-ai.de #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -32,17 +32,17 @@
 		<div class="col-auto">
       <div>
         <h1>E{{ dbline.id }}: {{ dbline.name }}</h1>
-        <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
-          fps = <span id="fpstag">?</span>, 
-          views = <span id="vnrtag">?</span></h5>
-        <img id="imagespace" />
+          <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+            fps = <span id="fpstag">?</span>, 
+            views = <span id="vnrtag">?</span></h5>
+        <img id="imagespace" class="img-rounded" />
       </div>
 		</div>
 	</div>
 </div>
 
 {% if may_write %}
-  <div class="container-fluid float-left" id="conditions">
+  <div class="container-fluid float-left rows" id="conditions">
 	  <div class="row my-1 bluegrey">
 		  <div class="col-auto my-2">General settings</div>
 	  </div>
