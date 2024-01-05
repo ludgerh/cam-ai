@@ -1,3 +1,10 @@
+.accordion {
+	--bs-accordion-btn-color: pink;
+	--bs-accordion-btn-bg: pink;
+	--bs-accordion-active-color: maroon;
+	--bs-accordion-active-bg: lightpink;
+}
+
 .img-rounded{
 	border-radius:2%;
 }

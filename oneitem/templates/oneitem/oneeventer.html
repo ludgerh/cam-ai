@@ -17,16 +17,12 @@
   {% load static %}
   <script src="{% static 'camai/git/js/wstools.js' %}"></script>
   <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
-	<link rel="stylesheet" href="{% static 'camai/git/css/camai.css' %}">
 {% else %}
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
     </script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
     </script>
-	<link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
 {% endif %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
-
 <div class="container-fluid float-left">
 	<div class="row">
 		<div class="col-auto">
@@ -42,75 +38,97 @@
 </div>
 
 {% if may_write %}
-  <div class="container-fluid float-left rows" id="conditions">
-	  <div class="row my-1 bluegrey">
-		  <div class="col-auto my-2">General settings</div>
-	  </div>
-	  <div class="row my-1 d-none">
-		  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
-				  method="post" id="oneform">
-			  <div class="container-fluid float-left">
-				  <div class="row my-2">
-					  {% csrf_token %}
-					  {% spaceless %}
-					  {% for field in form %}
-					  <div class="col-auto my-2">
-						  {{ field.errors }}
-						  {{ field.label_tag }}
-						  {% if field.name == 'eve_school' %}
-              <select name="eve_school" id="id_eve_school">
-                {% if dbline.eve_school.id == 1 %}
-                  <option value="1" selected>Standard</option>
-                {% else %}  
-                  <option value="1">Standard</option>
-                {% endif %}
-                {% for item in schoollist %}
-                  {% if dbline.eve_school.id == item.id %}
-                    <option value="{{ item.id }}" selected>{{ item.name }}</option>
-                  {% else %}  
-                    <option value="{{ item.id }}">{{ item.name }}</option>
-                  {% endif %}
-                {% endfor %}
-              </select>
-						  {% else %} 
-						    {{ field }}
-						  {% endif %} 	
-						  {% if field.help_text %}
-						  <p class="help">{{ field.help_text|safe }}</p>
-						  {% endif %}
-					  </div>
-					  {% endfor %}
-					  {% endspaceless %}
-				  </div>
-			  </div>
-			  <div class="container-fluid float-left">
-				  <div class="row my-1">
-					  <div class="col-auto my-2">
-						  <input type="submit" value="Submit">
-					  </div>
-				  </div>
-			  </div>
-		  </form>
+  <div class="accordion" id="accordionExample">
+	  <div class="accordion-item">
+		  <h2 class="accordion-header" id="heading{{ item.id }}">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ item.id }}" aria-expanded="true" aria-controls="collapse{{ item.id }}">
+          General settings
+        </button>
+      </h2>
+      <div id="collapse{{ item.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ item.id }}" data-bs-parent="#accordionExample">
+        <div class="accordion-body">
+          <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
+			        method="post" id="oneform">
+		        <div class="container-fluid float-left">
+			        <div class="row my-2">
+				        {% csrf_token %}
+				        {% spaceless %}
+				        {% for field in form %}
+				        <div class="col-auto my-2">
+					        {{ field.errors }}
+					        {{ field.label_tag }}
+					        {% if field.name == 'eve_school' %}
+                  <select name="eve_school" id="id_eve_school">
+                    {% if dbline.eve_school.id == 1 %}
+                      <option value="1" selected>Standard</option>
+                    {% else %}  
+                      <option value="1">Standard</option>
+                    {% endif %}
+                    {% for item in schoollist %}
+                      {% if dbline.eve_school.id == item.id %}
+                        <option value="{{ item.id }}" selected>{{ item.name }}</option>
+                      {% else %}  
+                        <option value="{{ item.id }}">{{ item.name }}</option>
+                      {% endif %}
+                    {% endfor %}
+                  </select>
+					        {% else %} 
+					          {{ field }}
+					        {% endif %} 	
+					        {% if field.help_text %}
+					        <p class="help">{{ field.help_text|safe }}</p>
+					        {% endif %}
+				        </div>
+				        {% endfor %}
+				        {% endspaceless %}
+			        </div>
+		        </div>
+		        <div class="container-fluid float-left">
+			        <div class="row my-1">
+				        <div class="col-auto my-2">
+					        <input type="submit" value="Submit">
+				        </div>
+			        </div>
+		        </div>
+	        </form>
+	      </div>
+	    </div>
 	  </div>
     {% for i in '12345'|make_list %}
-	  <div class="row my-1 bluegrey" rea="{{ i }}">
-		  <div class="col-auto my-2" rea="{{ i }}">
-    {% if i == '1' %}
-      Conditions for showing event frame..
-    {% endif %}
-    {% if i == '2' %}
-      Conditions for sending to school...
-    {% endif %}
-    {% if i == '3' %}
-      Conditions for recording video...
-    {% endif %}
-    {% if i == '4' %}
-      Conditions for sending email...
-    {% endif %}
-    {% if i == '5' %}
-      Conditions for alarm...
-    {% endif %}
-	  </div></div>
+    <div class="accordion-item">
+	    <h2 class="accordion-header">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ i }}" aria-expanded="true" aria-controls="collapse{{ i }}">
+          {% if i == '1' %}
+            Conditions for showing event frame..
+          {% endif %}
+          {% if i == '2' %}
+            Conditions for sending to school...
+          {% endif %}
+          {% if i == '3' %}
+            Conditions for recording video...
+          {% endif %}
+          {% if i == '4' %}
+            Conditions for sending email...
+          {% endif %}
+          {% if i == '5' %}
+            Conditions for alarm...
+          {% endif %}
+        </button>
+      </h2>   
+	  </div>
+	  <div id="collapse{{ i }}" class="accordion-collapse collapse" aria-labelledby="heading{{ i }}" data-bs-parent="#accordionExample">
+      <div class="accordion-body">
+        <div class="col-auto my-2"><h4>If...</h4>
+          <ul id="li_gr_{{ i }}" class="list-group">
+          </ul>
+          <button type="button" react="{{ i }}" class="btn btn-primary add-bt">Add</button>
+          <button type="button" react="{{ i }}" class="btn btn-primary save-bt">Save</button>
+  {#       {% if i == '5' %} #}
+  {#          <a href="/eventers/alarm/{{ dbline.id }}/" class="btn btn-primary">configure alarm</a> #}
+  {#       {% endif %} #}
+		    </div>
+      </div>
+    </div>
 	  <div class="row my-1 d-none">
 		  <div class="col-auto my-2"><h4>If...</h4>
         <ul id="li_gr_{{ i }}" class="list-group">
