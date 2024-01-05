@@ -28,7 +28,7 @@ import os
 from pathlib import Path
 from .passwords import (db_password, security_key, localaccess, 
   mydomain, myip, httpsport, smtp_account, smtp_password, smtp_server, smtp_port, 
-  smtp_email, smtp_use_ssl, debugpw, emulatestatic)
+  smtp_email, smtp_use_ssl)
 try:  
   from .passwords import data_path
 except  ImportError: # can be removed when everybody is up to date
@@ -53,10 +53,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = security_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-if emulatestatic:
-  DEBUG = True
-else:  
-  DEBUG = debugpw
+DEBUG = False
 
 ALLOWED_HOSTS = []
 if localaccess:
@@ -191,14 +188,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
-if emulatestatic:
-  #Development config, needs debug
-  STATIC_URL = 'static/'
-  STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
-else:  
-  #Production config
-  STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
-  STATIC_ROOT = str(BASE_DIR)+'/'+data_path+'static'
+STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
+#STATIC_URL = 'static/'
+#STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
+#from tools.l_tools import djconf
+#datapath = djconf.getconfig('datapath', 'data/')
+STATIC_ROOT = str(BASE_DIR)+'/'+data_path+'static'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

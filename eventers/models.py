@@ -82,7 +82,7 @@ class evt_condition(models.Model):
     return('evt_conditions model (TBD ...)')
     
 class alarm(models.Model):
-  mystream = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)
+  mystream = models.ForeignKey(stream, on_delete=models.CASCADE)
   mendef = models.CharField(max_length=255, default="[]")
   
   def __str__(self):

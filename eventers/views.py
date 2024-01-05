@@ -20,6 +20,7 @@ from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.generic import ListView
+from camai.passwords import emulatestatic
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.tokens import checktoken
@@ -38,7 +39,7 @@ def events(request, schoolnr):
     template = loader.get_template('eventers/events.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'events' : event.objects.filter(school_id=schoolnr, xmax__gt=0).order_by('-id'),
       'debug' : settings.DEBUG,
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
@@ -69,7 +70,7 @@ def oneevent(request, schoolnr, eventnr):
     template = loader.get_template('eventers/oneevent.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'is_android' : is_android,
       'uastring' : useragent['string'],
       'os' : useragent['os']['family'],
@@ -91,7 +92,7 @@ def alarm(request, schoolnr):
   template = loader.get_template('eventers/alarm.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+    'emulatestatic' : emulatestatic,
     'may_write' : access.check('S', schoolnr, request.user, 'W'),
     'school' : school.objects.get(id=schoolnr),
     'user' : request.user,

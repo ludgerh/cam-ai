@@ -313,6 +313,15 @@ class tf_worker():
     self.clientset = set(range(self.dbline.max_nr_clients))
     self.clientlock = Lock()
     self.users = {}
+    if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
+      import tensorflow as tf
+      gpus = tf.config.list_physical_devices('GPU')
+      if gpus:
+        for gpu in gpus:
+          tf.config.experimental.set_memory_growth(gpu, True)
+      from tensorflow.keras.models import load_model
+      self.load_model = load_model
+      self.tf = tf
     Thread(target=self.in_queue_thread, name='TFW_InQueueThread').start()
     signal(SIGINT, sigint_handler)
     signal(SIGTERM, sigint_handler)
@@ -320,57 +329,45 @@ class tf_worker():
     self.logname = 'tf_worker #'+str(self.dbline.id)
     self.logger = getLogger(self.logname)
     log_ini(self.logger, self.logname)
-    try:
-      setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
-      if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
-        environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        if self.dbline.gpu_nr == -1:
-          environ["CUDA_VISIBLE_DEVICES"] = ''
-        else:  
-          environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
-        import tensorflow as tf
-        gpus = tf.config.list_physical_devices('GPU')
-        if gpus:
-          for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        from tensorflow.keras.models import load_model
-        self.load_model = load_model
-        self.tf = tf
-      self.model_buffers = {}
-      if self.dbline.gpu_sim >= 0:
-        self.cachedict = {}
-      elif self.dbline.use_websocket:
-        if self.dbline.wsname:
-          self.reset_websocket()
-      self.is_ready = True
-      schoolnr = -1
-      while (len(self.model_buffers) == 0) and self.do_run:
-        if self.dbline.use_websocket:
-          self.send_ping()
-        sleep(djconf.getconfigfloat('long_brake', 1.0))
-      self.finished = False
+    setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
+    if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
+      environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+      if self.dbline.gpu_nr == -1:
+        environ["CUDA_VISIBLE_DEVICES"] = ''
+      else:  
+        environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
+    self.model_buffers = {}
+    if self.dbline.gpu_sim >= 0:
+      self.cachedict = {}
+    elif self.dbline.use_websocket:
+      if self.dbline.wsname:
+        self.reset_websocket()
+    self.is_ready = True
+    schoolnr = -1
+    while (len(self.model_buffers) == 0) and self.do_run:
+      if self.dbline.use_websocket:
+        self.send_ping()
+      sleep(djconf.getconfigfloat('long_brake', 1.0))
+    self.finished = False
+    while self.do_run:
+      if self.dbline.use_websocket:
+        self.send_ping()
       while self.do_run:
-        if self.dbline.use_websocket:
-          self.send_ping()
-        while self.do_run:
-          schoolnr += 1
-          if schoolnr > max(self.model_buffers):
-            schoolnr = 1
-          if schoolnr in self.model_buffers:
-            break
-        if self.do_run:
-          with self.model_buffers[schoolnr].bufferlock2:
-            run_ok = (
-              ((self.model_buffers[schoolnr].ts + self.dbline.timeout) < time()) 
-              and len(self.model_buffers[schoolnr]))
-            if run_ok:
-              self.process_buffer(schoolnr, self.logger, had_timeout=True)
-          if not run_ok:
-            sleep(djconf.getconfigfloat('short_brake', 0.01))
-      self.finished = True
-    except:
-      self.logger.error(format_exc())
-      self.logger.handlers.clear()
+        schoolnr += 1
+        if schoolnr > max(self.model_buffers):
+          schoolnr = 1
+        if schoolnr in self.model_buffers:
+          break
+      if self.do_run:
+        with self.model_buffers[schoolnr].bufferlock2:
+          run_ok = (
+            ((self.model_buffers[schoolnr].ts + self.dbline.timeout) < time()) 
+            and len(self.model_buffers[schoolnr]))
+          if run_ok:
+            self.process_buffer(schoolnr, self.logger, had_timeout=True)
+        if not run_ok:
+          sleep(djconf.getconfigfloat('short_brake', 0.01))
+    self.finished = True
     self.logger.info('Finished Process '+self.logname+'...')
     self.logger.handlers.clear()
 

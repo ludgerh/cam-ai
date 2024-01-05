@@ -16,6 +16,7 @@ from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
+from camai.passwords import emulatestatic
 from access.c_access import access
 from streams.models import stream
 from tf_workers.models import school, worker
@@ -35,7 +36,7 @@ def index(request, mode='C'):
   template = loader.get_template('index/index.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+    'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'mode' : mode,
     'camlist' : camlist,

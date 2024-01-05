@@ -16,6 +16,7 @@ from django.contrib.auth.decorators import login_required
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
+from camai.passwords import emulatestatic
 from access.c_access import access
 from tf_workers.models import school
 from schools.c_schools import get_taglist
@@ -31,7 +32,7 @@ def trainer(request, schoolnr):
     template = loader.get_template('trainers/trainer.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'schoolnr' : schoolnr,
       'schoolname' : myschool.name,
@@ -49,7 +50,7 @@ def epochs(request, schoolnr, fitnr):
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'user' : request.user,
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'fitnr' : fitnr,
       'schoolnr' : schoolnr,
     }
@@ -65,7 +66,7 @@ def dashboard(request, schoolnr):
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'user' : request.user,
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'school' : myschool,
       'schoolnr' : schoolnr,

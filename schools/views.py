@@ -20,6 +20,7 @@ from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
+from camai.passwords import emulatestatic
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.c_tools import c_convert
@@ -43,7 +44,7 @@ def images(request, schoolnr):
     template = loader.get_template('schools/images.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'schoolnr' : schoolnr,
       'schoolname' : myschool.name,
@@ -61,7 +62,7 @@ def classroom(request, schoolnr):
     template = loader.get_template('schools/classroom.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'school' : school.objects.get(id=schoolnr),
       'events' : event.objects.filter(school_id=schoolnr, done=False, xmax__gt=0),
       'debug' : settings.DEBUG,
@@ -170,7 +171,7 @@ def getbigmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
   template = loader.get_template('schools/bigmp4.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+    'emulatestatic' : emulatestatic,
     'is_android' : is_android,
     'uastring' : useragent['string'],
     'os' : useragent['os']['family'],

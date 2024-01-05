@@ -15,6 +15,7 @@
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
 from django_tables2 import SingleTableMixin
+from camai.passwords import emulatestatic
 from access.c_access import access
 from tools.l_tools import djconf
 from tf_workers.models import school
@@ -43,7 +44,7 @@ class archive(SingleTableMixin, myFilterView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'school' : school.objects.get(id=self.schoolnr),
       'user' : self.request.user,

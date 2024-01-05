@@ -19,6 +19,7 @@ from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
 from django.http import HttpResponse, FileResponse, HttpResponseRedirect
+from camai.passwords import emulatestatic
 from streams.models import stream
 from users.models import userinfo
 from access.c_access import access
@@ -43,7 +44,7 @@ class health(TemplateView):
     datapath = djconf.getconfig('datapath', 'data/')
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'camlist' : camlist,
       'detectorlist' : detectorlist,
@@ -77,7 +78,7 @@ class dbcompression(TemplateView):
     datapath = djconf.getconfig('datapath', 'data/')
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'camlist' : camlist,
       'detectorlist' : detectorlist,
@@ -112,7 +113,7 @@ class scan_cams(TemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'camlist' : camlist,
       'detectorlist' : detectorlist,
@@ -142,7 +143,7 @@ class inst_cam(TemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'camlist' : camlist,
       'detectorlist' : detectorlist,
@@ -175,7 +176,7 @@ class addschool(TemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'camlist' : camlist,
       'detectorlist' : detectorlist,
@@ -202,7 +203,7 @@ class linkworkers(TemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'camlist' : camlist,
       'detectorlist' : detectorlist,
@@ -224,7 +225,7 @@ class shutdown(TemplateView):
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
     context.update({
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'version' : djconf.getconfig('version', 'X.Y.Z'),
     })
     return context
@@ -245,7 +246,7 @@ class upgrade(TemplateView):
       response = json.loads(response.text)
     context = super().get_context_data(**kwargs)
     context.update({
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'new_version' : response['tag_name'],
       'zip_url' : response['zipball_url']
@@ -264,7 +265,7 @@ class backup(TemplateView):
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
     context.update({
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'version' : djconf.getconfig('version', 'X.Y.Z'),
     })
     return context
@@ -289,7 +290,7 @@ def downbackup(request):
 #  def get_context_data(self, **kwargs):
 #    context = super().get_context_data(**kwargs)
 #    context.update({
-#      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+#      'emulatestatic' : emulatestatic,
 #      'version' : djconf.getconfig('version', 'X.Y.Z'),
 #    })
 #    return context

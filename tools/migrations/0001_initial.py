@@ -6,7 +6,6 @@ def fill_table_setting(apps, schema_editor):
   Setting = apps.get_model("tools", "setting")
   if not Setting.objects.all().count():
     Setting.objects.create(setting='loglevel', value='INFO', comment='None')
-    Setting.objects.create(setting='emulatestatic', value='0', comment='None')
     Setting.objects.create(setting='version', value='0.0.0', comment='None')
     Setting.objects.create(setting='local_trainer', value='0', comment='None')
     Setting.objects.create(setting='smtp_account', value='theo@tester.de', comment='None')

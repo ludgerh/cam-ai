@@ -14,6 +14,7 @@
 from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
+from camai.passwords import emulatestatic
 from access.c_access import access
 from streams.models import stream
 from streams.c_streams import streams
@@ -73,7 +74,7 @@ def onecam(request, camnr, tokennr=0, token=None):
         schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'may_write' : may_write,
       'tokennr' : tokennr,
@@ -144,7 +145,7 @@ def onedetector(request, detectornr, tokennr=0, token=None):
         schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'may_write' : may_write,
       'tokennr' : tokennr,
@@ -210,7 +211,7 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
         schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : djconf.getconfigbool('emulatestatic', False),
+      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'may_write' : may_write,
       'tokennr' : tokennr,
