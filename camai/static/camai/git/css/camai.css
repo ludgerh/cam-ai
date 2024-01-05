@@ -1,9 +1,17 @@
-.accordion {
-	--bs-accordion-btn-color: pink;
-	--bs-accordion-btn-bg: pink;
-	--bs-accordion-active-color: maroon;
-	--bs-accordion-active-bg: lightpink;
+.accordion-button {
+  background-color: red;
+  color: white;
 }
+
+.accordion-button:not(.collapsed) {
+  background-color: green;
+  color: black;
+}
+
+.accordion-body {
+  background-color: yellow;
+  color: black;
+}  
 
 .img-rounded{
 	border-radius:2%;
