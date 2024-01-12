@@ -624,8 +624,8 @@ class admintools(WebsocketConsumer):
         resultdict = json.loads(ws.recv())
         ws.close()
       if not using_websocket:
-        copyfile(schoolsdir + 'model1/model/' + model_type + '.h5', 
-          schooldir + 'model/' + model_type + '.h5')
+        copyfile(schoolsdir + 'model1/model/' + model_type + '.keras', 
+          schooldir + 'model/' + model_type + '.keras')
       mytrainer = myschool.trainer
       mytrainer.active=True    
       if using_websocket or remote_trainer:

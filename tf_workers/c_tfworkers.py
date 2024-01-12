@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -12,7 +12,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# /tf_workers/c_tfworkers.py V0.9.14 03.07.2023
+# /tf_workers/c_tfworkers.py V1.0.15 09.01.2024
 
 import json
 import numpy as np
@@ -124,20 +124,21 @@ class model_buffer(deque):
     return(tempres0, tempres1, tempres2, tempres3)
 
 class tf_user(object):
+  clientset = set()
+  clientlock = Lock()
 
-  def __init__(self, clientset, clientlock):
-    self.clientset = clientset
-    self.clientlock = clientlock
+  def __init__(self):
     with self.clientlock:
       i = 0
-      while not (i in self.clientset):
+      while (i in self.clientset):
         i += 1
-      self.clientset.discard(i)
+      self.clientset.add(i)
       self.id = i
+    print('New User:', i)  
 
   def __del__(self):
     with self.clientlock:
-      self.clientset.add(self.id)
+      self.clientset.discard(self.id)
 
 #***************************************************************************
 #
@@ -154,8 +155,6 @@ class tf_worker():
     self.inqueue = Queue()
     self.registerqueue = Queue()
     self.outqueues = {}
-    for i in range(self.dbline.max_nr_clients):
-      self.outqueues[i] = Queue()
     self.is_ready = False
 
     #*** Server Var
@@ -167,7 +166,6 @@ class tf_worker():
     #*** Client Var
     self.run_out_procs = {}
     self.pred_out_dict = {}
-    self.mylock = Lock()
     self.very_short_brake = djconf.getconfigfloat('very_short_brake', 0.001)
     self.ws_ts = None
 
@@ -279,14 +277,14 @@ class tf_worker():
         elif (received[0] == 'get_is_ready'):
           self.outqueues[received[1]].put(('put_is_ready', self.is_ready))
         elif (received[0] == 'get_xy'):
-          self.check_model(received[1], self.logger)
+          self.check_allmodels(received[1], self.logger)
           xdim = self.allmodels[received[1]]['xdim']
           ydim = self.allmodels[received[1]]['ydim']
           self.outqueues[received[2]].put(('put_xy', (xdim, ydim)))
         elif (received[0] == 'imglist'):
           schoolnr = received[1]
           if schoolnr not in self.model_buffers:
-            self.check_model(schoolnr, self.logger)
+            self.check_allmodels(schoolnr, self.logger)
             self.model_buffers[schoolnr] = model_buffer(schoolnr, 
               self.allmodels[schoolnr]['xdim'], 
               self.allmodels[schoolnr]['ydim'],
@@ -297,11 +295,12 @@ class tf_worker():
             while len(self.model_buffers[schoolnr]) >= self.dbline.maxblock:
               self.process_buffer(schoolnr, self.logger)
         elif (received[0] == 'register'):
-          myuser = tf_user(self.clientset, self.clientlock)
+          myuser = tf_user()
+          self.outqueues[myuser.id] = Queue()
           self.users[myuser.id] = myuser
           self.registerqueue.put(myuser.id)
         elif (received[0] == 'checkmod'):
-          self.check_model(received[1], self.logger, received[2])
+          self.check_allmodels(received[1], self.logger, received[2])
         else:
           raise QueueUnknownKeyword(received[0])
     except:
@@ -310,8 +309,6 @@ class tf_worker():
 
   def runner(self):
     self.dbline = worker.objects.get(id=self.id)
-    self.clientset = set(range(self.dbline.max_nr_clients))
-    self.clientlock = Lock()
     self.users = {}
     if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
       import tensorflow as tf
@@ -376,11 +373,11 @@ class tf_worker():
     self.run_process = Process(target=self.runner)
     connections.close_all()
     self.run_process.start()
-
-  def check_model(self, schoolnr, logger, test_pred = False):
+    
+  def check_allmodels(self, schoolnr, logger):
     if schoolnr in self.modelschecked:
       return()
-    self.modelschecked.add(schoolnr)
+    self.modelschecked.add(schoolnr)  
     if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local GPU
       if ((schoolnr in self.myschool_cache) 
           and (self.myschool_cache[schoolnr][1] > (time() - 60))):
@@ -401,87 +398,90 @@ class tf_worker():
             )):
           del self.allmodels[schoolnr]
           del self.activemodels[schoolnr]
+      if not path.exists(model_path := (myschool.dir + 'model/' + myschool.model_type
+          + '.keras')):
+        model_path = myschool.dir+'model/'+myschool.model_type+'.h5'
+    if not (schoolnr in self.allmodels):
+      self.allmodels[schoolnr] = {}
+      if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket: #remote or simulation
+        self.allmodels[schoolnr]['time'] = time()
+        self.allmodels[schoolnr]['model_type'] = 'simulation'
+      else:  #lokal GPU
+        self.allmodels[schoolnr]['time'] = myschool.lastmodelfile
+        self.allmodels[schoolnr]['model_type'] = myschool.model_type
+      if self.dbline.gpu_sim >= 0:
+        self.allmodels[schoolnr]['xdim'] = 50
+        self.allmodels[schoolnr]['ydim'] = 50
+        sleep(self.dbline.gpu_sim_loading)
+      elif self.dbline.use_websocket:
+        myschool = school.objects.get(id=schoolnr)
+        outdict = {
+          'code' : 'get_xy',
+          'scho' : myschool.e_school,
+        }
+        xytemp = json.loads(self.continue_sending(json.dumps(outdict), 
+          opcode=1, logger=logger, get_answer=True))
+        self.allmodels[schoolnr]['xdim'] = xytemp[0]
+        self.allmodels[schoolnr]['ydim'] = xytemp[1]
+        sleep(self.dbline.gpu_sim_loading) 
+      else: #lokal GPU
+        tempmodel = self.load_model(
+          model_path, 
+          custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+        self.allmodels[schoolnr]['path'] = model_path  
+        self.allmodels[schoolnr]['type'] = myschool.model_type
+        self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
+        self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
+        self.allmodels[schoolnr]['weights'] = []
+        self.allmodels[schoolnr]['weights'].append(
+          tempmodel.get_layer(name=myschool.model_type).get_weights())
+        self.allmodels[schoolnr]['weights'].append(
+          tempmodel.get_layer(name='CAM-AI_Dense1').get_weights())
+        self.allmodels[schoolnr]['weights'].append(
+          tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
+        self.allmodels[schoolnr]['weights'].append(
+          tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
+        logger.info('***** Got model file #'+str(schoolnr) 
+          + ', file: '+model_path)
+    self.modelschecked.remove(schoolnr)
+
+  def check_activemodels(self, schoolnr, logger, test_pred = False):
     if not (schoolnr in self.activemodels):
-      tempmodel = None
-      if not (schoolnr in self.allmodels):
-        self.allmodels[schoolnr] = {}
-        if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket:
-          self.allmodels[schoolnr]['time'] = time()
-          self.allmodels[schoolnr]['model_type'] = 'simulation'
-        else:
-          self.allmodels[schoolnr]['time'] = myschool.lastmodelfile
-          self.allmodels[schoolnr]['model_type'] = myschool.model_type
-        if self.dbline.gpu_sim >= 0:
-          self.allmodels[schoolnr]['xdim'] = 50
-          self.allmodels[schoolnr]['ydim'] = 50
-          sleep(self.dbline.gpu_sim_loading)
-        elif self.dbline.use_websocket:
-          myschool = school.objects.get(id=schoolnr)
-          outdict = {
-            'code' : 'get_xy',
-            'scho' : myschool.e_school,
-          }
-          xytemp = json.loads(self.continue_sending(json.dumps(outdict), 
-            opcode=1, logger=logger, get_answer=True))
-          self.allmodels[schoolnr]['xdim'] = xytemp[0]
-          self.allmodels[schoolnr]['ydim'] = xytemp[1]
-          sleep(self.dbline.gpu_sim_loading) 
-        else: #lokal GPU
-          tempmodel= self.load_model(
-            myschool.dir+'model/'+myschool.model_type+'.h5', 
-            custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
-          self.allmodels[schoolnr]['type']=myschool.model_type
-          self.allmodels[schoolnr]['xdim']=tempmodel.layers[0].input_shape[1]
-          self.allmodels[schoolnr]['ydim']=tempmodel.layers[0].input_shape[2]
-          self.allmodels[schoolnr]['weights'] = []
-          self.allmodels[schoolnr]['weights'].append(
-            tempmodel.get_layer(index=2).get_weights())
-          self.allmodels[schoolnr]['weights'].append(
-            tempmodel.get_layer(index=3).get_weights())
-          self.allmodels[schoolnr]['weights'].append(
-            tempmodel.get_layer(index=4).get_weights())
-          logger.info('***** Got model file #'+str(schoolnr) 
-            + ', type: '+myschool.model_type)
-      if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket:
-        sleep(self.dbline.gpu_sim_loading / 2)
-        self.activemodels[schoolnr] = True
-      else:
-        if len(self.activemodels) < self.dbline.max_nr_models:
-          if tempmodel is None:
-            self.activemodels[schoolnr] = self.load_model(myschool.dir 
-              + 'model/'+myschool.model_type+'.h5', 
-              custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
-          else:
-            self.activemodels[schoolnr] = tempmodel
-        else: #this is not tested, needed if # of models > self.max_nr_models
-          nr_to_replace = min(self.activemodels, 
-            key= lambda x: self.activemodels[x]['time'])	
-          if self.allmodels[nr_to_replace]['type'] == myschool.model_type:
-            self.activemodels[schoolnr] = self.activemodels[nr_to_replace]
-            self.activemodels[schoolnr].get_layer(index=2).set_weights(
-              self.allmodels[schoolnr]['weights'][0])
-            self.activemodels[schoolnr].get_layer(index=3).set_weights(
-              self.allmodels[schoolnr]['weights'][1])
-            self.activemodels[schoolnr].get_layer(index=4).set_weights(
-              self.allmodels[schoolnr]['weights'][2])
-          else:
-            self.activemodels[schoolnr] = load_model(myschool.dir
-              + 'model/'+myschool.model_type+'.h5', 
-              custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
-          del self.activemodels[nr_to_replace]
-        logger.info('***** Got model buffer #'+str(schoolnr)+', type: '
-          + myschool.model_type)
-    if test_pred:
-      if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): 
-          #Local GPU
+      if len(self.activemodels) < self.dbline.max_nr_models:
+        tempmodel = self.load_model(
+          self.allmodels[schoolnr]['path'], 
+          custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+        self.activemodels[schoolnr] = {}
+        self.activemodels[schoolnr]['model'] = tempmodel
+        self.activemodels[schoolnr]['type'] = self.allmodels[schoolnr]['type']
+        self.activemodels[schoolnr]['xdim'] = self.allmodels[schoolnr]['xdim']
+        self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
+        self.activemodels[schoolnr]['time'] = time()
+      else: #if # of models > self.dbline.max_nr_models
+        nr_to_replace = min(self.activemodels, 
+          key= lambda x: self.activemodels[x]['time'])	
+        self.activemodels[schoolnr] = self.activemodels[nr_to_replace]
+        self.activemodels[schoolnr]['type'] = self.allmodels[schoolnr]['type']
+        self.activemodels[schoolnr]['xdim'] = self.allmodels[schoolnr]['xdim']
+        self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
+        self.activemodels[schoolnr]['time'] = time()
+        self.activemodels[schoolnr]['model'].get_layer(name=self.activemodels[schoolnr]['type']).set_weights(
+          self.allmodels[schoolnr]['weights'][0])
+        self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense1').set_weights(
+          self.allmodels[schoolnr]['weights'][1])
+        self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense2').set_weights(
+          self.allmodels[schoolnr]['weights'][2])
+        self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense3').set_weights(
+          self.allmodels[schoolnr]['weights'][3])
+        del self.activemodels[nr_to_replace]
+      logger.info('***** Got model buffer #'+str(schoolnr)+', file: '
+        + self.allmodels[schoolnr]['path'])
+      if test_pred:
         xdata = np.random.rand(8,self.allmodels[schoolnr]['xdim'],
           self.allmodels[schoolnr]['ydim'],3)
-        self.activemodels[schoolnr].predict_on_batch(xdata)
+        self.activemodels[schoolnr]['model'].predict_on_batch(xdata)
         logger.info('***** Testrun for model #' + str(schoolnr)+', type: '
-          + myschool.model_type)
-      else:
-        sleep(self.dbline.gpu_sim_loading / 3)
-    self.modelschecked.remove(schoolnr)
+          + self.allmodels[schoolnr]['type'])
 
   def process_buffer(self, schoolnr, logger, had_timeout=False):
     try:
@@ -497,7 +497,7 @@ class tf_worker():
       slice_to_process = mybuffer.get(self.dbline.maxblock)
       framelist = slice_to_process[0]
       framesinfo = slice_to_process[1:]
-      self.check_model(schoolnr, logger)
+      self.check_allmodels(schoolnr, logger)
       if self.dbline.gpu_sim >= 0: #GPU Simulation with random
         if self.dbline.gpu_sim > 0:
           sleep(self.dbline.gpu_sim)
@@ -553,12 +553,14 @@ class tf_worker():
             npframelist.shape[3]), 
             np.uint8)
           portion = np.vstack((npframelist, patch))
+          self.check_activemodels(schoolnr, logger)
           predictions = (
-            self.activemodels[schoolnr].predict_on_batch(portion))
+            self.activemodels[schoolnr]['model'].predict_on_batch(portion))
           predictions = predictions[:npframelist.shape[0]]
         else:
+          self.check_activemodels(schoolnr, logger)
           predictions = (
-            self.activemodels[schoolnr].predict_on_batch(npframelist))
+            self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
       starting = 0
       for i in range(len(framelist)):
         if ((i == len(framelist) - 1) 
@@ -597,6 +599,7 @@ class tf_worker():
 #***************************************************************************
 
   def out_reader_proc(self, index): #called by client (c_eventer)
+    print(self.outqueues)
     while (received := self.outqueues[index].get())[0] != 'stop':
       #print('Out to queue', index, ':', received)
       if (received[0] == 'put_is_ready'):

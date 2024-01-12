@@ -31,7 +31,7 @@ def index(request, mode='C'):
   templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
   schoollist = []
   for item in templist:
-    if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+    if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
       schoollist.append(item)
   template = loader.get_template('index/index.html')
   context = {

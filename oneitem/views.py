@@ -70,7 +70,7 @@ def onecam(request, camnr, tokennr=0, token=None):
     templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -141,7 +141,7 @@ def onedetector(request, detectornr, tokennr=0, token=None):
     templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -207,7 +207,7 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
     templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),

@@ -38,7 +38,7 @@ class health(TemplateView):
     templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
     datapath = djconf.getconfig('datapath', 'data/')
@@ -72,7 +72,7 @@ class dbcompression(TemplateView):
     templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
     datapath = djconf.getconfig('datapath', 'data/')
@@ -108,7 +108,7 @@ class scan_cams(TemplateView):
     templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
@@ -138,7 +138,7 @@ class inst_cam(TemplateView):
     templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
@@ -171,7 +171,7 @@ class addschool(TemplateView):
     templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
@@ -198,7 +198,7 @@ class linkworkers(TemplateView):
     templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
     schoollist = []
     for item in templist:
-      if (item.id > 1) or (not worker.objects.get(id=1).use_websocket):
+      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
         schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({

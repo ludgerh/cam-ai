@@ -25,7 +25,6 @@ class worker(models.Model):
   maxblock = models.IntegerField(default=8)
   timeout = models.FloatField(default=0.1)
   max_nr_models = models.IntegerField(default=64)
-  max_nr_clients = models.IntegerField(default=64)
   gpu_sim_loading = models.FloatField(default=0.0)
   gpu_sim = models.FloatField(default=-1.0)
   gpu_nr = models.IntegerField(default=0)
