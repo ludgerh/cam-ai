@@ -32,7 +32,7 @@ from tools.djangodbasync import (getonelinedict, updatefilter, getoneline,
 from access.c_access import access
 from tools.tokens import maketoken
 from tf_workers.models import school, worker
-from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size
+from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
 from .c_trainers import trainers
 
 logname = 'ws_trainerconsumers'
@@ -392,7 +392,7 @@ class trainerutil(AsyncWebsocketConsumer):
         self.maywrite = access.check('S', self.schoolnr, myuser, 'W')
         self.schoollinedict = await getonelinedict(school, 
           {'id' : self.schoolnr, }, 
-          ['trainer', 'tf_worker', 'e_school', ])
+          ['dir', 'trainer', 'tf_worker', 'e_school', ])
         self.trainernr = self.schoollinedict['trainer']
         tf_workerlinedict = await getonelinedict(worker, 
           {'id' : self.schoollinedict['tf_worker'], }, 
@@ -490,5 +490,21 @@ class trainerutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
       else:
-        self.close()		
+        self.close()						
+
+    elif params['command'] == 'getavailmodels':
+      if self.dblinedict['t_type'] == 3:
+        temp = json.loads(text_data)
+        temp['data']['school']=self.schoollinedict['e_school']
+        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
+        outlist['data'] = json.loads(self.ws.recv())['data']
+      else:
+        modeldir = self.schoollinedict['dir']
+        outlist = []
+        for item in model_type.objects.all:
+          search_path = modeldir + 'model/' + item.name
+          if path.exists(search_path + '.keras') or path.exists(search_path + '.h5'):
+            outlist.append(item.name)
+      logger.info('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))			
 

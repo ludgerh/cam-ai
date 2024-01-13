@@ -61,7 +61,7 @@
     <div class="col-sm-auto h4">
       <label class="m-2" for="model_type">Model Type:</label>
       <select id="model_type">
-      {% for item in model_types %}
+      {% for item in present_models %}
           <option value={{ item.name }}>{{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})</option>
       {% endfor %}    
       </select>

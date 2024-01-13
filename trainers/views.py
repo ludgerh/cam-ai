@@ -70,6 +70,7 @@ def dashboard(request, schoolnr):
       'debug' : settings.DEBUG,
       'school' : myschool,
       'schoolnr' : schoolnr,
+      'present_models' : model_type.objects.all(),
       'model_types' : model_type.objects.all(),
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
     }

@@ -19,6 +19,7 @@ import numpy as np
 import cv2 as cv
 import sys
 import gc
+import pickle
 from os import environ, path, makedirs
 from multiprocessing import Process, Queue
 from collections import deque
@@ -42,6 +43,7 @@ from tools.l_tools import QueueUnknownKeyword, djconf, get_proc_name
 if djconf.getconfigbool('local_trainer', False):
   from plugins.train_worker_gpu.train_gpu_tools import cmetrics, hit100
 from tools.c_logger import log_ini
+from tools.c_redis import saferedis
 from .models import school, worker
 from schools.c_schools import get_taglist
 
@@ -50,6 +52,7 @@ from tools.l_tools import displaybytes
 
 tf_workers = {}
 taglist = get_taglist(1)
+redis = saferedis()
 
 #***************************************************************************
 #
@@ -133,12 +136,33 @@ class tf_user(object):
       while (i in self.clientset):
         i += 1
       self.clientset.add(i)
-      self.id = i
-    print('New User:', i)  
+      self.id = i 
 
   def __del__(self):
     with self.clientlock:
       self.clientset.discard(self.id)
+      
+class output_dist():   
+  def __init__(self, worker_nr):
+    self.nametag = 'out_dist:' + str(worker_nr) + ':'
+    self.used_adresses = set()
+    
+  def put(self, address, data):
+    while redis.exists(self.nametag + str(address)):      
+      sleep(djconf.getconfigfloat('short_brake', 0.01))
+    self.used_adresses.add(address) 
+    redis.set(self.nametag + str(address), pickle.dumps(data))   
+    
+  def get(self, address):
+    while (result := redis.get(self.nametag + str(address))) is None: 
+      sleep(djconf.getconfigfloat('short_brake', 0.01))
+    redis.delete(self.nametag + str(address))
+    return(pickle.loads(result))
+    
+  def clean(self):
+    for address in self.used_adresses:
+      if redis.exists(self.nametag + str(address)):
+        redis.delete(self.nametag + str(address))  
 
 #***************************************************************************
 #
@@ -154,7 +178,7 @@ class tf_worker():
 
     self.inqueue = Queue()
     self.registerqueue = Queue()
-    self.outqueues = {}
+    self.my_output = output_dist(self.id)  
     self.is_ready = False
 
     #*** Server Var
@@ -264,23 +288,23 @@ class tf_worker():
     try:
       while True:
         received = self.inqueue.get()
-        #print('TFW in', received)
+        #('TFW in', received)
         if (received[0] == 'stop'):
-          #self.health_proc.stop()
           self.do_run = False
           while not self.inqueue.empty():
-            received = self.inqueue.get()
+            received = self.inqueue.get() 
+          self.my_output.clean()
           break
         elif (received[0] == 'unregister'):
           if received[1] in self.users:
             del self.users[received[1]]
         elif (received[0] == 'get_is_ready'):
-          self.outqueues[received[1]].put(('put_is_ready', self.is_ready))
+          self.my_output.put(received[1], ('put_is_ready', self.is_ready))
         elif (received[0] == 'get_xy'):
           self.check_allmodels(received[1], self.logger)
           xdim = self.allmodels[received[1]]['xdim']
           ydim = self.allmodels[received[1]]['ydim']
-          self.outqueues[received[2]].put(('put_xy', (xdim, ydim)))
+          self.my_output.put(received[2], ('put_xy', (xdim, ydim)))
         elif (received[0] == 'imglist'):
           schoolnr = received[1]
           if schoolnr not in self.model_buffers:
@@ -296,7 +320,6 @@ class tf_worker():
               self.process_buffer(schoolnr, self.logger)
         elif (received[0] == 'register'):
           myuser = tf_user()
-          self.outqueues[myuser.id] = Queue()
           self.users[myuser.id] = myuser
           self.registerqueue.put(myuser.id)
         elif (received[0] == 'checkmod'):
@@ -565,9 +588,8 @@ class tf_worker():
       for i in range(len(framelist)):
         if ((i == len(framelist) - 1) 
             or (framesinfo[0][i] != framesinfo[0][i+1])):
-          if ((framesinfo[0][starting] in self.users) 
-              and (framesinfo[0][starting] in self.outqueues)):
-            self.outqueues[framesinfo[0][starting]].put((
+          if (framesinfo[0][starting] in self.users):
+            self.my_output.put(framesinfo[0][starting], (
               'pred_to_send', 
               predictions[starting:i+1], 
               framesinfo[0][starting:i+1],
@@ -599,8 +621,7 @@ class tf_worker():
 #***************************************************************************
 
   def out_reader_proc(self, index): #called by client (c_eventer)
-    print(self.outqueues)
-    while (received := self.outqueues[index].get())[0] != 'stop':
+    while (received := self.my_output.get(index))[0] != 'stop':
       #print('Out to queue', index, ':', received)
       if (received[0] == 'put_is_ready'):
         self.is_ready = received[1]
@@ -678,13 +699,13 @@ class tf_worker():
     return(result)
 
   def stop_out(self, index):
-    self.outqueues[index].put(('stop',))
+    self.my_output.put(index, ('stop',))
     self.run_out_procs[index].join()
 
   def stop(self):
     for i in self.run_out_procs:
       if self.run_out_procs[i].is_alive():
-        self.outqueues[i].put(('stop',))
+        self.my_output.put(i, ('stop',))
         print('Put Stop', i)
         self.run_out_procs[i].join()
         print('Join', i)
