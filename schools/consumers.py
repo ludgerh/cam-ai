@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -546,9 +546,8 @@ class schoolutil(AsyncWebsocketConsumer):
         makedirs(schooldir+'model')
       except FileExistsError:
         logger.warning('Dir already exists: '+schooldir+'model')
-      print(schoolsdir + 'model1/model/' + newschool.model_type + '.keras', '>>>', schooldir + 'model/' + newschool.model_type + '.keras')  
-      copy(schoolsdir + 'model1/model/' + newschool.model_type + '.keras',
-        schooldir + 'model/' + newschool.model_type + '.keras')
+      copy(schoolsdir + 'model1/model/' + newschool.model_type + '.h5',
+        schooldir + 'model/' + newschool.model_type + '.h5')
       await updatefilter(school, 
         {'id' : newschool.id, }, 
         {'dir' : schooldir, 'creator_id' : indict['user']})

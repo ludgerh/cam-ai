@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -80,7 +81,7 @@ def dashboard(request, schoolnr):
 def downmodel(request, schoolnr, tokennr, token): 
   if checktoken((tokennr, token), 'MOD', schoolnr):
     myschool = school.objects.get(pk = schoolnr)
-    filename = myschool.dir + 'model/' + myschool.model_type + '.keras'
+    filename = myschool.dir + 'model/' + myschool.model_type + '.h5'
     modelfile = open(filename, 'rb')
     return FileResponse(modelfile)
   else:

@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -185,7 +185,7 @@ class train_once_remote():
         r = requests.get(dlurl, allow_redirects=True)
         datapath = djconf.getconfig('datapath', 'data/')
         dlfile = djconf.getconfig('schools_dir', datapath + 'schools/')
-        dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.keras'
+        dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.h5'
         self.logger.info('DL Model: ' + dlfile)
         open(dlfile, 'wb').write(r.content)
         self.myschool.lastmodelfile = timezone.now()

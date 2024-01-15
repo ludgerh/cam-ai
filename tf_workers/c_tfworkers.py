@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -441,9 +441,7 @@ class tf_worker():
             del self.activemodels[schoolnr]
           if schoolnr in self.model_buffers:
             del self.model_buffers[schoolnr]
-      if not path.exists(model_path := (myschool.dir + 'model/' + myschool.model_type
-          + '.keras')):
-        model_path = myschool.dir+'model/'+myschool.model_type+'.h5'
+      model_path = myschool.dir+'model/'+myschool.model_type+'.h5'
     if not (schoolnr in self.allmodels):
       self.allmodels[schoolnr] = {}
       if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket: #remote or simulation
@@ -476,8 +474,6 @@ class tf_worker():
             custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
           self.allmodels[schoolnr]['path'] = model_path  
           self.allmodels[schoolnr]['type'] = myschool.model_type
-          self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
-          self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
           self.allmodels[schoolnr]['weights'] = []
           self.allmodels[schoolnr]['weights'].append(
             tempmodel.get_layer(name=myschool.model_type).get_weights())
@@ -487,6 +483,8 @@ class tf_worker():
             tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
           self.allmodels[schoolnr]['weights'].append(
             tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
+          self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
+          self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
           logger.info('***** Got model file #'+str(schoolnr) 
             + ', file: '+model_path)
         except:
