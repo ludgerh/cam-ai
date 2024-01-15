@@ -198,6 +198,7 @@ if emulatestatic:
 else:  
   #Production config
   STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
+  STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
   STATIC_ROOT = str(BASE_DIR)+'/'+data_path+'static'
 
 MEDIA_URL = '/media/'

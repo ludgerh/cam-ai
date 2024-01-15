@@ -58,6 +58,11 @@ button {
 	margin:20px;
 }
 
+.btn-sm {
+	width: 24px;
+  height: 24px;
+}
+
 td {
 	vertical-align: top;
   border: 0px solid grey;
