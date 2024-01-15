@@ -1,21 +1,26 @@
-.accordion-button {
-  background-color: red;
-  color: white;
+.menurow {
+  background-color: #C0D8E0;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
-.accordion-button:not(.collapsed) {
-  background-color: green;
-  color: black;
+.btn-primary {
+  color: #F0F4F7;
+  background-color: #597081;
+  border-color: #597081; /*set the color you want here*/
+}
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active, .btn-primary.active, .open>.dropdown-toggle.btn-primary {
+  color: #F0F4F7;
+  background-color: #475B63;
+  border-color: #475B63; /*set the color you want here*/
 }
 
-.accordion-body {
-  background-color: yellow;
-  color: black;
-}  
-
-.img-rounded{
-	border-radius:2%;
+.stats {
+  margin-top: auto;
+  margin-bottom: auto;
 }
+
+
 .bluegrey {
 	background: #B4C2C8;
 	color: #000;
@@ -23,13 +28,6 @@
 	margin:auto;
 }
 
-.rows {
-	background:#475B63;
-	width:90%;
-	margin:1%;
-	border-radius:15px;
-	padding:5px;
-}
 
 .noselect  {
   user-select: none;

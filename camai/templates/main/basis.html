@@ -42,7 +42,7 @@
     {% endif %}
     {% if user.id %}
     <div class="container-fluid float-left">
-      <div class="row">
+      <div class="row menurow">
         <div class="col-sm-auto">
           <div class="dropdown">
             <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
@@ -148,19 +148,22 @@
             </ul>
           </div>
         </div>
-        <div class="col-sm-auto">
-          Software Version {{ version }}
-          (User: {{ user }})
-        </div>
+        <div class="col-sm-auto row stats">
+          <div class="col-sm-auto">
+            Software Version {{ version }}
+            (User: {{ user }})
+          </div>
 {% if user.is_superuser %}
-        <div class="col-sm-auto">
-          Free disc space <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> (<span id="freepercent">?</span>%)
-        </div>
-        <div class="progress px-0 my-1 mx-2" style="width: 200px">
-          <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
+          <div class="col-sm-auto row">
+            <div class="col-sm-auto">
+              Free disc space <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> (<span id="freepercent">?</span>%)
+            </div>
+            <div class="progress px-0 my-1 mx-2 align-middle" style="width: 200px">
+              <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
+            </div>
+          </div>
         </div>
 {% endif %}
-
       </div>
     </div>
     {% else %}
