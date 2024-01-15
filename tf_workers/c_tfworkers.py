@@ -80,6 +80,7 @@ class model_buffer(deque):
     self.bufferlock1 = Lock()
     self.bufferlock2 = Lock()
     self.websocket = websocket
+    self.pause = True
 
   def append(self, initem):
     # structure of initem:
@@ -88,25 +89,28 @@ class model_buffer(deque):
     # structure of list outitem:
     # outitem[0] = np.image, outitem[1] = userindex,
     # outitem[2] = frame_id, outitem[3] = entnr
-    framecount = len(initem[0])
-    imagelist = initem[0]
-    with self.bufferlock1:
-      for i in range(framecount):
-        frame = imagelist[i]
-        if self.websocket:
-          if ((frame.shape[1] * frame.shape[0]) > (self.xdim * self.ydim)):
+    if self.pause:
+      ('short_brake', 0.01)
+    else:      
+      framecount = len(initem[0])
+      imagelist = initem[0]
+      with self.bufferlock1:
+        for i in range(framecount):
+          frame = imagelist[i]
+          if self.websocket:
+            if ((frame.shape[1] * frame.shape[0]) > (self.xdim * self.ydim)):
+              frame = cv.resize(frame, (self.xdim, self.ydim))
+          else:
             frame = cv.resize(frame, (self.xdim, self.ydim))
-        else:
-          frame = cv.resize(frame, (self.xdim, self.ydim))
-        outitem = [frame]
-        outitem.append(initem[1])
-        if initem[2]:
-          outitem.append(initem[2][i])
-        else:
-          outitem.append(-1)
-        outitem.append(initem[3])
-        super().append(outitem)
-    self.ts = time()
+          outitem = [frame]
+          outitem.append(initem[1])
+          if initem[2]:
+            outitem.append(initem[2][i])
+          else:
+            outitem.append(-1)
+          outitem.append(initem[3])
+          super().append(outitem)
+      self.ts = time()
 
   def get(self, maxcount):
     tempres0 = []
@@ -309,15 +313,19 @@ class tf_worker():
           schoolnr = received[1]
           if schoolnr not in self.model_buffers:
             self.check_allmodels(schoolnr, self.logger)
+            while not 'xdim' in self.allmodels[schoolnr]:
+              sleep(djconf.getconfigfloat('long_brake', 1.0))
             self.model_buffers[schoolnr] = model_buffer(schoolnr, 
               self.allmodels[schoolnr]['xdim'], 
               self.allmodels[schoolnr]['ydim'],
               self.dbline.use_websocket,
             )
+            self.model_buffers[schoolnr].pause = False
           self.model_buffers[schoolnr].append(received[2:])
-          with self.model_buffers[schoolnr].bufferlock2:
-            while len(self.model_buffers[schoolnr]) >= self.dbline.maxblock:
-              self.process_buffer(schoolnr, self.logger)
+          if not self.model_buffers[schoolnr].pause:
+            with self.model_buffers[schoolnr].bufferlock2:
+              while len(self.model_buffers[schoolnr]) >= self.dbline.maxblock:
+                self.process_buffer(schoolnr, self.logger)
         elif (received[0] == 'register'):
           myuser = tf_user()
           self.users[myuser.id] = myuser
@@ -373,20 +381,28 @@ class tf_worker():
       if self.dbline.use_websocket:
         self.send_ping()
       while self.do_run:
-        schoolnr += 1
-        if schoolnr > max(self.model_buffers):
-          schoolnr = 1
-        if schoolnr in self.model_buffers:
-          break
+        if self.model_buffers:
+          schoolnr += 1
+          if schoolnr > max(self.model_buffers):
+            schoolnr = 0
+          if schoolnr in self.model_buffers:
+            break
+        else:
+          schoolnr = -1 
+          break  
       if self.do_run:
-        with self.model_buffers[schoolnr].bufferlock2:
-          run_ok = (
-            ((self.model_buffers[schoolnr].ts + self.dbline.timeout) < time()) 
-            and len(self.model_buffers[schoolnr]))
-          if run_ok:
-            self.process_buffer(schoolnr, self.logger, had_timeout=True)
-        if not run_ok:
-          sleep(djconf.getconfigfloat('short_brake', 0.01))
+        if schoolnr > -1:
+          if self.model_buffers[schoolnr].pause:
+            sleep(djconf.getconfigfloat('long_brake', 1.0)) 
+          else:   
+            with self.model_buffers[schoolnr].bufferlock2:
+              run_ok = (
+                ((self.model_buffers[schoolnr].ts + self.dbline.timeout) < time()) 
+                and len(self.model_buffers[schoolnr]))
+              if run_ok:
+                self.process_buffer(schoolnr, self.logger, had_timeout=True)
+            if not run_ok:
+              sleep(djconf.getconfigfloat('short_brake', 0.01))
     self.finished = True
     self.logger.info('Finished Process '+self.logname+'...')
     self.logger.handlers.clear()
@@ -419,8 +435,12 @@ class tf_worker():
             or (myschool.lastmodelfile > self.allmodels[schoolnr]['time'])
             or (myschool.model_type != self.allmodels[schoolnr]['model_type'])
             )):
+          self.model_buffers[schoolnr].pause = True  
           del self.allmodels[schoolnr]
-          del self.activemodels[schoolnr]
+          if schoolnr in self.activemodels:
+            del self.activemodels[schoolnr]
+          if schoolnr in self.model_buffers:
+            del self.model_buffers[schoolnr]
       if not path.exists(model_path := (myschool.dir + 'model/' + myschool.model_type
           + '.keras')):
         model_path = myschool.dir+'model/'+myschool.model_type+'.h5'
@@ -448,28 +468,39 @@ class tf_worker():
         self.allmodels[schoolnr]['ydim'] = xytemp[1]
         sleep(self.dbline.gpu_sim_loading) 
       else: #lokal GPU
-        tempmodel = self.load_model(
-          model_path, 
-          custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
-        self.allmodels[schoolnr]['path'] = model_path  
-        self.allmodels[schoolnr]['type'] = myschool.model_type
-        self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
-        self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
-        self.allmodels[schoolnr]['weights'] = []
-        self.allmodels[schoolnr]['weights'].append(
-          tempmodel.get_layer(name=myschool.model_type).get_weights())
-        self.allmodels[schoolnr]['weights'].append(
-          tempmodel.get_layer(name='CAM-AI_Dense1').get_weights())
-        self.allmodels[schoolnr]['weights'].append(
-          tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
-        self.allmodels[schoolnr]['weights'].append(
-          tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
-        logger.info('***** Got model file #'+str(schoolnr) 
-          + ', file: '+model_path)
+        try:
+          logger.info('***** Loading model file #'+str(schoolnr)
+            + ', file: '+model_path)
+          tempmodel = self.load_model(
+            model_path, 
+            custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+          self.allmodels[schoolnr]['path'] = model_path  
+          self.allmodels[schoolnr]['type'] = myschool.model_type
+          self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
+          self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
+          self.allmodels[schoolnr]['weights'] = []
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name=myschool.model_type).get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense1').get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
+          logger.info('***** Got model file #'+str(schoolnr) 
+            + ', file: '+model_path)
+        except:
+          self.logger.error(format_exc())
+          self.logger.handlers.clear()
     self.modelschecked.remove(schoolnr)
 
   def check_activemodels(self, schoolnr, logger, test_pred = False):
+    if schoolnr in self.modelschecked:
+      return()
+    self.modelschecked.add(schoolnr)  
     if not (schoolnr in self.activemodels):
+      logger.info('***** Loading model buffer #'+str(schoolnr)+', file: '
+        + self.allmodels[schoolnr]['path'])
       if len(self.activemodels) < self.dbline.max_nr_models:
         tempmodel = self.load_model(
           self.allmodels[schoolnr]['path'], 
@@ -505,113 +536,116 @@ class tf_worker():
         self.activemodels[schoolnr]['model'].predict_on_batch(xdata)
         logger.info('***** Testrun for model #' + str(schoolnr)+', type: '
           + self.allmodels[schoolnr]['type'])
+    self.modelschecked.remove(schoolnr)
 
   def process_buffer(self, schoolnr, logger, had_timeout=False):
-    try:
-      mybuffer = self.model_buffers[schoolnr]
-      if schoolnr in self.myschool_cache:
-        myschool= self.myschool_cache[schoolnr][0]
-      else:
-        myschool = school.objects.get(id=schoolnr)
-        self.myschool_cache[schoolnr] = (myschool, time())
+    mybuffer = self.model_buffers[schoolnr]
+    if schoolnr in self.myschool_cache:
+      myschool= self.myschool_cache[schoolnr][0]
+    else:
+      myschool = school.objects.get(id=schoolnr)
+      self.myschool_cache[schoolnr] = (myschool, time())
 
-      ts_one = time()
-      mybuffer.ts = time()
-      slice_to_process = mybuffer.get(self.dbline.maxblock)
-      framelist = slice_to_process[0]
-      framesinfo = slice_to_process[1:]
-      self.check_allmodels(schoolnr, logger)
-      if self.dbline.gpu_sim >= 0: #GPU Simulation with random
-        if self.dbline.gpu_sim > 0:
-          sleep(self.dbline.gpu_sim)
-        predictions = np.empty((0, len(taglist)), np.float32)
-        for i in framelist:
-          myindex = round(np.sum(i).item())
-          if myindex in self.cachedict:
-            line = self.cachedict[myindex]
+    ts_one = time()
+    mybuffer.ts = time()
+    slice_to_process = mybuffer.get(self.dbline.maxblock)
+    framelist = slice_to_process[0]
+    framesinfo = slice_to_process[1:]
+    self.check_allmodels(schoolnr, logger)
+    if self.dbline.gpu_sim >= 0: #GPU Simulation with random
+      if self.dbline.gpu_sim > 0:
+        sleep(self.dbline.gpu_sim)
+      predictions = np.empty((0, len(taglist)), np.float32)
+      for i in framelist:
+        myindex = round(np.sum(i).item())
+        if myindex in self.cachedict:
+          line = self.cachedict[myindex]
+        else:
+          line = []
+          for j in range(len(taglist)):
+            line.append(random())
+          line = np.array([np.float32(line)])
+          self.cachedict[myindex] = line
+        predictions = np.vstack((predictions, line))
+    elif self.dbline.use_websocket: #Predictions from Server
+      self.ws_ts = time()
+      outdict = {
+        'code' : 'imgl',
+        'scho' : myschool.e_school,
+      }
+      self.continue_sending(json.dumps(outdict), opcode=1, logger=logger)
+      while True:
+        try:
+          for item in framelist:
+            jpgdata = cv.imencode('.jpg', item)[1].tobytes()
+            schoolbytes = myschool.e_school.to_bytes(8, 'big')
+            self.continue_sending(schoolbytes+jpgdata, opcode=0, 
+              logger=logger, get_answer=False)
+          outdict = {
+            'code' : 'done',
+            'scho' : myschool.e_school,
+          }
+          predictions = self.continue_sending(json.dumps(outdict), opcode=1, 
+            logger=logger, get_answer=True)
+          if predictions == 'incomplete':
+            predictions = np.zeros((len(framelist), len(taglist)), np.float32)
           else:
-            line = []
-            for j in range(len(taglist)):
-              line.append(random())
-            line = np.array([np.float32(line)])
-            self.cachedict[myindex] = line
-          predictions = np.vstack((predictions, line))
-      elif self.dbline.use_websocket: #Predictions from Server
-        self.ws_ts = time()
-        outdict = {
-          'code' : 'imgl',
-          'scho' : myschool.e_school,
-        }
-        self.continue_sending(json.dumps(outdict), opcode=1, logger=logger)
-        while True:
-          try:
-            for item in framelist:
-              jpgdata = cv.imencode('.jpg', item)[1].tobytes()
-              schoolbytes = myschool.e_school.to_bytes(8, 'big')
-              self.continue_sending(schoolbytes+jpgdata, opcode=0, 
-                logger=logger, get_answer=False)
-            outdict = {
-              'code' : 'done',
-              'scho' : myschool.e_school,
-            }
-            predictions = self.continue_sending(json.dumps(outdict), opcode=1, 
-              logger=logger, get_answer=True)
-            if predictions == 'incomplete':
-              predictions = np.zeros((len(framelist), len(taglist)), np.float32)
-            else:
-              predictions = np.array(json.loads(predictions), dtype=np.float32)
-            break
-          except (ConnectionResetError, OSError):
-            sleep(djconf.getconfigfloat('long_brake', 1.0))
-            self.reset_websocket()
-      else: #local GPU
-        npframelist = []
-        for i in range(len(framelist)):
-          npframelist.append(np.expand_dims(framelist[i], axis=0))
-        npframelist = np.vstack(npframelist)
-        if npframelist.shape[0] < self.dbline.maxblock:
-          patch = np.zeros((self.dbline.maxblock - npframelist.shape[0], 
-            npframelist.shape[1], 
-            npframelist.shape[2], 
-            npframelist.shape[3]), 
-            np.uint8)
-          portion = np.vstack((npframelist, patch))
-          self.check_activemodels(schoolnr, logger)
+            predictions = np.array(json.loads(predictions), dtype=np.float32)
+          break
+        except (ConnectionResetError, OSError):
+          sleep(djconf.getconfigfloat('long_brake', 1.0))
+          self.reset_websocket()
+    else: #local GPU
+      npframelist = []
+      for i in range(len(framelist)):
+        npframelist.append(np.expand_dims(framelist[i], axis=0))
+      npframelist = np.vstack(npframelist)
+      if npframelist.shape[0] < self.dbline.maxblock:
+        patch = np.zeros((self.dbline.maxblock - npframelist.shape[0], 
+          npframelist.shape[1], 
+          npframelist.shape[2], 
+          npframelist.shape[3]), 
+          np.uint8)
+        portion = np.vstack((npframelist, patch))
+        self.check_activemodels(schoolnr, logger)
+        try:
           predictions = (
             self.activemodels[schoolnr]['model'].predict_on_batch(portion))
-          predictions = predictions[:npframelist.shape[0]]
-        else:
-          self.check_activemodels(schoolnr, logger)
+        except KeyError:
+          logger.info('KeyError while predicting')    
+        predictions = predictions[:npframelist.shape[0]]
+      else:
+        self.check_activemodels(schoolnr, logger)
+        try:
           predictions = (
             self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
-      starting = 0
-      for i in range(len(framelist)):
-        if ((i == len(framelist) - 1) 
-            or (framesinfo[0][i] != framesinfo[0][i+1])):
-          if (framesinfo[0][starting] in self.users):
-            self.my_output.put(framesinfo[0][starting], (
-              'pred_to_send', 
-              predictions[starting:i+1], 
-              framesinfo[0][starting:i+1],
-              framesinfo[1][starting:i+1],
-              framesinfo[2][starting:i+1],
-            ))
-          starting = i + 1
-      if self.dbline.savestats > 0: #Later to be written in DB
-        newtime = time()
-        logtext = 'School: ' + str(schoolnr).zfill(3)
-        logtext += ('  Buffer Size: ' 
-          + str(len(mybuffer)).zfill(5))
-        logtext += ('  Block Size: ' 
-          + str(len(framelist)).zfill(5))
-        logtext += ('  Proc Time: ' 
-          + str(round(newtime - ts_one, 3)).ljust(5, '0'))
-        if had_timeout:
-          logtext += ' T'
-        logger.info(logtext)
-    except:
-      self.logger.error(format_exc())
-      self.logger.handlers.clear()
+        except KeyError:
+          logger.info('KeyError while predicting')    
+    starting = 0
+    for i in range(len(framelist)):
+      if ((i == len(framelist) - 1) 
+          or (framesinfo[0][i] != framesinfo[0][i+1])):
+        if (framesinfo[0][starting] in self.users):
+          self.my_output.put(framesinfo[0][starting], (
+            'pred_to_send', 
+            predictions[starting:i+1], 
+            framesinfo[0][starting:i+1],
+            framesinfo[1][starting:i+1],
+            framesinfo[2][starting:i+1],
+          ))
+        starting = i + 1
+    if self.dbline.savestats > 0: #Later to be written in DB
+      newtime = time()
+      logtext = 'School: ' + str(schoolnr).zfill(3)
+      logtext += ('  Buffer Size: ' 
+        + str(len(mybuffer)).zfill(5))
+      logtext += ('  Block Size: ' 
+        + str(len(framelist)).zfill(5))
+      logtext += ('  Proc Time: ' 
+        + str(round(newtime - ts_one, 3)).ljust(5, '0'))
+      if had_timeout:
+        logtext += ' T'
+      logger.info(logtext)
 
 
 #***************************************************************************

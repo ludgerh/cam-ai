@@ -500,11 +500,12 @@ class trainerutil(AsyncWebsocketConsumer):
         outlist['data'] = json.loads(self.ws.recv())['data']
       else:
         modeldir = self.schoollinedict['dir']
-        outlist = []
-        for item in model_type.objects.all:
-          search_path = modeldir + 'model/' + item.name
+        outlist['data'] = []
+        model_type_dict = await filterlinesdict(model_type, fields=['name', ])
+        for item in  model_type_dict:
+          search_path = modeldir + 'model/' + item['name']
           if path.exists(search_path + '.keras') or path.exists(search_path + '.h5'):
-            outlist.append(item.name)
-      logger.info('--> ' + str(outlist))
+            outlist['data'].append(item['name'])
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			
 
