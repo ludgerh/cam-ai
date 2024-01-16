@@ -28,7 +28,15 @@ import os
 from pathlib import Path
 from .passwords import (db_password, security_key, localaccess, 
   mydomain, myip, httpsport, smtp_account, smtp_password, smtp_server, smtp_port, 
-  smtp_email, smtp_use_ssl, debugpw, emulatestatic)
+  smtp_email, smtp_use_ssl)
+try:  
+  from .passwords import debugpw
+except  ImportError: # can be removed when everybody is up to date
+  debugpw = False
+try:  
+  from .passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
 try:  
   from .passwords import data_path
 except  ImportError: # can be removed when everybody is up to date

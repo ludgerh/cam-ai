@@ -27,6 +27,6 @@ if validate $1; then
   cd ..
   echo "Upgrade is done"
 else
-  echo "Usage: upgrade [OSTYPE]"
+  echo "Usage: upgrade-conda.sh [OSTYPE]"
   echo "OSTYPE in raspi11, raspi12, debian10, debian12"  
 fi  
