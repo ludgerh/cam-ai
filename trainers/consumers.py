@@ -505,7 +505,7 @@ class trainerutil(AsyncWebsocketConsumer):
         model_type_dict = await filterlinesdict(model_type, fields=['name', ])
         for item in  model_type_dict:
           search_path = modeldir + 'model/' + item['name']
-          if path.exists(search_path + '.h5':
+          if path.exists(search_path + '.h5'):
             outlist['data'].append(item['name'])
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			
