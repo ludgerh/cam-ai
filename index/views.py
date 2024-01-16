@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -16,7 +17,10 @@ from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from camai.passwords import emulatestatic
+try:  
+  from camai.passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
 from access.c_access import access
 from streams.models import stream
 from tf_workers.models import school, worker

@@ -20,7 +20,10 @@ from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
-from camai.passwords import emulatestatic
+try:  
+  from camai.passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.c_tools import c_convert
