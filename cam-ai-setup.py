@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -36,19 +36,18 @@ print('Just for in case: Stopping c_server process (red failure message should b
 subprocess.call(['sudo', 'systemctl', 'stop', 'c_server']) 
 print()
 
-os_code = platform.release()
-if os_code == '6.1.0-13-amd64':
-  os_code = 'debian12'
-  env_type = 'conda'
-elif (os_code == '6.1.0-rpi4-rpi-v8'
-  or os_code == '6.1.0-rpi6-rpi-v8'
-  or os_code == '6.1.0-rpi6-rpi-2712'
-  ):
-  os_code = 'raspi12'
-  env_type = 'venv'
-else:
+release_code = platform.release()
+env_type = None
+if release_code[:6] == '6.1.0-':
+  if '-amd64' in release_code:
+    os_code = 'debian12'
+    env_type = 'conda'
+  elif '-rpi-' in release_code:
+    os_code = 'raspi12'
+    env_type = 'venv'
+if env_type is None:  
   print('Unknown OS code:', os_code) 
-  exit(1)
+  exit(1) 
 print('Detected OS:', os_code)
 print('Environment Type:', env_type)
 print()

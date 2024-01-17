@@ -353,6 +353,8 @@ class tf_worker():
       environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
       if self.dbline.gpu_nr == -1:
         environ["CUDA_VISIBLE_DEVICES"] = ''
+      else:  
+        environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
       import tensorflow as tf 
       self.logger.info("TensorFlow version: "+tf.__version__)
       cpus = tf.config.list_physical_devices('CPU')
@@ -474,23 +476,23 @@ class tf_worker():
         try:
           logger.info('***** Loading model file #'+str(schoolnr)
             + ', file: '+model_path)
-          with self.tf.device(self.cuda_select):
-            tempmodel = self.load_model(
-              model_path, 
-              custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
-            self.allmodels[schoolnr]['path'] = model_path  
-            self.allmodels[schoolnr]['type'] = myschool.model_type
-            self.allmodels[schoolnr]['weights'] = []
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name=myschool.model_type).get_weights())
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name='CAM-AI_Dense1').get_weights())
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
-            self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
-            self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
+          #with self.tf.device(self.cuda_select):
+          tempmodel = self.load_model(
+            model_path, 
+            custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+          self.allmodels[schoolnr]['path'] = model_path  
+          self.allmodels[schoolnr]['type'] = myschool.model_type
+          self.allmodels[schoolnr]['weights'] = []
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name=myschool.model_type).get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense1').get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
+          self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
+          self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
           logger.info('***** Got model file #'+str(schoolnr) 
             + ', file: '+model_path)
         except:
@@ -506,34 +508,34 @@ class tf_worker():
       logger.info('***** Loading model buffer #'+str(schoolnr)+', file: '
         + self.allmodels[schoolnr]['path'])
       if len(self.activemodels) < self.dbline.max_nr_models:
-        with self.tf.device(self.cuda_select):
-          tempmodel = self.load_model(
-            self.allmodels[schoolnr]['path'], 
-            custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
-          self.activemodels[schoolnr] = {}
-          self.activemodels[schoolnr]['model'] = tempmodel
-          self.activemodels[schoolnr]['type'] = self.allmodels[schoolnr]['type']
-          self.activemodels[schoolnr]['xdim'] = self.allmodels[schoolnr]['xdim']
-          self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
-          self.activemodels[schoolnr]['time'] = time()
+        #with self.tf.device(self.cuda_select):
+        tempmodel = self.load_model(
+          self.allmodels[schoolnr]['path'], 
+          custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+        self.activemodels[schoolnr] = {}
+        self.activemodels[schoolnr]['model'] = tempmodel
+        self.activemodels[schoolnr]['type'] = self.allmodels[schoolnr]['type']
+        self.activemodels[schoolnr]['xdim'] = self.allmodels[schoolnr]['xdim']
+        self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
+        self.activemodels[schoolnr]['time'] = time()
       else: #if # of models > self.dbline.max_nr_models
-        with self.tf.device(self.cuda_select):
-          nr_to_replace = min(self.activemodels, 
-            key= lambda x: self.activemodels[x]['time'])	
-          self.activemodels[schoolnr] = self.activemodels[nr_to_replace]
-          self.activemodels[schoolnr]['type'] = self.allmodels[schoolnr]['type']
-          self.activemodels[schoolnr]['xdim'] = self.allmodels[schoolnr]['xdim']
-          self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
-          self.activemodels[schoolnr]['time'] = time()
-          self.activemodels[schoolnr]['model'].get_layer(name=self.activemodels[schoolnr]['type']).set_weights(
-            self.allmodels[schoolnr]['weights'][0])
-          self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense1').set_weights(
-            self.allmodels[schoolnr]['weights'][1])
-          self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense2').set_weights(
-            self.allmodels[schoolnr]['weights'][2])
-          self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense3').set_weights(
-            self.allmodels[schoolnr]['weights'][3])
-          del self.activemodels[nr_to_replace]
+        #with self.tf.device(self.cuda_select):
+        nr_to_replace = min(self.activemodels, 
+          key= lambda x: self.activemodels[x]['time'])	
+        self.activemodels[schoolnr] = self.activemodels[nr_to_replace]
+        self.activemodels[schoolnr]['type'] = self.allmodels[schoolnr]['type']
+        self.activemodels[schoolnr]['xdim'] = self.allmodels[schoolnr]['xdim']
+        self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
+        self.activemodels[schoolnr]['time'] = time()
+        self.activemodels[schoolnr]['model'].get_layer(name=self.activemodels[schoolnr]['type']).set_weights(
+          self.allmodels[schoolnr]['weights'][0])
+        self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense1').set_weights(
+          self.allmodels[schoolnr]['weights'][1])
+        self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense2').set_weights(
+          self.allmodels[schoolnr]['weights'][2])
+        self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense3').set_weights(
+          self.allmodels[schoolnr]['weights'][3])
+        del self.activemodels[nr_to_replace]
       logger.info('***** Got model buffer #'+str(schoolnr)+', file: '
         + self.allmodels[schoolnr]['path'])
       if test_pred:
@@ -615,18 +617,18 @@ class tf_worker():
         portion = np.vstack((npframelist, patch))
         self.check_activemodels(schoolnr, logger)
         try:
-          with self.tf.device(self.cuda_select):
-            predictions = (
-              self.activemodels[schoolnr]['model'].predict_on_batch(portion))
+          #with self.tf.device(self.cuda_select):
+          predictions = (
+            self.activemodels[schoolnr]['model'].predict_on_batch(portion))
         except KeyError:
           logger.info('KeyError while predicting')    
         predictions = predictions[:npframelist.shape[0]]
       else:
         self.check_activemodels(schoolnr, logger)
         try:
-          with self.tf.device(self.cuda_select):
-            predictions = (
-              self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
+          #with self.tf.device(self.cuda_select):
+          predictions = (
+            self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
         except KeyError:
           logger.info('KeyError while predicting')    
     starting = 0
