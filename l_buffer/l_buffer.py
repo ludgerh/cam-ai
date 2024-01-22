@@ -33,6 +33,8 @@ from threading import Thread
 from tools.c_redis import saferedis
 from traceback import format_exc
 
+import cv2 as cv
+
 class l_buffer:
   redis_list = []
 
@@ -68,6 +70,9 @@ class l_buffer:
       self.p.subscribe(self.storage[0])
       self.thread = Thread(target=self.message_handler, name='L_Buffer_Thread')
       self.thread.start()
+    self.last_display = 0
+    
+    self.i = 0
     
   def message_handler(self):
     while self.do_run:

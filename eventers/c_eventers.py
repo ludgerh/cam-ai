@@ -515,9 +515,11 @@ class c_eventer(c_device):
             frame = None
           else:
             queueresult = self.detectorqueue.get()
+            np_image = np.frombuffer(queueresult[0], dtype=np.uint8)
+            np_image = np_image.reshape(queueresult[1][5]-queueresult[1][4], queueresult[1][3]-queueresult[1][2], 3)
             frame = (
               queueresult[1][0],
-              np.frombuffer(queueresult[0], dtype=np.uint8),
+              np_image,
               queueresult[1][1],
               queueresult[1][2],
               queueresult[1][3],
