@@ -128,6 +128,7 @@ class c_detector(c_device):
           self.logger.warning('Detector #' + str(self.id)
             + ' skipped cycle, eventer queue > ' 
             + str(5 * self.dbline.det_max_rect))
+          self.warning_done = True  
         return(None)  
       frametime = input[2]
       if not (self.do_run and self.sl.greenlight(self.period, frametime)):
