@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -23,9 +24,11 @@ When using this, stop() must be called from the getting process to finalize
 shutdown.
 """
 
+import pickle
 import numpy as np
 from os import getpid
 from time import sleep, time
+from multiprocessing import Lock
 from threading import Thread
 from tools.c_redis import saferedis
 from traceback import format_exc
@@ -33,27 +36,32 @@ from traceback import format_exc
 class l_buffer:
   redis_list = []
 
-  def __init__(self, itemtype, block=False, call=None):
+  def __init__(self, itemtype=None, block=False, call=None):
     self.block = block
     self.call = call
     self.redis = saferedis()
     self.itemtype = itemtype    
     self.blockdelay = 0.01  
-    if itemtype == 1:
-      self.first_time = True
     i = 0
     while i in l_buffer.redis_list:
       i += 1
     l_buffer.redis_list.append(i)
-    if self.itemtype == 0:
-      storagedim = 1
-    elif self.itemtype == 1:
-      storagedim = 5
-    self.storage = []  
-    for j in range(storagedim):      
-      self.storage.append('l_buffer:'+str(i)+':'+str(j))
-    for item in self.storage:
-      self.redis.delete(item)
+    if itemtype is None:
+      self.my_lock = Lock()
+      self.storage = ('l_buffer:'+str(i)+':bytes', 'l_buffer:'+str(i)+':object')
+      self.redis.delete(self.storage[0])
+      self.redis.delete(self.storage[1])
+    else:
+      if self.itemtype == 0:
+        storagedim = 1
+      elif self.itemtype == 1:
+        self.first_time = True
+        storagedim = 5
+      self.storage = []  
+      for j in range(storagedim):      
+        self.storage.append('l_buffer:'+str(i)+':'+str(j))
+      for item in self.storage:
+        self.redis.delete(item)
     if self.call:
       self.do_run = True
       self.p = self.redis.pubsub(ignore_subscribe_messages=True)
@@ -71,7 +79,7 @@ class l_buffer:
           sleep(0.01) 
     
   def get(self):
-    if self.block or self.first_time:
+    if self.block or (self.itemtype == 1 and self.first_time):
       ts1 = time()
       while (not self.redis.exists(self.storage[0])):
         if time() - ts1 > 5:
@@ -81,7 +89,15 @@ class l_buffer:
           if self.blockdelay < 1.0:
             self.blockdelay += 0.01       
       self.blockdelay = 0.01  
-    if self.itemtype == 0:
+    if self.itemtype is None:
+      with self.my_lock:
+        if (objdata := self.redis.rpop(self.storage[1])) is not None:
+          objdata = pickle.loads(objdata)
+        result = (
+          self.redis.rpop(self.storage[0]),
+          objdata,
+        )
+    elif self.itemtype == 0:
       result = np.frombuffer(self.redis.get(self.storage[0]), dtype=np.uint8)
     elif self.itemtype == 1:
       if self.first_time:
@@ -105,7 +121,13 @@ class l_buffer:
       self.redis.delete(self.storage[0])
     return(result)
 
-  def put(self, data):
+  def put(self, bytedata=None, objdata=None, data=None):
+    if self.itemtype is None:
+      with self.my_lock:
+        if bytedata:
+          self.redis.lpush(self.storage[0], bytedata)
+        if objdata:
+          self.redis.lpush(self.storage[1], pickle.dumps(objdata))
     if self.itemtype == 0:
       self.redis.set(self.storage[0], data.tobytes())
     elif self.itemtype == 1:
@@ -118,6 +140,20 @@ class l_buffer:
       self.redis.set(self.storage[0], data[0])
     if self.call: 
       self.redis.publish(self.storage[0], 'T') #Trigger
+      
+  def empty(self): 
+    with self.my_lock:
+      if self.redis.llen(self.storage[0]):
+        return(False)
+      if self.redis.llen(self.storage[1]):
+        return(False)
+    return(True)   
+    
+  def qsize(self):
+    return(max(
+      self.redis.llen(self.storage[0]), 
+      self.redis.llen(self.storage[1]), 
+    ))  
 
   def stop(self):
     if self.call:

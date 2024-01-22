@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -12,10 +12,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# c_eventer.py V0.9.9 30.03.2023
+# c_eventer.py V1.1.3 21.01.2024
 
 import cv2 as cv
 import json
+import numpy as np
 from os import remove, path, nice
 from math import inf
 from shutil import copyfile
@@ -25,7 +26,7 @@ from setproctitle import setproctitle
 from collections import deque
 from time import time, sleep
 from threading import Thread
-from multiprocessing import Process, Lock, SimpleQueue
+from multiprocessing import Process, Lock
 from subprocess import Popen, run
 from django.forms.models import model_to_dict
 from django.db import connection
@@ -60,7 +61,7 @@ class c_eventer(c_device):
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
     self.dataqueue = l_buffer(1, block=True)
-    self.detectorqueue = SimpleQueue()
+    self.detectorqueue = l_buffer()
     self.frameslist = deque()
     self.inserter_ts = 0
     self.buffer_ts = time()
@@ -101,7 +102,8 @@ class c_eventer(c_device):
       self.webm_proc = Process(target=self.make_webm).start()
       while self.do_run:
         frameline = self.dataqueue.get()
-        if (self.do_run and (frameline is not None) and self.sl.greenlight(self.period, frameline[2])):
+        if (self.do_run and (frameline is not None) 
+            and self.sl.greenlight(self.period, frameline[2])):
           self.run_one(frameline) 
         else:
           sleep(djconf.getconfigfloat('short_brake', 0.1))
@@ -125,26 +127,21 @@ class c_eventer(c_device):
       if super().in_queue_handler(received):
         return(True)
       else:
-        #self.logger.info(str(received))
         if (received[0] == 'new_video'):
           self.vid_deque.append(received[1:])
-          #self.logger.info('comparing: ' + str(time()) + ' ' + str(self.vid_deque[0][2]) + ' ' + str(time() - self.vid_deque[0][2]))
           while True:
             if self.vid_deque and (time() - self.vid_deque[0][2]) > 300:
               listitem = self.vid_deque.popleft()
               try:
-                #self.logger.info('removing: ' + self.recordingspath + listitem[1])
                 remove(self.recordingspath + listitem[1])
               except FileNotFoundError:
                 self.logger.warning('c_eventers.py:new_video - Delete did not find: '
                   + self.recordingspath + listitem[1])
-                #self.logger.info(str(self.vid_deque))
             else:
               break
         elif (received[0] == 'purge_videos'):
           for item in self.vid_deque.copy():
             try:
-              #self.logger.info('removing: ' + self.recordingspath + item[1])
               remove(self.recordingspath + item[1])
             except FileNotFoundError:
               self.logger.warning('c_eventers.py:purge_videos - Delete did not find: '
@@ -224,7 +221,11 @@ class c_eventer(c_device):
       with self.eventdict_lock:
         for i in self.eventdict:
           if self.eventdict[i].status == 0:
-            frameplusevents['events'].append((i, self.eventdict[i].end, self.eventdict[i][:4]))
+            frameplusevents['events'].append((
+              i, 
+              self.eventdict[i].end, 
+              self.eventdict[i][:4]
+            ))
       self.frameslist.append(frameplusevents)
       self.display_events()
 
@@ -302,7 +303,8 @@ class c_eventer(c_device):
                       self.tag_list[displaylist[j][0]].name[:3]
                       +' - '+str(round(displaylist[j][1],2)), 
                       (itemold[0]+2, y0 + j * 30 * self.textheight), 
-                      cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, self.textthickness, cv.LINE_AA)
+                      cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
+                      self.textthickness, cv.LINE_AA)
                 else:
                   imax = -1
                   pmax = -1
@@ -312,10 +314,12 @@ class c_eventer(c_device):
                         pmax = predictions[j]
                         imax = j
                   if resolve_rules(self.cond_dict[1], predictions):
-                    cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), self.linewidth)
+                    cv.rectangle(newimage, rect_btoa(itemold), (255, 0, 0), 
+                      self.linewidth)
                     cv.putText(newimage, self.tag_list[imax].name[:3], 
                       (itemold[0]+10, itemold[2]+30), 
-                      cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), self.textthickness, cv.LINE_AA)
+                      cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
+                        self.textthickness, cv.LINE_AA)
               self.last_display = frame[2]
           if self.dbline.eve_view:
             fps = self.som.gettime()
@@ -328,7 +332,7 @@ class c_eventer(c_device):
                 except OperationalError:
                   connection.close()
               self.redis.fps_to_dev('E', self.dbline.id, fps)
-            self.viewer.inqueue.put((3, newimage, frame[2]))
+            self.viewer.inqueue.put(data=(3, newimage, frame[2]))
         else:
           self.frameslist.appendleft(myframeplusevents)
           break
@@ -351,7 +355,8 @@ class c_eventer(c_device):
           self.redis.set('webm_queue:' + str(self.id) + ':end', 0)
       if the_end > the_start:
         the_start += 1
-        savepath = self.redis.get('webm_queue:' + str(self.id) + ':item:' + str(the_start)).decode("utf-8") 
+        savepath = (self.redis.get('webm_queue:' + str(self.id) + ':item:' 
+          + str(the_start)).decode("utf-8"))
         self.redis.delete('webm_queue:' + str(self.id) + ':item:' + str(the_start))
         self.redis.set('webm_queue:' + str(self.id) + ':start', str(the_start))
         niceness = nice(0)
@@ -365,7 +370,8 @@ class c_eventer(c_device):
           '-vf', 'scale=500:-1',
           savepath[:-4]+'.webm'
         ])
-        self.logger.info('WEBM-Conversion: E' + str(self.id) + ' ' + str(round(time() - myts)) + ' sec')
+        self.logger.info('WEBM-Conversion: E' + str(self.id) + ' ' 
+          + str(round(time() - myts)) + ' sec')
       else:
         sleep(djconf.getconfigfloat('long_brake', 5.0))
     
@@ -508,7 +514,16 @@ class c_eventer(c_device):
           if self.detectorqueue.empty():
             frame = None
           else:
-            frame = self.detectorqueue.get()
+            queueresult = self.detectorqueue.get()
+            frame = (
+              queueresult[1][0],
+              np.frombuffer(queueresult[0], dtype=np.uint8),
+              queueresult[1][1],
+              queueresult[1][2],
+              queueresult[1][3],
+              queueresult[1][4],
+              queueresult[1][5],
+            )
           if frame:
             if not self.dbline.cam_xres:
               self.dbline.refresh_from_db(fields=['cam_xres', 'cam_yres', ])
@@ -524,12 +539,6 @@ class c_eventer(c_device):
                   found = myevent
                   break
               if found is None:
-                #while True:
-                #  try:
-                #    myschoolid = self.dbline.eve_school.id
-                #    break
-                #  except OperationalError:
-                #    connection.close()
                 myevent = c_event(self.tf_worker, self.tf_w_index, frame, 
                   self.dbline.eve_margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
                   self.dbline.eve_school.id, self.id, self.dbline.name, self.logger)

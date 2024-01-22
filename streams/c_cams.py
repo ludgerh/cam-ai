@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -257,14 +257,14 @@ class c_cam(c_device):
         if frameline is not None:
           if (self.dbline.cam_view 
               and self.redis.view_from_dev('C', self.dbline.id)):
-            self.viewer.inqueue.put(frameline)
+            self.viewer.inqueue.put(data=frameline)
           if (self.dbline.det_mode_flag 
               and (self.redis.view_from_dev('D', self.dbline.id) 
               or self.redis.data_from_dev('D', self.dbline.id))):
-            self.mydetector.dataqueue.put(frameline)
+            self.mydetector.dataqueue.put(data=frameline)
           if (self.dbline.eve_mode_flag 
               and self.redis.view_from_dev('E', self.dbline.id)): 
-            self.mydetector.myeventer.dataqueue.put(frameline)
+            self.mydetector.myeventer.dataqueue.put(data=frameline)
       self.finished = True
     except:
       self.logger.error(format_exc())
@@ -450,7 +450,7 @@ class c_cam(c_device):
     if self.dbline.cam_fpslimit:
       frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
     else:
-      frame_rate = self.cam_fps
+      frame_rate = 0
     self.wd_ts = time()
     self.mydetector.myeventer.inqueue.put(('purge_videos', ))
     if self.dbline.cam_feed_type in {2, 3}:
