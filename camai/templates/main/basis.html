@@ -102,10 +102,8 @@
             </button>
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
               {% spaceless %}
-                {% for item in schoollist %}
-                  {% if item.id != 1 or user.is_superuser or user.is_staff %}
-                    <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
-                  {% endif %}
+                {% for item in camlist %}
+                  <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
                 {% endfor %}
               {% endspaceless %}
             </ul>

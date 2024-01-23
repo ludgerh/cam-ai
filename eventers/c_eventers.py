@@ -288,9 +288,9 @@ class c_eventer(c_device):
                   if self.nr_of_cond_ed <= 0:
                     self.last_cond_ed = 1
                   if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
-                    colorcode= (0, 255, 0)
-                  else:
                     colorcode= (0, 0, 255)
+                  else:
+                    colorcode= (0, 255, 0)
                   displaylist = [(j, predictions[j]) for j in range(10)]
                   displaylist.sort(key=lambda x: -x[1])
                   cv.rectangle(newimage, rect_btoa(itemold), colorcode, self.linewidth)

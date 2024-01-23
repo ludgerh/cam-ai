@@ -1,4 +1,5 @@
-{# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
+{# More information and complete source: https://github.com/ludgerh/cam-ai #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -52,7 +53,7 @@
   </div>
 </div>
 
-<h2 class="m-2">New events: {{ school.name }}
+<h2 class="m-2">New events: {{ stream.name }}
 {% if may_write %}
 <button type="button" class="btn btn-primary m-2" id="0" 
   data-bs-toggle="modal" data-bs-target="#deleteModal" 
@@ -84,7 +85,7 @@
             {{ item.numframes }} Image(s)</h6>
 {% endif %}
           <p class="card-text">{{ item.p_string }}</p>
-          <a href="/eventers/oneevent/{{ school.id }}/{{ item.id }}" 
+          <a href="/eventers/oneevent/{{ stream.id }}/{{ item.id }}" 
             class="btn btn-primary position-absolute bottom-0 start-0 m-3" 
             style="width: 120px;">See details</a>
 {% if may_write %}
@@ -187,7 +188,7 @@ $(document).ready(function() {
         SchoolDBUtilSocket.sendandwait({
 			    'command' : 'delevent',
 			    'eventnr' : event_nr,
-          'schoolnr' : {{ school.id }},
+          'streamnr' : {{ stream.id }},
 		    })
 		    .then((result) => {
 			    if (result === 'OK') {
@@ -209,7 +210,7 @@ $(document).ready(function() {
         SchoolDBUtilSocket.sendandwait({
 			    'command' : 'delevent',
 			    'eventnr' : event_nr,
-          'schoolnr' : {{ school.id }},
+          'streamnr' : {{ stream.id }},
 		    })
 		    .then((result) => {
 			    if (result === 'OK') {

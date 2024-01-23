@@ -28,6 +28,7 @@ class event(models.Model):
   ymax = models.IntegerField(default=0)
   numframes = models.IntegerField(default=0)
   school = models.ForeignKey(school, on_delete=models.CASCADE, default=1)
+  camera = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)
   done = models.BooleanField(default=False)
   videoclip = models.CharField(max_length=256, default='')
   double = models.BooleanField(default=False)

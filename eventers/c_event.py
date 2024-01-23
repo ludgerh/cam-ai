@@ -32,6 +32,7 @@ from tools.l_tools import ts2filename, uniquename, randomfilter, np_mov_avg, djc
 from tools.l_smtp import l_smtp
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
+from streams.models import stream
 
 datapath = djconf.getconfig('datapath', 'data/')
 schoolpath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
@@ -278,6 +279,7 @@ class c_event(list):
       self.dbline.ymax=self[3]
       self.dbline.numframes=len(frames_to_save)
       self.dbline.done = not self.goes_to_school
+      self.dbline.camera = stream.objects.get(id = self.eventer_id)
       self.dbline.save()
       self.mailimages = []
       for item in frames_to_save:

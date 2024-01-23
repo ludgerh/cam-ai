@@ -31,22 +31,22 @@ from tf_workers.models import school
 from users.models import archive
 from .models import event, event_frame
 from .models import alarm as dbalarm
+from streams.models import stream
 
 datapath = djconf.getconfig('datapath', 'data/')
 archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
 
 @login_required
-def events(request, schoolnr):
-  if ((((schoolnr > 1) or (request.user.is_staff)) or (request.user.is_superuser)) 
-      and (access.check('S', schoolnr, request.user, 'R'))):
+def events(request, camnr):
+  if access.check('C', camnr, request.user, 'R'):
     template = loader.get_template('eventers/events.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
-      'events' : event.objects.filter(school_id=schoolnr, xmax__gt=0).order_by('-id'),
+      'events' : event.objects.filter(camera_id=camnr, xmax__gt=0).order_by('-id'),
       'debug' : settings.DEBUG,
-      'may_write' : access.check('S', schoolnr, request.user, 'W'),
-      'school' : school.objects.get(id=schoolnr),
+      'may_write' : access.check('S', camnr, request.user, 'W'),
+      'stream' : stream.objects.get(id=camnr),
       'user' : request.user,
     }
     return(HttpResponse(template.render(context)))
@@ -54,11 +54,9 @@ def events(request, schoolnr):
     return(HttpResponse('No Access'))
 
 @login_required
-def oneevent(request, schoolnr, eventnr):
+def oneevent(request, streamnr, eventnr):
   myevent = event.objects.get(id=eventnr)
-  if ((myevent.school.id == schoolnr) 
-      and (((schoolnr > 1) or (request.user.is_staff)) or (request.user.is_superuser))
-      and access.check('S', schoolnr, request.user, 'R')):
+  if access.check('C', streamnr, request.user, 'R'):
     length_in_seconds = round(myevent.end.timestamp() - myevent.start.timestamp())
     length = str(length_in_seconds // 60)+':'
     seconds = str(length_in_seconds % 60)
@@ -81,8 +79,7 @@ def oneevent(request, schoolnr, eventnr):
       'event' : event.objects.get(id=eventnr),
       'frames' : frames,
       'debug' : settings.DEBUG,
-      'may_write' : access.check('S', schoolnr, request.user, 'W'),
-      'school' : school.objects.get(id=schoolnr),
+      'may_write' : access.check('C', streamnr, request.user, 'W'),
       'length' : length,
       'user' : request.user,
     }

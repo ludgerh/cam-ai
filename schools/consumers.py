@@ -400,15 +400,15 @@ class schooldbutil(AsyncWebsocketConsumer):
     elif params['command'] == 'delevent':
       try:
         if params['eventnr'] == -1:
-          eventdicts = await filterlinesdict(event, {'school__id' : params['schoolnr'], 'xmax__gt' : 0, }, ['id', 'school', 'videoclip'])
-          schoolnr =  params['schoolnr']
+          eventdicts = await filterlinesdict(event, {'camera__id' : params['streamnr'], 'xmax__gt' : 0, }, ['id', 'camera', 'videoclip'])
+          streamnr =  params['streamnr']
         elif params['eventnr'] == 0:
-          eventdicts = await filterlinesdict(event, {'school__id' : params['schoolnr'], 'xmax__gt' : 0, 'done' : True, }, ['id', 'school', 'videoclip'])
-          schoolnr =  params['schoolnr']
+          eventdicts = await filterlinesdict(event, {'camera__id' : params['streamnr'], 'xmax__gt' : 0, 'done' : True, }, ['id', 'camera', 'videoclip'])
+          streamnr =  params['streamnr']
         else:
-          eventdicts = await filterlinesdict(event, {'id' : params['eventnr'], }, ['id', 'school', 'videoclip'])
-          schoolnr = eventdicts[0]['school']
-        if access.check('S', schoolnr, self.scope['user'], 'W'):
+          eventdicts = await filterlinesdict(event, {'id' : params['eventnr'], }, ['id', 'camera', 'videoclip'])
+          streamnr = eventdicts[0]['camera']
+        if access.check('C', streamnr, self.scope['user'], 'W'):
           for eitem in eventdicts:
             framelines = await filterlinesdict(event_frame, {'event__id' : eitem['id'], }, ['id', 'name', ])
             for fitem in framelines:
@@ -443,9 +443,9 @@ class schooldbutil(AsyncWebsocketConsumer):
     elif params['command'] == 'delitem':
       if params['dtype'] == '0':
         framedict = await getonelinedict(event_frame, {'id' : params['nr_todel'], }, ['id', 'name', 'event'])
-        eventdict = await getonelinedict(event, {'id' : framedict['event'], }, ['id', 'school', 'numframes'])
-        myschool = eventdict['school']
-        if access.check('S', myschool, self.scope['user'], 'W'):
+        eventdict = await getonelinedict(event, {'id' : framedict['event'], }, ['id', 'camera', 'numframes'])
+        mycamera = eventdict['camera']
+        if access.check('C', mycamera, self.scope['user'], 'W'):
           framefile = schoolframespath + framedict['name']
           if path.exists(framefile):
             remove(framefile)
@@ -454,9 +454,9 @@ class schooldbutil(AsyncWebsocketConsumer):
           await deletefilter(event_frame, {'id' : framedict['id'], })
           await updatefilter(event, {'id' : eventdict['id'], }, {'numframes' : (eventdict['numframes'] - 1), })
       elif params['dtype'] == '1':
-        eventdict = await getonelinedict(event, {'id' : int(params['nr_todel']), }, ['id', 'school', 'videoclip'])
-        myschool = eventdict['school']
-        if access.check('S', myschool, self.scope['user'], 'W'):
+        eventdict = await getonelinedict(event, {'id' : int(params['nr_todel']), }, ['id', 'camera', 'videoclip'])
+        mycamera = eventdict['camera']
+        if access.check('C', mycamera, self.scope['user'], 'W'):
           if (await countfilter(event, {'videoclip' : eventdict['videoclip'], })) <= 1:
             videofile = recordingspath + eventdict['videoclip']
             if path.exists(videofile + '.mp4'):
