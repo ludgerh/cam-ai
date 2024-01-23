@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -16,7 +17,10 @@ from django.contrib.auth.decorators import login_required
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
-from camai.passwords import emulatestatic
+try:  
+  from camai.passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
 from access.c_access import access
 from tf_workers.models import school
 from schools.c_schools import get_taglist
@@ -70,7 +74,6 @@ def dashboard(request, schoolnr):
       'debug' : settings.DEBUG,
       'school' : myschool,
       'schoolnr' : schoolnr,
-      'present_models' : model_type.objects.all(),
       'model_types' : model_type.objects.all(),
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
     }
@@ -81,7 +84,7 @@ def dashboard(request, schoolnr):
 def downmodel(request, schoolnr, tokennr, token): 
   if checktoken((tokennr, token), 'MOD', schoolnr):
     myschool = school.objects.get(pk = schoolnr)
-    filename = myschool.dir + 'model/' + myschool.model_type + '.keras'
+    filename = myschool.dir + 'model/' + myschool.model_type + '.h5'
     modelfile = open(filename, 'rb')
     return FileResponse(modelfile)
   else:

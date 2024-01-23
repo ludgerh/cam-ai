@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -624,8 +624,8 @@ class admintools(WebsocketConsumer):
         resultdict = json.loads(ws.recv())
         ws.close()
       if not using_websocket:
-        copyfile(schoolsdir + 'model1/model/' + model_type + '.keras', 
-          schooldir + 'model/' + model_type + '.keras')
+        copyfile(schoolsdir + 'model1/model/' + model_type + '.h5', 
+          schooldir + 'model/' + model_type + '.h5')
       mytrainer = myschool.trainer
       mytrainer.active=True    
       if using_websocket or remote_trainer:

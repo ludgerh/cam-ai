@@ -61,9 +61,6 @@
     <div class="col-sm-auto h4">
       <label class="m-2" for="model_type">Model Type:</label>
       <select id="model_type">
-      {% for item in present_models %}
-          <option value={{ item.name }}>{{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})</option>
-      {% endfor %}    
       </select>
     </div>  
     <div class="col-sm-auto h4">
@@ -364,6 +361,16 @@ $(document).ready(function() {
   .then((result) => {
     if (result == 'OK') {
 {% if may_write %}
+      trainerutilSocket.sendandwait({
+        'command' : 'getavailmodels',
+        'school' : {{ school.id }},
+      }) 
+      .then((result) => {
+        result.forEach((item) => {
+          $('#model_type').append('<option value='+item+'>'+item+'</option>');
+        });
+      })
+      .catch(err => {console.log(err);});
       $('#train_button').click(function() {
         modal_visible = true;
         $('.modal-title').text('Synchronizing the Training Data');

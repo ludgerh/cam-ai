@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -500,11 +501,12 @@ class trainerutil(AsyncWebsocketConsumer):
         outlist['data'] = json.loads(self.ws.recv())['data']
       else:
         modeldir = self.schoollinedict['dir']
-        outlist = []
-        for item in model_type.objects.all:
-          search_path = modeldir + 'model/' + item.name
-          if path.exists(search_path + '.keras') or path.exists(search_path + '.h5'):
-            outlist.append(item.name)
-      logger.info('--> ' + str(outlist))
+        outlist['data'] = []
+        model_type_dict = await filterlinesdict(model_type, fields=['name', ])
+        for item in  model_type_dict:
+          search_path = modeldir + 'model/' + item['name']
+          if path.exists(search_path + '.h5'):
+            outlist['data'].append(item['name'])
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			
 

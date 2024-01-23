@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,7 +19,10 @@ from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
 from django.http import HttpResponse, FileResponse, HttpResponseRedirect
-from camai.passwords import emulatestatic
+try:  
+  from camai.passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
 from streams.models import stream
 from users.models import userinfo
 from access.c_access import access

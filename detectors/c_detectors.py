@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -102,13 +103,14 @@ class c_detector(c_device):
       setproctitle('CAM-AI-Detector #'+str(self.dbline.id))
       self.finished = False
       self.do_run = True
+      self.warning_done = False
       while self.do_run:
         frameline = self.run_one(self.dataqueue.get())
         if frameline is None:
           sleep(djconf.getconfigfloat('short_brake', 0.1))
         else:
           if self.dbline.det_view and self.redis.view_from_dev('D', self.dbline.id):
-            self.viewer.inqueue.put(frameline)
+            self.viewer.inqueue.put(data=frameline)
       self.dataqueue.stop()
       self.finished = True
     except:
@@ -121,6 +123,13 @@ class c_detector(c_device):
     try:
       if input is None:
         return(None)
+      if self.myeventer.detectorqueue.qsize() > 5 * self.dbline.det_max_rect:
+        if not self.warning_done:
+          self.logger.warning('Detector #' + str(self.id)
+            + ' skipped cycle, eventer queue > ' 
+            + str(5 * self.dbline.det_max_rect))
+          self.warning_done = True  
+        return(None)  
       frametime = input[2]
       if not (self.do_run and self.sl.greenlight(self.period, frametime)):
         return(None)
@@ -128,7 +137,11 @@ class c_detector(c_device):
       frameall = frame
       if self.firstdetect:
         if self.scaledown > 1:
-          self.buffer = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
+          self.buffer = cv.resize(
+            frame, 
+            (self.xres, self.yres), 
+            interpolation=cv.INTER_NEAREST,
+          )
         else:
           self.buffer = frame
         self.background = np.float32(self.buffer)
@@ -137,7 +150,10 @@ class c_detector(c_device):
         frame = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
       if self.dbline.det_apply_mask and (self.viewer.drawpad.mask is not None):
         frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
-      objectmaxsize = round(max(self.buffer.shape[0],self.buffer.shape[1])*self.dbline.det_max_size)
+      objectmaxsize = round(max(
+        self.buffer.shape[0],
+        self.buffer.shape[1],
+      ) * self.dbline.det_max_size,)
       buffer1 = cv.absdiff(self.buffer, frame)
       buffer1 = cv.split(buffer1)
       buffer2 = cv.max(buffer1[0], buffer1[1])
@@ -200,7 +216,10 @@ class c_detector(c_device):
             if self.scaledown > 1:
               rect = [item * self.scaledown for item in rect]
             aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
-            self.myeventer.detectorqueue.put((3, aoi, sendtime, rect[0], rect[1], rect[2], rect[3]))
+            self.myeventer.detectorqueue.put(
+              bytedata = aoi.tobytes(),
+              objdata = (3, sendtime, rect[0], rect[1], rect[2], rect[3]),
+            )  
           sendtime += 0.000001
         else:
           self.background = np.float32(frame)

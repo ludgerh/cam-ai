@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,7 +20,10 @@ from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
-from camai.passwords import emulatestatic
+try:  
+  from camai.passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.c_tools import c_convert
@@ -64,7 +67,7 @@ def classroom(request, schoolnr):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'school' : school.objects.get(id=schoolnr),
-      'events' : event.objects.filter(school_id=schoolnr, done=False, xmax__gt=0),
+      'events' : event.objects.filter(school_id=schoolnr, done=False, xmax__gt=0).order_by('-id'),
       'debug' : settings.DEBUG,
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
       'user' : request.user,

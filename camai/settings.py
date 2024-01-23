@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -28,7 +28,15 @@ import os
 from pathlib import Path
 from .passwords import (db_password, security_key, localaccess, 
   mydomain, myip, httpsport, smtp_account, smtp_password, smtp_server, smtp_port, 
-  smtp_email, smtp_use_ssl, debugpw, emulatestatic)
+  smtp_email, smtp_use_ssl)
+try:  
+  from .passwords import debugpw
+except  ImportError: # can be removed when everybody is up to date
+  debugpw = False
+try:  
+  from .passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
 try:  
   from .passwords import data_path
 except  ImportError: # can be removed when everybody is up to date
@@ -198,6 +206,7 @@ if emulatestatic:
 else:  
   #Production config
   STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
+  STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
   STATIC_ROOT = str(BASE_DIR)+'/'+data_path+'static'
 
 MEDIA_URL = '/media/'
