@@ -15,6 +15,18 @@
   border-color: #475B63; /*set the color you want here*/
 }
 
+.back {
+  background-color: #FFFFFF;
+  color: #597081;
+  border-color: #597081;
+}
+
+.back:hover, .back:focus, .back:active, .back.active, .open>.dropdown-toggle.back {
+  color: #597081;
+  background-color: #F0F4F7;
+  border-color: #597081; /*set the color you want here*/
+}
+
 .stats {
   margin-top: auto;
   margin-bottom: auto;

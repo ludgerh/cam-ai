@@ -43,20 +43,22 @@
     <div class="container-fluid float-left">
       <div class="row menurow">
         <div class="col-sm-auto">
-          <a href="/schools/images/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Images</a>
+          <a href="/schools/images/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Tagging</a>
         </div>
         <div class="col-sm-auto">
-          <a href="/trainers/trainer/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Trainer</a>
+          <a href="/trainers/dashboard/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">AI Modeling</a>
         </div>
         <div class="col-sm-auto">
-          <a href="/trainers/dashboard/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Dashboard</a>
+          <a href="/trainers/trainer/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Reports</a>
         </div>
         <div class="col-sm-auto">
-          <a href="/" class="btn btn-primary m-2" style="width: 120px;">Back to Main</a>
+          <a href="/" class="btn btn-primary m-2 back" style="width: 120px;">Back to Main</a>
         </div>
-        <div class="col-sm-auto">
-          <div class="m-2">Software Version {{ version }}
-          (User: {{ user }})</div>
+        <div class="stats">
+          <div class="col-sm-auto">
+            <div class="m-2">Software Version {{ version }}
+            (User: {{ user }})</div>
+          </div>
         </div>
       </div>
     </div>
