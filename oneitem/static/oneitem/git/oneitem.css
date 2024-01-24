@@ -3,13 +3,21 @@
   width: 1000px;
   padding: 15px;
   border-radius: 10px;
-  background-color: #C0D8E0;
+  background-color: #F0F4F7;
 }
   
 .accordion-item {
-  background-color: #C0D8E0;
+  background-color: #F0F4F7;
 }
-  
+
+.box {
+  width: auto;
+  background-color: #F0F4F7;
+  margin: 1%;
+  margin-right: 0;
+  padding: 1%;
+  border-radius: 10px;
+}  
 .accordion-button {
   margin: 0;
   margin-top: 10px;
@@ -25,7 +33,7 @@
 }
 
 .accordion-body {
-  background-color: #C0D8E0;
+  background-color: #F0F4F7;
   color: #2E2C2F;
 }  
 
