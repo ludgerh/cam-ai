@@ -17,9 +17,11 @@ from .models import archive
 
 class archivetable(Table):
   image = Column(empty_values=())
+  image.orderable = False
   made = DateTimeColumn(format ='d. m. Y, H:i')
   typecode = Column(verbose_name='Type' )
   action = Column(empty_values=())
+  action.orderable = False
 
   class Meta:
     model = archive

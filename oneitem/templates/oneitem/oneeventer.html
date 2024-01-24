@@ -151,9 +151,17 @@
 
 <script>
 
-let displaywidth = Math.round($(window).width() * 0.97);
-let displayheight = 
-  Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
+xscale = ($(window).width() - 20) / {{ dbline.cam_xres }};
+yscale = ($(window).height() - 230) / {{ dbline.cam_yres }};
+let displaywidth;
+let displayheight;
+if (xscale > yscale) {
+  displaywidth = Math.round({{ dbline.cam_xres }} * yscale);
+  displayheight = Math.round({{ dbline.cam_yres }} * yscale);
+} else {
+  displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
+  displayheight = Math.round({{ dbline.cam_yres }}* xscale);
+};
 let xinput
 let yinput
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";

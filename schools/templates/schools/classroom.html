@@ -46,7 +46,7 @@
 </div>
 {% endif %}
 
-<h2 class="m-2">Classroom: {{ school.name }}</h2>
+<h2 class="m-2">Camera Stream: {{ stream.name }}</h2>
 <div class="container-fluid float-left">
 {% for item in events %}
   <br><br><div done=0 class="row eventrow" id={{ item.id }}>
@@ -281,7 +281,6 @@ $(document).ready(function () {
     .then((result) => {
       if (result === 'OK') {
         $('#deleteModal').modal('hide');
-        console.log('#'+$(this).attr('id')+'.eventrow')
         $('#'+$(this).attr('id')+'.eventrow').remove(); 
       }
     })

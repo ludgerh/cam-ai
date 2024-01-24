@@ -1,4 +1,5 @@
-{# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
+{# More information and complete source: https://github.com/ludgerh/cam-ai #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -180,9 +181,17 @@
 
 <script>
 
-let displaywidth = Math.round($(window).width() * 0.97);
-let displayheight 
-  = Math.round(displaywidth * {{ dbline.cam_yres }} / {{ dbline.cam_xres }});
+xscale = ($(window).width() - 20) / {{ dbline.cam_xres }};
+yscale = ($(window).height() - 230) / {{ dbline.cam_yres }};
+let displaywidth;
+let displayheight;
+if (xscale > yscale) {
+  displaywidth = Math.round({{ dbline.cam_xres }} * yscale);
+  displayheight = Math.round({{ dbline.cam_yres }} * yscale);
+} else {
+  displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
+  displayheight = Math.round({{ dbline.cam_yres }}* xscale);
+};
 let xinput;
 let yinput;
 let ptz_data;
