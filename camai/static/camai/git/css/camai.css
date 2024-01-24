@@ -1,5 +1,5 @@
 .menurow {
-  background-color: #C0D8E0;
+  background-color: #F0F4F7;
   padding-top: 8px;
   padding-bottom: 8px;
 }
@@ -32,6 +32,9 @@
   margin-bottom: auto;
 }
 
+.progress {
+  border-color: #7F7F7F;
+}
 
 .bluegrey {
 	background: #B4C2C8;

@@ -27,19 +27,6 @@
   <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
 {% endif %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
-<div class="container-fluid float-left">
-	<div class="row">
-		<div class="col-auto">
-      <div>
-        <h1>E{{ dbline.id }}: {{ dbline.name }}</h1>
-          <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
-            fps = <span id="fpstag">?</span>, 
-            views = <span id="vnrtag">?</span></h5>
-        <img id="imagespace" class="img-rounded" />
-      </div>
-		</div>
-	</div>
-</div>
 
 {% if may_write %}
   <div class="accordion" id="accordionExample">
@@ -147,6 +134,20 @@
     {% endfor %}
   </div>
 {% endif %}
+
+<div class="container-fluid float-left box">
+	<div class="row">
+		<div class="col-auto">
+      <div>
+        <h1>Preview: {{ dbline.name }}</h1>
+          <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+            fps = <span id="fpstag">?</span>, 
+            views = <span id="vnrtag">?</span></h5>
+        <img id="imagespace" class="img-rounded" />
+      </div>
+		</div>
+	</div>
+</div>
 
 <script>
 

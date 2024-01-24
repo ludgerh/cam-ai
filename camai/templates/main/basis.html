@@ -1,4 +1,4 @@
-{# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de #}
+{# Copyright (C) 2023 The CAM-AI team, info@cam-ai.de #}
 {# More information and complete source: https://github.com/ludgerh/cam-ai #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
@@ -81,11 +81,11 @@
         <div class="col-sm-auto">
           <div class="dropdown">
             <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Eventers
+              Preferences
             </button>
             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
               {% if user.is_superuser %}
-              <a class="dropdown-item" href="/index/E/">All Eventers</a>
+              <a class="dropdown-item" href="/index/E/">All Previews</a>
               <div class="dropdown-divider"></div>
               {% endif %}
               {% spaceless %}
@@ -149,13 +149,13 @@
         </div>
         <div class="col-sm-auto row stats">
           <div class="col-sm-auto">
-            Software Version {{ version }}
-            (User: {{ user }})
+            V{{ version }}
+            (User: {{ user }}){# Kommt als dropdown mit logout #}
           </div>
 {% if user.is_superuser %}
           <div class="col-sm-auto row">
             <div class="col-sm-auto">
-              Free disc space <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> (<span id="freepercent">?</span>%)
+              <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> Free (<span id="freepercent">?</span>%)
             </div>
             <div class="progress px-0 my-1 mx-2 align-middle" style="width: 200px">
               <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
