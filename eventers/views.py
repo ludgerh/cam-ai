@@ -80,6 +80,7 @@ def oneevent(request, streamnr, eventnr):
       'frames' : frames,
       'debug' : settings.DEBUG,
       'may_write' : access.check('C', streamnr, request.user, 'W'),
+      'stream' : stream.objects.get(id=streamnr),
       'length' : length,
       'user' : request.user,
     }

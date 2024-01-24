@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -16,7 +17,7 @@ from django.urls import path
 from .views import archive, downarchive
 
 urlpatterns = [
-	path('archive/<int:schoolnr>/', archive.as_view(), name='archive'),
+	path('archive/<int:streamnr>/', archive.as_view(), name='archive'),
 	path('downarchive/<int:line_nr>/<int:tokennr>/<str:token>/image.bmp', downarchive, name='downmodelbmp'),
 	path('downarchive/<int:line_nr>/<int:tokennr>/<str:token>/video.mp4', downarchive, name='downmodelmp4'),
 ]

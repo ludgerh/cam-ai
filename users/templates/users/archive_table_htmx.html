@@ -50,7 +50,7 @@
 {% load crispy_forms_tags %}
 
 {# Search form #}
-<form hx-get="{% url 'archive' school.id %}" 
+<form hx-get="{% url 'archive' stream.id %}" 
   hx-target="div.table-container" 
   hx-swap="outerHTML" 
   hx-indicator=".progress" 

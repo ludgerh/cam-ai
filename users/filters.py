@@ -12,7 +12,7 @@ class myFilterView(FilterView):
     if (not self.filterset.is_bound 
         or self.filterset.is_valid() 
         or not self.get_strict()):
-      self.object_list = self.filterset.qs.filter(school=kwargs['schoolnr'])
+      self.object_list = self.filterset.qs.filter(stream_id=kwargs['streamnr'])
     else:
       self.object_list = self.filterset.queryset.none()
     context = self.get_context_data(filter=self.filterset, object_list=self.object_list)

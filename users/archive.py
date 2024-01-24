@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -93,7 +93,7 @@ class archive():
       archiveline = dbarchive.objects.get(typecode=mytype, number = mynumber)
     except dbarchive.DoesNotExist:
       return(False)
-    return(len(archiveline.users.filter(id=user)) > 0)
+    return(len(archiveline.users.filter(id=user.id)) > 0)
     
   def del_archive(self, line_nr, user):
     archiveline = dbarchive.objects.get(id = line_nr)

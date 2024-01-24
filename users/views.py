@@ -21,7 +21,7 @@ except  ImportError: # can be removed when everybody is up to date
   emulatestatic = False
 from access.c_access import access
 from tools.l_tools import djconf
-from tf_workers.models import school
+from streams.models import stream
 from tools.tokens import checktoken
 from .filters import archivefilter, myFilterView
 from .models import archive as dbarchive
@@ -35,12 +35,12 @@ class archive(SingleTableMixin, myFilterView):
   
   def get(self, request, *args, **kwargs):
     self.request = request
-    self.schoolnr = kwargs['schoolnr']
-    if (((self.schoolnr > 1) or (request.user.is_superuser)) 
-        and (access.check('S', self.schoolnr, request.user, 'R'))):
+    self.streamnr = kwargs['streamnr']
+    if access.check('S', self.streamnr, request.user, 'W'):
       return(super().get(request, *args, **kwargs))
     else:
       return(HttpResponse('No Access'))
+
 
 
   def get_context_data(self, **kwargs):
@@ -49,7 +49,7 @@ class archive(SingleTableMixin, myFilterView):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'school' : school.objects.get(id=self.schoolnr),
+      'stream' : stream.objects.get(id=self.streamnr),
       'user' : self.request.user,
     })
     return context
