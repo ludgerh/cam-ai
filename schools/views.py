@@ -59,17 +59,17 @@ def images(request, schoolnr):
     return(HttpResponse('No Access'))
 
 @login_required
-def classroom(request, schoolnr):
-  if ((((schoolnr > 1) or (request.user.is_staff)) or (request.user.is_superuser)) 
-      and (access.check('S', schoolnr, request.user, 'R'))):
+def classroom(request, streamnr):
+  if access.check('C', streamnr, request.user, 'R'):
     template = loader.get_template('schools/classroom.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
-      'school' : school.objects.get(id=schoolnr),
-      'events' : event.objects.filter(school_id=schoolnr, done=False, xmax__gt=0).order_by('-id'),
+      'school' : stream.objects.get(id=streamnr).eve_school,
+      'stream' : stream.objects.get(id=streamnr),
+      'events' : event.objects.filter(camera_id=streamnr, done=False, xmax__gt=0).order_by('-id'),
       'debug' : settings.DEBUG,
-      'may_write' : access.check('S', schoolnr, request.user, 'W'),
+      'may_write' : access.check('C', streamnr, request.user, 'W'),
       'user' : request.user,
     }
     return(HttpResponse(template.render(context)))

@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -17,7 +18,7 @@ from .views import images, classroom, getbmp, getbigbmp, getbigmp4
 
 urlpatterns = [
 	path('images/<int:schoolnr>/', images, name='images'),
-	path('classroom/<int:schoolnr>/', classroom, name='classroom'),
+	path('classroom/<int:streamnr>/', classroom, name='classroom'),
 	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>/<int:x>/<int:y>/', getbmp, name='getbmp'),
 	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>/<int:x>/<int:y>/<int:tokennr>/<str:token>/', getbmp, name='getbmptoken'),
 	path('getbigbmp/<int:mode>/<int:framenr>/', getbigbmp, name='getbigbmp'),

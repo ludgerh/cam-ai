@@ -44,7 +44,7 @@ class archive():
           archiveline = dbarchive(
             typecode=0, 
             number=frameline.id, 
-            school=frameline.event.school, 
+            stream=frameline.event.camera, 
             name=targetname, 
             made=frameline.time,
           )
@@ -78,7 +78,7 @@ class archive():
           archiveline = dbarchive(
             typecode=1, 
             number=eventline.id, 
-            school=eventline.school, 
+            stream=eventline.camera, 
             name=targetname, 
             made=eventline.start,
           )
@@ -97,7 +97,7 @@ class archive():
     
   def del_archive(self, line_nr, user):
     archiveline = dbarchive.objects.get(id = line_nr)
-    if access.check('S', archiveline.school.id, user, 'W'):
+    if access.check('C', archiveline.stream.id, user, 'W'):
       archiveline.users.remove(user)
       if len(archiveline.users.all()) == 0:
         if archiveline.typecode == 0:
