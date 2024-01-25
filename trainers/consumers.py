@@ -113,27 +113,32 @@ class remotetrainer(AsyncWebsocketConsumer):
           f.write(bytes_data)
         cod_x = 0
         cod_y = 0  
-      frameline = trainframe(
-        made = timezone.make_aware(datetime.fromtimestamp(time())),
-        school = self.myschooldict['id'],
-        name = self.frameinfo['name'],
-        code = self.frameinfo['code'],
-        c0 = self.frameinfo['tags'][0], c1 = self.frameinfo['tags'][1],
-        c2 = self.frameinfo['tags'][2], c3 = self.frameinfo['tags'][3],
-        c4 = self.frameinfo['tags'][4], c5 = self.frameinfo['tags'][5],
-        c6 = self.frameinfo['tags'][6], c7 = self.frameinfo['tags'][7],
-        c8 = self.frameinfo['tags'][8], c9 = self.frameinfo['tags'][9],
-        checked = 1,
-        train_status = 1,
-      )
-      await frameline.asave()
+      framelines = trainframe.objects.filter(name=self.frameinfo['name'])
+      if framelines:
+        frameline = framelines(-1)
+        fields = ['img_sizes']
+      else:
+        frameline = trainframe(
+          made = timezone.make_aware(datetime.fromtimestamp(time())),
+          school = self.myschooldict['id'],
+          name = self.frameinfo['name'],
+          code = self.frameinfo['code'],
+          c0 = self.frameinfo['tags'][0], c1 = self.frameinfo['tags'][1],
+          c2 = self.frameinfo['tags'][2], c3 = self.frameinfo['tags'][3],
+          c4 = self.frameinfo['tags'][4], c5 = self.frameinfo['tags'][5],
+          c6 = self.frameinfo['tags'][6], c7 = self.frameinfo['tags'][7],
+          c8 = self.frameinfo['tags'][8], c9 = self.frameinfo['tags'][9],
+          checked = 1,
+          train_status = 1,
+        )
+        fields = None
       try:
         sizeline = await img_size.objects.aget(x=cod_x, y=cod_y)
       except img_size.DoesNotExist:
         sizeline = img_size(x=cod_x, y=cod_y)
         await sizeline.asave()
       await frameline.img_sizes.aadd(sizeline)
-      await savedbline(frameline)
+      await frameline.asave(update_fields=fields)
       await self.send('OK')
       return()
     if text_data == 'Ping':
