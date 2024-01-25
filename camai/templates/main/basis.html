@@ -26,8 +26,10 @@
     {% if emulatestatic %}
     {% load static %}
       <link rel="stylesheet" href="{% static 'camai/git/css/camai.css' %}">
+      <link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
     {% else %}
       <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
+      <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
     {% endif %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -43,6 +45,9 @@
     {% if user.id %}
     <div class="container-fluid float-left">
       <div class="row menurow">
+        <div class="col-sm-auto">
+          <a href="/" class="btn btn-primary m-2 back" style="width: 120px;">Back to Main</a>
+        </div>
         <div class="col-sm-auto">
           <div class="dropdown">
             <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
@@ -143,7 +148,7 @@
               <li><a class="dropdown-item" href="/tools/upgrade/">Upgrade Server</a></li>
               <li><a class="dropdown-item" href="/tools/shutdown/">Shutdown Server</a></li>
 {% endif %}
-              <li><a class="dropdown-item" href="{% url 'logout' %}">Log Out</a></li>
+              <li></li>
             </ul>
           </div>
         </div>
@@ -161,6 +166,9 @@
               <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
             </div>
           </div>
+        </div>
+        <div class="col-sm-auto">
+          <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out</a>
         </div>
 {% endif %}
       </div>
