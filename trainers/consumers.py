@@ -113,11 +113,12 @@ class remotetrainer(AsyncWebsocketConsumer):
           f.write(bytes_data)
         cod_x = 0
         cod_y = 0  
-      framelines = trainframe.objects.filter(name=self.frameinfo['name'])
-      if framelines:
-        frameline = framelines(-1)
-        fields = ['img_sizes']
-      else:
+      try:  
+        frameline = await trainframe.objects.aget(
+          name=self.frameinfo['name'], 
+          school=self.myschooldict['id'],
+        )
+      except trainframe.DoesNotExist:  
         frameline = trainframe(
           made = timezone.make_aware(datetime.fromtimestamp(time())),
           school = self.myschooldict['id'],
@@ -131,14 +132,14 @@ class remotetrainer(AsyncWebsocketConsumer):
           checked = 1,
           train_status = 1,
         )
-        fields = None
+        await frameline.asave()
       try:
         sizeline = await img_size.objects.aget(x=cod_x, y=cod_y)
       except img_size.DoesNotExist:
         sizeline = img_size(x=cod_x, y=cod_y)
         await sizeline.asave()
       await frameline.img_sizes.aadd(sizeline)
-      await frameline.asave(update_fields=fields)
+      await frameline.asave()
       await self.send('OK')
       return()
     if text_data == 'Ping':
