@@ -41,7 +41,17 @@
     <h2 class="m-2">Emulating Static Server</h2>
     {% endif %}
     <div class="container-fluid float-left">
-      <div class="row">
+      <div class="row menurow">
+        <div class="col-sm-auto">
+          <a href="/">
+            {% if emulatestatic %}
+            {% load static %}
+            <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
+            {% else %}
+            <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:auto;height:auto;">
+            {% endif %}
+          </a>
+        </div>
         <div class="col-sm-auto">
           <a href="/eventers/events/{{ stream.id }}" class="btn btn-primary m-2" style="width: 120px;">New Events</a>
         </div>
@@ -51,12 +61,14 @@
         <div class="col-sm-auto">
           <a href="/schools/classroom/{{ stream.id }}" class="btn btn-primary m-2" style="width: 120px;">Classroom</a>
         </div>
-        <div class="col-sm-auto">
-          <a href="/" class="btn btn-primary m-2" style="width: 120px;">Back to Main</a>
+        <div class="col-sm-auto row stats">
+          <div class="col-sm-auto">
+            V{{ version }}
+            (User: {{ user }}){# Kommt als dropdown mit logout #}
+          </div>
         </div>
         <div class="col-sm-auto">
-          <div class="m-2">Software Version {{ version }}
-          (User: {{ user }})</div>
+          <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out</a>
         </div>
       </div>
     </div>

@@ -27,6 +27,13 @@
   border-color: #597081; /*set the color you want here*/
 }
 
+.submit:hover, .submit:focus, .submit:active, .submit.active, .open>.dropdown-toggle.submit {
+  color: #475B63 ;
+  background-color: #51b04e;
+  border-color: #51b04e; /*set the color you want here*/
+}
+
+
 .stats {
   margin-top: auto;
   margin-bottom: auto;
@@ -48,6 +55,9 @@
   user-select: none;
 }
 
+input[type="checkbox"]:checked:before {
+    accent-color: #475B63;    
+}
 
 button {
 	margin:20px;

@@ -43,6 +43,16 @@
     <div class="container-fluid float-left">
       <div class="row menurow">
         <div class="col-sm-auto">
+          <a href="/">
+            {% if emulatestatic %}
+            {% load static %}
+            <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
+            {% else %}
+            <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:auto;height:auto;">
+            {% endif %}
+          </a>
+        </div>
+        <div class="col-sm-auto">
           <a href="/schools/images/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Tagging</a>
         </div>
         <div class="col-sm-auto">
@@ -51,18 +61,27 @@
         <div class="col-sm-auto">
           <a href="/trainers/trainer/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Reports</a>
         </div>
-        <div class="col-sm-auto">
-          <a href="/" class="btn btn-primary m-2 back" style="width: 120px;">Back to Main</a>
-        </div>
-        <div class="stats">
+        <div class="col-sm-auto row stats">
           <div class="col-sm-auto">
-            <div class="m-2">Software Version {{ version }}
-            (User: {{ user }})</div>
+            V{{ version }}
+            (User: {{ user }}){# Kommt als dropdown mit logout #}
           </div>
+{% if user.is_superuser %}
+          <div class="col-sm-auto row">
+            <div class="col-sm-auto">
+              <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> Free (<span id="freepercent">?</span>%)
+            </div>
+            <div class="progress px-0 my-1 mx-2 align-middle" style="width: 200px">
+              <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-auto">
+          <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out</a>
         </div>
       </div>
     </div>
-
+{% endif %}
     {% block content %}No Content yet...{% endblock %}
 
   </body>

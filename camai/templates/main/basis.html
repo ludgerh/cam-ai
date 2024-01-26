@@ -46,7 +46,14 @@
     <div class="container-fluid float-left">
       <div class="row menurow">
         <div class="col-sm-auto">
-          <a href="/" class="btn btn-primary m-2 back" style="width: 120px;">Back to Main</a>
+          <a href="/">
+            {% if emulatestatic %}
+            {% load static %}
+            <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
+            {% else %}
+            <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:auto;height:auto;">
+            {% endif %}
+          </a>
         </div>
         <div class="col-sm-auto">
           <div class="dropdown">
