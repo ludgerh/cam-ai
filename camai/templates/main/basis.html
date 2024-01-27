@@ -31,6 +31,7 @@
       <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
       <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
     {% endif %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>CAM-AI client</title>
@@ -175,7 +176,7 @@
           </div>
         </div>
         <div class="col-sm-auto">
-          <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out</a>
+          <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out &#8205; <i class="bi bi-box-arrow-left"></i></a>
         </div>
 {% endif %}
       </div>

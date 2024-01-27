@@ -1,3 +1,9 @@
+.btn-primary.disabled, .btn-primary:disabled {
+    color: #000;
+    background-color: #B4C2C8;
+    border-width: 0;
+}
+
 .accordion {
   margin: 20px;
   width: 1300px;
@@ -8,6 +14,7 @@
   
 .accordion-item {
   background-color: #F0F4F7;
+  border: 0;
 }
 
 .box {
@@ -37,10 +44,6 @@
   color: #2E2C2F;
 }  
 
-.img-rounded{
-  border: 2px solid #7F7F7F;
-	border-radius:2%;
-}
 
 .blue {
 	background: #90B0D0;

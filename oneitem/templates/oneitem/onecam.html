@@ -54,15 +54,15 @@
   </div>
 </div>
 
-<div class="container-fluid float-left">
+<div class="container-fluid float-left box">
 	<div class="row">
 		<div class="col-auto">
       <div>
-        <h1>C{{ dbline.id }}: {{ dbline.name }}</h1>
+        <h1>Camera: {{ dbline.name }}</h1>
         <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
           fps = <span id="fpstag">?</span>, 
           views = <span id="vnrtag">?</span></h5>
-        <img class="noselect" id="imagespace" />
+        <img class="noselect img-rounded" id="imagespace" />
       </div>
 		</div>
 	</div>
@@ -122,43 +122,75 @@
 
 {% if may_write %}
   <div class="container-fluid float-left" id="conditions">
-	  <div class="row my-1 bluegrey">
-		  <div class="col-auto my-2">General settings</div>
-	  </div>
-	  <div class="row my-1 d-none">
-		  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
-				  method="post" id="oneform">
-			  <div class="container-fluid float-left">
-				  <div class="row my-2">
-					  {% csrf_token %}
-					  {% spaceless %}
-					  {% for field in form %}
-					  <div class="col-auto my-2">
-						  {{ field.errors }}
-						  {{ field.label_tag }} {{ field }}
-						  {% if field.help_text %}
-						  <p class="help">{{ field.help_text|safe }}</p>
-						  {% endif %}
-					  </div>
-					  {% endfor %}
-					  {% endspaceless %}
-				  </div>
-			  </div>
-			  <div class="container-fluid float-left">
-				  <div class="row my-1">
-					  <div class="col-auto my-2">
-						  <input type="submit" class="btn btn-primary m-2" value="Submit">
-					    <button class="btn btn-primary m-2" data-bs-toggle="modal" 
-					      data-bs-target="#deleteModal" id="delete_button" 
-					      type="button">Delete this stream</button>
-					  </div>
-				  </div>
-			  </div>
-		  </form>
-	  </div>
-	  <div class="row my-1 bluegrey" rea="0">
-		  <div class="col-auto my-2" rea="0">Mask settings</div>
-	  </div>
+    <div class="accordion" id="accordionExample">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingOne">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+          General settings
+        </button>
+      </h2>
+      <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
+        <div class="accordion-body">
+          <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" method="post" id="oneform">
+			      <div class="container-fluid float-left">
+				      <div class="row my-2">
+					      {% csrf_token %}
+					      {% spaceless %}
+					      {% for field in form %}
+					      <div class="col-auto my-2">
+						      {{ field.errors }}
+						      {{ field.label_tag }} {{ field }}
+						      {% if field.help_text %}
+						      <p class="help">{{ field.help_text|safe }}</p>
+						      {% endif %}
+					      </div>
+					      {% endfor %}
+					      {% endspaceless %}
+				      </div>
+			      </div>
+			      <div class="container-fluid float-left">
+				      <div class="row my-1">
+					      <div class="col-auto my-2">
+						      <input type="submit" class="btn btn-primary m-2" value="Submit">
+					        <button class="btn btn-primary m-2" data-bs-toggle="modal" 
+					          data-bs-target="#deleteModal" id="delete_button" 
+					          type="button">Delete this stream</button>
+					      </div>
+				      </div>
+			      </div>
+		      </form>
+        </div>
+      </div>
+    </div>
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingTwo">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
+          Mask settings
+        </button>
+      </h2>
+      <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
+        <div class="accordion-body">
+          <label for="ch_show">Show</label>
+		      <input class="me-3" type="checkbox" id="ch_show" name="ch_show">
+		      <label for="ch_apply">Apply</label>
+		      <input class="me-3" type="checkbox" id="ch_apply" name="ch_apply">
+		      <label for="ch_edit">Edit</label>
+		      <input class="me-3" type="checkbox" id="ch_edit" name="ch_edit">
+		      <label for="ch_white">White Marks</label>
+		      <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
+		      <button class="me-3" type="button" id="bt_new">New Masked Area</button>
+		      <select class="me-3" id="mask_select">
+            <option value="C" selected>Edit Camera Mask</option>
+            <option value="X">Edit Detector Mask</option>
+          </select>
+        </div>
+      </div>
+    </div>  
+  </div>
+
+
+
+		  
 	  <div class="row my-1 d-none" id="cam_c_boxes">
 		  <div class="col-auto my-2">
 			  <label for="ch_show">Show</label>

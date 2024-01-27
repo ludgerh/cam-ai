@@ -32,7 +32,13 @@
   background-color: #51b04e;
   border-color: #51b04e; /*set the color you want here*/
 }
-
+.rect {
+  background-color: #F0F4F7;
+  margin: 1%;
+  margin-right: 0;
+  padding: 1%;
+  border-radius: 10px;
+}
 
 .stats {
   margin-top: auto;

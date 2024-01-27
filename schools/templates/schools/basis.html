@@ -29,6 +29,7 @@
     {% else %}
       <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
     {% endif %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>CAM-AI client</title>
@@ -53,7 +54,7 @@
           </a>
         </div>
         <div class="col-sm-auto">
-          <a href="/schools/images/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Tagging</a>
+          <a href="/schools/images/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Review</a>
         </div>
         <div class="col-sm-auto">
           <a href="/trainers/dashboard/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">AI Modeling</a>
@@ -61,23 +62,20 @@
         <div class="col-sm-auto">
           <a href="/trainers/trainer/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Reports</a>
         </div>
+        <div class="col-sm-auto">
+          <a class="btn btn-primary m-2 back back" href="/">Back to main</a>
+        </div>
         <div class="col-sm-auto row stats">
           <div class="col-sm-auto">
             V{{ version }}
             (User: {{ user }}){# Kommt als dropdown mit logout #}
           </div>
 {% if user.is_superuser %}
-          <div class="col-sm-auto row">
-            <div class="col-sm-auto">
-              <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> Free (<span id="freepercent">?</span>%)
-            </div>
-            <div class="progress px-0 my-1 mx-2 align-middle" style="width: 200px">
-              <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
-            </div>
-          </div>
         </div>
         <div class="col-sm-auto">
-          <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out</a>
+          <div style="position: absolute; right: 0; margin-right: 1%;">
+            <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out &#8205; <i class="bi bi-box-arrow-left"></i></a>
+          </div>
         </div>
       </div>
     </div>
