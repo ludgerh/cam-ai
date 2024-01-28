@@ -87,48 +87,53 @@ class trainer():
           active=True,
           tf_worker=self.dbline.id,
         )
-        for item in schoollines:
-          with self.mylock:
-            if item.id not in self.job_queue_list:
-              run_condition = False
-              if item.extra_runs:
-                item.extra_runs -= 1
-                item.save(update_fields=["extra_runs"])
-                run_condition=trainframe.objects.filter(school=item.id).count()
-              else:
-                filterdict = {
-                  'school' : item.id,
-                  'train_status__lt' : 2,}
-                if not item.ignore_checked:
-                  filterdict['checked'] = True
-                undone = trainframe.objects.filter(**filterdict)
-                count = undone.count()
-                if count:
-                  undone.update(train_status=1)
-                  alllines = 1
-                else:
-                  alllines = trainframe.objects.filter(school=item.id).count()
-                run_condition = (count >= item.trigger) and alllines
-              if run_condition:
-                fitstodelete = fit.objects.filter(
-                  status='Queuing', 
-                  school=item.id)
-                for fititem in fitstodelete:
-                  epoch.objects.filter(fit=fititem).delete()
-                fitstodelete.delete()
-                fitstodelete = fit.objects.filter(
-                  status='Working', 
-                  school=item.id)
-                for fititem in fitstodelete:
-                  epoch.objects.filter(fit=fititem).delete()
-                fitstodelete.delete()
-                myfit = fit(made=timezone.now(), 
-	                school = item.id, 
-                  status = 'Queuing',
-                )
-                myfit.save()
-                self.job_queue_list.append(item.id)
-                self.job_queue.put((item, myfit)) 
+        while True:
+          try:
+            for item in schoollines:
+              with self.mylock:
+                if item.id not in self.job_queue_list:
+                  run_condition = False
+                  if item.extra_runs:
+                    item.extra_runs -= 1
+                    item.save(update_fields=["extra_runs"])
+                    run_condition=trainframe.objects.filter(school=item.id).count()
+                  else:
+                    filterdict = {
+                      'school' : item.id,
+                      'train_status__lt' : 2,}
+                    if not item.ignore_checked:
+                      filterdict['checked'] = True
+                    undone = trainframe.objects.filter(**filterdict)
+                    count = undone.count()
+                    if count:
+                      undone.update(train_status=1)
+                      alllines = 1
+                    else:
+                      alllines = trainframe.objects.filter(school=item.id).count()
+                    run_condition = (count >= item.trigger) and alllines
+                  if run_condition:
+                    fitstodelete = fit.objects.filter(
+                      status='Queuing', 
+                      school=item.id)
+                    for fititem in fitstodelete:
+                      epoch.objects.filter(fit=fititem).delete()
+                    fitstodelete.delete()
+                    fitstodelete = fit.objects.filter(
+                      status='Working', 
+                      school=item.id)
+                    for fititem in fitstodelete:
+                      epoch.objects.filter(fit=fititem).delete()
+                    fitstodelete.delete()
+                    myfit = fit(made=timezone.now(), 
+	                    school = item.id, 
+                      status = 'Queuing',
+                    )
+                    myfit.save()
+                    self.job_queue_list.append(item.id)
+                    self.job_queue.put((item, myfit)) 
+            break
+          except OperationalError:
+            connection.close()
         sleep(10.0)
     except:
       self.logger.error(format_exc())
