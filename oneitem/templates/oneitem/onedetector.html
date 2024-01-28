@@ -33,7 +33,7 @@
 	      <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
           fps = <span id="fpstag">?</span>, 
           views = <span id="vnrtag">?</span></h5>
-        <img id="imagespace" />
+        <img id="imagespace" class="img-rounded" />
       </div>
 		</div>
 	</div>
@@ -41,49 +41,59 @@
 
 {% if may_write %}
 <div class="container-fluid float-left" id="conditions">
-  <div class="row my-1 bluegrey">
-	  <div class="col-auto my-2">General settings</div>
+  <div class="accordion" id="accordionExample">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingOne">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+          General settings
+        </button>
+      </h2>
+      <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
+        <div class="accordion-body">
+          <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" method="post" id="oneform">
+		        <div class="container-fluid float-left">
+			        <div class="row my-2">
+				        {% csrf_token %}
+				        {% spaceless %}
+				        {% for field in form %}
+				        <div class="col-auto my-2">
+					        {{ field.errors }}
+					        {{ field.label_tag }} {{ field }}
+					        {% if field.help_text %}
+					        <p class="help">{{ field.help_text|safe }}</p>
+					        {% endif %}
+				        </div>
+				        {% endfor %}
+				        {% endspaceless %}
+			        </div>
+		        </div>
+		        <div class="container-fluid float-left">
+			        <div class="row my-1">
+				        <div class="col-auto my-2">
+					        <input type="submit" value="Submit">
+				        </div>
+			        </div>
+		        </div>
+	        </form>
+        </div>
+      </div>
+    </div>
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingTwo">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
+          Mask settings
+        </button>
+      </h2>
+      <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
+        <div class="accordion-body">
+          <label for="ch_show">Show</label>
+		      <input class="me-3 bool" type="checkbox" id="ch_show" name="ch_show">
+		      <label for="ch_apply">Apply</label>
+		      <input class="me-3 bool" type="checkbox" id="ch_apply" name="ch_apply">
+        </div>
+      </div>
+    </div>  
   </div>
-  <div class="row my-1 d-none">
-	  <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
-			  method="post" id="oneform">
-		  <div class="container-fluid float-left">
-			  <div class="row my-2">
-				  {% csrf_token %}
-				  {% spaceless %}
-				  {% for field in form %}
-				  <div class="col-auto my-2">
-					  {{ field.errors }}
-					  {{ field.label_tag }} {{ field }}
-					  {% if field.help_text %}
-					  <p class="help">{{ field.help_text|safe }}</p>
-					  {% endif %}
-				  </div>
-				  {% endfor %}
-				  {% endspaceless %}
-			  </div>
-		  </div>
-		  <div class="container-fluid float-left">
-			  <div class="row my-1">
-				  <div class="col-auto my-2">
-					  <input type="submit" value="Submit">
-				  </div>
-			  </div>
-		  </div>
-	  </form>
-  </div>
-  <div class="row my-1 bluegrey" rea="0">
-	  <div class="col-auto my-2" rea="0">Mask{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
-{# More information and complete source: https://github.com/ludgerh/cam-ai #} settings</div>
-  </div>
-	  <div class="col-auto my-2">
-		  <label for="ch_show">Show</label>
-		  <input class="me-3" type="checkbox" id="ch_show" name="ch_show">
-		  <label for="ch_apply">Apply</label>
-		  <input class="me-3" type="checkbox" id="ch_apply" name="ch_apply">
-	  </div>
-  </div>
-</div>
 {% endif %}
 
 <script>
