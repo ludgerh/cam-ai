@@ -68,6 +68,7 @@ class stream(models.Model):
   det_apply_mask = models.BooleanField(default=False)
   det_scaledown = models.IntegerField("scaledown", default=0)
   # 0: automatic, epending on size, 1: switch off scaling
+  det_gpu_nr_cv = models.IntegerField(default=0)
 
   eve_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
@@ -82,6 +83,7 @@ class stream(models.Model):
   eve_margin = models.IntegerField("frame margin", default=20)
   eve_school = models.ForeignKey(school, on_delete=models.SET_DEFAULT, default=1)
   eve_all_predictions = models.BooleanField(default=True)
+  eve_gpu_nr_cv = models.IntegerField(default=0)
 
   def __str__(self):
     return('Stream model, name: '+self.name)

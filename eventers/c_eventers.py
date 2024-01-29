@@ -80,6 +80,8 @@ class c_eventer(c_device):
     log_ini(self.logger, self.logname)
     setproctitle('CAM-AI-Eventer #'+str(self.dbline.id))
     try:
+      if self.dbline.eve_gpu_nr_cv:
+        cv.cuda.setDevice(self.dbline.eve_gpu_nr_cv)
       self.eventdict = {}
       self.eventdict_lock = Lock()
 

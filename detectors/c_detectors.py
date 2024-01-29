@@ -101,6 +101,8 @@ class c_detector(c_device):
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Detector #'+str(self.dbline.id))
+      if self.dbline.det_gpu_nr_cv:
+        cv.cuda.setDevice(self.dbline.det_gpu_nr_cv)
       self.finished = False
       self.do_run = True
       self.warning_done = False
