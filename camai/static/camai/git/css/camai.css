@@ -9,12 +9,12 @@
   background-color: #597081;
   border-color: #597081; /*set the color you want here*/
 }
+
 .btn-primary:hover, .btn-primary:focus, .btn-primary:active, .btn-primary.active, .open>.dropdown-toggle.btn-primary {
   color: #F0F4F7;
   background-color: #475B63;
-  border-color: #475B63; /*set the color you want here*/
+  border-color: #475B63;
 }
-
 .back {
   background-color: #FFFFFF;
   color: #597081;
@@ -27,11 +27,12 @@
   border-color: #597081; /*set the color you want here*/
 }
 
-.submit:hover, .submit:focus, .submit:active, .submit.active, .open>.dropdown-toggle.submit {
+.btn-success:hover, .btn-success:focus, .btn-success:active, .btn-success.active{
   color: #475B63 ;
   background-color: #51b04e;
   border-color: #51b04e; /*set the color you want here*/
 }
+
 .rect {
   background-color: #F0F4F7;
   margin: 1%;
@@ -56,13 +57,16 @@
 	margin:auto;
 }
 
+.page-link, .page-link:hover {
+	color: #7F7F7F;
+}
 
 .noselect  {
   user-select: none;
 }
 
-input[type="checkbox"]:checked:before {
-    accent-color: #475B63;    
+input[type="checkbox"] {
+  accent-color: #475B63;
 }
 
 button {

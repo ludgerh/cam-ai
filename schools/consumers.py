@@ -157,7 +157,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'getpredictions':
       if access.check('S', params['school'], self.scope['user'], 'R'):
-        imglist = None
+        imglist = []
         for item in params['idxs']:
           try:
             if params['is_school']:
@@ -175,8 +175,6 @@ class schooldbutil(AsyncWebsocketConsumer):
                 xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schooldict, }
               imagepath = self.schoolinfo['schooldict']['dir'] + 'frames/' + framedict['name']
-            if imglist is None:
-              imglist = []
             np_image = np.array(Image.open(imagepath))
             imglist.append(np_image)
           except FileNotFoundError:

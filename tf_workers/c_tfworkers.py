@@ -476,7 +476,6 @@ class tf_worker():
         try:
           logger.info('***** Loading model file #'+str(schoolnr)
             + ', file: '+model_path)
-          #with self.tf.device(self.cuda_select):
           tempmodel = self.load_model(
             model_path, 
             custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
@@ -508,7 +507,6 @@ class tf_worker():
       logger.info('***** Loading model buffer #'+str(schoolnr)+', file: '
         + self.allmodels[schoolnr]['path'])
       if len(self.activemodels) < self.dbline.max_nr_models:
-        #with self.tf.device(self.cuda_select):
         tempmodel = self.load_model(
           self.allmodels[schoolnr]['path'], 
           custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
@@ -519,7 +517,6 @@ class tf_worker():
         self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
         self.activemodels[schoolnr]['time'] = time()
       else: #if # of models > self.dbline.max_nr_models
-        #with self.tf.device(self.cuda_select):
         nr_to_replace = min(self.activemodels, 
           key= lambda x: self.activemodels[x]['time'])	
         self.activemodels[schoolnr] = self.activemodels[nr_to_replace]
@@ -577,6 +574,7 @@ class tf_worker():
             self.cachedict[myindex] = line
           predictions = np.vstack((predictions, line))
       elif self.dbline.use_websocket: #Predictions from Server
+        print(framelist[0]) 
         self.ws_ts = time()
         outdict = {
           'code' : 'imgl',
@@ -604,32 +602,47 @@ class tf_worker():
           except (ConnectionResetError, OSError):
             sleep(djconf.getconfigfloat('long_brake', 1.0))
             self.reset_websocket()
+        print(predictions)       
       else: #local GPU
-        npframelist = []
-        for i in range(len(framelist)):
-          npframelist.append(np.expand_dims(framelist[i], axis=0))
-        npframelist = np.vstack(npframelist)
-        if npframelist.shape[0] < self.dbline.maxblock:
-          patch = np.zeros((self.dbline.maxblock - npframelist.shape[0], 
-            npframelist.shape[1], 
-            npframelist.shape[2], 
-            npframelist.shape[3]), 
-            np.uint8)
-          portion = np.vstack((npframelist, patch))
-          self.check_activemodels(schoolnr, logger)
-          try:
+        print(framelist[0]) 
+        try:
+          npframelist = []
+          for i in range(len(framelist)):
+            npframelist.append(np.expand_dims(framelist[i], axis=0))
+          npframelist = np.vstack(npframelist)
+          print(npframelist)
+          #if npframelist.shape[0] < self.dbline.maxblock:
+          if False:
+            patch = np.zeros((self.dbline.maxblock - npframelist.shape[0], 
+              npframelist.shape[1], 
+              npframelist.shape[2], 
+              npframelist.shape[3]), 
+              np.uint8) 
+            portion = np.vstack((npframelist, patch))
+            print('portion:')
+            print(portion)
+            self.check_activemodels(schoolnr, logger)
             predictions = (
               self.activemodels[schoolnr]['model'].predict_on_batch(portion))
-          except KeyError:
-            logger.info('KeyError while predicting')    
-          predictions = predictions[:npframelist.shape[0]]
-        else:
-          self.check_activemodels(schoolnr, logger)
-          try:
+            print('predictions:')
+            print(predictions)
+            predictions = predictions[:npframelist.shape[0]]
+          else:
+            self.check_activemodels(schoolnr, logger)
+            self.activemodels[schoolnr]['model'].summary
             predictions = (
-              self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
-          except KeyError:
-            logger.info('KeyError while predicting')    
+              self.activemodels[schoolnr]['model'].predict(npframelist))
+        except:
+          predictions = np.zeros((
+            npframelist.shape[0], 
+            npframelist.shape[1], 
+            npframelist.shape[2], 
+            npframelist.shape[3]), np.uint8, )
+          logger.error(format_exc())
+          logger.handlers.clear()
+        print('Final:')  
+        print(predictions)       
+              
       starting = 0
       for i in range(len(framelist)):
         if ((i == len(framelist) - 1) 

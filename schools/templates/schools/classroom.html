@@ -124,7 +124,7 @@ getimages = function() {
 		          cblines = '<div class="checklist h4">';
 		          for (let k=0; k<taglines.length; k++) {
 {% if may_write %}
-				        cblines += '<input type="checkbox" data-k="'+k+'"';
+				        cblines += '<input type="checkbox" class="checkboxx" data-k="'+k+'"';
 				        if (predictions[j][k] >= 0.5) {
 					        cblines += ' checked>';
 				        } else {
@@ -176,7 +176,7 @@ getimages = function() {
             +$(this).attr('id')+'" value="Day Clean" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
 		      buttonline += '<input type="button" class="btn btn-primary my-1" id="nc_button'
             +$(this).attr('id')+'" value="Night Clean" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
-		      buttonline += '<input type="button" class="btn btn-primary my-1 submit" id="s_button'
+		      buttonline += '<input type="button" class="btn btn-primary my-1" id="s_button'
             +$(this).attr('id')+'" idnr="'+$(this).attr('id')+'" value="Submit" style="width: 110px;"></input><br>';
 		      buttonline += '<input type="button" class="btn btn-primary my-1" id="'
             +$(this).attr('id')+'" data-bs-toggle="modal" data-bs-target="#deleteModal" value="Remove from school"></input>';
@@ -194,27 +194,33 @@ getimages = function() {
 		      });
 		      $('#d_button'+$(this).attr('id')).click(function(evt) {
             targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).removeClass('btn-primary');
 			      $(evt.target).addClass('btn-success');
 			      setTimeout(function() {
 			      $(evt.target).removeClass('btn-success');
+			      $(evt.target).addClass('btn-primary');
 			      }, 1000);
 			      targets.children('[data-k=0]').prop("checked", false);
             targets.children().trigger("change");
 		      });
 		      $('#n_button'+$(this).attr('id')).click(function(evt) {
             targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).removeClass('btn-primary');
 			      $(evt.target).addClass('btn-success');
 			      setTimeout(function() {
-				      $(evt.target).removeClass('btn-success');
+			      $(evt.target).removeClass('btn-success');
+			      $(evt.target).addClass('btn-primary');
 			      }, 1000);
 			      targets.children('[data-k=0]').prop("checked", true);
             targets.children().trigger("change");
 		      });
 		      $('#dc_button'+$(this).attr('id')).click(function(evt) {
             targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).removeClass('btn-primary');
 			      $(evt.target).addClass('btn-success');
 			      setTimeout(function() {
-				      $(evt.target).removeClass('btn-success');
+			      $(evt.target).removeClass('btn-success');
+			      $(evt.target).addClass('btn-primary');
 			      }, 1000);
 			      targets.children('input:checkbox').prop('checked', false);
             targets.children().trigger("change");
@@ -222,9 +228,11 @@ getimages = function() {
 		      });
 		      $('#nc_button'+$(this).attr('id')).click(function(evt) {
             targets = $(evt.target).parents().parents().children('.card').children('.checklist');
+			      $(evt.target).removeClass('btn-primary');
 			      $(evt.target).addClass('btn-success');
 			      setTimeout(function() {
-				      $(evt.target).removeClass('btn-success');
+			      $(evt.target).removeClass('btn-success');
+			      $(evt.target).addClass('btn-primary');
 			      }, 1000);
 			      targets.children('input:checkbox').prop('checked', false);
 			      targets.children('[data-k=0]').prop("checked", true);
@@ -252,12 +260,15 @@ getimages = function() {
 			      .then((result) => {
 				      if (result === 'OK') {
 					      if($(evt.target).hasClass('btneventrow-success')) {
-						      $(evt.target).removeClass('btn-success');
+			            $(evt.target).removeClass('btn-success');
+			            $(evt.target).addClass('btn-primary');
 						      setTimeout(function() {
-							      $(evt.target).addClass('btn-success');
+			              $(evt.target).removeClass('btn-primary');
+			              $(evt.target).addClass('btn-success');
 						      }, 1000);
 					      } else {
-						      $(evt.target).addClass('btn-success');
+			            $(evt.target).removeClass('btn-primary');
+			            $(evt.target).addClass('btn-success');
 					      };
 				      }
 			      })

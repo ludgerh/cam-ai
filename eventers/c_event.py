@@ -255,6 +255,7 @@ class c_event(list):
     return(predline+']')
 
   def frames_filter(self, outlength, cond_dict):
+    frames_in = len(self.frames)
     sortindex = [x for x in self.frames if (
       resolve_rules(cond_dict[2],  self.frames[x][1])
         or resolve_rules(cond_dict[3], self.frames[x][1])
@@ -264,6 +265,8 @@ class c_event(list):
       sortindex.sort(key=lambda x: self.frames[x][2], reverse=True)
       sortindex = sorted(sortindex[:outlength])
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
+    #if len(self.frames) == 0:
+    print('**** Before:', frames_in, 'After:', len(self.frames)) 
 
   def save(self, cond_dict):
     try:
