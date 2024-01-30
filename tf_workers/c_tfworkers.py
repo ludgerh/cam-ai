@@ -574,7 +574,6 @@ class tf_worker():
             self.cachedict[myindex] = line
           predictions = np.vstack((predictions, line))
       elif self.dbline.use_websocket: #Predictions from Server
-        print(framelist[0]) 
         self.ws_ts = time()
         outdict = {
           'code' : 'imgl',
@@ -602,36 +601,16 @@ class tf_worker():
           except (ConnectionResetError, OSError):
             sleep(djconf.getconfigfloat('long_brake', 1.0))
             self.reset_websocket()
-        print(predictions)       
       else: #local GPU
-        print(framelist[0]) 
         try:
           npframelist = []
           for i in range(len(framelist)):
             npframelist.append(np.expand_dims(framelist[i], axis=0))
           npframelist = np.vstack(npframelist)
-          print(npframelist)
-          #if npframelist.shape[0] < self.dbline.maxblock:
-          if False:
-            patch = np.zeros((self.dbline.maxblock - npframelist.shape[0], 
-              npframelist.shape[1], 
-              npframelist.shape[2], 
-              npframelist.shape[3]), 
-              np.uint8) 
-            portion = np.vstack((npframelist, patch))
-            print('portion:')
-            print(portion)
-            self.check_activemodels(schoolnr, logger)
-            predictions = (
-              self.activemodels[schoolnr]['model'].predict_on_batch(portion))
-            print('predictions:')
-            print(predictions)
-            predictions = predictions[:npframelist.shape[0]]
-          else:
-            self.check_activemodels(schoolnr, logger)
-            self.activemodels[schoolnr]['model'].summary
-            predictions = (
-              self.activemodels[schoolnr]['model'].predict(npframelist))
+          self.check_activemodels(schoolnr, logger)
+          self.activemodels[schoolnr]['model'].summary
+          predictions = (
+            self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
         except:
           predictions = np.zeros((
             npframelist.shape[0], 
@@ -640,8 +619,6 @@ class tf_worker():
             npframelist.shape[3]), np.uint8, )
           logger.error(format_exc())
           logger.handlers.clear()
-        print('Final:')  
-        print(predictions)       
               
       starting = 0
       for i in range(len(framelist)):
