@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -15,6 +16,11 @@ from django.conf import settings
 from django_registration.backends.activation.views import ActivationView, RegistrationView
 from django.views.generic.base import TemplateView
 from django.contrib.auth.models import User
+try:  
+  from camai.passwords import emulatestatic
+except  ImportError: # can be removed when everybody is up to date
+  emulatestatic = False
+from tools.l_tools import djconf
 from users.models import userinfo
 
 class MyActivationView(ActivationView):
@@ -34,5 +40,16 @@ class MyRegistrationView(RegistrationView):
       "site": settings.CLIENT_URL[:-1],
     }
     
+  def get_context_data(self, *args, **kwargs):
+    context = super().get_context_data(*args, **kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'), 
+      'emulatestatic' : emulatestatic,
+    })
+    return context
+    
 class TermsView(TemplateView):
   template_name = 'django_registration/terms.html'
+    
+class PrivacyView(TemplateView):
+  template_name = 'django_registration/privacy.html'

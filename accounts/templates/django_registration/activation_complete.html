@@ -1,4 +1,5 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
+{# More information and complete source: https://github.com/ludgerh/cam-ai #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -17,6 +18,10 @@
 
 {% block content %}
   <h2>CAM-AI Activation complete</h2>
-  You can now login...
-  <a class="btn btn-primary m-2" href="/accounts/login?next=/" role="button">Log In</a>
+  <div>Thank you for signing up with CAM-AI! Your registration is now complete. 
+  You can now login to your dashboard by clicking this button:</div><br>
+  <a class="btn btn-primary m-2" href="/accounts/login_new?next=/" role="button">Log In</a><br><br>
+  <div>Thank you for choosing CAM-AI. We look forward to make your camera smarter!</div><br>
+  <div>Best regards</div><br>
+  <div>The CAM-AI Team</div><br>
 {% endblock %}

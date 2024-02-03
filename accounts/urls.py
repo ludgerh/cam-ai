@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -12,9 +13,8 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.urls import path
-#from django_registration.backends.activation.views import RegistrationView, ActivationView
 from django.views.generic.base import TemplateView
-from .views import MyActivationView, MyRegistrationView, TermsView
+from .views import MyActivationView, MyRegistrationView, TermsView, PrivacyView
 from .forms import MyRegistrationFormUniqueEmail
 
 app_name = 'accounts'
@@ -27,6 +27,10 @@ urlpatterns = [
   path("terms/", 
     TermsView.as_view(),
     name="django_terms_view",
+  ),
+  path("privacy/", 
+    PrivacyView.as_view(),
+    name="django_privacy_view",
   ),
   path(
     "activate/complete/",

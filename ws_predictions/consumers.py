@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -140,44 +141,60 @@ class predictionsConsumer(WebsocketConsumer):
             except KeyError:
               logger.warning('KeyError while initializing ImgList')
           elif indict['code'] == 'done':
-            myschool = indict['scho']
+            myschool = indict['scho'] 
             self.checkschooldata(myschool)
             if ('imglist' in self.mydatacache['schooldata'][myschool]):
-              tf_workers[self.mydatacache['workernr']].client_check_model(
-                myschool, test_pred = False)
-              tf_workers[self.mydatacache['workernr']].ask_pred(
-                myschool, 
-                self.mydatacache['schooldata'][myschool]['imglist'], 
-                self.mydatacache['tf_w_index'],
-                [],
-                -1,
-              )
-              predictions = np.empty((0, len(taglist)), np.float32)
-              while (predictions.shape[0] 
-                  < len(self.mydatacache['schooldata'][myschool]['imglist'])):
-                predictions = np.vstack((predictions, 
-                  tf_workers[self.mydatacache['workernr']].get_from_outqueue(
-                    self.mydatacache['tf_w_index'])))
-              logger.debug('--> ' + str(predictions))
-              self.send(json.dumps(predictions.tolist()))
+              if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
+                tf_workers[self.mydatacache['workernr']].client_check_model(
+                  myschool, test_pred = False)
+                tf_workers[self.mydatacache['workernr']].ask_pred(
+                  myschool, 
+                  self.mydatacache['schooldata'][myschool]['imglist'], 
+                  self.mydatacache['tf_w_index'],
+                  [],
+                  -1,
+                )
+                predictions = np.empty((0, len(taglist)), np.float32)
+                while (predictions.shape[0] 
+                    < len(self.mydatacache['schooldata'][myschool]['imglist'])):
+                  predictions = np.vstack((predictions, 
+                    tf_workers[self.mydatacache['workernr']].get_from_outqueue(
+                      self.mydatacache['tf_w_index'])))
+                predictions = predictions.tolist()
+              else:
+                logger.warning('Defective image in ws_predictions / consumers') 
+                predictions = None        
             else:
-              self.send('incomplete')
+              logger.warning('Incomplete image data in ws_predictions / consumers') 
+              predictions = None   
+            logger.debug('--> ' + str(predictions))
+            self.send(json.dumps(predictions))
       else: #bytes_data
         myschool = int.from_bytes(bytes_data[:8], 'big')
-        logger.debug('<-- Length = ' + str(len(bytes_data)))
-        frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
-          dtype=np.uint8), cv.IMREAD_UNCHANGED)
-        try:
-          if ((frame.shape[1] 
-                != self.mydatacache['schooldata'][myschool]['xdim'])
-              or (frame.shape[0] 
-                != self.mydatacache['schooldata'][myschool]['ydim'])):
-            frame = cv.resize(frame, (
-              self.mydatacache['schooldata'][myschool]['ydim'], 
-              self.mydatacache['schooldata'][myschool]['xdim']))
-          self.mydatacache['schooldata'][myschool]['imglist'].append(frame)
-        except KeyError:
-          logger.warning('KeyError while adding image data')
+        if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
+          frame_ok = True
+          try:
+            logger.debug('<-- Length = ' + str(len(bytes_data)))
+            frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
+              dtype=np.uint8), cv.IMREAD_UNCHANGED)
+            if len(frame.shape) != 3:
+              frame_ok = False 
+          except:
+            frame_ok = False  
+          if frame_ok:    
+            try:
+              if ((frame.shape[1] 
+                    != self.mydatacache['schooldata'][myschool]['xdim'])
+                  or (frame.shape[0] 
+                    != self.mydatacache['schooldata'][myschool]['ydim'])):
+                frame = cv.resize(frame, (
+                  self.mydatacache['schooldata'][myschool]['ydim'], 
+                  self.mydatacache['schooldata'][myschool]['xdim']))
+              self.mydatacache['schooldata'][myschool]['imglist'].append(frame)
+            except KeyError:
+              logger.warning('KeyError while adding image data')
+          else:
+            self.mydatacache['schooldata'][myschool]['imglist'] = None    
     except:
       logger.error(format_exc())
       logger.handlers.clear()

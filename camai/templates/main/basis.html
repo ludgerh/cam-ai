@@ -38,161 +38,161 @@
   </head>
   <body>
     {% if debug %}
-    <h1>*** Debug-Mode ***</h1>
+      <h1>*** Debug-Mode ***</h1>
     {% endif %}
     {% if emulatestatic %}
-    <h2>Emulating Static Server</h2>
+      <h2>Emulating Static Server</h2>
     {% endif %}
     {% if user.id %}
-    <div class="container-fluid float-left">
-      <div class="row menurow">
-        <div class="col-sm-auto">
-          <a href="/">
-            {% if emulatestatic %}
-            {% load static %}
-            <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
-            {% else %}
-            <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:auto;height:auto;">
-            {% endif %}
-          </a>
-        </div>
-        <div class="col-sm-auto">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Cameras
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              <a class="dropdown-item" href="/index/C/">All Cameras</a>
-              <div class="dropdown-divider"></div>
-              {% spaceless %}
-                {% for item in camlist %}
-                  <li><a class="dropdown-item" href="/oneitem/cam/{{ item.id }}/">{{ item.name }}</a></li>
-                {% endfor %}
-              <div class="dropdown-divider"></div>
-              <a class="dropdown-item" href="/tools/scan_cams/">Scan for cameras in Network</a>
-              {% endspaceless %}
-            </ul>
-          </div>
-        </div>
-                                    
-        <div class="col-sm-auto">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Detectors
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              <a class="dropdown-item" href="/index/D/">All Motion Detectors</a>
-              <div class="dropdown-divider"></div>
-              {% spaceless %}
-                {% for item in detectorlist %}
-                  <li><a class="dropdown-item" href="/oneitem/detector/{{ item.id }}/">{{ item.name }}</a></li>
-                {% endfor %}
-              {% endspaceless %}
-            </ul>
-          </div>
-        </div>
-        <div class="col-sm-auto">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Preferences
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              {% if user.is_superuser %}
-              <a class="dropdown-item" href="/index/E/">All Previews</a>
-              <div class="dropdown-divider"></div>
-              {% endif %}
-              {% spaceless %}
-                {% for item in eventerlist %}
-                  <li><a class="dropdown-item" href="/oneitem/eventer/{{ item.id }}/">{{ item.name }}</a></li>
-                {% endfor %}
-              {% endspaceless %}
-            </ul>
-          </div>
-        </div>
-        <div class="col-sm-auto">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Events
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              {% spaceless %}
-                {% for item in camlist %}
-                  <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
-                {% endfor %}
-              {% endspaceless %}
-            </ul>
-          </div>
-        </div>
-        <div class="col-sm-auto">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Schools
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              {% spaceless %}
-                {% for item in schoollist %}
-                  {% if item.id != 1 or user.is_superuser or user.is_staff %}
-                    <li><a class="dropdown-item" href="/schools/images/{{ item.id }}/">{{ item.name }}</a></li>
-                  {% endif %}
-                {% endfor %}
-                <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="/tools/addschool/">Add School</a>
-              {% endspaceless %}
-            </ul>
-          </div>
-        </div>
-        <div class="col-sm-auto">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-              Tools
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-{% if user.is_superuser %}
-              <li><a class="dropdown-item" href="/tools/health/">Health Check</a></li>
-              <li><a class="dropdown-item" href="/tools/linkworkers/">Link Worker(s)</a></li>
-              <li><a class="dropdown-item" href="/admin/">Database Admin</a></li>
-{#              <li><a class="dropdown-item" href="/tools/backup/">Backup Server</a></li> #}
-{#              <li><a class="dropdown-item" href="/tools/restore/">Restore Server</a></li> #}
-              <li><a class="dropdown-item" href="/tools/upgrade/">Upgrade Server</a></li>
-              <li><a class="dropdown-item" href="/tools/shutdown/">Shutdown Server</a></li>
-{% endif %}
-              <li></li>
-            </ul>
-          </div>
-        </div>
-        <div class="col-sm-auto row stats">
+      <div class="container-fluid float-left">
+        <div class="row menurow">
           <div class="col-sm-auto">
-            V{{ version }}
-            (User: {{ user }}){# Kommt als dropdown mit logout #}
+            <a href="/">
+              {% if emulatestatic %}
+              {% load static %}
+                <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
+              {% else %}
+                <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:auto;height:auto;">
+              {% endif %}
+            </a>
           </div>
-{% if user.is_superuser %}
-          <div class="col-sm-auto row">
+          <div class="col-sm-auto">
+            <div class="dropdown">
+              <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                Cameras
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                <a class="dropdown-item" href="/index/C/">All Cameras</a>
+                <div class="dropdown-divider"></div>
+                {% spaceless %}
+                  {% for item in camlist %}
+                    <li><a class="dropdown-item" href="/oneitem/cam/{{ item.id }}/">{{ item.name }}</a></li>
+                  {% endfor %}
+                  <div class="dropdown-divider"></div>
+                  <a class="dropdown-item" href="/tools/scan_cams/">Scan for cameras in Network</a>
+                {% endspaceless %}
+              </ul>
+            </div>
+          </div>
+                                      
+          <div class="col-sm-auto">
+            <div class="dropdown">
+              <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                Detectors
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                <a class="dropdown-item" href="/index/D/">All Motion Detectors</a>
+                <div class="dropdown-divider"></div>
+                {% spaceless %}
+                  {% for item in detectorlist %}
+                    <li><a class="dropdown-item" href="/oneitem/detector/{{ item.id }}/">{{ item.name }}</a></li>
+                  {% endfor %}
+                {% endspaceless %}
+              </ul>
+            </div>
+          </div>
+          <div class="col-sm-auto">
+            <div class="dropdown">
+              <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                Preferences
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                {% if user.is_superuser %}
+                  <a class="dropdown-item" href="/index/E/">All Previews</a>
+                  <div class="dropdown-divider"></div>
+                {% endif %}
+                {% spaceless %}
+                  {% for item in eventerlist %}
+                    <li><a class="dropdown-item" href="/oneitem/eventer/{{ item.id }}/">{{ item.name }}</a></li>
+                  {% endfor %}
+                {% endspaceless %}
+              </ul>
+            </div>
+          </div>
+          <div class="col-sm-auto">
+            <div class="dropdown">
+              <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                Events
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                {% spaceless %}
+                  {% for item in camlist %}
+                    <li><a class="dropdown-item" href="/eventers/events/{{ item.id }}/">{{ item.name }}</a></li>
+                  {% endfor %}
+                {% endspaceless %}
+              </ul>
+            </div>
+          </div>
+          <div class="col-sm-auto">
+            <div class="dropdown">
+              <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                Schools
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                {% spaceless %}
+                  {% for item in schoollist %}
+                    {% if item.id != 1 or user.is_superuser or user.is_staff %}
+                      <li><a class="dropdown-item" href="/schools/images/{{ item.id }}/">{{ item.name }}</a></li>
+                    {% endif %}
+                  {% endfor %}
+                  <div class="dropdown-divider"></div>
+                  <a class="dropdown-item" href="/tools/addschool/">Add School</a>
+                {% endspaceless %}
+              </ul>
+            </div>
+          </div>
+          <div class="col-sm-auto">
+            <div class="dropdown">
+              <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                Tools
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                {% if user.is_superuser %}
+                  <li><a class="dropdown-item" href="/tools/health/">Health Check</a></li>
+                  <li><a class="dropdown-item" href="/tools/linkworkers/">Link Worker(s)</a></li>
+                  <li><a class="dropdown-item" href="/admin/">Database Admin</a></li>
+    {#              <li><a class="dropdown-item" href="/tools/backup/">Backup Server</a></li> #}
+    {#              <li><a class="dropdown-item" href="/tools/restore/">Restore Server</a></li> #}
+                  <li><a class="dropdown-item" href="/tools/upgrade/">Upgrade Server</a></li>
+                  <li><a class="dropdown-item" href="/tools/shutdown/">Shutdown Server</a></li>
+                {% endif %}
+                <li></li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-sm-auto row stats">
             <div class="col-sm-auto">
-              <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> Free (<span id="freepercent">?</span>%)
+              V{{ version }}
+              (User: {{ user }}){# Kommt als dropdown mit logout #}
             </div>
-            <div class="progress px-0 my-1 mx-2 align-middle" style="width: 200px">
-              <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
-            </div>
+            {% if user.is_superuser %}
+              <div class="col-sm-auto row">
+                <div class="col-sm-auto">
+                  <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> Free (<span id="freepercent">?</span>%)
+                </div>
+                <div class="progress px-0 my-1 mx-2 align-middle" style="width: 200px">
+                  <div class="progress-bar bg-success" role="progressbar" id="progressbar" style="width: 100%"></div>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+          <div class="col-sm-auto">
+            <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out &#8205; <i class="bi bi-box-arrow-left"></i></a>
           </div>
         </div>
-        <div class="col-sm-auto">
-          <a class="btn btn-primary m-2 back back" href="{% url 'logout' %}">Log Out &#8205; <i class="bi bi-box-arrow-left"></i></a>
-        </div>
-{% endif %}
       </div>
-    </div>
     {% else %}
-    <div class="container">
-        <a class="navbar-brand text-primary" href="https://cam-ai.de">
-          <h2>
-          {% if debug %}
-          <img src="{% static 'git/img/4.png' %}" style="width:120px;height:60px;">
-          {% else %}
-          <img src="https://static.cam-ai.de/assets/logos/4.png" style="width:120px;height:60px;">
-          {% endif %}
-          Artificial Intelligence for cameras....<br>
-          ...to learn more click here.</h1></a>
-    </div>
+      <div class="container">
+          <a class="navbar-brand text-primary" href="https://cam-ai.de">
+            <h2>
+            {% if debug %}
+              <img src="{% static 'git/img/4.png' %}" style="width:120px;height:60px;">
+            {% else %}
+             <img src="https://static.cam-ai.de/assets/logos/4.png" style="width:120px;height:60px;">
+            {% endif %}
+            Artificial Intelligence for cameras....<br>
+            ...to learn more click here.</h1></a>
+      </div>
     {% endif %}
 
     <br>

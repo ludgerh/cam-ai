@@ -1,4 +1,11 @@
-Dear new user,
-to activate your new account with CAM-AI, please click on this link:
+Dear New User,
+
+Thank you for signing up with CAM-AI! Your registration is almost complete. To activate your new account with CAM-AI, please click on the following link: 
+
 {{ site }}{% url 'django_registration_activate' activation_key %}
-...
+
+Thank you for choosing CAM-AI. We look forward to making your camera smarter!
+
+Best regards
+
+The CAM-AI Team

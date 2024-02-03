@@ -175,7 +175,7 @@ class schooldbutil(AsyncWebsocketConsumer):
                 xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schooldict, }
               imagepath = self.schoolinfo['schooldict']['dir'] + 'frames/' + framedict['name']
-            np_image = np.array(Image.open(imagepath))
+            np_image = np.array(Image.open(imagepath))   
             imglist.append(np_image)
           except FileNotFoundError:
             logger.error('File not found: ' + imagepath)

@@ -199,14 +199,17 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
+STATICFILES_DIRS = [
+  str(BASE_DIR)+'/camai/static', 
+  str(BASE_DIR)+'/accounts/static', 
+]
+
 if emulatestatic:
   #Development config, needs debug
   STATIC_URL = 'static/'
-  STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
 else:  
   #Production config
   STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
-  STATICFILES_DIRS = [str(BASE_DIR)+'/camai/static', ]
   STATIC_ROOT = str(BASE_DIR)+'/'+data_path+'static'
 
 MEDIA_URL = '/media/'

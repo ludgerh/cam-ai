@@ -365,8 +365,7 @@ class tf_worker():
         self.cuda_select = '/CPU:0'
       else:  
         self.cuda_select = '/GPU:'+str(self.dbline.gpu_nr)
-        for gpu in gpus:
-          tf.config.experimental.set_memory_growth(gpu, True)
+        tf.config.experimental.set_memory_growth(gpus[self.dbline.gpu_nr], True)
       self.logger.info('+++++ tf_worker Selected: '+self.cuda_select)
       from tensorflow.keras.models import load_model
       self.tf = tf
@@ -593,58 +592,65 @@ class tf_worker():
             }
             predictions = self.continue_sending(json.dumps(outdict), opcode=1, 
               logger=logger, get_answer=True)
-            if predictions == 'incomplete':
+            predictions = json.loads(predictions) 
+            if predictions is None:
               predictions = np.zeros((len(framelist), len(taglist)), np.float32)
             else:
-              predictions = np.array(json.loads(predictions), dtype=np.float32)
+              predictions = np.array(predictions, dtype=np.float32)
             break
           except (ConnectionResetError, OSError):
             sleep(djconf.getconfigfloat('long_brake', 1.0))
             self.reset_websocket()
       else: #local GPU
+        frames_ok = True
         try:
           npframelist = []
-          for i in range(len(framelist)):
-            npframelist.append(np.expand_dims(framelist[i], axis=0))
+          for item in framelist:
+            if item is not None and len(item.shape) == 3:
+              npframelist.append(np.expand_dims(item, axis=0))
+            else:
+              frames_ok = False  
+              break
+        except:
+          frame_ok = False
+          logger.error(format_exc())
+          logger.handlers.clear()      
+        if frames_ok:    
           npframelist = np.vstack(npframelist)
           self.check_activemodels(schoolnr, logger)
           self.activemodels[schoolnr]['model'].summary
           predictions = (
             self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
-        except:
-          predictions = np.zeros((
-            npframelist.shape[0], 
-            npframelist.shape[1], 
-            npframelist.shape[2], 
-            npframelist.shape[3]), np.uint8, )
-          logger.error(format_exc())
-          logger.handlers.clear()
+        else:
+          logger.warning('Defective image in c_tfworkers / processbuffer') 
+          predictions = None
               
-      starting = 0
-      for i in range(len(framelist)):
-        if ((i == len(framelist) - 1) 
-            or (framesinfo[0][i] != framesinfo[0][i+1])):
-          if (framesinfo[0][starting] in self.users):
-            self.my_output.put(framesinfo[0][starting], (
-              'pred_to_send', 
-              predictions[starting:i+1], 
-              framesinfo[0][starting:i+1],
-              framesinfo[1][starting:i+1],
-              framesinfo[2][starting:i+1],
-            ))
-          starting = i + 1
-      if self.dbline.savestats > 0: #Later to be written in DB
-        newtime = time()
-        logtext = 'School: ' + str(schoolnr).zfill(3)
-        logtext += ('  Buffer Size: ' 
-          + str(len(mybuffer)).zfill(5))
-        logtext += ('  Block Size: ' 
-          + str(len(framelist)).zfill(5))
-        logtext += ('  Proc Time: ' 
-          + str(round(newtime - ts_one, 3)).ljust(5, '0'))
-        if had_timeout:
-          logtext += ' T'
-        logger.info(logtext)
+      if predictions is not None:
+        starting = 0
+        for i in range(len(framelist)):
+          if ((i == len(framelist) - 1) 
+              or (framesinfo[0][i] != framesinfo[0][i+1])):
+            if (framesinfo[0][starting] in self.users):
+              self.my_output.put(framesinfo[0][starting], (
+                'pred_to_send', 
+                predictions[starting:i+1], 
+                framesinfo[0][starting:i+1],
+                framesinfo[1][starting:i+1],
+                framesinfo[2][starting:i+1],
+              ))
+            starting = i + 1
+        if self.dbline.savestats > 0: #Later to be written in DB
+          newtime = time()
+          logtext = 'School: ' + str(schoolnr).zfill(3)
+          logtext += ('  Buffer Size: ' 
+            + str(len(mybuffer)).zfill(5))
+          logtext += ('  Block Size: ' 
+            + str(len(framelist)).zfill(5))
+          logtext += ('  Proc Time: ' 
+            + str(round(newtime - ts_one, 3)).ljust(5, '0'))
+          if had_timeout:
+            logtext += ' T'
+          logger.info(logtext)
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()

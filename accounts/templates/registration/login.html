@@ -1,4 +1,5 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
+{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
+{# More information and complete source: https://github.com/ludgerh/cam-ai #}
 {# This program is free software; you can redistribute it and/or #}
 {# modify it under the terms of the GNU General Public License #}
 {# as published by the Free Software Foundation; either version 3 #}
@@ -22,7 +23,7 @@
 {% else %}
 <img src="https://static.cam-ai.de/const/camai/git/img/5.png" style="width:auto;height:auto;">
 {% endif %}
-<h2>Login</h2>
+<h2>Login {{ version }}</h2>
 <form method="post">
   {% csrf_token %}
   {{ form.as_p }}

@@ -18,15 +18,22 @@ class MyRegistrationFormUniqueEmail(RegistrationFormUniqueEmail):
           "password1",
           "password2",
       ]
+      
   firstname = forms.CharField(label = 'Your first name', max_length = 100)
   lastname = forms.CharField(label = 'Your last name', max_length = 100)
-           
   tos = forms.BooleanField(
-      widget=forms.CheckboxInput,
-      #label=_('I have read and agree to the <a href="/accounts/terms.html">Terms of Service</a>'), 
-      error_messages={"required": validators.TOS_REQUIRED},
+    widget=forms.CheckboxInput,
+    error_messages={"required": validators.TOS_REQUIRED},
+  )   
+  pp = forms.BooleanField(
+    widget=forms.CheckboxInput,
+    error_messages={"required": validators.TOS_REQUIRED},
   )
-
+  doi = forms.BooleanField(
+    label = 'I agree to recieve emails from the CAM-AI team.',
+    widget=forms.CheckboxInput,
+    error_messages={"required": validators.TOS_REQUIRED},
+  )
   def save(self, commit=True):
     user = super().save(commit=False)
     user.first_name = self.cleaned_data["firstname"]

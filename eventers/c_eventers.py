@@ -17,7 +17,7 @@
 import cv2 as cv
 import json
 import numpy as np
-from os import remove, path, nice
+from os import remove, path, nice, environ
 from math import inf
 from shutil import copyfile
 from traceback import format_exc
@@ -81,7 +81,9 @@ class c_eventer(c_device):
     setproctitle('CAM-AI-Eventer #'+str(self.dbline.id))
     try:
       if self.dbline.eve_gpu_nr_cv:
-        cv.cuda.setDevice(self.dbline.eve_gpu_nr_cv)
+        environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.eve_gpu_nr_cv)
+        self.logger.info('**** Eventer running GPU #' + str(self.dbline.eve_gpu_nr_cv))
       self.eventdict = {}
       self.eventdict_lock = Lock()
 

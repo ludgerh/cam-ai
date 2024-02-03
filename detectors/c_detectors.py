@@ -14,6 +14,7 @@
 
 import numpy as np
 import cv2 as cv
+from os import environ
 from traceback import format_exc
 from logging import getLogger
 from time import time, sleep
@@ -27,6 +28,7 @@ from l_buffer.l_buffer import l_buffer
 from viewers.c_viewers import c_viewer
 from streams.c_devices import c_device
 from streams.models import stream
+
 
 class c_detector(c_device):
   def __init__(self, *args, **kwargs):
@@ -102,8 +104,9 @@ class c_detector(c_device):
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Detector #'+str(self.dbline.id))
       if self.dbline.det_gpu_nr_cv:
-        cv.cuda.setDevice(self.dbline.det_gpu_nr_cv)
-      self.finished = False
+        environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.det_gpu_nr_cv)
+        self.logger.info('**** Detector running GPU #' + str(self.dbline.det_gpu_nr_cv))
       self.do_run = True
       self.warning_done = False
       while self.do_run:

@@ -79,6 +79,10 @@ if not  camurl.objects.filter(type='Reolink RLC-410W'):
   newcam = camurl(type='Reolink RLC-410W', 
     url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
   newcam.save()
+if not  camurl.objects.filter(type='Reolink E1 Zoom'):
+  newcam = camurl(type='Reolink E1 Zoom', 
+    url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
+  newcam.save()
 
 restart_mode = 0
 do_run = True
