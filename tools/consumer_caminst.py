@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -114,8 +114,10 @@ class caminst(AsyncWebsocketConsumer):
     elif params['command'] == 'scanoneip':
       if not await self.check_create_stream_priv():
         await self.close()
-      cmds = ['ffprobe', '-v', 'fatal', '-print_format', 'json', 
-        '-show_streams', params['camurl']]
+      cmds = ['ffprobe', '-v', 'fatal']
+      if params['camurl'][:4].upper() == 'RTSP':
+        cmds += ['-rtsp_transport',  'tcp']
+      cmds += ['-print_format', 'json', '-show_streams', params['camurl']]
       p = Popen(cmds, stdout=PIPE)
       output, _ = p.communicate()
       outlist['data'] = json.loads(output)

@@ -28,7 +28,6 @@ from logging import getLogger
 from multitimer import MultiTimer
 from traceback import format_exc
 from glob import glob
-#from threading import Thread
 from subprocess import Popen, PIPE, DEVNULL
 from django.db import connection
 from django.db.utils import OperationalError
@@ -469,15 +468,20 @@ class c_cam(c_device):
       outparams1 = ' -f rawvideo'
       outparams1 += ' -pix_fmt bgr24'
       outparams1 += ' -r ' + str(frame_rate)
-      outparams1 += ' -vsync cfr'
+      outparams1 += ' -fps_mode cfr'
       outparams1 += ' pipe:1'
       inparams = ' -i "' + source_string + '"'
       generalparams = ' -v fatal'
+      if source_string[:4].upper() == 'RTSP':
+        generalparams += ' -rtsp_transport tcp'
       generalparams += ' -fflags nobuffer'
       generalparams += ' -flags low_delay'
       if self.video_codec_name in {'h264', 'hevc'}:
         if filepath:
-          outparams2 = ' -c copy'
+          if self.audio_codec_name == 'pcm_alaw':
+            outparams2 = ' -c:v copy -c:a aac'
+          else:
+            outparams2 = ' -c copy'
           outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
           outparams2 += ' -f segment'
           outparams2 += ' -reset_timestamps 1'

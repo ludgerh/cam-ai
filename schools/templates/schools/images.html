@@ -1,18 +1,21 @@
-{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
-{# More information and complete source: https://github.com/ludgerh/cam-ai #}
-{# This program is free software; you can redistribute it and/or #}
-{# modify it under the terms of the GNU General Public License #}
-{# as published by the Free Software Foundation; either version 3 #}
-{# of the License, or (at your option) any later version. #}
-{# This program is distributed in the hope that it will be useful, #}
-{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
-{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
-{# See the GNU General Public License for more details. #}
-{# You should have received a copy of the GNU General Public License #}
-{# along with this program; if not, write to the Free Software #}
-{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
-
 {% extends 'schools/basis.html' %}
+
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
+
 {% block content %}
 
 {% if emulatestatic %}
@@ -39,20 +42,22 @@
   <input type="checkbox" id="cbchecked" class="m-2">Show checked
 </span>
 {% if may_write %}
-<span style="white-space:nowrap;" id="hide_if_no_write">
-  <button type="button" id="checkallbutton" class="btn btn-primary m-2" action="checkall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Check all!</button>
-</span>
-<span style="white-space:nowrap;">
-   <button type="button" id="delallbutton" class="btn btn-primary m-2" action="delall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Delete all!</button>
-</span>
-{% if user.is_superuser %}
-<span style="white-space:nowrap;">
-   <button type="button" id="copyallbutton" class="btn btn-primary m-2" action="copyall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Copy all!</button>
-</span>
-{% endif %}
-<span style="white-space:nowrap;">
-  <input type="checkbox" id="cbkiller" class="m-2">Killer mode
-</span>
+  <span style="white-space:nowrap;" id="hide_if_no_write">
+     <button type="button" id="checkallbutton" class="btn btn-primary m-2" action="checkall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Check all!</button>
+  </span>
+  <span style="white-space:nowrap;">
+     <button type="button" id="delallbutton" class="btn btn-primary m-2" action="delall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Delete all!</button>
+  </span>
+  {% comment %}
+  {% if user.is_superuser %}
+    <span style="white-space:nowrap;">
+      <button type="button" id="copyallbutton" class="btn btn-primary m-2" action="copyall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Copy all!</button>
+    </span>
+  {% endif %}
+    <span style="white-space:nowrap;">
+     <input type="checkbox" id="cbkiller" class="m-2">Killer mode
+    </span> #}
+  {% endcomment %}
 {% endif %}
 </h2>
 <h4>

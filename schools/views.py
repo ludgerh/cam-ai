@@ -67,7 +67,7 @@ def classroom(request, streamnr):
       'emulatestatic' : emulatestatic,
       'school' : stream.objects.get(id=streamnr).eve_school,
       'stream' : stream.objects.get(id=streamnr),
-      'events' : event.objects.filter(camera_id=streamnr, done=False, xmax__gt=0).order_by('-id'),
+      'events' : event.objects.filter(camera_id=streamnr, done=False, xmax__gt=-1).order_by('-id'),
       'debug' : settings.DEBUG,
       'may_write' : access.check('C', streamnr, request.user, 'W'),
       'user' : request.user,

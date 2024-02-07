@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -82,6 +82,10 @@ if not  camurl.objects.filter(type='Reolink RLC-410W'):
 if not  camurl.objects.filter(type='Reolink E1 Zoom'):
   newcam = camurl(type='Reolink E1 Zoom', 
     url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
+  newcam.save()
+if not  camurl.objects.filter(type='TP-Link Tapo C200'):
+  newcam = camurl(type='TP-Link Tapo C200', 
+    url='rtsp://{user}:{pass}@{address}/stream1')
   newcam.save()
 
 restart_mode = 0
