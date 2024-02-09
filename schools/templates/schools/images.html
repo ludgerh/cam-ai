@@ -1,5 +1,4 @@
 {% extends 'schools/basis.html' %}
-
 {% comment %}
 Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -15,16 +14,16 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
-
 {% block content %}
-
 {% if emulatestatic %}
 {% load static %}
 <script src="{% static 'camai/git/js/wstools.js' %}"></script>
 <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
 {% else %}
 <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
-<script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+<script 
+  src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+</script>
 {% endif %}
 <div class="h1">Images for training: {{ schoolname }}</div>
 <h2>
@@ -43,15 +42,27 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </span>
 {% if may_write %}
   <span style="white-space:nowrap;" id="hide_if_no_write">
-     <button type="button" id="checkallbutton" class="btn btn-primary m-2" action="checkall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Check all!</button>
+     <button 
+        type="button" id="checkallbutton" class="btn btn-primary m-2" 
+        action="checkall" data-bs-toggle="modal" data-bs-target="#shureModal" 
+        style="width: 120px;">Check all!
+      </button>
   </span>
   <span style="white-space:nowrap;">
-     <button type="button" id="delallbutton" class="btn btn-primary m-2" action="delall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Delete all!</button>
+     <button 
+      type="button" id="delallbutton" class="btn btn-primary m-2" action="delall" 
+      data-bs-toggle="modal" data-bs-target="#shureModal" 
+      style="width: 120px;">Delete all!
+    </button>
   </span>
   {% comment %}
   {% if user.is_superuser %}
     <span style="white-space:nowrap;">
-      <button type="button" id="copyallbutton" class="btn btn-primary m-2" action="copyall" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 120px;">Copy all!</button>
+      <button 
+        type="button" id="copyallbutton" class="btn btn-primary m-2" action="copyall" 
+        data-bs-toggle="modal" data-bs-target="#shureModal" 
+        style="width: 120px;">Copy all!
+      </button>
     </span>
   {% endif %}
     <span style="white-space:nowrap;">
@@ -88,19 +99,28 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 {% if may_write %}
 <!-- Modal -->
-<div class="modal fade" id="shureModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+<div class="modal fade" id="shureModal" tabindex="-1" aria-labelledby="deleteModalLabel" 
+    aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="deleteModalLabel">???</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button 
+          type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+        </button>
       </div>
       <div class="modal-body">
         <p>Are you sure?</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">No, close!</button>
-        <button type="button" class="btn btn-primary modalbutton" style="width: 120px;">Yes, go!</button>
+        <button 
+          type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
+          style="width: 120px;">No, close!
+        </button>
+        <button 
+          type="button" class="btn btn-primary modalbutton" 
+          style="width: 120px;">Yes, go!
+        </button>
       </div>
     </div>
   </div>
@@ -182,21 +202,12 @@ $('#pagesizeselect').change(function() {
   draw_all_cards();
 });
 
-function wait_for_done() {
-  if (get_images_active) {
-    setTimeout(wait, 100);
-  } else {
-    do_run = 1;
-    getimages();
-  };
-};
-
 function draw_all_cards() {
   do_run = 0;
   $('#gallery').children().slice(0,-1).remove();
 
   SchoolDButilSocket.sendandwait({
-    'command' : 'settrainpag',
+    'command' : 'settrainpage',
     'model' : {{ schoolnr }},
     'class' : parseInt($('#selectclass').val()),
     'cbnot' : $('#cbnot').prop('checked'),
@@ -216,7 +227,8 @@ function draw_all_cards() {
         if (parseInt(item) == page_nr) {
           $('#pageselect').append('<li class="page-item m-2">'+item);
         } else {
-          $('#pageselect').append('<li page="'+item+'" class="page-item"><a class="page-link">'+item+'</a></li>');
+          $('#pageselect').append('<li page="' + item 
+            + '" class="page-item"><a class="page-link">'+item+'</a></li>');
         };
       } else {
         $('#pageselect').append('<li class="page-item">...</li>');
@@ -241,84 +253,110 @@ function draw_all_cards() {
       max_id = frames[frames.length-1].id;
     };
     frames_count = frames.length;
-    frames_ready = 0;frames_ready
+    frames_ready = 0;
     last_frame_visible = 0;
-    wait_for_done();
+    /*wait_for_done();*/
+    do_run = 1;
+    getimages();
   })
   .catch(err => {console.log(err);});
 };
 
 function getimages() {
-  get_images_active = true;
-  while ((frames_ready < frames_count) 
-      && ((frames_ready - last_frame_visible) <= 32)
-      && $('#endtrigger').isInViewport()
-      && do_run) {
-    let frame_processing = frames_ready; 
-    frames_ready += 1;
+  if (get_images_active) {
+    setTimeout(getimages, 100);
+  } else {  
+    get_images_active = true;
+    let numbers = [];
+    let idxs = [];
+    let counts = [];
+    while ((frames_ready < frames_count) 
+        && ((frames_ready - last_frame_visible) < 32)
+        && $('#endtrigger').isInViewport()
+        && do_run) {
+      let frame_processing = frames_ready; 
+      frames_ready += 1;
+      numbers.push(idxs.length);
+      idxs.push(frames[frame_processing].id);
+      counts.push(frame_processing);
+    };  
     SchoolDButilSocket.sendandwait({
       'command' : 'getpredictions',
-      'idxs' :  [frames[frame_processing].id],
+      'idxs' :  idxs,
       'school' : {{ schoolnr }},
       'is_school' : false,
     })
     .then((predictions) => {
       if (do_run) {
-        newaddition = '<div id="col' + frames[frame_processing].id+'" class="col-sm-auto m-0 p-0">'
-          + '<div class="card m-1 p-0"'
-          + ' style="border: 1; width: 212px; height: auto;" done=0>' + frames[frame_processing].made
-            + '<a href="/schools/getbigbmp/1/'+frames[frame_processing].id+'/" target="_blank">'
-            + '<img idx='+frames[frame_processing].id+' style="width: 210px; height: 210px; object-fit: contain" src="'
-            + '/schools/getbmp/1/'
-            + frames[frame_processing].id +'/3/1/210/210/"></a><br>'
-            newaddition += '<div class="checklist h4">';
-            for (let i=0; i<taglines.length; i++) {
-  {% if may_write %}
-		          newaddition += '<input type="checkbox" class="tc'+frames[frame_processing].id+'" img="'+frames[frame_processing].id+'" cnt="'+i+'"';
-		          if (frames[frame_processing].cs[i] >= 0.5) {
-			          newaddition += ' checked>';
-		          } else {
-			          newaddition += '>';
-		          };
-  {% endif %}
-              if (predictions[0][i] >= 0.5) {
-                if (frames[frame_processing].cs[i] < 0.5) {
-                  newaddition += '<span class="bluegrey">';
-                } else {
-                  newaddition += '<span>';
-                };
+        numbers.forEach((nr) => {
+          newaddition = '<div id="col' + frames[counts[nr]].id;
+          newaddition += '" class="col-sm-auto m-0 p-0">';
+          newaddition += '<div class="card m-1 p-0"';
+          newaddition += 'style="border: 1; width: 212px; height: auto;" done=0>';
+          newaddition += frames[counts[nr]].made;
+          newaddition += '<a href="/schools/getbigbmp/1/' + frames[counts[nr]].id;
+          newaddition += '/" target="_blank">';
+          newaddition += '<img idx=' + frames[counts[nr]].id;
+          newaddition += ' style="width: 210px;';
+          newaddition += ' height: 210px; object-fit: contain"';
+          newaddition += ' src="/schools/getbmp/1/' + frames[counts[nr]].id;
+          newaddition += '/3/1/210/210/"></a><br><div class="checklist h4">';
+          for (let i=0; i<taglines.length; i++) {
+            {% if may_write %}
+              newaddition += '<input type="checkbox" class="tc';
+              newaddition += frames[counts[nr]].id+'"';
+              newaddition += ' img="'+frames[counts[nr]].id+'" cnt="'+i+'"';
+              if (frames[counts[nr]].cs[i] >= 0.5) {
+	              newaddition += ' checked>';
               } else {
-                if (frames[frame_processing].cs[i] >= 0.5) {
-                  newaddition += '<span class="bluegrey">';
-                } else {
-                  newaddition += '<span>';
-                };
+	              newaddition += '>';
               };
-		          newaddition += taglines[i].substr(0,3)+': ';
-		          newaddition += Math.round(predictions[0][i]*10000)
-				          /10000+'</span><br>';
-	          };
-            newaddition += '<h6>'+frame_processing+': Tagged by '+frames[frame_processing].made_by+'</h6>';
-  {% if may_write %}
-            newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="checkone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Check</button>';
-            newaddition += '<button type="button" img="'+frames[frame_processing].id+'" class="btn btn-primary m-1" action="delone" data-bs-toggle="modal" data-bs-target="#shureModal" style="width: 80px;">Delete</button>';
-  {% endif %}
-	          newaddition += '</div>';
-
-          + '</div>'
-        + '</div>';
-        $('#lastcol').before(newaddition);
-  {% if may_write %}
-        $('.tc'+frames[frame_processing].id).change(function(event) {
-          tagcheck_changed(event);
+            {% endif %}
+            if (predictions[nr][i] >= 0.5) {
+              if (frames[counts[nr]].cs[i] < 0.5) {
+                newaddition += '<span class="bluegrey">';
+              } else {
+                newaddition += '<span>';
+              };
+            } else {
+              if (frames[counts[nr]].cs[i] >= 0.5) {
+                newaddition += '<span class="bluegrey">';
+              } else {
+                newaddition += '<span>';
+              };
+            };
+            newaddition += taglines[i].substr(0,3)+': ';
+            newaddition += Math.round(predictions[nr][i]*10000)
+	              /10000+'</span><br>';
+            };
+          newaddition += '<h6>'+counts[nr]+': Tagged by ';
+          newaddition += frames[counts[nr]].made_by+'</h6>';
+          {% if may_write %}
+            newaddition += '<button type="button" img="'+frames[counts[nr]].id
+            newaddition += '" class="btn btn-primary m-1" action="checkone"';
+            newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
+            newaddition += ' style="width: 80px;">Check</button>';
+            newaddition += '<button type="button" img="'+frames[counts[nr]].id;
+            newaddition += '" class="btn btn-primary m-1" action="delone"';
+            newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
+            newaddition += ' style="width: 80px;">Delete</button>';
+          {% endif %}
+          newaddition += '</div>';
+          newaddition += '</div>';
+          newaddition += '</div>';
+          $('#lastcol').before(newaddition);
+          {% if may_write %}
+            $('.tc'+frames[counts[nr]].id).change(function(event) {
+              tagcheck_changed(event);
+            });
+          {% endif %}
+          last_frame_visible = nr;
         });
-  {% endif %}
-        last_frame_visible = frame_processing;
       };
     })
     .catch(err => {console.log(err);});
-  };
-  get_images_active = false;
+    get_images_active = false;
+  };  
 };
 
 {% if may_write %}

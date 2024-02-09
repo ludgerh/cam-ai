@@ -16,6 +16,8 @@ import json
 #from pprint import pprint
 from requests import get as rget
 from django.conf import settings
+from django.contrib.auth import logout
+from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
 from django.http import HttpResponse, FileResponse, HttpResponseRedirect
@@ -315,3 +317,7 @@ def restore(request):
         'uploaded_file_url': uploaded_file_url
     })
   return render(request, 'tools/restore.html')
+  
+def logout_and_redirect(request):
+  logout(request)
+  return redirect('/')

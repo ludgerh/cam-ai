@@ -36,11 +36,7 @@ from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
   updatefilter, savedbline, countfilter)
 from camai.passwords import db_password 
-try:  
-  from camai.passwords import os_type, env_type 
-except  ImportError: # can be removed when everybody is up to date
-  os_type = 'raspi11'
-  env_type = 'venv'  
+from camai.passwords import os_type, env_type 
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tools.c_tools import image_size, reduce_image
@@ -852,16 +848,25 @@ class admintools(WebsocketConsumer):
         zip_file.write('temp/backup/db.sql', 'db.sql')
       remove('temp/backup/db.sql')
       dirpath = Path(basepath + '/' + datapath)
-      total =  len(list(dirpath.rglob("*")))
+      glob_list = []
+      for item in dirpath.rglob("*"):
+        #print(str(item.relative_to(dirpath)), 'static/', str(recordingspath.relative_to(Path(datapath)))+'/')
+        if not (
+          str(item.relative_to(dirpath)).startswith('static')
+          or (str(item.relative_to(dirpath)).startswith(str(recordingspath.relative_to(Path(datapath)))+'/C'))
+        ) : 
+          glob_list.append(item)
+      total =  len(glob_list)
       count = 0
       transmitted = 0
       with ZipFile('temp/backup/backup.zip', "a", ZIP_DEFLATED) as zip_file:
-        for entry in dirpath.rglob("*"):
+        for entry in glob_list:
+          print(str(entry.relative_to(dirpath)))
           count += 1
           zip_file.write(entry, entry.relative_to(dirpath))
           percentage = (count / total * 100)
-          if percentage >= transmitted + 1.0:
-            outlist['data'] = str(round(percentage)) + '% compressed'
+          if percentage >= transmitted + 0.1:
+            outlist['data'] = str(round(percentage, 1)) + '% compressed'
             self.send(json.dumps(outlist))	
             transmitted = percentage
       chdir(basepath)
