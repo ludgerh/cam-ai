@@ -861,7 +861,7 @@ class admintools(WebsocketConsumer):
       transmitted = 0
       with ZipFile('temp/backup/backup.zip', "a", ZIP_DEFLATED) as zip_file:
         for entry in glob_list:
-          print(str(entry.relative_to(dirpath)))
+          #print(str(entry.relative_to(dirpath)))
           count += 1
           zip_file.write(entry, entry.relative_to(dirpath))
           percentage = (count / total * 100)
