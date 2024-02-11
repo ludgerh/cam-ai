@@ -253,7 +253,7 @@ function draw_all_cards() {
       max_id = frames[frames.length-1].id;
     };
     frames_count = frames.length;
-    frames_ready = 0;
+    frames_ready = 1;
     last_frame_visible = 0;
     /*wait_for_done();*/
     do_run = 1;
@@ -270,8 +270,10 @@ function getimages() {
     let numbers = [];
     let idxs = [];
     let counts = [];
+    console.log(frames_ready < frames_count, (frames_ready - last_frame_visible) < 32, $('#endtrigger').isInViewport(), do_run);
+    console.log(frames_ready, last_frame_visible, frames_ready - last_frame_visible);
     while ((frames_ready < frames_count) 
-        && ((frames_ready - last_frame_visible) < 32)
+        && ((frames_ready - last_frame_visible) < 33)
         && $('#endtrigger').isInViewport()
         && do_run) {
       let frame_processing = frames_ready; 
@@ -350,7 +352,7 @@ function getimages() {
               tagcheck_changed(event);
             });
           {% endif %}
-          last_frame_visible = nr;
+          last_frame_visible = counts[nr];
         });
       };
     })
