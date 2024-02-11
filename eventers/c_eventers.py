@@ -363,8 +363,7 @@ class c_eventer(c_device):
           + str(the_start)).decode("utf-8"))
         self.redis.delete('webm_queue:' + str(self.id) + ':item:' + str(the_start))
         self.redis.set('webm_queue:' + str(self.id) + ':start', str(the_start))
-        niceness = nice(0)
-        nice(19 - niceness)
+        nice(19)
         myts = time()
         run([
           'ffmpeg', 

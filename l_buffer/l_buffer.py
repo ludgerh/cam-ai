@@ -80,8 +80,8 @@ class l_buffer:
       if message:
         if message['data'] == b'T':
           self.call()
-        else:  
-          sleep(0.01) 
+          return()
+      sleep(0.01) 
     
   def get(self):
     if self.block or (self.itemtype == 1 and self.first_time):
