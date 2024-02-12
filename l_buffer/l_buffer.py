@@ -80,7 +80,7 @@ class l_buffer:
       if message:
         if message['data'] == b'T':
           self.call()
-          return()
+          continue
       sleep(0.01) 
     
   def get(self):
