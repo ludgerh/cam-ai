@@ -495,7 +495,7 @@ class tools_async(AsyncWebsocketConsumer):
       await self.accept()
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
     
@@ -518,7 +518,7 @@ class tools_async(AsyncWebsocketConsumer):
           await asleep(long_brake) 
       outlist['data'] = 'OK'
       del outlist['callback']
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
 #*****************************************************************************
