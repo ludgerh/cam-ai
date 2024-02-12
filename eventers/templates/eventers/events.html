@@ -31,76 +31,77 @@
 {% endif %}
 
 <!-- Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" 
-    aria-labelledby="deleteModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="deleteModalLabel">Deleting event</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" 
-          aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
-          style="width: 120px;">Close</button>
-        <button type="button" class="btn btn-primary delbutton" 
-          style="width: 120px;">Yes, delete!</button>
+<main>
+  <div class="modal fade" id="deleteModal" tabindex="-1" 
+      aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteModalLabel">Deleting event</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" 
+            aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
+            style="width: 120px;">Close</button>
+          <button type="button" class="btn btn-primary delbutton" 
+            style="width: 120px;">Yes, delete!</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<h2 class="m-2">New events: {{ stream.name }}
-{% if may_write %}
-<button type="button" class="btn btn-primary m-2" id="0" 
-  data-bs-toggle="modal" data-bs-target="#deleteModal" 
-  style="width: 240px;">Purge schooled events</button>
-<button type="button" class="btn btn-primary m-2" id="-1" 
-  data-bs-toggle="modal" data-bs-target="#deleteModal" 
-  style="width: 240px;">Purge all(!!!) events</button></h2>
-{% endif %}
-<div class="container-fluid float-left">
-  <div class="row">
-{% for item in events %}
-    <div id="col{{ item.id }}" class="col-sm-auto colall {% if item.done %} colisdone{% endif %}">
-      <div class="card m-2" style="width: 375px; height: 585px;">
-        <div done=0 id="{{ item.id }}" class="carousel slide card-img-top" 
-            data-bs-ride="carousel" style="width: 375px; height: 375px">
-          <div class="carousel-inner">
+  <h2 class="m-2">New events: {{ stream.name }}
+  {% if may_write %}
+  <button type="button" class="btn btn-primary m-2" id="0" 
+    data-bs-toggle="modal" data-bs-target="#deleteModal" 
+    style="width: 240px;">Purge schooled events</button>
+  <button type="button" class="btn btn-primary m-2" id="-1" 
+    data-bs-toggle="modal" data-bs-target="#deleteModal" 
+    style="width: 240px;">Purge all(!!!) events</button></h2>
+  {% endif %}
+  <div class="container-fluid float-left">
+    <div class="row">
+  {% for item in events %}
+      <div id="col{{ item.id }}" class="col-sm-auto colall {% if item.done %} colisdone{% endif %}">
+        <div class="card m-2" style="width: 375px; height: 585px;">
+          <div done=0 id="{{ item.id }}" class="carousel slide card-img-top" 
+              data-bs-ride="carousel" style="width: 375px; height: 375px">
+            <div class="carousel-inner">
+            </div>
+          </div>
+          <div class="card-body">
+            <h6 class="card-title">{{ item.start|date:'d.m.Y H:i:s' }}
+  {% if item.done %}
+              &#10004;
+  {% endif %}
+            </h6>
+            <h6 class="card-subtitle mb-2 text-muted">
+  {% if item.videoclip %}
+              {{ item.numframes }} Image(s), 1 Video</h6>
+  {% else %}
+              {{ item.numframes }} Image(s)</h6>
+  {% endif %}
+            <p class="card-text">{{ item.p_string }}</p>
+            <a href="/eventers/oneevent/{{ stream.id }}/{{ item.id }}" 
+              class="btn btn-primary position-absolute bottom-0 start-0 m-3" 
+              style="width: 120px;">See details</a>
+  {% if may_write %}
+            <button type="button"  id="{{ item.id }}" 
+              class="btn btn-primary position-absolute bottom-0 end-0 m-3" 
+              data-bs-toggle="modal" data-bs-target="#deleteModal" 
+              style="width: 120px;">Delete</button>
+  {% endif %}
           </div>
         </div>
-        <div class="card-body">
-          <h6 class="card-title">{{ item.start|date:'d.m.Y H:i:s' }}
-{% if item.done %}
-            &#10004;
-{% endif %}
-          </h6>
-          <h6 class="card-subtitle mb-2 text-muted">
-{% if item.videoclip %}
-            {{ item.numframes }} Image(s), 1 Video</h6>
-{% else %}
-            {{ item.numframes }} Image(s)</h6>
-{% endif %}
-          <p class="card-text">{{ item.p_string }}</p>
-          <a href="/eventers/oneevent/{{ stream.id }}/{{ item.id }}" 
-            class="btn btn-primary position-absolute bottom-0 start-0 m-3" 
-            style="width: 120px;">See details</a>
-{% if may_write %}
-          <button type="button"  id="{{ item.id }}" 
-            class="btn btn-primary position-absolute bottom-0 end-0 m-3" 
-            data-bs-toggle="modal" data-bs-target="#deleteModal" 
-            style="width: 120px;">Delete</button>
-{% endif %}
-        </div>
       </div>
+  {% endfor %}
     </div>
-{% endfor %}
   </div>
-</div>
-
+</main>
 <script>
 
 {% if may_write %}

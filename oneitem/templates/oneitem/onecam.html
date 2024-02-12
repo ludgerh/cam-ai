@@ -32,96 +32,96 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
 
 <!-- Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" 
-    aria-labelledby="deleteModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="deleteModalLabel">Deleting this camera stream</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" 
-          aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
-          style="width: 120px;">Close</button>
-        <button type="button" class="btn btn-primary delbutton" 
-          style="width: 120px;">Yes, delete!</button>
+<main>
+  <div class="modal fade" id="deleteModal" tabindex="-1" 
+      aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteModalLabel">Deleting this camera stream</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" 
+            aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
+            style="width: 120px;">Close</button>
+          <button type="button" class="btn btn-primary delbutton" 
+            style="width: 120px;">Yes, delete!</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<div class="container-fluid float-left box">
-	<div class="row">
-		<div class="col-auto">
-      <div>
-        <h1>Camera: {{ dbline.name }}</h1>
-        <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
-          fps = <span id="fpstag">?</span>, 
-          views = <span id="vnrtag">?</span></h5>
-        <img class="noselect img-rounded" id="imagespace" />
+  <div class="container-fluid float-left box">
+	  <div class="row">
+		  <div class="col-auto">
+        <div>
+          <h1>Camera: {{ dbline.name }}</h1>
+          <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+            fps = <span id="fpstag">?</span>, 
+            views = <span id="vnrtag">?</span></h5>
+          <img class="noselect img-rounded" id="imagespace" />
+        </div>
+		  </div>
+	  </div>
+  </div>
+
+  <div class="container-fluid float-left d-none" id="ptz-control">
+    <div class="row d-flex justify-content-center">
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-up-left"><i class="bi bi-arrow-up-left"></i></button>
       </div>
-		</div>
-	</div>
-</div>
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-up"><i class="bi bi-arrow-up"></i></button>
+      </div>
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-up-right"><i class="bi bi-arrow-up-right"></i></button>
+      </div>
+      <div class="col-2 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="faster">Faster</button>
+      </div>
+      <div class="col-2 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="zoomplus">Zoom+</button>
+      </div>
+    </div>
+    <div class="row d-flex justify-content-center">
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-left"><i class="bi bi-arrow-left"></i></button>
+      </div>
+      <div class="col-1"></div>
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-right"><i class="bi bi-arrow-right"></i></button>
+      </div>
+      <div class="col-2 d-flex align-items-center justify-content-center">
+        <input type="number" size="5" min="1" max="500" id="speedinput">
+      </div>
+      <div class="col-2 d-flex align-items-center justify-content-center">
+        <input type="number" size="5" id="zoominput">
+      </div>
+    </div>
+    <div class="row d-flex justify-content-center">
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-down-left"><i class="bi bi-arrow-down-left"></i></button>
+      </div>
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-down"><i class="bi bi-arrow-down"></i></button>
+      </div>
+      <div class="col-1 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="arrow-down-right"><i class="bi bi-arrow-down-right"></i></button>
+      </div>
+      <div class="col-2 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="slower">Slower</button>
+      </div>
+      <div class="col-2 d-flex align-items-center justify-content-center">
+        <button type="button" class="btn btn-primary my-1" id="zoomminus">Zoom-</button>
+      </div>
+    </div>
+  </div>
 
-<div class="container-fluid float-left d-none" id="ptz-control">
-  <div class="row d-flex justify-content-center">
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-up-left"><i class="bi bi-arrow-up-left"></i></button>
-    </div>
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-up"><i class="bi bi-arrow-up"></i></button>
-    </div>
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-up-right"><i class="bi bi-arrow-up-right"></i></button>
-    </div>
-    <div class="col-2 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="faster">Faster</button>
-    </div>
-    <div class="col-2 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="zoomplus">Zoom+</button>
-    </div>
-  </div>
-  <div class="row d-flex justify-content-center">
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-left"><i class="bi bi-arrow-left"></i></button>
-    </div>
-    <div class="col-1"></div>
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-right"><i class="bi bi-arrow-right"></i></button>
-    </div>
-    <div class="col-2 d-flex align-items-center justify-content-center">
-      <input type="number" size="5" min="1" max="500" id="speedinput">
-    </div>
-    <div class="col-2 d-flex align-items-center justify-content-center">
-      <input type="number" size="5" id="zoominput">
-    </div>
-  </div>
-  <div class="row d-flex justify-content-center">
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-down-left"><i class="bi bi-arrow-down-left"></i></button>
-    </div>
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-down"><i class="bi bi-arrow-down"></i></button>
-    </div>
-    <div class="col-1 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="arrow-down-right"><i class="bi bi-arrow-down-right"></i></button>
-    </div>
-    <div class="col-2 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="slower">Slower</button>
-    </div>
-    <div class="col-2 d-flex align-items-center justify-content-center">
-      <button type="button" class="btn btn-primary my-1" id="zoomminus">Zoom-</button>
-    </div>
-  </div>
-</div>
-
-{% if may_write %}
-  <div class="container-fluid float-left" id="conditions">
+  {% if may_write %}
     <div class="accordion" id="accordionExample">
     <div class="accordion-item">
       <h2 class="accordion-header" id="headingOne">
@@ -132,33 +132,33 @@
       <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
         <div class="accordion-body">
           <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" method="post" id="oneform">
-			      <div class="container-fluid float-left">
-				      <div class="row my-2">
-					      {% csrf_token %}
-					      {% spaceless %}
-					      {% for field in form %}
-					      <div class="col-auto my-2">
-						      {{ field.errors }}
-						      {{ field.label_tag }} {{ field }}
-						      {% if field.help_text %}
-						      <p class="help">{{ field.help_text|safe }}</p>
-						      {% endif %}
-					      </div>
-					      {% endfor %}
-					      {% endspaceless %}
-				      </div>
-			      </div>
-			      <div class="container-fluid float-left">
-				      <div class="row my-1">
-					      <div class="col-auto my-2">
-						      <input type="submit" class="btn btn-primary m-2" value="Submit">
-					        <button class="btn btn-primary m-2" data-bs-toggle="modal" 
-					          data-bs-target="#deleteModal" id="delete_button" 
-					          type="button">Delete this stream</button>
-					      </div>
-				      </div>
-			      </div>
-		      </form>
+		        <div class="container-fluid float-left">
+			        <div class="row my-2">
+				        {% csrf_token %}
+				        {% spaceless %}
+				        {% for field in form %}
+				        <div class="col-auto my-2">
+					        {{ field.errors }}
+					        {{ field.label_tag }} {{ field }}
+					        {% if field.help_text %}
+					        <p class="help">{{ field.help_text|safe }}</p>
+					        {% endif %}
+				        </div>
+				        {% endfor %}
+				        {% endspaceless %}
+			        </div>
+		        </div>
+		        <div class="container-fluid float-left">
+			        <div class="row my-1">
+				        <div class="col-auto my-2">
+					        <input type="submit" class="btn btn-primary m-2" value="Submit">
+				          <button class="btn btn-primary m-2" data-bs-toggle="modal" 
+				            data-bs-target="#deleteModal" id="delete_button" 
+				            type="button">Delete this stream</button>
+				        </div>
+			        </div>
+		        </div>
+	        </form>
         </div>
       </div>
     </div>
@@ -171,22 +171,22 @@
       <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
         <div class="accordion-body">
           <label for="ch_show">Show</label>
-		      <input class="me-3" type="checkbox" id="ch_show" name="ch_show">
-		      <label for="ch_apply">Apply</label>
-		      <input class="me-3" type="checkbox" id="ch_apply" name="ch_apply">
-		      <label for="ch_edit">Edit</label>
-		      <input class="me-3" type="checkbox" id="ch_edit" name="ch_edit">
-		      <label for="ch_white">White Marks</label>
-		      <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
-		      <button class="me-3" type="button" id="bt_new">New Masked Area</button>
-		      <select class="me-3" id="mask_select">
+	        <input class="me-3" type="checkbox" id="ch_show" name="ch_show">
+	        <label for="ch_apply">Apply</label>
+	        <input class="me-3" type="checkbox" id="ch_apply" name="ch_apply">
+	        <label for="ch_edit">Edit</label>
+	        <input class="me-3" type="checkbox" id="ch_edit" name="ch_edit">
+	        <label for="ch_white">White Marks</label>
+	        <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
+	        <button class="btn btn-primary m-2" type="button" id="bt_new">New Masked Area</button>
+	        <select class="me-3" id="mask_select">
             <option value="C" selected>Edit Camera Mask</option>
             <option value="X">Edit Detector Mask</option>
           </select>
         </div>
       </div>
     </div>  
-  </div>
+</main>
 
 
 
@@ -201,7 +201,7 @@
 			  <input class="me-3" type="checkbox" id="ch_edit" name="ch_edit">
 			  <label for="ch_white">White Marks</label>
 			  <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
-			  <button class="me-3" type="button" id="bt_new">New Masked Area</button>
+			  <button class="btn btn-primary m-2" type="button" id="bt_new">New Masked Area</button>
 			  <select class="me-3" id="mask_select">
           <option value="C" selected>Edit Camera Mask</option>
           <option value="X">Edit Detector Mask</option>

@@ -5,8 +5,6 @@
 }
 
 .accordion {
-  margin: 20px;
-  width: 1300px;
   padding: 15px;
   border-radius: 10px;
   background-color: #F0F4F7;
@@ -20,11 +18,13 @@
 .box {
   width: 100%;
   background-color: #F0F4F7;
-  margin: 1%;
+  margin-top: 1%;
+  margin-bottom: 1%;
   margin-right: 0;
   padding: 1%;
   border-radius: 10px;
 }  
+
 .accordion-button {
   margin: 0;
   margin-top: 10px;
