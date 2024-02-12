@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -17,7 +18,7 @@ from . import consumers, consumer_caminst
 
 websocket_urlpatterns = [
   re_path(r'ws/health/$', consumers.health.as_asgi()),
-  re_path(r'ws/dbcompress/$', consumers.dbcompress.as_asgi()),
+  re_path(r'ws/tools_async/$', consumers.tools_async.as_asgi()),
   re_path(r'ws/admintools/$', consumers.admintools.as_asgi()),
   re_path(r'ws/caminst/$', consumer_caminst.caminst.as_asgi()),
 ]

@@ -44,17 +44,17 @@
   
 <script>
 
-let admintoolsSocket;
+let tools_asyncSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 $(document).ready(function() {
   WSAsync(
     ws_scheme + '//'
     + window.location.host
-    + '/ws/admintools/'
+    + '/ws/tools_async/'
   )
   .then((result) => {
-    admintoolsSocket = result;
+    tools_asyncSocket = result;
     $('#continue-button').click(function() {
       $('#continue-button').prop('disabled', true);
       $('#line2').removeClass("d-none");
@@ -63,7 +63,7 @@ $(document).ready(function() {
         result = JSON.parse(param)
         $('#line3').text(result.data);
       }
-      admintoolsSocket.sendandwait({
+      tools_asyncSocket.sendandwait({
         'command' : 'backup',
       }, mycallback)
       .then((result) => {

@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -13,9 +13,12 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
+import os
 #from pprint import pprint
 from requests import get as rget
 from django.conf import settings
+from django.contrib.auth import logout
+from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
 from django.http import HttpResponse, FileResponse, HttpResponseRedirect
@@ -279,13 +282,15 @@ class backup(TemplateView):
     else:
       return(HttpResponse('No Access'))
     
-def downbackup(request): 
+def downbackup(request):
   if request.user.is_superuser:
-    filename = '../temp/backup/backup.zip'
-    sourcefile = open(filename, 'rb')
-    return FileResponse(sourcefile)
+    response = HttpResponse()
+    response['Content-Disposition'] = 'attachment; filename=backup.zip'
+    response['X-Accel-Redirect'] = '/protected/backup/backup.zip'  
+    return response
   else:
-    return(HttpResponse('No Access.'))
+    return HttpResponse('No Access.')
+
       
 #class restore(TemplateView):
 #  template_name = 'tools/restore.html'
@@ -315,3 +320,7 @@ def restore(request):
         'uploaded_file_url': uploaded_file_url
     })
   return render(request, 'tools/restore.html')
+  
+def logout_and_redirect(request):
+  logout(request)
+  return redirect('/')

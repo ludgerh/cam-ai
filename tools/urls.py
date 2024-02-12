@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,5 +29,6 @@ urlpatterns = [
 	path('backup/', views.backup.as_view(), name='backup'),
 	path('restore/', views.restore, name='restore'),
 	path('downbackup/backup.zip', views.downbackup, name='downbackup'),
+	path('logout/', views.logout_and_redirect, name='logout_and_redirect'),
 ]
 

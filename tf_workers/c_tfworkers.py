@@ -365,7 +365,8 @@ class tf_worker():
         self.cuda_select = '/CPU:0'
       else:  
         self.cuda_select = '/GPU:'+str(self.dbline.gpu_nr)
-        tf.config.experimental.set_memory_growth(gpus[self.dbline.gpu_nr], True)
+        for gpu in gpus:
+          tf.config.experimental.set_memory_growth(gpu, True)
       self.logger.info('+++++ tf_worker Selected: '+self.cuda_select)
       from tensorflow.keras.models import load_model
       self.tf = tf

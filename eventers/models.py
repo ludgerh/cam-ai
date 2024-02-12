@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -22,10 +23,10 @@ class event(models.Model):
   p_string = models.CharField(max_length=255, default='[]')
   start = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
   end = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
-  xmin = models.IntegerField(default=0)
-  xmax = models.IntegerField(default=0)
-  ymin = models.IntegerField(default=0)
-  ymax = models.IntegerField(default=0)
+  xmin = models.IntegerField(default=-1)
+  xmax = models.IntegerField(default=-1)
+  ymin = models.IntegerField(default=-1)
+  ymax = models.IntegerField(default=-1)
   numframes = models.IntegerField(default=0)
   school = models.ForeignKey(school, on_delete=models.CASCADE, default=1)
   camera = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)

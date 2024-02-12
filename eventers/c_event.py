@@ -1,4 +1,4 @@
-# Copyright (C) 2024 by the CAM-AI authors, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -266,7 +266,6 @@ class c_event(list):
       sortindex = sorted(sortindex[:outlength])
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
     #if len(self.frames) == 0:
-    print('**** Before:', frames_in, 'After:', len(self.frames)) 
 
   def save(self, cond_dict):
     try:

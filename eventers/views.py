@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -43,7 +43,7 @@ def events(request, camnr):
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
-      'events' : event.objects.filter(camera_id=camnr, xmax__gt=0).order_by('-id'),
+      'events' : event.objects.filter(camera_id=camnr, xmax__gt=-1).order_by('-id'),
       'debug' : settings.DEBUG,
       'may_write' : access.check('S', camnr, request.user, 'W'),
       'stream' : stream.objects.get(id=camnr),

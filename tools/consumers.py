@@ -19,10 +19,11 @@ import subprocess
 from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
-from os import makedirs, path as ospath, system as ossystem, getcwd, chdir, remove
+from os import makedirs, path as ospath, system as ossystem, getcwd, chdir, remove, nice
 from shutil import copyfile, move, rmtree, copytree
 from time import time, sleep
 from random import randint
+from setproctitle import setproctitle
 from multiprocessing import Process, Pipe, Lock
 from logging import getLogger
 from ipaddress import ip_network, ip_address
@@ -36,11 +37,7 @@ from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
   updatefilter, savedbline, countfilter)
 from camai.passwords import db_password 
-try:  
-  from camai.passwords import os_type, env_type 
-except  ImportError: # can be removed when everybody is up to date
-  os_type = 'raspi11'
-  env_type = 'venv'  
+from camai.passwords import os_type, env_type 
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tools.c_tools import image_size, reduce_image
@@ -449,120 +446,80 @@ class health(AsyncWebsocketConsumer):
 
 
 #*****************************************************************************
-# dbcompress
+# tools_async
 #*****************************************************************************
+        
+def compress_backup(redis_key):
+  setproctitle('CAM-AI-Backup-Compression')
+  nice(19)
+  basepath = getcwd() 
+  chdir('..')
+  if ospath.exists('temp/backup'):
+    rmtree('temp/backup')
+  makedirs('temp/backup') 
+  redis.set(redis_key, 'Compressing Database...')
+  cmd = 'mariadb-dump --password=' + db_password + ' '
+  cmd += '--user=CAM-AI --host=localhost --all-databases '
+  cmd += '> temp/backup/db.sql'
+  subprocess.call(cmd, shell=True, executable='/bin/bash')
+  with ZipFile('temp/backup/backup.zip', "w", ZIP_DEFLATED) as zip_file:
+    zip_file.write('temp/backup/db.sql', 'db.sql')
+  remove('temp/backup/db.sql')
+  dirpath = Path(basepath + '/' + datapath)
+  glob_list = []
+  for item in dirpath.rglob("*"):
+    if not (
+      str(item.relative_to(dirpath)).startswith('static')
+      or (str(item.relative_to(dirpath)).startswith(str(recordingspath.relative_to(Path(datapath)))+'/C'))
+    ) : 
+      glob_list.append(item)
+  total =  len(glob_list)
+  count = 0
+  transmitted = 0
+  with ZipFile('temp/backup/backup.zip', "a", ZIP_DEFLATED) as zip_file:
+    for entry in glob_list:
+      count += 1
+      zip_file.write(entry, entry.relative_to(dirpath))
+      percentage = (count / total * 100)
+      if percentage >= transmitted + 0.1:
+        redis.set(redis_key, str(round(percentage, 1)) + '% compressed')
+        transmitted = percentage
+  chdir(basepath)
+  
+class tools_async(AsyncWebsocketConsumer):
 
-def checkolddb(myschool, mypipe):
-  myschooldir = school.objects.get(id=myschool).dir
-  dbsetquery = trainframe.objects.filter(school=myschool)
-  allset = {item.name for item in dbsetquery}
-  oldset = {item.name for item in dbsetquery if ((item.name[1] != '/') and (item.name[2] != '/'))}
-  bigset = set()
-  i = dbsetquery.count()
-  for item in dbsetquery:
-    print(i, ':', item.name)
-    filename = myschooldir + 'frames/' + item.name
-    mysize = image_size(filename)
-    if (mysize[0] > school_x_max) and (mysize[1] > school_y_max):
-      bigset.add(item.name)
-    i -= 1
-  result = {
-    'correct' : allset - oldset - bigset,
-    'old' : oldset,
-    'big' : bigset,
-  }
-  mypipe[OUT].send(result)
-  
-def fixbigimg(myschool, set_to_fix):
-  myschooldir = school.objects.get(id=myschool).dir
-  i = len(set_to_fix)
-  for item in set_to_fix:
-    print(i, ':', item)
-    reduce_image(myschooldir + 'frames/' + item, None, school_x_max, school_y_max)
-    i -= 1
-  
-def fixolddb(myschool, set_to_fix):
-  myschooldir = school.objects.get(id=myschool).dir
-  i = len(set_to_fix)
-  for item in set_to_fix:
-    print(i, ':', item)
-    pathadd = str(randint(0,99))+'/'
-    if not ospath.exists(myschooldir + 'frames/' + pathadd):
-      makedirs(myschooldir + 'frames/' + pathadd)
-    if ospath.exists(myschooldir + 'frames/' + item):
-      move(myschooldir + 'frames/' + item, myschooldir + 'frames/' + pathadd)  
-      try:
-        frameline = trainframe.objects.get(name=item, school=myschool)
-      except trainframe.MultipleObjectsReturned:
-        frameline = trainframe.objects.filter(name=item, school=myschool).first()
-      frameline.name = pathadd + frameline.name
-      frameline.save(update_fields=("name", ))
-    i -= 1
-  
-class dbcompress(AsyncWebsocketConsumer):
+  backup_proc_dict = {}
 
   async def connect(self):
-    self.started = True
     if self.scope['user'].is_superuser:
-      self.olddbddict = {}
-      self.bigimgdict = {}
       await self.accept()
-  
-  async def disconnect(self, close_code):  
-    self.started = False
 
   async def receive(self, text_data):
-    global lock_dict
     logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
-
-    if self.scope['user'].is_superuser:
-
-      if params['command'] == 'checkolddb':
-        if not (params['school'] in lock_dict):
-          lock_dict[params['school']] = Lock()
-        with lock_dict[params['school']]:
-          mypipe = Pipe()
-          myproc = Process(target=checkolddb, args=(params['school'], mypipe))
-          myproc.start()
-          while (not mypipe[IN].poll()):
-            await asleep(1)
-          result = mypipe[IN].recv()
-          #while myproc.is_alive():
-          #  await asleep(1)
-          self.olddbddict[params['school']] = result['old']
-          self.bigimgdict[params['school']] = result['big']
-          outlist['data'] = {
-            'correct' : len(result['correct']),
-            'old' : len(result['old']),
-            'big' : len(result['big']),
-          }
-          logger.debug('--> ' + str(outlist))
+    
+    if params['command'] == 'backup':
+      count = 0
+      while count in self.backup_proc_dict:
+        count += 1 
+      redis_key = 'CAM-AI.backup.zip'+str(count)
+      if redis.exists(redis_key):
+        redis.delete(redis_key)
+      self.backup_proc_dict[count] = Process(target=compress_backup, args=[redis_key])
+      self.backup_proc_dict[count].start()
+      while self.backup_proc_dict[count].is_alive():
+        if redis.exists(redis_key):
+          outlist['data'] = redis.get(redis_key).decode("utf-8")
+          outlist['callback'] = True
           await self.send(json.dumps(outlist))	
-
-      elif params['command'] == 'fixbigimg':	
-        with lock_dict[params['school']]:
-          myproc = Process(target=fixbigimg, args=(params['school'], self.bigimgdict[params['school']]))
-          myproc.start()
-          while myproc.is_alive():
-            await asleep(1)
-          outlist['data'] = 'OK'
-          logger.debug('--> ' + str(outlist))
-          await self.send(json.dumps(outlist))	
-
-      elif params['command'] == 'fixolddb':	
-        with lock_dict[params['school']]:
-          myproc = Process(target=fixolddb, args=(params['school'], self.olddbddict[params['school']]))
-          myproc.start()
-          while myproc.is_alive():
-            await asleep(1)
-          outlist['data'] = 'OK'
-          logger.debug('--> ' + str(outlist))
-          await self.send(json.dumps(outlist))	
-
-    else:
-      await self.close()
+          redis.delete(redis_key)
+        else:  
+          await asleep(long_brake) 
+      outlist['data'] = 'OK'
+      del outlist['callback']
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
 
 #*****************************************************************************
 # admintools
@@ -579,7 +536,7 @@ class admintools(WebsocketConsumer):
     else:
       limit = userinfo.objects.get(user=self.scope['user'].id).allowed_schools
       schoolcount = school.objects.filter(creator=self.scope['user'].id).count()
-      return(schoolcount < limit)  
+      return(schoolcount < limit)
 
   def receive(self, text_data):
     logger.debug('<-- ' + text_data)
@@ -791,7 +748,7 @@ class admintools(WebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       self.send(json.dumps(outlist))	
       
-    elif params['command'] == 'upgrade':
+    elif params['command'] == 'upgrade': #this needs to get out of sync consumer
       if not self.scope['user'].is_superuser:
         self.close()
       basepath = getcwd() 
@@ -831,41 +788,4 @@ class admintools(WebsocketConsumer):
         sleep(long_brake) 
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))	
-
-    elif params['command'] == 'backup':
-      if not self.scope['user'].is_superuser:
-        self.close()
-      basepath = getcwd() 
-      chdir('..')
-      if ospath.exists('temp/backup'):
-        rmtree('temp/backup')
-      makedirs('temp/backup') 
-      outlist['data'] = 'Compressing Database...'
-      outlist['callback'] = True
-      self.send(json.dumps(outlist))	
-      cmd = 'mariadb-dump --password=' + db_password + ' '
-      cmd += '--user=CAM-AI --host=localhost --all-databases '
-      cmd += '> temp/backup/db.sql'
-      subprocess.call(cmd, shell=True, executable='/bin/bash')
-      with ZipFile('temp/backup/backup.zip', "w", ZIP_DEFLATED) as zip_file:
-        zip_file.write('temp/backup/db.sql', 'db.sql')
-      remove('temp/backup/db.sql')
-      dirpath = Path(basepath + '/' + datapath)
-      total =  len(list(dirpath.rglob("*")))
-      count = 0
-      transmitted = 0
-      with ZipFile('temp/backup/backup.zip', "a", ZIP_DEFLATED) as zip_file:
-        for entry in dirpath.rglob("*"):
-          count += 1
-          zip_file.write(entry, entry.relative_to(dirpath))
-          percentage = (count / total * 100)
-          if percentage >= transmitted + 1.0:
-            outlist['data'] = str(round(percentage)) + '% compressed'
-            self.send(json.dumps(outlist))	
-            transmitted = percentage
-      chdir(basepath)
-      outlist['data'] = 'OK'
-      del outlist['callback']
-      logger.info('--> ' + str(outlist))
       self.send(json.dumps(outlist))	

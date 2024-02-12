@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,6 +29,18 @@ from pathlib import Path
 from .passwords import (db_password, security_key, localaccess, 
   mydomain, myip, httpsport, smtp_account, smtp_password, smtp_server, smtp_port, 
   smtp_email, smtp_use_ssl)
+try:  
+  from .passwords import debugpw
+except  ImportError: # can be removed when everybody is up to date
+  debugpw = False
+try:  
+  from .passwords import debug_daphne
+except  ImportError: # can be removed when everybody is up to date
+  debug_daphne = False
+try:  
+  from .passwords import debug_channels
+except  ImportError: # can be removed when everybody is up to date
+  debug_channels = False
 try:  
   from .passwords import debugpw
 except  ImportError: # can be removed when everybody is up to date
@@ -115,6 +127,35 @@ INSTALLED_APPS = [
     'ws_predictions',
     'onvif',
 ]
+
+if debug_daphne or debug_channels:
+  LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+      'console': {
+        'level': 'DEBUG', 
+        'class': 'logging.StreamHandler',
+      },
+      # You can add more handlers if needed, such as file handlers
+    },
+    'loggers': {},
+  }
+  
+if debug_daphne:
+  LOGGING['loggers']['daphne'] =  {
+    'handlers': ['console'],
+    'level': 'DEBUG',
+    'propagate': False,
+  }
+  
+if debug_channels:
+  LOGGING['loggers']['channels'] =  {
+    'handlers': ['console'],
+    'level': 'DEBUG',
+    'propagate': False,
+  }
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

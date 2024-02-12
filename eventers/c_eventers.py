@@ -363,8 +363,7 @@ class c_eventer(c_device):
           + str(the_start)).decode("utf-8"))
         self.redis.delete('webm_queue:' + str(self.id) + ':item:' + str(the_start))
         self.redis.set('webm_queue:' + str(self.id) + ':start', str(the_start))
-        niceness = nice(0)
-        nice(19 - niceness)
+        nice(19)
         myts = time()
         run([
           'ffmpeg', 
@@ -537,11 +536,12 @@ class c_eventer(c_device):
             with self.eventdict_lock:
               for idict in self.eventdict:
                 myevent = self.eventdict[idict]
-                if ((myevent.end > (frame[2] - 
+                if ((myevent.status == 0)
+                  and (myevent.dbline.xmax > -1)
+                  and (myevent.end > (frame[2] - 
                     self.dbline.eve_event_time_gap))
                   and hasoverlap((frame[3]-margin, frame[4]+margin, 
-                    frame[5]-margin, frame[6]+margin), myevent)
-                  and (myevent.status == 0)):
+                    frame[5]-margin, frame[6]+margin), myevent)):
                   found = myevent
                   break
               if found is None:

@@ -69,7 +69,7 @@ class schooldbutil(AsyncWebsocketConsumer):
   @database_sync_to_async
   def gettrainimages(self, page_nr):
     lines = []
-    for line in self.trainpag.page(page_nr):
+    for line in self.trainpage.page(page_nr):
       if line.made_by is None:
         made_by = ''
       else:
@@ -86,7 +86,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
   @database_sync_to_async
   def getshortlist(self, page_nr):
-    return(list(self.trainpag.get_elided_page_range(page_nr)))
+    return(list(self.trainpage.get_elided_page_range(page_nr)))
 
   async def connect(self):
     self.user = self.scope['user']
@@ -112,7 +112,7 @@ class schooldbutil(AsyncWebsocketConsumer):
     else:
       await self.close()
 
-    if params['command'] == 'settrainpag' :
+    if params['command'] == 'settrainpage' :
       filterdict = {'school' : params['model']}
       if params['cbnot']:
         if not params['cbchecked']:
@@ -130,7 +130,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       else:
         filterdict['c'+str(params['class'])] = 1
       allresults = await filterlines(trainframe, filterdict)
-      self.trainpag = Paginator(allresults, params['pagesize'])
+      self.trainpage = Paginator(allresults, params['pagesize'])
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
