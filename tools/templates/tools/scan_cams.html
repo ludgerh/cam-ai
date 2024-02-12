@@ -23,77 +23,78 @@
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 {% endif %}
-<div class="h2 m-2">
-  My Network:
-  <span id="network">?</span>
-</div>
-<div class="h2 m-2">
-  My IP address:
-  <span id="ipaddress">?</span>
-</div>
-</div><div class="h2 m-2">
-  <label for="ipaddress" class="form-label h3">
-    {% if user.is_superuser %}
-      Camera address or domain (leave empty to scan your network):
-    {% elif is_public_server %}  
-      Camera domain:
-    {% else %}  
-       Camera address or domain:
-    {% endif %}  
-  </label>
-  <input type="text" class="form-control" id="camdomain">
+<main>
   <div class="h2 m-2">
-    {% if user.is_superuser %}
-      Examples: '', '192.168.1.13', 'mydomain.com'
-    {% elif is_public_server %}  
-      Example: 'mydomain.com'
-    {% else %}  
-      Examples: '192.168.1.13', 'mydomain.com'
-    {% endif %}  
+    My Network:
+    <span id="network">?</span>
   </div>
-</div>
-<div class="h2 m-2">IPs scanned:</div>
-<div class="form-check h2 m-2">
-  <input class="form-check-input" type="checkbox" value="" id="checkbox80" port="80">
-  <label class="form-check-label" for="flexCheckDefault">
-    80 (HTML, ISAPI, ONVIF)
-  </label>
-</div>
-<div class="form-check h2 m-2">
-  <input class="form-check-input" type="checkbox" value="" id="checkbox443" port="443">
-  <label class="form-check-label" for="flexCheckDefault">
-    443 (HTTPS)
-  </label>
-</div>
-<div class="form-check h2 m-2">
-  <input class="form-check-input" type="checkbox" value="" id="checkbox554" port="554">
-  <label class="form-check-label" for="flexCheckDefault">
-    554 (RTSP)
-  </label>
-</div>
-<div class="form-check h2 m-2">
-  <input class="form-check-input" type="checkbox" value="" id="checkbox1935" port="1935">
-  <label class="form-check-label" for="flexCheckDefault">
-    1935 (RTMP)
-  </label>
-</div>
-<div class="form-check h2 m-2">
-  <input class="form-check-input" type="checkbox" value="" id="checkbox8000" port="8000">
-  <label class="form-check-label" for="flexCheckDefault">
-    8000 (HTML, ONVIF)
-  </label>
-</div>
-<div>
-<button class="btn btn-primary m-2" id="scan-button" type="button" disabled>Check (may take a while)</button>
-</div>
-<div class="h2 m-2 d-none" id="please_wait">
-Scanning your network. Please wait a while...
-</div>
-<div class="container-fluid float-left">
-  <div class="row" id="netlist">
+  <div class="h2 m-2">
+    My IP address:
+    <span id="ipaddress">?</span>
   </div>
-</div>
-
+  </div><div class="h2 m-2">
+    <label for="ipaddress" class="form-label h3">
+      {% if user.is_superuser %}
+        Camera address or domain (leave empty to scan your network):
+      {% elif is_public_server %}  
+        Camera domain:
+      {% else %}  
+         Camera address or domain:
+      {% endif %}  
+    </label>
+    <input type="text" class="form-control" id="camdomain">
+    <div class="h2 m-2">
+      {% if user.is_superuser %}
+        Examples: '', '192.168.1.13', 'mydomain.com'
+      {% elif is_public_server %}  
+        Example: 'mydomain.com'
+      {% else %}  
+        Examples: '192.168.1.13', 'mydomain.com'
+      {% endif %}  
+    </div>
+  </div>
+  <div class="h2 m-2">IPs scanned:</div>
+  <div class="form-check h2 m-2">
+    <input class="me-3 bool" type="checkbox" value="" id="checkbox80" port="80">
+    <label class="form-check-label" for="flexCheckDefault">
+      80 (HTML, ISAPI, ONVIF)
+    </label>
+  </div>
+  <div class="form-check h2 m-2">
+    <input class="me-3 bool" type="checkbox" value="" id="checkbox443" port="443">
+    <label class="form-check-label" for="flexCheckDefault">
+      443 (HTTPS)
+    </label>
+  </div>
+  <div class="form-check h2 m-2">
+    <input class="me-3 bool" type="checkbox" value="" id="checkbox554" port="554">
+    <label class="form-check-label" for="flexCheckDefault">
+      554 (RTSP)
+    </label>
+  </div>
+  <div class="form-check h2 m-2">
+    <input class="me-3 bool" type="checkbox" value="" id="checkbox1935" port="1935">
+    <label class="form-check-label" for="flexCheckDefault">
+      1935 (RTMP)
+    </label>
+  </div>
+  <div class="form-check h2 m-2">
+    <input class="me-3 bool" type="checkbox" value="" id="checkbox8000" port="8000">
+    <label class="form-check-label" for="flexCheckDefault">
+      8000 (HTML, ONVIF)
+    </label>
+  </div>
+  <div>
+  <button class="btn btn-primary m-2" id="scan-button" type="button" disabled>Check (may take a while)</button>
+  </div>
+  <div class="h2 m-2 d-none" id="please_wait">
+  Scanning your network. Please wait a while...
+  </div>
+  <div class="container-fluid float-left">
+    <div class="row" id="netlist">
+    </div>
+  </div>
+</main>
 <script>
 
 {% if is_public_server %}  

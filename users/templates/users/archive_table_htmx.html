@@ -21,51 +21,52 @@
 <link rel="stylesheet" href="https://static.cam-ai.de/0.9.21/camai/git/css/htmx_tables.css">
 
 <!-- Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" 
-    aria-labelledby="deleteModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="deleteModalLabel">Deleting event</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" 
-          aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
-          style="width: 120px;">Close</button>
-        <button type="button" class="btn btn-primary delmodalbutton" 
-          style="width: 120px;">Yes, delete!</button>
+<main>
+  <div class="modal fade" id="deleteModal" tabindex="-1" 
+      aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteModalLabel">Deleting event</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" 
+            aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
+            style="width: 120px;">Close</button>
+          <button type="button" class="btn btn-primary delmodalbutton" 
+            style="width: 120px;">Yes, delete!</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<h2 class="m-2">Archive: {{ school.name }}</h2>
+  <h2 class="m-2">Archive: {{ school.name }}</h2>
 
-{% load render_table from django_tables2 %}
-{% load i18n %}
-{% load crispy_forms_tags %}
+  {% load render_table from django_tables2 %}
+  {% load i18n %}
+  {% load crispy_forms_tags %}
 
-{# Search form #}
-<form hx-get="{% url 'archive' stream.id %}" 
-  hx-target="div.table-container" 
-  hx-swap="outerHTML" 
-  hx-indicator=".progress" 
-  class="form-inline">
-  {% crispy filter.form %}
-</form>
+  {# Search form #}
+  <form hx-get="{% url 'archive' stream.id %}" 
+    hx-target="div.table-container" 
+    hx-swap="outerHTML" 
+    hx-indicator=".progress" 
+    class="form-inline">
+    {% crispy filter.form %}
+  </form>
 
-{# Progress indicator #}
-<div class="progress">
-  <div class="indeterminate"></div>
-</div>
+  {# Progress indicator #}
+  <div class="progress">
+    <div class="indeterminate"></div>
+  </div>
 
-{# The actual table #}
-{% render_table table %}
-
+  {# The actual table #}
+  {% render_table table %}
+</main>
 <script>
 
 let ArchiveSocket;

@@ -27,44 +27,45 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 {% if may_write %}
 <!-- Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="deleteModalLabel">Removing event from school</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">Close</button>
-        <button type="button" class="btn btn-primary delbutton" style="width: 120px;">Yes, remove!</button>
+<main>
+  <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteModalLabel">Removing event from school</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="width: 120px;">Close</button>
+          <button type="button" class="btn btn-primary delbutton" style="width: 120px;">Yes, remove!</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
-{% endif %}
+  {% endif %}
 
-<h2 class="m-2">Camera Stream: {{ stream.name }}</h2>
-<div class="container-fluid float-left">
-{% for item in events %}
-  <br><br><div done=0 class="row eventrow" id={{ item.id }}>
-	  <h4>
-    {{ item.id }}
-    {{ item.p_string }}
-		S:{{ item.start|date:'d.m.Y-H:i' }}
-	  E:{{ item.end|date:'d.m.Y-H:i' }}
-		XMIN:{{ item.xmin }}
-		XMAX:{{ item.xmax }}
-		YMIN:{{ item.ymin }}
-		YMAX:{{ item.ymax }}
-		N:{{ item.numframes }}
-	  </h4>
+  <h2 class="m-2">Camera Stream: {{ stream.name }}</h2>
+  <div class="container-fluid float-left">
+  {% for item in events %}
+    <br><br><div done=0 class="row eventrow" id={{ item.id }}>
+	    <h4>
+      {{ item.id }}
+      {{ item.p_string }}
+		  S:{{ item.start|date:'d.m.Y-H:i' }}
+	    E:{{ item.end|date:'d.m.Y-H:i' }}
+		  XMIN:{{ item.xmin }}
+		  XMAX:{{ item.xmax }}
+		  YMIN:{{ item.ymin }}
+		  YMAX:{{ item.ymax }}
+		  N:{{ item.numframes }}
+	    </h4>
+    </div>
+  {% endfor %}
   </div>
-{% endfor %}
-</div>
-
+</main>
 <script>
 
 {% if may_write %}

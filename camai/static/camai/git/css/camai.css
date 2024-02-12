@@ -10,6 +10,35 @@
   border-color: #597081; /*set the color you want here*/
 }
 
+.login {
+  margin-left:20px;
+  margin-right:20px;
+}
+.accordion {
+  padding: 15px;
+  border-radius: 10px;
+  background-color: #F0F4F7;
+}
+  
+.accordion-item {
+  background-color: #F0F4F7;
+  border: 0;
+}
+
+.accordion-button {
+  margin: 0;
+  margin-top: 10px;
+  background-color: #597081;
+  color: #F0F4F7;
+  border-radius: 5px;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: #597081;
+  color: #F0F4F7;
+  border-radius: 5px;
+}
+
 .btn-primary:hover, .btn-primary:focus, .btn-primary:active, .btn-primary.active, .open>.dropdown-toggle.btn-primary {
   color: #F0F4F7;
   background-color: #475B63;
@@ -63,6 +92,10 @@
 
 .noselect  {
   user-select: none;
+}
+
+main {
+  margin-left:1%;
 }
 
 input[type="checkbox"] {

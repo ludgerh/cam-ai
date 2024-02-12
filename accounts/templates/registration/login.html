@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
 {% block title %}CAM-AI Login{% endblock %}
 {% block content %}
+<div class="login" style="margin-left:20px;margin-top:20px;color:#2E2C2F;">
 {% if emulatestatic %}
 {% load static %}
 <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
@@ -28,5 +29,5 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   {{ form.as_p }}
   <button class="btn btn-primary m-2" type="submit">Log In</button>
 </form>
+</div>
 {% endblock %}
-
