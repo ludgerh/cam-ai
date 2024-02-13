@@ -1,18 +1,19 @@
-{# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de #}
-{# More information and complete source: https://github.com/ludgerh/cam-ai #}
-{# This program is free software; you can redistribute it and/or #}
-{# modify it under the terms of the GNU General Public License #}
-{# as published by the Free Software Foundation; either version 3 #}
-{# of the License, or (at your option) any later version. #}
-{# This program is distributed in the hope that it will be useful, #}
-{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
-{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
-{# See the GNU General Public License for more details. #}
-{# You should have received a copy of the GNU General Public License #}
-{# along with this program; if not, write to the Free Software #}
-{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
-
 {% extends 'main/basis.html' %}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
 {% block content %}
 {% if mayadd %}
 {% if emulatestatic %}
@@ -53,33 +54,33 @@
       {% endif %}  
     </div>
   </div>
-  <div class="h2 m-2">IPs scanned:</div>
+  <div class="h2 m-2">Ports scanned:</div>
   <div class="form-check h2 m-2">
-    <input class="me-3 bool" type="checkbox" value="" id="checkbox80" port="80">
+    <input class="me-3 form-check-input bool" type="checkbox" value="" id="checkbox80" port="80">
     <label class="form-check-label" for="flexCheckDefault">
       80 (HTML, ISAPI, ONVIF)
     </label>
   </div>
   <div class="form-check h2 m-2">
-    <input class="me-3 bool" type="checkbox" value="" id="checkbox443" port="443">
+    <input class="me-3 form-check-input bool" type="checkbox" value="" id="checkbox443" port="443">
     <label class="form-check-label" for="flexCheckDefault">
       443 (HTTPS)
     </label>
   </div>
   <div class="form-check h2 m-2">
-    <input class="me-3 bool" type="checkbox" value="" id="checkbox554" port="554">
+    <input class="me-3 form-check-input bool" type="checkbox" value="" id="checkbox554" port="554">
     <label class="form-check-label" for="flexCheckDefault">
       554 (RTSP)
     </label>
   </div>
   <div class="form-check h2 m-2">
-    <input class="me-3 bool" type="checkbox" value="" id="checkbox1935" port="1935">
+    <input class="me-3 form-check-input bool" type="checkbox" value="" id="checkbox1935" port="1935">
     <label class="form-check-label" for="flexCheckDefault">
       1935 (RTMP)
     </label>
   </div>
   <div class="form-check h2 m-2">
-    <input class="me-3 bool" type="checkbox" value="" id="checkbox8000" port="8000">
+    <input class="me-3 form-check-input bool" type="checkbox" value="" id="checkbox8000" port="8000">
     <label class="form-check-label" for="flexCheckDefault">
       8000 (HTML, ONVIF)
     </label>
@@ -122,11 +123,13 @@ $(document).ready(function() {
     }));
   })
   .then((result) => {
+    console.log(result);
     mynetwork = result.mynet;
     myip = result.myip;
     $('#network').text(result.mynet);
     $('#ipaddress').text(result.myip);
     $('.form-check-input').each(function( index ) {
+      console.log(ports, parseInt($(this).attr('port')));
       if (ports.includes(parseInt($(this).attr('port')))) {
         $(this).prop("checked",true);
       } else {

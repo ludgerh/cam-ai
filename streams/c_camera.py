@@ -68,10 +68,11 @@ def logger_init(logger):
   init_log(logger)
   
 def sortfunc(myinput):
-  return(myinput['address']['ip'])
+  return(ip_address(myinput['address']['ip']))
       
 class search_executor(ThreadPoolExecutor):
   def __init__(self, net, ip, ports, url, uname='', upass='', *args, **kwargs):
+    self.thread_count = 0
     super().__init__(*args, **kwargs)
     self.net = net
     self.ip = ip
@@ -88,17 +89,28 @@ class search_executor(ThreadPoolExecutor):
       if str(item) != self.ip:
         f = self.submit(self.scan_one, item)
         f.add_done_callback(self.callback)
+    #print('***** Shutdown')
     self.shutdown()
+    #print('***** Shutdown done')
+    #>>> Probably not necessary, shutdown waits for callbacks
+    while True:
+      sleep(1.0)
+      count = self.thread_count
+      if not count:
+        break  
+    #>>>
+    #print('***** Done')
     self.all_results.sort(key = sortfunc)
         
       
   def scan_one(self, my_ip):
+    self.thread_count += 1
     my_ip = str(my_ip)
     result = {}
     socketdict = {}
     for port in self.ports:
       socketdict[port] = socket(AF_INET, SOCK_STREAM)
-      socketdict[port].settimeout(0.1)
+      socketdict[port].settimeout(1.0)
       try:
         socketdict[port].connect((my_ip, port))
         socketdict[port].close()
@@ -224,6 +236,8 @@ class search_executor(ThreadPoolExecutor):
           except:
             pass     
       self.all_results.append(myresult)
+    self.thread_count -= 1
+    #print('***** Callback finished: ', self.thread_count)
       
 class ptz_base():
   
