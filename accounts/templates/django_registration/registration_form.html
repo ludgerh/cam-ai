@@ -17,22 +17,30 @@
 {% block title %}CAM-AI Sign up{% endblock %}
 
 {% block content %}
-  <h2>CAM-AI Sign up</h2>
-  <form method="post">
-    {% csrf_token %}
-    {% for field in form %}
-      <p><div class="fieldWrapper">
-        {{ field.errors }}
-        {% if field.name == "tos" %}
-          I have read and agree to the <a href="/accounts/terms/" target="_blank">Terms of Service</a>
-        {% elif field.name == "pp" %}
-          I have read and agree to the <a href="/accounts/privacy/" target="_blank">Privacy Policy</a>
-        {% else %}   
-          {{ field.label_tag }}
-        {% endif %}
-        {{ field }} {{ field.help_text }}
-      </div></p>
-    {% endfor %}
-    <button class="btn btn-primary m-2" type="submit">Sign Up</button>
-  </form>
+  <div style="width: 75%;background-color: #F0F4F7;margin: 1%;padding: 1%;border-radius: 10px;">    
+    {% if emulatestatic %}
+    {% load static %}
+    <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
+    {% else %}
+    <img src="https://static.cam-ai.de/const/camai/git/img/5.png" style="width:auto;height:auto;">
+    {% endif %}
+    <h2>Sign Up</h2>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <p><div class="fieldWrapper">
+          {{ field.errors }}
+          {% if field.name == "tos" %}
+            I have read and agree to the <a href="/accounts/terms/" target="_blank">Terms of Service</a>
+          {% elif field.name == "pp" %}
+            I have read and agree to the <a href="/accounts/privacy/" target="_blank">Privacy Policy</a>
+          {% else %}   
+            {{ field.label_tag }}
+          {% endif %}
+          {{ field }} {{ field.help_text }}
+        </div></p>
+      {% endfor %}
+      <button class="btn btn-primary m-2" type="submit">Sign Up!</button>
+    </form>
+  </div>
 {% endblock %}

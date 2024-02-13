@@ -24,86 +24,89 @@
 <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/chart.min.js"></script>
 {% endif %}
-<div class="container-fluid float-left">
-  <div class="h1 m-10">Trainer for School: {{ schoolname }}</div>
-  <div class="h2 m-10">Content</div>
-  <div class="row" id="imagecounts">
-    <div class="col-sm-auto m-10">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Image numbers</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Total</td>
-            <td id="nr_total">?</td>
-          </tr>
-          <tr>
-            <td>Checked in</td>
-            <td id="nr_checked">?</td>
-          </tr>
-          <tr>
-            <td>Trained</td>
-            <td id="nr_trained">?</td>
-          </tr>
-          <tr>
-          <tr>
-            <td>Validated</td>
-            <td id="nr_validated">?</td>
-          </tr>
-          <tr>
-            <td>Not trained</td>
-            <td id="nr_not_trained">?</td>
-          </tr>
-          <tr>
-            <td>Not checked in</td>
-            <td id="nr_not_checked">?</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="col-sm-auto m-10">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Recognized Items</th>
-          </tr>
-        </thead>
-        <tbody>
-{% for item in taglist %}
-          <tr>
-            <td>{{ item.name }}</td>
-            <td id="recog{{ item.id }}">?</td>
-          </tr>
-{% endfor %}
-        </tbody>
-      </table>
+<main>
+  <div class="container-fluid float-left">
+    <div class="h2 m-10">Statistics for School: {{ schoolname }}</div>
+  <div>
+  <div class="container-fluid float-left box">
+    <div class="h3 m-10">Content</div>
+    <div class="row" id="imagecounts">
+      <div class="col-sm-auto m-10">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Image numbers</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Total</td>
+              <td id="nr_total">?</td>
+            </tr>
+            <tr>
+              <td>Checked in</td>
+              <td id="nr_checked">?</td>
+            </tr>
+            <tr>
+              <td>Trained</td>
+              <td id="nr_trained">?</td>
+            </tr>
+            <tr>
+            <tr>
+              <td>Validated</td>
+              <td id="nr_validated">?</td>
+            </tr>
+            <tr>
+              <td>Not trained</td>
+              <td id="nr_not_trained">?</td>
+            </tr>
+            <tr>
+              <td>Not checked in</td>
+              <td id="nr_not_checked">?</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col-sm-auto m-10">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Recognized Items</th>
+            </tr>
+          </thead>
+          <tbody>
+  {% for item in taglist %}
+            <tr>
+              <td>{{ item.name }}</td>
+              <td id="recog{{ item.id }}">?</td>
+            </tr>
+  {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-</div>
-<div class="container-fluid float-left">
-  <div class="h2 m-10">Schools reports</div>
-</div>
-<div class="container-fluid float-left">
-  <canvas id="myChart"></canvas>
-</div>
-<div class="container-fluid float-left">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>Loss</th>
-        <th>H100</th><th>Cmet</th><th>val_Loss</th><th>val_H100</th><th>val_Cmet</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-    <tbody id="tablebody">
-    </tbody>
-  </table>
-</div>
-
+  <div class="container-fluid float-left">
+    <div class="h2 m-10">Schools reports</div>
+  </div>
+  <div class="container-fluid float-left">
+    <canvas id="myChart"></canvas>
+  </div>
+  <div class="container-fluid float-left">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>Loss</th>
+          <th>H100</th><th>Cmet</th><th>val_Loss</th><th>val_H100</th><th>val_Cmet</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+      <tbody id="tablebody">
+      </tbody>
+    </table>
+  </div>
+</main>
 <script >
 
 let trainerutilSocket;

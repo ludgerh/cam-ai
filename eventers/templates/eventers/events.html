@@ -55,14 +55,16 @@
   </div>
 
   <h2 class="m-2">New events: {{ stream.name }}
+    <br>
   {% if may_write %}
-  <button type="button" class="btn btn-primary m-2" id="0" 
-    data-bs-toggle="modal" data-bs-target="#deleteModal" 
-    style="width: 240px;">Purge schooled events</button>
-  <button type="button" class="btn btn-primary m-2" id="-1" 
-    data-bs-toggle="modal" data-bs-target="#deleteModal" 
-    style="width: 240px;">Purge all events</button></h2>
+    <button type="button" class="btn btn-primary " id="0" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 240px; margin-left: 0;">
+      Purge schooled events
+    </button>
+    <button type="button" class="btn btn-primary m-2" id="-1" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 240px;">
+      Purge all events
+    </button>
   {% endif %}
+  </h2>
   <div class="container-fluid float-left">
     <div class="row">
   {% for item in events %}

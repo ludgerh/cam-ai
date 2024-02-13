@@ -25,108 +25,109 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
 </script>
 {% endif %}
-<div class="h1">Images for training: {{ schoolname }}</div>
-<h2>
-<span style="white-space:nowrap;">
-  Tagged class:
-  <select id="selectclass" class="m-2">
-    <option value='-2'>All...</option>
-    <option value='-1'>None...</option>
-  </select>
-</span>
-<span style="white-space:nowrap;">
-  <input type="checkbox" id="cbnot" class="m-2" checked>Show not checked
-</span>
-<span style="white-space:nowrap;">
-  <input type="checkbox" id="cbchecked" class="m-2">Show checked
-</span>
-{% if may_write %}
-  <span style="white-space:nowrap;" id="hide_if_no_write">
-     <button 
-        type="button" id="checkallbutton" class="btn btn-primary m-2" 
-        action="checkall" data-bs-toggle="modal" data-bs-target="#shureModal" 
-        style="width: 120px;">Check all!
-      </button>
-  </span>
-  <span style="white-space:nowrap;">
-     <button 
-      type="button" id="delallbutton" class="btn btn-primary m-2" action="delall" 
-      data-bs-toggle="modal" data-bs-target="#shureModal" 
-      style="width: 120px;">Delete all!
-    </button>
-  </span>
-  {% comment %}
-  {% if user.is_superuser %}
+<main>
+  <h2>Images for training: {{ schoolname }}</h2>
+  <h3 style="padding-top:auto;padding-bottom:auto;">
     <span style="white-space:nowrap;">
-      <button 
-        type="button" id="copyallbutton" class="btn btn-primary m-2" action="copyall" 
-        data-bs-toggle="modal" data-bs-target="#shureModal" 
-        style="width: 120px;">Copy all!
-      </button>
+      Tagged class:
+      <select id="selectclass" class="m-2">
+        <option value='-2'>All...</option>
+        <option value='-1'>None...</option>
+      </select>
     </span>
-  {% endif %}
     <span style="white-space:nowrap;">
-     <input type="checkbox" id="cbkiller" class="m-2">Killer mode
-    </span> #}
-  {% endcomment %}
-{% endif %}
-</h2>
-<h4>
-  <span style="white-space:nowrap; display: inline-block;">
-    <nav aria-label="Page navigation" style="display: inline-block;">
-      <ul id="pageselect" class="pagination m-2">
-      </ul>
-    </nav>
-    Page Size:
-    <select class=" m-2" id="pagesizeselect">
-      <option value='10'>10</option>
-      <option value='100' selected>100</option>
-      <option value='1000'>1000</option>
-      <option value='10000'>10000</option>
-      <option value='100000'>100000</option>
-    </select>
-  </span>
-</h4>
-<div class="container-fluid float-left">
-  <div class="row" id="gallery">
-    <div id="lastcol" class="col-sm-auto m-0 p-0">
-      <div class="card m-1 p-0" style="border: 1; width: 212px; height: auto;">
-        <div id="endtrigger">...</div>
+      <input type="checkbox" id="cbnot" class="m-2" checked>Show not checked
+    </span>
+    <span style="white-space:nowrap;">
+      <input type="checkbox" id="cbchecked" class="m-2">Show checked
+    </span>
+    {% if may_write %}
+      <span style="white-space:nowrap;" id="hide_if_no_write">
+         <button 
+            type="button" id="checkallbutton" class="btn btn-primary m-2" 
+            action="checkall" data-bs-toggle="modal" data-bs-target="#shureModal" 
+            style="width: 120px;">Check all!
+          </button>
+      </span>
+      <span style="white-space:nowrap;">
+         <button 
+          type="button" id="delallbutton" class="btn btn-primary m-2" action="delall" 
+          data-bs-toggle="modal" data-bs-target="#shureModal" 
+          style="width: 120px;">Delete all!
+        </button>
+      </span>
+      {% comment %}
+      {% if user.is_superuser %}
+        <span style="white-space:nowrap;">
+          <button 
+            type="button" id="copyallbutton" class="btn btn-primary m-2" action="copyall" 
+            data-bs-toggle="modal" data-bs-target="#shureModal" 
+            style="width: 120px;">Copy all!
+          </button>
+        </span>
+      {% endif %}
+        <span style="white-space:nowrap;">
+         <input type="checkbox" id="cbkiller" class="m-2">Killer mode
+        </span> #}
+      {% endcomment %}
+    {% endif %}
+  </h3>
+  <h4>
+    <span style="white-space:nowrap; display: inline-block;">
+      <nav aria-label="Page navigation" style="display: inline-block;">
+        <ul id="pageselect" class="pagination m-2">
+        </ul>
+      </nav>
+      Page Size:
+      <select class=" m-2" id="pagesizeselect">
+        <option value='10'>10</option>
+        <option value='100' selected>100</option>
+        <option value='1000'>1000</option>
+        <option value='10000'>10000</option>
+        <option value='100000'>100000</option>
+      </select>
+    </span>
+  </h4>
+  <div class="container-fluid float-left">
+    <div class="row" id="gallery">
+      <div id="lastcol" class="col-sm-auto m-0 p-0">
+        <div class="card m-1 p-0" style="border: 1; width: 212px; height: auto;">
+          <div id="endtrigger">...</div>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-{% if may_write %}
-<!-- Modal -->
-<div class="modal fade" id="shureModal" tabindex="-1" aria-labelledby="deleteModalLabel" 
-    aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="deleteModalLabel">???</h5>
-        <button 
-          type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-        </button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure?</p>
-      </div>
-      <div class="modal-footer">
-        <button 
-          type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
-          style="width: 120px;">No, close!
-        </button>
-        <button 
-          type="button" class="btn btn-primary modalbutton" 
-          style="width: 120px;">Yes, go!
-        </button>
+  {% if may_write %}
+  <!-- Modal -->
+  <div class="modal fade" id="shureModal" tabindex="-1" aria-labelledby="deleteModalLabel" 
+      aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteModalLabel">???</h5>
+          <button 
+            type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure?</p>
+        </div>
+        <div class="modal-footer">
+          <button 
+            type="button" class="btn btn-secondary" data-bs-dismiss="modal" 
+            style="width: 120px;">No, close!
+          </button>
+          <button 
+            type="button" class="btn btn-primary modalbutton" 
+            style="width: 120px;">Yes, go!
+          </button>
+        </div>
       </div>
     </div>
   </div>
-</div>
-{% endif %}
-
+  {% endif %}
+</main>
 <script >
 
 {% if may_write %}

@@ -28,11 +28,14 @@
     <div class="row">
     {% spaceless %}
     {% for item in camlist %} 
-      <div class="col-sm-auto">
-      <h1>{{ mode }}{{ item.id }}: {{ item.name }}</h1>
+      <div class="col-sm-auto box">
+      <h2>{{ mode }}{{ item.id }}: {{ item.name }}</h2>
       <h5>{{ item.cam_xres }}x{{ item.cam_yres }}, 
-        fps = <span id="fpstag{{ item.id }}">?</span>, 
-        views = <span id="vnrtag{{ item.id }}">?</span></h5>
+        fps = <span id="fpstag{{ item.id }}">?</span>
+{% comment %}
+        views = <span id="vnrtag{{ item.id }}">?</span>
+{% endcomment %}
+    </h5>
       {% if mode == 'C' %}
         <div>
           <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>

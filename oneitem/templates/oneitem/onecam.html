@@ -59,10 +59,13 @@
 	  <div class="row">
 		  <div class="col-auto">
         <div>
-          <h1>Camera: {{ dbline.name }}</h1>
+          <h2>Camera: {{ dbline.name }}</h2>
           <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
-            fps = <span id="fpstag">?</span>, 
-            views = <span id="vnrtag">?</span></h5>
+            fps = <span id="fpstag">?</span>
+{% comment %}
+            views = <span id="vnrtag">?</span>
+{% endcomment %}
+          </h5>
           <img class="noselect img-rounded" id="imagespace" />
         </div>
 		  </div>

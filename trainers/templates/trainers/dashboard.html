@@ -23,13 +23,11 @@
 <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 {% endif %}
 <main>
-  <div class="h1">Training dashboard for school:</div>
-  <div class="h1">{{ school.name }}</div>
-  <div class="h1">Status: <span id="queue_status">?</span></div>
-  <div class="h1">Queue position: <span id="queue_pos">?</span></div>
+  <div class="h2">Training dashboard for school: {{ school.name }}</div>
+  <div class="h2">Status: <span id="queue_status">?</span> Queue position: <span id="queue_pos">?</span></div>
   {% if may_write %}
   <div class="h2">
-    <button type="button" id="train_button" class="btn btn-primary m-2" style="width: 120px;">Train AI Now!</button>
+    <button type="button" id="train_button" class="btn btn-primary m-2" style="width: 180px;">Train AI now!</button>
   </div>
   <div class="h2">
     School Settings:
