@@ -106,7 +106,6 @@ def restartcheck_thread():
         restart_mode = 1
       elif command == 2:  
         restart_mode = 2
-      print('redis-command', restart_mode)
       os.kill(os.getpid(), SIGINT)
       return()
     if (item := redis.get_start_trainer_busy()):

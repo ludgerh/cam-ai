@@ -100,7 +100,8 @@ class search_executor(ThreadPoolExecutor):
         break  
     #>>>
     #print('***** Done')
-    self.all_results.sort(key = sortfunc)
+    if len(self.all_results) > 1: #Domain String entered
+      self.all_results.sort(key = sortfunc)
         
       
   def scan_one(self, my_ip):

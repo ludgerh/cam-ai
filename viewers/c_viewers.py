@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -14,6 +15,8 @@
 from threading import Lock
 from l_buffer.l_buffer import l_buffer
 from drawpad.drawpad import drawpad
+
+#from threading import enumerate
 
 class c_viewer():
 
@@ -45,4 +48,6 @@ class c_viewer():
 
   def stop(self):
     self.inqueue.stop()
+#    for thread in enumerate(): 
+#      print(thread)
 

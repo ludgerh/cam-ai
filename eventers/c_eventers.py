@@ -46,7 +46,7 @@ from .models import event
 from .c_event import c_event, resolve_rules
 from .c_alarm import alarm
 
-#from threading import enumerate
+from threading import enumerate
 
 class c_eventer(c_device):
 
@@ -104,14 +104,22 @@ class c_eventer(c_device):
       self.redis.set('webm_queue:' + str(self.id) + ':start', 0)
       self.redis.set('webm_queue:' + str(self.id) + ':end', 0)
       self.webm_proc = Process(target=self.make_webm).start()
+      print('Loop started')    
       while self.do_run:
+        print('111')
         frameline = self.dataqueue.get()
+        print('222')
         if (self.do_run and (frameline is not None) 
             and self.sl.greenlight(self.period, frameline[2])):
-          self.run_one(frameline) 
+          print('aaa', len(self.frameslist))
+          print('bbb')
         else:
+          print('ccc')
           sleep(djconf.getconfigfloat('short_brake', 0.1))
+        print('333')
+      print('Loop finished')    
       self.dataqueue.stop()
+      print('Dataqueue stopped')    
       with self.eventdict_lock:
         for item in self.eventdict.values():
           event.objects.get(id=item.dbline.id).delete()
@@ -123,8 +131,8 @@ class c_eventer(c_device):
     self.logger.handlers.clear()
     self.tf_worker.stop_out(self.tf_w_index)
     self.tf_worker.unregister(self.tf_w_index)
-    #for thread in enumerate(): 
-    #  print(thread)
+    for thread in enumerate(): 
+      print(thread)
 
   def in_queue_handler(self, received):
     try:
@@ -613,8 +621,10 @@ class c_eventer(c_device):
         self.eventdict[events[i]].set_pred(frames[i], predictions[i])
 
   def stop(self):
+    print('*****', "self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')")
     self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')
+    print('*****', "self.dataqueue.stop()")
     self.dataqueue.stop()
+    print('*****', "super().stop()")
     super().stop()
-    #self.run_process.join()
     

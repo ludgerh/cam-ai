@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -88,13 +89,15 @@ class c_device():
     try:
       while True:
         received = self.inqueue.get()
-        #print(self.type+str(self.dbline.id)+' in_queue_thread:', self.type, self.dbline.id, received)
+        print(self.type+str(self.dbline.id)+' in_queue_thread:', self.type, self.dbline.id, received)
         if (received[0] == 'stop'):
-          #if self.viewer:
-          #  self.viewer.stop()
+          print('?????', "self.do_run = False")
           self.do_run = False
+          print('?????', "while not self.inqueue.empty():")
           while not self.inqueue.empty():
+            print('Inqueue Loop')
             received = self.inqueue.get()
+          print('?????', "break")
           break
         if not self.in_queue_handler(received):
           raise QueueUnknownKeyword(received[0])
@@ -159,7 +162,10 @@ class c_device():
       self.parent.take_data_count()
 
   def stop(self):
+    print('+++++', "self.viewer.stop()")
     if self.viewer:
       self.viewer.stop()
+    print('+++++', "self.inqueue.put(('stop',))")
     self.inqueue.put(('stop',))
+    print('+++++', "self.run_process.join()")
     self.run_process.join()
