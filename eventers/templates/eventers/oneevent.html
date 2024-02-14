@@ -104,24 +104,22 @@
     <div id="collapseTwo" class="accordion-collapse collapse show" aria-labelledby="headingTwo" data-bs-parent="#eventaccordion">
 {% endif %}
       <div class="accordion-body">
-        <div class="container-fluid float-left">
-          <div class="row">
+        <div class="row">
 {% for item in frames %}
-            <div id="col{{ frame.id }}" class="col-sm-auto">
-              <div class="card m-2" id="crd{{ item.id }}" dtype="0" style="width: 375px; height: 480px;">
-	              <a href="/schools/getbigbmp/0/{{ item.id }}/" target="_blank">
-                  <img src="/schools/getbmp/0/{{ item.id }}/3/1/375/375/" style="width: 375px; height: 375px; object-fit: contain;"></a>
-                  <div class="card-body">
-                    <h6 class="card-title">{{ item.time|date:'d.m.Y H:i:s' }}</h6>
-                    <button type="button"  id="{{ item.id }}" class="btn btn-primary position-absolute bottom-0 start-0 m-3 framearchbutton" style="width: 120px;">To Archive</button>
+          <div id="col{{ frame.id }}" class="col-sm-auto">
+            <div class="card m-2" id="crd{{ item.id }}" dtype="0" style="width: 375px; height: 480px;">
+              <a href="/schools/getbigbmp/0/{{ item.id }}/" target="_blank">
+                <img src="/schools/getbmp/0/{{ item.id }}/3/1/375/375/" style="width: 375px; height: 375px; object-fit: contain;"></a>
+                <div class="card-body">
+                  <h6 class="card-title">{{ item.time|date:'d.m.Y H:i:s' }}</h6>
+                  <button type="button"  id="{{ item.id }}" class="btn btn-primary position-absolute bottom-0 start-0 m-3 framearchbutton" style="width: 120px;">To Archive</button>
 {% if may_write %}
-                    <button type="button"  id="{{ item.id }}" dtype="0" class="btn btn-primary position-absolute bottom-0 end-0 m-3" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 120px;">Delete</button>
+                  <button type="button"  id="{{ item.id }}" dtype="0" class="btn btn-primary position-absolute bottom-0 end-0 m-3" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 120px;">Delete</button>
 {% endif %}
-                  </div>
-              </div>
+                </div>
             </div>
-{% endfor %}
           </div>
+{% endfor %}
         </div>
       </div>
     </div>

@@ -15,16 +15,6 @@
   border: 0;
 }
 
-.box {
-  width: auto;
-  background-color: #F0F4F7;
-  margin-top: 1%;
-  margin-bottom: 1%;
-  margin-right: 0;
-  padding: 1%;
-  border-radius: 10px;
-}  
-
 .accordion-button {
   margin: 0;
   margin-top: 10px;

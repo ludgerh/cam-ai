@@ -142,25 +142,25 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               </ul>
             </div>
           </div>
-          <div class="col-sm-auto">
-            <div class="dropdown">
-              <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
-                Tools
-              </button>
-              <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                {% if user.is_superuser %}
-                  <li><a class="dropdown-item" href="/tools/health/">Health Check</a></li>
-                  <li><a class="dropdown-item" href="/tools/linkworkers/">Link Worker(s)</a></li>
-                  <li><a class="dropdown-item" href="/admin/">Database Admin</a></li>
-                  <li><a class="dropdown-item" href="/tools/backup/">Backup Server</a></li> 
-    {#              <li><a class="dropdown-item" href="/tools/restore/">Restore Server</a></li> #}
-                  <li><a class="dropdown-item" href="/tools/upgrade/">Upgrade Server</a></li>
-                  <li><a class="dropdown-item" href="/tools/shutdown/">Shutdown Server</a></li>
-                {% endif %}
-                <li></li>
-              </ul>
+          {% if user.is_superuser %}
+            <div class="col-sm-auto">
+              <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                  Tools
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                    <li><a class="dropdown-item" href="/tools/health/">Health Check</a></li>
+                    <li><a class="dropdown-item" href="/tools/linkworkers/">Link Worker(s)</a></li>
+                    <li><a class="dropdown-item" href="/admin/">Database Admin</a></li>
+                    <li><a class="dropdown-item" href="/tools/backup/">Backup Server</a></li> 
+      {#              <li><a class="dropdown-item" href="/tools/restore/">Restore Server</a></li> #}
+                    <li><a class="dropdown-item" href="/tools/upgrade/">Upgrade Server</a></li>
+                    <li><a class="dropdown-item" href="/tools/shutdown/">Shutdown Server</a></li>
+                  <li></li>
+                </ul>
+              </div>
             </div>
-          </div>
+          {% endif %}
           <div class="col-sm-auto row stats">
             <div class="col-sm-auto">
               V{{ version }}

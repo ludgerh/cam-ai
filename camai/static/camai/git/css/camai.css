@@ -13,12 +13,22 @@
 .box {
   width: auto;
   background-color: #F0F4F7;
-  margin-top: 1%;
-  margin-bottom: 1%;
-  margin-right: 0;
+  margin: 1%;
+  margin-left: 0;
   padding: 1%;
   border-radius: 10px;
 }  
+
+.form-check-input:checked {
+    background-color: #597081;
+    border-color: #597081;
+}
+
+.btn-primary:disabled {
+    color: #fff;
+    background-color: #475B63;
+    border-color: #475B63;
+}
 
 .login {
   margin-left:20px;
