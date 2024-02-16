@@ -128,12 +128,12 @@ class c_detector(c_device):
     try:
       if input is None:
         return(None)
-      print('Queuesize:', self.myeventer.detectorqueue.qsize())
-      if self.myeventer.detectorqueue.qsize() > 5 * self.dbline.det_max_rect:
+      #print('Queuesize:', self.myeventer.detectorqueue.qsize())
+      if self.myeventer.detectorqueue.qsize() > 2 * self.dbline.det_max_rect:
         if not self.warning_done:
           self.logger.warning('Detector #' + str(self.id)
             + ' skipped cycle, eventer queue > ' 
-            + str(5 * self.dbline.det_max_rect))
+            + str(2 * self.dbline.det_max_rect))
           self.warning_done = True  
         return(None)  
       frametime = input[2]
@@ -165,10 +165,10 @@ class c_detector(c_device):
       buffer2 = cv.max(buffer1[0], buffer1[1])
       buffer1 = cv.max(buffer2, buffer1[2])
       ret, buffer1 = cv.threshold(buffer1,self.dbline.det_threshold,255,cv.THRESH_BINARY)
-      if self.scaledown > 1:
-      	erosion = round(self.dbline.det_erosion / self.scaledown)
-      else:
-      	erosion = self.dbline.det_erosion
+      #if self.scaledown > 1:
+      #	erosion = round(self.dbline.det_erosion / self.scaledown)
+      #else:
+      erosion = self.dbline.det_erosion
       if (erosion > 0) :
         kernel = np.ones((erosion*2 + 1,erosion*2 + 1),np.uint8)
         buffer2 = cv.erode(buffer1,kernel,iterations =1)

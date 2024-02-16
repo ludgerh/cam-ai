@@ -18,17 +18,15 @@ import cv2 as cv
 import json
 import numpy as np
 from os import remove, path, nice, environ
-from math import inf
 from shutil import copyfile
 from traceback import format_exc
 from logging import getLogger
 from setproctitle import setproctitle
 from collections import deque
 from time import time, sleep
-from threading import Thread
-from multiprocessing import Process, Lock
-from subprocess import Popen, run
-from copy import deepcopy
+from threading import Thread, Lock as t_lock
+from multiprocessing import Process, Lock as p_lock
+from subprocess import run
 from django.forms.models import model_to_dict
 from django.db import connection
 from django.db.utils import OperationalError
@@ -47,7 +45,7 @@ from .models import event
 from .c_event import c_event, resolve_rules
 from .c_alarm import alarm
 
-from threading import enumerate
+#from threading import enumerate
 
 class c_eventer(c_device):
 
@@ -84,7 +82,7 @@ class c_eventer(c_device):
         environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.eve_gpu_nr_cv)
         self.logger.info('**** Eventer running GPU #' + str(self.dbline.eve_gpu_nr_cv))
       self.eventdict = {}
-      self.eventdict_lock = Lock()
+      self.eventdict_lock = t_lock()
 
       self.vid_deque = deque()
       self.vid_str_dict = {}
@@ -99,7 +97,7 @@ class c_eventer(c_device):
 
       Thread(target=self.inserter, name='InserterThread').start()
       
-      self.webm_lock = Lock()
+      self.webm_lock = p_lock()
       self.redis.set('webm_queue:' + str(self.id) + ':start', 0)
       self.redis.set('webm_queue:' + str(self.id) + ':end', 0)
       self.webm_proc = Process(target=self.make_webm).start()
@@ -122,8 +120,8 @@ class c_eventer(c_device):
     self.logger.handlers.clear()
     self.tf_worker.stop_out(self.tf_w_index)
     self.tf_worker.unregister(self.tf_w_index)
-    for thread in enumerate(): 
-      print(thread)
+    #for thread in enumerate(): 
+    #  print(thread)
 
   def in_queue_handler(self, received):
     try:
@@ -341,7 +339,7 @@ class c_eventer(c_device):
   def check_events(self, i, item):
     try:
       check_to = (item.end < time() - self.dbline.eve_event_time_gap 
-        or item.end > item.start + 30.0)
+        or item.end > item.start + 180.0)
       if self.cond_dict[5]:
         predictions = item.pred_read(max=1.0)
       else:
@@ -362,10 +360,8 @@ class c_eventer(c_device):
           item.to_email = self.dbline.eve_alarm_email
         else:
           item.to_email = ''
-        print(item.goes_to_school, item.isrecording, '>'+item.to_email+'<')
         is_ready = True
         if (item.goes_to_school or item.isrecording or item.to_email):
-          print('111')
           if item.isrecording:
             if (self.vid_deque and (item.end <= (self.vid_deque[-1][2] - self.dbline.cam_latency))):
               my_vid_list = []
@@ -425,9 +421,7 @@ class c_eventer(c_device):
                   self.redis.set('webm_queue:' + str(self.id) + ':end', str(the_end))
             else:  
               is_ready = False
-          print('222')
           if is_ready:
-            print('Saving...')
             item.save(self.cond_dict)
         else:
           while True:
@@ -470,7 +464,7 @@ class c_eventer(c_device):
             continue
           detector_to = new_time
           if detector_buffer:
-            ts = time()
+            #ts = time()
             imglist = []
             for item in detector_buffer:
               np_image = cv.cvtColor(item[1], cv.COLOR_BGR2RGB)
@@ -487,9 +481,11 @@ class c_eventer(c_device):
                   predictions, 
                   self.tf_worker.get_from_outqueue(self.tf_w_index)
                 ))
+              print('Predictions:')
+              print(predictions)  
               for i in range(len(imglist)):
                 detector_buffer[i].append(predictions[i])
-            print('Inserter Time:', time() - ts)  
+            #print('Inserter Time:', time() - ts)  
           margin = self.dbline.eve_margin
           for item in detector_buffer:
             frame = item
@@ -543,10 +539,7 @@ class c_eventer(c_device):
     return(result)
 
   def stop(self):
-    print('*****', "self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')")
     self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')
-    print('*****', "self.dataqueue.stop()")
     self.dataqueue.stop()
-    print('*****', "super().stop()")
     super().stop()
     

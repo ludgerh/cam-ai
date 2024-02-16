@@ -13,12 +13,10 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import numpy as np
-from multiprocessing import Lock
 import cv2 as cv
 from datetime import datetime
-from random import choice, randint
+from random import randint
 from os import path, makedirs
-from concurrent import futures
 from time import sleep, time
 from threading import Thread
 from collections import OrderedDict
@@ -28,16 +26,11 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.utils import OperationalError
 from .models import event, event_frame, school
-from tools.l_tools import ts2filename, uniquename, randomfilter, np_mov_avg, djconf
+from tools.l_tools import ts2filename, uniquename, np_mov_avg, djconf
 from tools.l_smtp import l_smtp
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 from streams.models import stream
-
-PRED_MERGE_MAX = 1.0 #maximum
-PRED_MERGE_AVE = 0.0 #averagr
-PRED_MERGE_LAST = 0.0 #last value
-PRED_MERGE_RADIUS = 3 #moving average width
 
 datapath = djconf.getconfig('datapath', 'data/')
 schoolpath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
@@ -162,44 +155,6 @@ class c_event(list):
     self.last_frame_index = index
     return(index)
 
-
-  def make_predictions(self):
-    ts1 = time()
-    while True:
-      with self.frames_lock:
-        framescopy = self.frames.copy()
-      frames_to_process = [x for x in framescopy if framescopy[x][2] <= 0.0]
-      if frames_to_process and ((time() - ts1) < 1.0):
-        imglist = []
-        frame_idxs = []
-        for i in frames_to_process:
-          if i in self.frames:
-            self.frames[i][2] = 0.1
-            np_image = cv.cvtColor(self.frames[i][0][1], cv.COLOR_BGR2RGB)
-            imglist.append(np_image)
-            frame_idxs.append(i)
-        if self.tf_w_index is not None:
-          self.tf_worker.ask_pred(
-            self.schoolnr, 
-            imglist, 
-            self.tf_w_index,
-            frame_idxs,
-            self.dbline.id,
-          )
-      else:       
-        break
-
-  def set_pred(self, frame, prediction):
-    if (self.tf_w_index is None):
-      sleep(djconf.getconfigfloat('short_brake', 0.01))
-    else:
-      if frame in self.frames:
-        self.frames[frame][1] = prediction
-        self.frames[frame][2] = np.max(prediction[1:])
-        if self.frames[frame][2] >= self.focus_max:
-          self.focus_max = self.frames[frame][2]
-          self.focus_time = self.frames[frame][0][2]
-
   def add_frame(self, frame):
     s_factor = 0.01 # user changeable later: 0.0 -> No Shrinking 1.0 50%
     if (frame[3] - self.margin) <= self[0]:
@@ -254,20 +209,6 @@ class c_event(list):
     else:
       return(result2)
 
-  def pred_is_done(self, ts):
-    with self.frames_lock:
-      framescopy = self.frames.copy()
-    for item in framescopy.items():
-      if ((item[0] in self.frames) and (item[1][0][2] <= ts) 
-          and (item[1][1] is None)):
-        if item[1][0][2] < ((time() - 240.0)):
-          self.logger.debug('Eventer '+str(self.eventer_id)+': pred_is_done got old frame, age: (sec) ' + str(round(time() - item[1][0][2], 3)))
-          with self.frames_lock:
-            del self.frames[item[0]]
-        elif item[1][0][2] > ((time() - 5.0)):
-          return(False)
-    return(True)
-
   def p_string(self):
     predictions = self.pred_read(max=1.0)
     predline = '['
@@ -293,7 +234,7 @@ class c_event(list):
 
   def save(self, cond_dict):
     try:
-      self.logger.info('*** Saving Event: '+str(self.dbline.id))
+      #self.logger.info('*** Saving Event: '+str(self.dbline.id))
       self.frames_filter(self.number_of_frames, cond_dict)
       frames_to_save = self.frames.values()
       self.dbline.p_string=self.eventer_name+'('+str(self.eventer_id)+'): '+self.p_string()
