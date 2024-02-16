@@ -89,7 +89,7 @@ class c_device():
     try:
       while True:
         received = self.inqueue.get()
-        print(self.type+str(self.dbline.id)+' in_queue_thread:', self.type, self.dbline.id, received)
+        #print(self.type+str(self.dbline.id)+' in_queue_thread:', self.type, self.dbline.id, received)
         if (received[0] == 'stop'):
           print('?????', "self.do_run = False")
           self.do_run = False

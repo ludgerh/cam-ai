@@ -183,8 +183,6 @@ class schooldbutil(AsyncWebsocketConsumer):
           params['school'], 
           imglist, 
           self.tf_w_index,
-          [],
-          -1,
         )
         predictions = np.empty((0, len(classes_list)), np.float32)
         while predictions.shape[0] < len(imglist):

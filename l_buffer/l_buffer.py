@@ -33,8 +33,6 @@ from threading import Thread
 from tools.c_redis import saferedis
 from traceback import format_exc
 
-import cv2 as cv
-
 class l_buffer:
   redis_list = []
 
@@ -70,9 +68,6 @@ class l_buffer:
       self.p.subscribe(self.storage[0])
       self.thread = Thread(target=self.message_handler, name='L_Buffer_Thread')
       self.thread.start()
-    self.last_display = 0
-    
-    self.i = 0
     
   def message_handler(self):
     while self.do_run:
@@ -96,7 +91,7 @@ class l_buffer:
       self.blockdelay = 0.01  
     if self.itemtype is None:
       with self.my_lock:
-        if (objdata := self.redis.rpop(self.storage[1])) is not None:
+        if (objdata := self.redis.rpop(self.storage[1])):
           objdata = pickle.loads(objdata)
         result = (
           self.redis.rpop(self.storage[0]),
@@ -131,8 +126,12 @@ class l_buffer:
       with self.my_lock:
         if bytedata:
           self.redis.lpush(self.storage[0], bytedata)
+        else:
+          self.redis.lpush(self.storage[0], b'')
         if objdata:
           self.redis.lpush(self.storage[1], pickle.dumps(objdata))
+        else:
+          self.redis.lpush(self.storage[1], b'')
     if self.itemtype == 0:
       self.redis.set(self.storage[0], data.tobytes())
     elif self.itemtype == 1:

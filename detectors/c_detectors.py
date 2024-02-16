@@ -128,6 +128,7 @@ class c_detector(c_device):
     try:
       if input is None:
         return(None)
+      print('Queuesize:', self.myeventer.detectorqueue.qsize())
       if self.myeventer.detectorqueue.qsize() > 5 * self.dbline.det_max_rect:
         if not self.warning_done:
           self.logger.warning('Detector #' + str(self.id)

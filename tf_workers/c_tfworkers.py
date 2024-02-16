@@ -104,19 +104,12 @@ class model_buffer(deque):
             frame = cv.resize(frame, (self.xdim, self.ydim))
           outitem = [frame]
           outitem.append(initem[1])
-          if initem[2]:
-            outitem.append(initem[2][i])
-          else:
-            outitem.append(-1)
-          outitem.append(initem[3])
           super().append(outitem)
       self.ts = time()
 
   def get(self, maxcount):
     tempres0 = []
     tempres1 = []
-    tempres2 = []
-    tempres3 = []
     while True:
       with self.bufferlock1:
         if not len(self):
@@ -124,11 +117,9 @@ class model_buffer(deque):
         initem = self.popleft()
       tempres0.append(initem[0])
       tempres1.append(initem[1])
-      tempres2.append(initem[2])
-      tempres3.append(initem[3])
       if len(tempres0) >= maxcount:
         break
-    return(tempres0, tempres1, tempres2, tempres3)
+    return(tempres0, tempres1)
 
 class tf_user(object):
   clientset = set()
@@ -636,8 +627,6 @@ class tf_worker():
                 'pred_to_send', 
                 predictions[starting:i+1], 
                 framesinfo[0][starting:i+1],
-                framesinfo[1][starting:i+1],
-                framesinfo[2][starting:i+1],
               ))
             starting = i + 1
         if self.dbline.savestats > 0: #Later to be written in DB
@@ -671,13 +660,10 @@ class tf_worker():
       elif (received[0] == 'put_xy'):
         self.xy = received[1]
       elif (received[0] == 'pred_to_send'):
-        if received[4][0] == -1:
-          while self.pred_out_dict[received[2][0]] is not None: 
-            sleep(djconf.getconfigfloat('very_short_brake', 0.001))
-          
-          self.pred_out_dict[received[2][0]] = received[1]
-        else:
-          self.eventer.sort_in_prediction(received[4], received[3], received[1])      
+        while self.pred_out_dict[received[2][0]] is not None: 
+          sleep(djconf.getconfigfloat('very_short_brake', 0.001))
+        
+        self.pred_out_dict[received[2][0]] = received[1]
       else:
         raise QueueUnknownKeyword(received[0])
     #print('Finished:', received)
@@ -713,16 +699,13 @@ class tf_worker():
       sleep(self.very_short_brake)
     return(self.xy)
 
-  def ask_pred(self, school, img_list, userindex, frame_idxs, eventnr):
-    if eventnr == -1:
-      self.pred_out_dict[userindex] = None
+  def ask_pred(self, school, img_list, userindex):
+    self.pred_out_dict[userindex] = None
     self.inqueue.put((
       'imglist', 
       school, 
       img_list, 
       userindex, 
-      frame_idxs,
-      eventnr,
     ))
 
   def client_check_model(self, schoolnr, test_pred = False):

@@ -34,6 +34,11 @@ from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 from streams.models import stream
 
+PRED_MERGE_MAX = 1.0 #maximum
+PRED_MERGE_AVE = 0.0 #averagr
+PRED_MERGE_LAST = 0.0 #last value
+PRED_MERGE_RADIUS = 3 #moving average width
+
 datapath = djconf.getconfig('datapath', 'data/')
 schoolpath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
 clienturl = settings.CLIENT_URL
@@ -100,6 +105,7 @@ def resolve_rules(conditions, predictions):
 
 
 class c_event(list):
+  last_frame_index = 0
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, xmax, ymax, 
       schoolnr, eventer_id, eventer_name, logger):
@@ -108,12 +114,13 @@ class c_event(list):
     self.eventer_id = eventer_id
     self.eventer_name = eventer_name
     self.tf_w_index = tf_w_index
-    self.frames_lock = Lock()
+    self.xmax = xmax
+    self.ymax = ymax
+    self.margin = margin
     self.number_of_frames = djconf.getconfigint('frames_event', 32)
     self.isrecording = False
     self.goes_to_school = False
     self.to_email = ''
-    self.status = 0
     self.ts = None
     self.savename = ''
     self.schoolnr = schoolnr
@@ -135,27 +142,24 @@ class c_event(list):
     self.append(min(xmax, frame[4] + margin))
     self.append(max(0, frame[5] - margin))
     self.append(min(ymax, frame[6] + margin))
-    self.append(False)
+    self.append([frame[7]]) #Predictions
     self.logger = logger
-    #self.logger.info('***** Client-Url:' + clienturl)
     index = self.get_new_frame_index(frame[2], True)
-    with self.frames_lock:
-      self.frames = OrderedDict([(index, [frame, None, 0.0])])
+    self.frames = OrderedDict([(index, frame)])
     while True:
       try:
         self.dbline.save()
         break
       except OperationalError:
         connection.close()
-    self.focus_max = 0.0
-    self.make_predictions()
+    self.focus_max = np.max(frame[7][1:])
     self.focus_time = frame[2]
 
   def get_new_frame_index(self, timestamp, first=False):
     index = (round(timestamp * 10000000.0) % 36000000000)
-    if not first:
-      while index in self.frames:
-        index += 1
+    while index <= self.last_frame_index:
+      index += 1
+    self.last_frame_index = index
     return(index)
 
 
@@ -189,35 +193,55 @@ class c_event(list):
     if (self.tf_w_index is None):
       sleep(djconf.getconfigfloat('short_brake', 0.01))
     else:
-        if frame in self.frames:
-          self.frames[frame][1] = prediction
-          self.frames[frame][2] = np.max(prediction[1:])
-          if self.frames[frame][2] >= self.focus_max:
-            self.focus_max = self.frames[frame][2]
-            self.focus_time = self.frames[frame][0][2]
+      if frame in self.frames:
+        self.frames[frame][1] = prediction
+        self.frames[frame][2] = np.max(prediction[1:])
+        if self.frames[frame][2] >= self.focus_max:
+          self.focus_max = self.frames[frame][2]
+          self.focus_time = self.frames[frame][0][2]
 
-  def add_frame(self, frame, schoolnr):
-    self.schoolnr = schoolnr
+  def add_frame(self, frame):
+    s_factor = 0.01 # user changeable later: 0.0 -> No Shrinking 1.0 50%
+    if (frame[3] - self.margin) <= self[0]:
+      self[0] = max(0, frame[3] - self.margin)
+    else:
+      self[0] = round(((frame[3] - self.margin) * s_factor + self[0]) 
+        / (s_factor+1.0))
+    if (frame[4] + self.margin) >= self[1]:
+      self[1] = min(self.xmax, frame[4] + self.margin)
+    else:
+      self[1] = round(((frame[4] + self.margin) * s_factor + self[1]) 
+        / (s_factor+1.0))
+    if (frame[5] - self.margin) <= self[2]:
+      self[2] = max(0, frame[5] - self.margin)
+    else:
+      self[2] = round(((frame[5] - self.margin) * s_factor + self[2]) 
+        / (s_factor+1.0))
+    if (frame[6] + self.margin) >= self[3]:
+      self[3] = min(self.ymax, frame[6] + self.margin)
+    else:
+      self[3] = round(((frame[6] + self.margin) * s_factor + self[3]) 
+        / (s_factor+1.0))
+    self.end = frame[2]
+    self[4].append(frame[7]) 
     index = self.get_new_frame_index(frame[2])
-    with self.frames_lock:
-      self.frames[index] = [frame, None, 0.0]
-    self.make_predictions()
+    self.frames[index] = frame
+    if (new_max := np.max(frame[7][1:])) > self.focus_max:
+      self.focus_max = new_max
+      self.focus_time = frame[2]
+    
 
   def merge_frames(self, the_other_one):
-    with self.frames_lock:
-      self.frames = {**self.frames, **the_other_one.frames}
-      if the_other_one.focus_max > self.focus_max:
-        self.focus_max = the_other_one.focus_max
-        self.focus_time = the_other_one.focus_time
+    self.frames = {**self.frames, **the_other_one.frames}
+    self.frames = OrderedDict(sorted(self.frames.items(), key=lambda x: x[0]))
+    if the_other_one.focus_max > self.focus_max:
+      self.focus_max = the_other_one.focus_max
+      self.focus_time = the_other_one.focus_time
 
   def pred_read(self, radius=3, max=None, ave=None, last=None):
     result2 = np.zeros((len(self.tag_list)), np.float32)
-    with self.frames_lock:
-      result1 = [
-        self.frames[x][1] for x in self.frames if self.frames[x][1] is not None
-      ]
-    if result1:
-      result1 = np.vstack(result1)
+    if self[4]:
+      result1 = np.vstack(self[4])
       if radius > 0:
         result1 = np_mov_avg(result1, radius)
       if max is not None:
@@ -257,9 +281,9 @@ class c_event(list):
   def frames_filter(self, outlength, cond_dict):
     frames_in = len(self.frames)
     sortindex = [x for x in self.frames if (
-      resolve_rules(cond_dict[2],  self.frames[x][1])
-        or resolve_rules(cond_dict[3], self.frames[x][1])
-        or resolve_rules(cond_dict[4],  self.frames[x][1])
+      resolve_rules(cond_dict[2],  self.frames[x][7])
+        or resolve_rules(cond_dict[3], self.frames[x][7])
+        or resolve_rules(cond_dict[4],  self.frames[x][7])
     )]
     if len(sortindex) > outlength:
       sortindex.sort(key=lambda x: self.frames[x][2], reverse=True)
@@ -269,7 +293,7 @@ class c_event(list):
 
   def save(self, cond_dict):
     try:
-      #self.logger.info('*** Saving Event: '+str(self.dbline.id))
+      self.logger.info('*** Saving Event: '+str(self.dbline.id))
       self.frames_filter(self.number_of_frames, cond_dict)
       frames_to_save = self.frames.values()
       self.dbline.p_string=self.eventer_name+'('+str(self.eventer_id)+'): '+self.p_string()
@@ -288,16 +312,16 @@ class c_event(list):
         pathadd = str(self.schoolnr)+'/'+str(randint(0,99))
         if not path.exists(schoolpath+pathadd):
           makedirs(schoolpath+pathadd)
-        filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[0][2], 
+        filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[2], 
           noblank=True), 'bmp')
-        cv.imwrite(schoolpath+filename, item[0][1])
+        cv.imwrite(schoolpath+filename, item[1])
         frameline = event_frame(
-          time=timezone.make_aware(datetime.fromtimestamp(item[0][2])),
+          time=timezone.make_aware(datetime.fromtimestamp(item[2])),
           name=filename,
-          x1=item[0][3],
-          x2=item[0][4],
-          y1=item[0][5],
-          y2=item[0][6],
+          x1=item[3],
+          x2=item[4],
+          y1=item[5],
+          y2=item[6],
           event=self.dbline,
         )
         frameline.save()

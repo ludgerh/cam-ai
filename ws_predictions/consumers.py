@@ -151,8 +151,6 @@ class predictionsConsumer(WebsocketConsumer):
                   myschool, 
                   self.mydatacache['schooldata'][myschool]['imglist'], 
                   self.mydatacache['tf_w_index'],
-                  [],
-                  -1,
                 )
                 predictions = np.empty((0, len(taglist)), np.float32)
                 while (predictions.shape[0] 
