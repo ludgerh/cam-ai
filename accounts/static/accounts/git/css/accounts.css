@@ -2,3 +2,12 @@
 	background: #FF9999;
 	color: #000000;
 }
+
+.ul {
+  max-width:600px;
+  width:auto;
+  background-color:#597081;
+  border-radius:10px;
+  margin:1%;
+  margin-right:20%;
+}
