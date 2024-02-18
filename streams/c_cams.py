@@ -543,8 +543,4 @@ class c_cam(c_device):
 
   def set_pause(self, status):
     self.inqueue.put(('pause', status))
-
-  def stop(self):
-    super().stop()
-    #self.run_process.join()
     

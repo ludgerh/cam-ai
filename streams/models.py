@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -62,7 +63,7 @@ class stream(models.Model):
   det_threshold = models.IntegerField("threshold", default=40)
   det_backgr_delay = models.IntegerField("background delay", default=1)
   det_dilation = models.IntegerField("dilation", default=20)
-  det_erosion = models.IntegerField("erosion", default=3)
+  det_erosion = models.IntegerField("erosion", default=1)
   det_max_rect = models.IntegerField("max. number", default=20)
   det_max_size = models.IntegerField("max. size", default=100)
   det_apply_mask = models.BooleanField(default=False)

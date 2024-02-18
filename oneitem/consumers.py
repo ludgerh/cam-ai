@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -72,7 +73,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + str(text_data))
+    logger.info('<-- ' + str(text_data))
     params = json.loads(text_data)['data']
     outlist = {'tracker' : json.loads(text_data)['tracker']}
 
@@ -403,12 +404,15 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'delete_cam':
       if self.may_write:
+        print("streams[params['itemid']].stop()")
         if params['itemid'] in streams:
           streams[params['itemid']].stop()
+        print("await updatefilter(stream, {'id' : params['itemid'], }, {'active' : False, })")
         await updatefilter(stream, {'id' : params['itemid'], }, {'active' : False, })
+        print("outlist['data'] = 'OK'")
         outlist['data'] = 'OK'
       else:
         outlist['data'] = 'No Access'
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 

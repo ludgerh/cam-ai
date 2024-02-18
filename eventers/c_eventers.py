@@ -481,8 +481,6 @@ class c_eventer(c_device):
                   predictions, 
                   self.tf_worker.get_from_outqueue(self.tf_w_index)
                 ))
-              print('Predictions:')
-              print(predictions)  
               for i in range(len(imglist)):
                 detector_buffer[i].append(predictions[i])
             #print('Inserter Time:', time() - ts)  
@@ -539,7 +537,10 @@ class c_eventer(c_device):
     return(result)
 
   def stop(self):
+    print('eventer-stop:', "self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')")
     self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')
+    print('eventer-stop:', "self.dataqueue.stop()")
     self.dataqueue.stop()
+    print('eventer-stop:', "super().stop()")
     super().stop()
     

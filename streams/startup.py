@@ -95,7 +95,7 @@ redis.set_start_trainer_busy(0)
 redis.set_start_worker_busy(0)
 redis.set_start_stream_busy(0)
 redis.set_shutdown_command(0)
-redis.set('KBInt', 0)
+redis.set('CAM-AI:KBInt', 0)
 
 def restartcheck_thread():
   global restart_mode
@@ -132,7 +132,7 @@ def restartcheck_thread():
 def newexit(*args):
   global restart_mode
   global do_run
-  redis.set('KBInt', 1)
+  redis.set('CAM-AI:KBInt', 1) #Signal for onf in views/consumers
   print ('Caught KeyboardInterrupt...')
   do_run = False
   sleep(5.0)

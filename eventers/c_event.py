@@ -227,7 +227,7 @@ class c_event(list):
         or resolve_rules(cond_dict[4],  self.frames[x][7])
     )]
     if len(sortindex) > outlength:
-      sortindex.sort(key=lambda x: self.frames[x][2], reverse=True)
+      sortindex.sort(key=lambda x: np.max(self.frames[x][7][1:]), reverse=True)
       sortindex = sorted(sortindex[:outlength])
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
     #if len(self.frames) == 0:

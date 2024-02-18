@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -133,34 +134,45 @@ class triggerConsumer(WebsocketConsumer):
           self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
 
           def onf(onf_viewer):
-            try:
-              indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
-              if not self.busydict[indicator]:
-                self.busydict[indicator] = True
-                ts = time()
-                frame = onf_viewer.inqueue.get()[1]
-                if params['mode'] == 'D':
-                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
-                elif params['mode'] == 'C':
-                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
-                  if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
-                    if onf_viewer.drawpad.whitemarks:
-                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
-                    else:
-                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
-                frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
-                #return()
-                if int(redis.get('KBInt')):
+            print('0', end = '')
+            indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
+            print('1', end = '')
+            if not self.busydict[indicator]:
+              self.busydict[indicator] = True
+              print('2', end = '')
+              ts = time()
+              frame = onf_viewer.inqueue.get()[1]
+              print('3', end = '')
+              if params['mode'] == 'D':
+                if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                  frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
+              elif params['mode'] == 'C':
+                if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                  frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
+                if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
+                  if onf_viewer.drawpad.whitemarks:
+                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
+                  else:
+                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
+              print('4', end = '')
+              print('5', end = '')
+              frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
+              print('6', end = '')
+              try:
+                if (int(redis.get('CAM-AI:KBInt')) 
+                    or int(redis.get('CAM-AI:KillStream:'+str(params['idx'])))):
                   return()  
+                print('7', end = '')
                 try:
+                  print('a', end = '')
                   self.send(bytes_data=indicator.encode()+frame)
                 except Disconnected:
+                  print('b', end = '')
                   logger.error('*** Could not send Frame, socket closed...')
-            except:
-              logger.error(format_exc())
-              logger.handlers.clear()
+                print('8', end = '')
+              except:
+                print(format_exc()) 
+              print('9', end = '')
 
           myviewer.parent.add_view_count()
           self.indexdict[params['idx']] = myviewer.push_to_onf(onf)

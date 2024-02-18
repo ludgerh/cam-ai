@@ -73,10 +73,18 @@ class l_buffer:
     while self.do_run:
       message = self.p.get_message()
       if message:
-        if message['data'] == b'T':
-          self.call()
+        if message['data'] == b'D':
+          break
+        elif message['data'] == b'T':
+          print('+', end = '')
+          try:
+            self.call()
+          except:
+            print(format_exc()) 
+          print('-', end = '')
           continue
       sleep(0.01) 
+    print('Message Handler finished')  
     
   def get(self):
     if self.block or (self.itemtype == 1 and self.first_time):
@@ -145,6 +153,10 @@ class l_buffer:
     if self.call: 
       self.redis.publish(self.storage[0], 'T') #Trigger
       
+  def send_death_pill(self):  
+    if self.call: 
+      self.redis.publish(self.storage[0], 'D') #Trigger  
+      
   def empty(self): 
     with self.my_lock:
       if self.redis.llen(self.storage[0]):
@@ -161,6 +173,11 @@ class l_buffer:
 
   def stop(self):
     if self.call:
+      print('LBuffer-----', "self.send_death_pill()")
+      self.send_death_pill()
+      print('LBuffer-----', "self.do_run = False")
       self.do_run = False
+      print('LBuffer-----', "self.thread.join()")
       self.thread.join()
+      print('LBuffer-----', "Done")
         

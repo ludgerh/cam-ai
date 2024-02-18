@@ -1,4 +1,5 @@
-# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+# More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -34,6 +35,7 @@ class c_stream():
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
       self.redis = myredis()
+      self.redis.set('CAM-AI:KillStream:'+str(self.dbline.id), 0)
       self.redis.name_to_stream(self.dbline.id, self.dbline.name)
       if self.dbline.eve_mode_flag:
         self.myeventer = c_eventer(self.dbline, self.logger)
@@ -56,12 +58,14 @@ class c_stream():
       self.logger.handlers.clear()
 
   def stop(self):
-    try:
-      self.mycam.stop()
-      self.mydetector.stop()
-      self.myeventer.stop()
-      self.logger.info('Finished Process '+self.logname+'...')
-      self.logger.handlers.clear()
-    except:
-      self.logger.error(format_exc())
-      self.logger.handlers.clear()
+    self.redis.set('CAM-AI:KillStream:'+str(self.dbline.id), 1)
+    print('+++++', "self.mycam.stop()")
+    self.mycam.stop()
+    print('+++++', "self.mydetector.stop()")
+    self.mydetector.stop()
+    print('+++++', "self.myeventer.stop()")
+    self.myeventer.stop()
+    print('+++++', "self.logger.info('Finished Process '+self.logname+'...')")
+    self.logger.info('Finished Process '+self.logname+'...')
+    print('+++++', "self.logger.handlers.clear()")
+    self.logger.handlers.clear()

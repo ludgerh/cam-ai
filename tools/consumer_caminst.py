@@ -42,6 +42,7 @@ redis = myredis()
 
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 is_public_server = djconf.getconfigbool('is_public_server', False)
+cv_gpu_nr = djconf.getconfigint('cv_gpu_nr', 0)
 
 class caminst(AsyncWebsocketConsumer):
     
@@ -150,6 +151,7 @@ class caminst(AsyncWebsocketConsumer):
       newstream.cam_control_passwd = params['control_pass']
       newstream.cam_control_ip = params['control_ip']
       newstream.cam_control_port = params['control_port']
+      newstream.det_gpu_nr_cv = cv_gpu_nr
       newstream.eve_school_id = myschool
       newstream.creator = self.scope['user']
       newlineid = await savedbline(newstream)
