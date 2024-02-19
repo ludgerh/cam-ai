@@ -447,10 +447,11 @@ class c_cam(c_device):
       self.logger.handlers.clear()
 
   def newprocess(self):
-    if self.dbline.cam_fpslimit:
-      frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
+    
+    if self.dbline.cam_fpslimit and self.dbline.cam_fpslimit < self.cam_fps:
+      det_frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
     else:
-      frame_rate = 0
+      det_frame_rate = 0.0
     self.wd_ts = time()
     self.mydetector.myeventer.inqueue.put(('purge_videos', ))
     if self.dbline.cam_feed_type in {2, 3}:
@@ -466,9 +467,10 @@ class c_cam(c_device):
           + str(self.dbline.id).zfill(4) + '_%08d.mp4')
       else:
         filepath = None
-      outparams1 = ' -f rawvideo'
+      outparams1 = ' -map 0:'+str(self.video_codec) + ' -map -0:a -f rawvideo'
       outparams1 += ' -pix_fmt bgr24'
-      outparams1 += ' -r ' + str(frame_rate)
+      if det_frame_rate:
+        outparams1 += ' -r ' + str(det_frame_rate)
       if os_type == 'raspi11':
         outparams1 += ' -vsync cfr'
       else:
@@ -480,34 +482,42 @@ class c_cam(c_device):
         generalparams += ' -rtsp_transport tcp'
       generalparams += ' -fflags nobuffer'
       generalparams += ' -flags low_delay'
-      if self.video_codec_name in {'h264', 'hevc'}:
-        if filepath:
-          if self.audio_codec_name == 'pcm_alaw':
-            outparams2 = ' -c:v copy -c:a aac'
-          else:
-            outparams2 = ' -c copy'
-          outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
-          outparams2 += ' -f segment'
-          outparams2 += ' -reset_timestamps 1'
-          outparams2 += ' ' + filepath
-        else:
-          outparams2 =''
-      else:
+      if self.video_codec_name not in {'h264', 'hevc'}:
         generalparams += ' -use_wallclock_as_timestamps 1'
-        if filepath:
-          outparams2 = ' -c libx264'
-          if self.dbline.cam_ffmpeg_fps:
-            outparams2 += ' -r ' + str(self.dbline.cam_ffmpeg_fps)
-          outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
-          outparams2 += ' -f segment'
-          outparams2 += ' -reset_timestamps 1'
-          if self.dbline.cam_ffmpeg_crf:
-            outparams2 += ' -crf ' + str(self.dbline.cam_ffmpeg_crf)
-          outparams2 += ' ' + filepath
+      outparams2 = ''
+      if filepath:
+        if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
+          video_framerate = self.dbline.cam_ffmpeg_fps
         else:
-          outparams2 = ''
+          video_framerate = 0.0 
+        outparams2 += ' -map 0:'+str(self.video_codec)
+        if self.audio_codec > -1:
+          outparams2 += ' -map 0:'+str(self.audio_codec)
+        if self.video_codec_name in {'h264', 'hevc'}:
+          if video_framerate:
+            outparams2 += ' -c libx264'
+          else:
+            outparams2 += ' -c:v copy'
+          if self.audio_codec_name == 'pcm_alaw':
+            outparams2 += ' -c:a aac'
+          else:
+            outparams2 += ' -c:a copy'
+        else:    
+          outparams2 = ' -c libx264'
+        if video_framerate:
+          outparams2 += ' -r ' + str(video_framerate)
+          outparams2 += ' -g ' + str(round(video_framerate * self.dbline.cam_ffmpeg_segment))
+        outparams2 += ' -f segment'
+        outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
+        if video_framerate:
+          outparams2 += ' -segment_time_delta '+str(0.5 / (video_framerate))
+        outparams2 += ' -reset_timestamps 1'
+        if self.dbline.cam_ffmpeg_crf:
+          outparams2 += ' -crf ' + str(self.dbline.cam_ffmpeg_crf)
+        outparams2 += ' ' + filepath
       cmd = ('/usr/bin/ffmpeg ' + generalparams + inparams + outparams1 
         + outparams2)
+      #print(cmd)
       self.ff_proc = Popen(cmd, stdout=PIPE, shell=True)
       if self.dbline.cam_repeater > 0:
         self.repeater.rep_connect(self.mycam.url, self.rep_cam_nr)

@@ -73,7 +73,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       
 
   async def receive(self, text_data):
-    logger.info('<-- ' + str(text_data))
+    logger.debug('<-- ' + str(text_data))
     params = json.loads(text_data)['data']
     outlist = {'tracker' : json.loads(text_data)['tracker']}
 
@@ -404,15 +404,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'delete_cam':
       if self.may_write:
-        print("streams[params['itemid']].stop()")
         if params['itemid'] in streams:
           streams[params['itemid']].stop()
-        print("await updatefilter(stream, {'id' : params['itemid'], }, {'active' : False, })")
         await updatefilter(stream, {'id' : params['itemid'], }, {'active' : False, })
-        print("outlist['data'] = 'OK'")
         outlist['data'] = 'OK'
       else:
         outlist['data'] = 'No Access'
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 

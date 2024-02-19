@@ -59,13 +59,8 @@ class c_stream():
 
   def stop(self):
     self.redis.set('CAM-AI:KillStream:'+str(self.dbline.id), 1)
-    print('+++++', "self.mycam.stop()")
     self.mycam.stop()
-    print('+++++', "self.mydetector.stop()")
     self.mydetector.stop()
-    print('+++++', "self.myeventer.stop()")
     self.myeventer.stop()
-    print('+++++', "self.logger.info('Finished Process '+self.logname+'...')")
     self.logger.info('Finished Process '+self.logname+'...')
-    print('+++++', "self.logger.handlers.clear()")
     self.logger.handlers.clear()

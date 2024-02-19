@@ -43,6 +43,7 @@ redis = myredis()
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 is_public_server = djconf.getconfigbool('is_public_server', False)
 cv_gpu_nr = djconf.getconfigint('cv_gpu_nr', 0)
+video_fps_limit = djconf.getconfigfloat('video_fps_limit', 0.0)
 
 class caminst(AsyncWebsocketConsumer):
     
@@ -134,15 +135,11 @@ class caminst(AsyncWebsocketConsumer):
       if 'name' in params:
         newstream.name = params['name']
       newstream.cam_url = params['camurl']
-      # cam_video_codec and cam_audio_codec are set to -1 (auto)
-      # should be put to values from params
-      newstream.cam_video_codec = -1
-      newstream.cam_audio_codec = -1
-      #newstream.cam_video_codec = params['videocodec']
-      #if params['audiocodec'] is None:
-      #  newstream.cam_audio_codec = -1
-      #else:  
-      #  newstream.cam_audio_codec = params['audiocodec']
+      newstream.cam_video_codec = params['videocodec']
+      if params['audiocodec'] is None:
+        newstream.cam_audio_codec = -1
+      else:  
+        newstream.cam_audio_codec = params['audiocodec']
       newstream.name = params['cam_name']
       newstream.cam_xres = params['xresolution']
       newstream.cam_yres = params['yresolution']
@@ -151,6 +148,7 @@ class caminst(AsyncWebsocketConsumer):
       newstream.cam_control_passwd = params['control_pass']
       newstream.cam_control_ip = params['control_ip']
       newstream.cam_control_port = params['control_port']
+      newstream.cam_ffmpeg_fps = video_fps_limit
       newstream.det_gpu_nr_cv = cv_gpu_nr
       newstream.eve_school_id = myschool
       newstream.creator = self.scope['user']
@@ -180,10 +178,8 @@ class caminst(AsyncWebsocketConsumer):
         mydomain = mydomain.split('/')[0]  
       if (mydomain == '') and self.scope['user'].is_superuser:
         result = True #Admin may scan the network
-      elif domain(mydomain):  
-        result = True #Anyone may check an external domain
-      elif ipv4(mydomain) or ipv6(mydomain):
-        result = not is_public_server #IPs permitted on Raspis, not Eygelshoven
+      elif domain(mydomain) or ipv4(mydomain) or ipv6(mydomain): 
+        result = True #Anyone may check an external domain or IP
       else:
         result = False #No correct IP nor domain
       outlist['data'] = {'result' : result, 'domain' : mydomain, } 

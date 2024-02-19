@@ -30,8 +30,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <span id="ipaddress">{{ ipaddress }}</span>
   </div>
   <div class="h2 m-2">
-    Used ports:
-    <span id="ipaddress">{{ ports }}</span>
+    Open ports:
+    <span>{{ ports }}</span>
   </div>
   <div class="h4 m-2">
     <div>
@@ -41,6 +41,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <div>
       Password:
       <input class="mb-3 m-2" type="password" id="passinput" size="30">
+    </div>
+    <div>
+      Select Port:
+      <select class="mb-3 m-2" id="portselect">
+      {% for item in ports %}
+        <option value="{{ item }}">{{ item }}</option>
+      {% endfor %}  
+      </select>
     </div>
   </div>
   <button class="btn btn-primary m-2 scan-button" type="button">Collect info from camera</button>
@@ -192,7 +200,10 @@ $(document).ready(function() {
         urlscheme = $('#urlselect').val();
       };
     };
-    urlstr = urlscheme.replace('{user}', $('#userinput').val()).replace('{pass}', $('#passinput').val()).replace('{address}', $('#ipaddress').text());
+    urlstr =  urlscheme.replace('{user}', $('#userinput').val())
+    urlstr = urlstr.replace('{pass}', $('#passinput').val())
+    urlstr = urlstr.replace('{address}', $('#ipaddress').text())
+    urlstr = urlstr.replace('{port}', $('#portselect').val())
     $('#camurl').val(urlstr);
   });
   $('#urlselect').trigger("change");
@@ -200,6 +211,9 @@ $(document).ready(function() {
     $('#urlselect').trigger("change");
   });
   $('#passinput').change(function() {
+    $('#urlselect').trigger("change");
+  });
+  $('#portselect').change(function() {
     $('#urlselect').trigger("change");
   });
   WSAsync(

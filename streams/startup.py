@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -69,23 +69,23 @@ if not model_type.objects.filter(name='efficientnetv2-l'):
     
 if not  camurl.objects.filter(type='levelone FCS-4051'):
   newcam = camurl(type='levelone FCS-4051', 
-    url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
+    url='rtsp://{user}:{pass}@{address}:{port}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
   newcam.save()
 if not  camurl.objects.filter(type='levelone FCS-5201'):
   newcam = camurl(type='levelone FCS-5201', 
-    url='rtsp://{user}:{pass}@{address}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
+    url='rtsp://{user}:{pass}@{address}:{port}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
   newcam.save()
 if not  camurl.objects.filter(type='Reolink RLC-410W'):
   newcam = camurl(type='Reolink RLC-410W', 
-    url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
+    url='rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
   newcam.save()
 if not  camurl.objects.filter(type='Reolink E1 Zoom'):
   newcam = camurl(type='Reolink E1 Zoom', 
-    url='rtmp://{address}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
+    url='rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
   newcam.save()
 if not  camurl.objects.filter(type='TP-Link Tapo C200'):
   newcam = camurl(type='TP-Link Tapo C200', 
-    url='rtsp://{user}:{pass}@{address}/stream1')
+    url='rtsp://{user}:{pass}@{address}:{port}/stream1')
   newcam.save()
 
 restart_mode = 0

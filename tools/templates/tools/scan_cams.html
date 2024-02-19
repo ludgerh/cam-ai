@@ -37,8 +37,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <label for="ipaddress" class="form-label h3">
       {% if user.is_superuser %}
         Camera address or domain (leave empty to scan your network):
-      {% elif is_public_server %}  
-        Camera domain:
       {% else %}  
          Camera address or domain:
       {% endif %}  
@@ -47,8 +45,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <div class="h2 m-2">
       {% if user.is_superuser %}
         Examples: '', '192.168.1.13', 'mydomain.com'
-      {% elif is_public_server %}  
-        Example: 'mydomain.com'
       {% else %}  
         Examples: '192.168.1.13', 'mydomain.com'
       {% endif %}  
@@ -82,8 +78,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="form-check h2 m-2">
     <input class="form-check-input me-3 bool" type="checkbox" value="" id="checkbox8000" port="8000">
     <label class="form-check-label" for="flexCheckDefault">
-      8000 (HTML, ONVIF)
+      8000 (HTML, ONVIF)?
     </label>
+  </div>
+  </div><div class="h2 m-2">
+    <label for="custom_port" class="form-label h3">
+      Custom Port:
+    </label>
+    <input type="number" class="form-control" id="custom_port" min="80" max="65535"  style="width: 200px;">
   </div>
   <div>
   <button class="btn btn-primary m-2" id="scan-button" type="button" disabled>Check (may take a while)</button>
@@ -111,6 +113,19 @@ let myip;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 $(document).ready(function() {
+
+  $('#custom_port').change(function() {
+    var min = parseInt($(this).attr('min'));
+    var max = parseInt($(this).attr('max'));
+    var value = parseInt($(this).val());
+
+    if (value < min) {
+      $(this).val(min);
+    } else if (value > max) {
+      $(this).val(max);
+    }
+  });
+  
   WSAsync(
     ws_scheme + '//'
     + window.location.host
@@ -123,13 +138,11 @@ $(document).ready(function() {
     }));
   })
   .then((result) => {
-    console.log(result);
     mynetwork = result.mynet;
     myip = result.myip;
     $('#network').text(result.mynet);
     $('#ipaddress').text(result.myip);
     $('.form-check-input').each(function( index ) {
-      console.log(ports, parseInt($(this).attr('port')));
       if (ports.includes(parseInt($(this).attr('port')))) {
         $(this).prop("checked",true);
       } else {
@@ -161,14 +174,15 @@ $(document).ready(function() {
       .catch(err => {console.log(err);});
     });
     $('#camdomain').trigger('change');
-    
     $('#scan-button').click(function() {
       $('#netlist').empty();
       $('#please_wait').removeClass("d-none");
+      portarray = ports.concat([parseInt($('#custom_port').val())]).sort(function(a, b){return a-b});
+      console.log(portarray);
       caminstSocket.sendandwait({
         'command' : 'scanips',
         'camaddress' : $('#camdomain').val(),
-        'portaddr' : ports,
+        'portaddr' : portarray,
         'network' : mynetwork,
         'ipaddr' : myip,
       })  

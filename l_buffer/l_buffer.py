@@ -76,15 +76,9 @@ class l_buffer:
         if message['data'] == b'D':
           break
         elif message['data'] == b'T':
-          print('+', end = '')
-          try:
-            self.call()
-          except:
-            print(format_exc()) 
-          print('-', end = '')
+          self.call()
           continue
       sleep(0.01) 
-    print('Message Handler finished')  
     
   def get(self):
     if self.block or (self.itemtype == 1 and self.first_time):
@@ -173,11 +167,7 @@ class l_buffer:
 
   def stop(self):
     if self.call:
-      print('LBuffer-----', "self.send_death_pill()")
       self.send_death_pill()
-      print('LBuffer-----', "self.do_run = False")
       self.do_run = False
-      print('LBuffer-----', "self.thread.join()")
       self.thread.join()
-      print('LBuffer-----', "Done")
         

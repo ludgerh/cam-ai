@@ -158,10 +158,7 @@ class c_device():
       self.parent.take_data_count()
 
   def stop(self):
-    print('-----', "self.viewer.stop()")
     if self.viewer:
       self.viewer.stop()
-    print('-----', "self.inqueue.put(('stop',))")
     self.inqueue.put(('stop',))
-    print('-----', "self.run_process.join()")
     self.run_process.join()
