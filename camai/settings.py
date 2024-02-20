@@ -73,6 +73,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = security_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
+# Don't change the settings here, got to passwords.py instead
 if emulatestatic:
   DEBUG = True
 else:  

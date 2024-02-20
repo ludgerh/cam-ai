@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -36,7 +36,7 @@ class archive(SingleTableMixin, myFilterView):
   def get(self, request, *args, **kwargs):
     self.request = request
     self.streamnr = kwargs['streamnr']
-    if access.check('S', self.streamnr, request.user, 'W'):
+    if access.check('C', self.streamnr, request.user, 'W'):
       return(super().get(request, *args, **kwargs))
     else:
       return(HttpResponse('No Access'))
@@ -44,12 +44,14 @@ class archive(SingleTableMixin, myFilterView):
 
 
   def get_context_data(self, **kwargs):
+    mystream = stream.objects.get(id=self.streamnr)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'stream' : stream.objects.get(id=self.streamnr),
+      'may_write_school' : access.check('S', mystream.eve_school.id, self.request.user, 'W'),
+      'stream' : mystream,
       'user' : self.request.user,
     })
     return context

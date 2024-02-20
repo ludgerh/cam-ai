@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endif %}
 
 
-{% if may_write %}
+{% if may_write_school %}
 <!-- Modal -->
 <main>
   <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
@@ -68,7 +68,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </main>
 <script>
 
-{% if may_write %}
+{% if may_write_stream %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
   const button = event.relatedTarget;
   const nr_todel = button.getAttribute('id');
@@ -124,7 +124,7 @@ getimages = function() {
 		        for (let j=0; j<framelines[$(this).attr('id')].length; j++) {
 		          cblines = '<div class="checklist h4">';
 		          for (let k=0; k<taglines.length; k++) {
-{% if may_write %}
+{% if may_write_school %}
 				        cblines += '<input type="checkbox" class="checkboxx" data-k="'+k+'"';
 				        if (predictions[j][k] >= 0.5) {
 					        cblines += ' checked>';
@@ -139,7 +139,7 @@ getimages = function() {
 			        cblines += '</div>';
               cblines = $(cblines)
               cblines.appendTo($('#card'+framelines[$(this).attr('id')][j].id));
-{% if may_write %}
+{% if may_write_school %}
 			        cblines.children('input:checkbox').change(function(evt) {
                 let k = $(evt.target).data('k');
                 if ($(evt.target).prop('checked')) {
@@ -160,7 +160,7 @@ getimages = function() {
 {% endif %}
           })
           .catch(err => {console.log(err);});
-{% if may_write %}
+{% if may_write_school %}
           buttonline = '<h4>Who / what is this?<br>';
 		      buttonline += '<select id="myselect'+$(this).attr('id')+'" class="btn btn-primary">';
 		      buttonline += '<option value="0">Choose...</option>';
@@ -284,7 +284,7 @@ getimages = function() {
 };
 
 $(document).ready(function () {
-{% if may_write %}
+{% if may_write_stream %}
   $('.delbutton').click(function(evt) {
     SchoolDBUtilSocket.sendandwait({
       'command' : 'remfrschool',

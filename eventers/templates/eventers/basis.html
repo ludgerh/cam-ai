@@ -1,16 +1,18 @@
-{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
-{# More information and complete source: https://github.com/ludgerh/cam-ai #}
-{# This program is free software; you can redistribute it and/or #}
-{# modify it under the terms of the GNU General Public License #}
-{# as published by the Free Software Foundation; either version 3 #}
-{# of the License, or (at your option) any later version. #}
-{# This program is distributed in the hope that it will be useful, #}
-{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
-{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
-{# See the GNU General Public License for more details. #}
-{# You should have received a copy of the GNU General Public License #}
-{# along with this program; if not, write to the Free Software #}
-{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
 
 <!doctype html>
 <html lang="en">
@@ -56,12 +58,16 @@
         <div class="col-sm-auto">
           <a href="/eventers/events/{{ stream.id }}" class="btn btn-primary m-2" style="width: 120px;">New Events</a>
         </div>
-        <div class="col-sm-auto">
-          <a href="/users/archive/{{ stream.id }}" class="btn btn-primary m-2" style="width: 120px;">Archive</a>
-        </div>
-        <div class="col-sm-auto">
-          <a href="/schools/classroom/{{ stream.id }}" class="btn btn-primary m-2" style="width: 120px;">Tagging</a>
-        </div>
+        {% if may_write_stream %}
+          <div class="col-sm-auto">
+            <a href="/users/archive/{{ stream.id }}" class="btn btn-primary m-2" style="width: 120px;">Archive</a>
+          </div>
+        {% endif %}
+        {% if may_write_school %}
+          <div class="col-sm-auto">
+            <a href="/schools/classroom/{{ stream.id }}" class="btn btn-primary m-2" style="width: 120px;">Tagging</a>
+          </div>
+        {% endif %}
         <div class="col-sm-auto">
           <a class="btn btn-primary m-2 back back" href="/">Back to main</a>
         </div>

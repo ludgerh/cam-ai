@@ -1,18 +1,19 @@
-{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
-{# More information and complete source: https://github.com/ludgerh/cam-ai #}
-{# This program is free software; you can redistribute it and/or #}
-{# modify it under the terms of the GNU General Public License #}
-{# as published by the Free Software Foundation; either version 3 #}
-{# of the License, or (at your option) any later version. #}
-{# This program is distributed in the hope that it will be useful, #}
-{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
-{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
-{# See the GNU General Public License for more details. #}
-{# You should have received a copy of the GNU General Public License #}
-{# along with this program; if not, write to the Free Software #}
-{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.#}
-
 {% extends 'eventers/basis.html' %}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
 {% block content %}
 
 {% if emulatestatic %}
@@ -56,7 +57,7 @@
 
   <h2 class="m-2">New events: {{ stream.name }}
     <br>
-  {% if may_write %}
+  {% if may_write_stream %}
     <button type="button" class="btn btn-primary " id="0" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 240px; margin-left: 0;">
       Purge schooled events
     </button>
@@ -91,7 +92,7 @@
             <a href="/eventers/oneevent/{{ stream.id }}/{{ item.id }}" 
               class="btn btn-primary position-absolute bottom-0 start-0 m-3" 
               style="width: 120px;">See details</a>
-  {% if may_write %}
+  {% if may_write_stream %}
             <button type="button"  id="{{ item.id }}" 
               class="btn btn-primary position-absolute bottom-0 end-0 m-3" 
               data-bs-toggle="modal" data-bs-target="#deleteModal" 
@@ -106,7 +107,7 @@
 </main>
 <script>
 
-{% if may_write %}
+{% if may_write_stream %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
   const button = event.relatedTarget;
   const event_nr = button.getAttribute('id');
@@ -181,7 +182,7 @@ $(document).ready(function() {
     $(window).on('resize scroll', function() {
       getimages();
     });
-{% if may_write %}
+{% if may_write_stream %}
     $('.delbutton').click(function() {
       let event_nr = $(this).attr('idx');
       $('#deleteModal').modal('hide');

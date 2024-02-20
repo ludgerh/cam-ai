@@ -60,16 +60,20 @@ def images(request, schoolnr):
 
 @login_required
 def classroom(request, streamnr):
-  if access.check('C', streamnr, request.user, 'R'):
+  myschool = stream.objects.get(id=streamnr).eve_school
+  if access.check('S', myschool.id, request.user, 'W'):
+    mystream = stream.objects.get(id=streamnr)
     template = loader.get_template('schools/classroom.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
-      'school' : stream.objects.get(id=streamnr).eve_school,
-      'stream' : stream.objects.get(id=streamnr),
+      'school' : myschool,
+      'stream' : mystream,
       'events' : event.objects.filter(camera_id=streamnr, done=False, xmax__gt=-1).order_by('-id'),
       'debug' : settings.DEBUG,
-      'may_write' : access.check('C', streamnr, request.user, 'W'),
+      'may_write_stream' : access.check('C', streamnr, request.user, 'W'),
+      'may_write_school' : access.check('S', myschool.id, request.user, 'W'),
+      'stream' : mystream,
       'user' : request.user,
     }
     return(HttpResponse(template.render(context)))

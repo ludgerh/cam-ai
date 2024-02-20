@@ -65,7 +65,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <div class="accordion-body">
 {% if event.videoclip %}
         <div class="row" id="crd{{ event.id }}" dtype="1">
-          <video width="50" height="auto" id="video" poster="/eventers/eventjpg/{{ event.id }}/video.jpg" controls>
+          <video width="50" height="50" id="video" poster="/eventers/eventjpg/{{ event.id }}/video.jpg" controls>
             {% if is_android %}
               <source src="/eventers/eventwebm/0/{{ event.id }}/video.webm" type="video/webm"/>
               <source src="/eventers/eventmp4/0/{{ event.id }}/video.mp4" type="video/mp4"/>
@@ -78,7 +78,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
         <div class="row">
           <button type="button"  id="{{ event.id }}" class="btn btn-primary m-3 videoarchbutton" style="width: 120px;">To Archive</button>
-  {% if may_write %}
+  {% if may_write_stream %}
           <button type="button"  id="{{ event.id }}" dtype="1" class="btn btn-primary m-3 videodelbutton" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 120px;">Delete</button>
   {% endif %}
         </div>
@@ -112,7 +112,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                 <div class="card-body">
                   <h6 class="card-title">{{ item.time|date:'d.m.Y H:i:s' }}</h6>
                   <button type="button"  id="{{ item.id }}" class="btn btn-primary position-absolute bottom-0 start-0 m-3 framearchbutton" style="width: 120px;">To Archive</button>
-{% if may_write %}
+{% if may_write_stream %}
                   <button type="button"  id="{{ item.id }}" dtype="0" class="btn btn-primary position-absolute bottom-0 end-0 m-3" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 120px;">Delete</button>
 {% endif %}
                 </div>
@@ -129,7 +129,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 let displaywidth = Math.round($(window).width() * 0.97);
 
-{% if may_write %}
+{% if may_write_stream %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
   const button = event.relatedTarget;
   const nr_todel = button.getAttribute('id');
@@ -156,8 +156,27 @@ $.fn.isInViewport = function() {
   return elementBottom > viewportTop && elementTop < viewportBottom;
 };
 
+
+vid = document.getElementById("video");
+video.addEventListener( "loadedmetadata", function () {
+  xscale = ($(window).width() - 20) / this.videoWidth;
+  yscale = ($(window).height() - 300) / this.videoHeight;
+  let displaywidth;
+  let displayheight;
+  if (xscale > yscale) {
+    displaywidth = Math.round(vid.videoWidth * yscale);
+    displayheight = Math.round(vid.videoHeight * yscale);
+  } else {
+    displaywidth = Math.round(vid.videoWidth * xscale);
+    displayheight = Math.round(vid.videoHeight* xscale);
+  };
+  $('#video').attr('width', displaywidth);
+  $('#video').attr('height', displayheight);
+}, false);
+
+
 $(document).ready(function() {
-  $('#video').attr('width', displaywidth+'px');
+
 	WSAsync(
 		  ws_scheme + '//'
 		  + window.location.host
@@ -225,7 +244,7 @@ $(document).ready(function() {
       })
 	    .catch(err => {console.log(err);});
     });
-{% if may_write %}
+{% if may_write_stream %}
     $('.delbutton').click(function() {
       const nr_todel = $(this).attr('id');
       const dtype = $(this).attr('dtype');

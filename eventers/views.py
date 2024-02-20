@@ -39,14 +39,16 @@ archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
 @login_required
 def events(request, camnr):
   if access.check('C', camnr, request.user, 'R'):
+    mystream = stream.objects.get(id=camnr)
     template = loader.get_template('eventers/events.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'events' : event.objects.filter(camera_id=camnr, xmax__gt=-1).order_by('-id'),
       'debug' : settings.DEBUG,
-      'may_write' : access.check('S', camnr, request.user, 'W'),
-      'stream' : stream.objects.get(id=camnr),
+      'may_write_stream' : access.check('C', camnr, request.user, 'W'),
+      'may_write_school' : access.check('S', mystream.eve_school.id, request.user, 'W'),
+      'stream' : mystream,
       'user' : request.user,
     }
     return(HttpResponse(template.render(context)))
@@ -55,6 +57,7 @@ def events(request, camnr):
 
 @login_required
 def oneevent(request, streamnr, eventnr):
+  mystream = stream.objects.get(id=streamnr)
   myevent = event.objects.get(id=eventnr)
   if access.check('C', streamnr, request.user, 'R'):
     length_in_seconds = round(myevent.end.timestamp() - myevent.start.timestamp())
@@ -78,8 +81,9 @@ def oneevent(request, streamnr, eventnr):
       'event' : event.objects.get(id=eventnr),
       'frames' : frames,
       'debug' : settings.DEBUG,
-      'may_write' : access.check('C', streamnr, request.user, 'W'),
-      'stream' : stream.objects.get(id=streamnr),
+      'may_write_stream' : access.check('C', streamnr, request.user, 'W'),
+      'may_write_school' : access.check('S', mystream.eve_school.id, request.user, 'W'),
+      'stream' : mystream,
       'length' : length,
       'user' : request.user,
     }
