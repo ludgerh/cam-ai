@@ -57,16 +57,20 @@ if not model_type.objects.filter(name='efficientnetv2-b2'):
 if not model_type.objects.filter(name='efficientnetv2-b3'):
   newtype = model_type(name='efficientnetv2-b3', x_in_default=300, y_in_default=300)
   newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-s'):
-  newtype = model_type(name='efficientnetv2-s', x_in_default=384, y_in_default=384)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-m'):
-  newtype = model_type(name='efficientnetv2-m', x_in_default=480, y_in_default=480)
-  newtype.save()
-if not model_type.objects.filter(name='efficientnetv2-l'):
-  newtype = model_type(name='efficientnetv2-l', x_in_default=480, y_in_default=480)
-  newtype.save()
+#if not model_type.objects.filter(name='efficientnetv2-s'):
+#  newtype = model_type(name='efficientnetv2-s', x_in_default=384, y_in_default=384)
+#  newtype.save()
+#if not model_type.objects.filter(name='efficientnetv2-m'):
+#  newtype = model_type(name='efficientnetv2-m', x_in_default=480, y_in_default=480)
+#  newtype.save()
+#if not model_type.objects.filter(name='efficientnetv2-l'):
+#  newtype = model_type(name='efficientnetv2-l', x_in_default=480, y_in_default=480)
+#  newtype.save()
     
+if not  camurl.objects.filter(type='Imou Cruiser SE+'):
+  newcam = camurl(type='Imou Cruiser SE+', 
+    url='rtsp://{user}:{pass}@{address}:{port}/cam/realmonitor?channel=1&subtype=0')
+  newcam.save()
 if not  camurl.objects.filter(type='levelone FCS-4051'):
   newcam = camurl(type='levelone FCS-4051', 
     url='rtsp://{user}:{pass}@{address}:{port}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')

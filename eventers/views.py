@@ -73,7 +73,6 @@ def oneevent(request, streamnr, eventnr):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'is_android' : is_android,
-      'uastring' : useragent['string'],
       'os' : useragent['os']['family'],
       'browser' : useragent['user_agent']['family'],
       'event' : event.objects.get(id=eventnr),

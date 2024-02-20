@@ -176,7 +176,6 @@ def getbigmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
     'is_android' : is_android,
-    'uastring' : useragent['string'],
     'os' : useragent['os']['family'],
     'browser' : useragent['user_agent']['family'],
     'linenr' : linenr,
