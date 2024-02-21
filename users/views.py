@@ -41,8 +41,6 @@ class archive(SingleTableMixin, myFilterView):
     else:
       return(HttpResponse('No Access'))
 
-
-
   def get_context_data(self, **kwargs):
     mystream = stream.objects.get(id=self.streamnr)
     context = super().get_context_data(**kwargs)
@@ -50,6 +48,7 @@ class archive(SingleTableMixin, myFilterView):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
+      'may_write_stream' : access.check('C', self.streamnr, self.request.user, 'W'),
       'may_write_school' : access.check('S', mystream.eve_school.id, self.request.user, 'W'),
       'stream' : mystream,
       'user' : self.request.user,

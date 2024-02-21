@@ -1,4 +1,4 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
+# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 # More information and complete source: https://github.com/ludgerh/cam-ai
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,24 +29,32 @@ from tools.l_tools import djconf
 
 @login_required
 def index(request, mode='C'):
-  camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', request.user, 'R')
-  detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', request.user, 'R')
-  eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', request.user, 'R')
-  templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
-  schoollist = []
-  for item in templist:
-    if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-      schoollist.append(item)
   template = loader.get_template('index/index.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'mode' : mode,
-    'camlist' : camlist,
-    'detectorlist' : detectorlist,
-    'eventerlist' : eventerlist,
-    'schoollist' : schoollist,
+    'camlist' : access.filter_items(
+      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+      request.user, 'R'
+    ),
+    'detectorlist' : access.filter_items(
+      stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+      request.user, 'R'
+    ),
+    'eventerlist' : access.filter_items(
+      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+      request.user, 'R'
+    ),
+    'schoollist' : access.filter_items(
+      school.objects.filter(active=True), 'S', 
+      request.user, 'R'
+    ),
+    'schoollist_write' : access.filter_items(
+      school.objects.filter(active=True), 'S', 
+      request.user, 'W'
+    ),
     'user' : request.user,
   }
   return(HttpResponse(template.render(context)))

@@ -41,8 +41,7 @@ archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
 
 @login_required
 def images(request, schoolnr):
-  if ((((schoolnr > 1) or (request.user.is_staff)) or (request.user.is_superuser)) 
-      and (access.check('S', schoolnr, request.user, 'R'))):
+  if access.check('S', schoolnr, request.user, 'W'):
     myschool = school.objects.get(pk = schoolnr)
     template = loader.get_template('schools/images.html')
     context = {

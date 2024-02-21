@@ -41,55 +41,32 @@ class health(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     datapath = djconf.getconfig('datapath', 'data/')
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
-      'recordingspath' : djconf.getconfig('recordingspath', datapath + 'recordings/'),
-      'schoolframespath' : djconf.getconfig('schoolframespath', 
-        datapath + 'schoolframes/')
-    })
-    return context
-
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
-
-class dbcompression(TemplateView):
-  template_name = 'tools/dbcompression.html'
-
-  def get_context_data(self, **kwargs):
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
-    context = super().get_context_data(**kwargs)
-    datapath = djconf.getconfig('datapath', 'data/')
-    context.update({
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
-      'debug' : settings.DEBUG,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'recordingspath' : djconf.getconfig('recordingspath', datapath + 'recordings/'),
       'schoolframespath' : djconf.getconfig('schoolframespath', 
         datapath + 'schoolframes/')
@@ -111,20 +88,31 @@ class scan_cams(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'streamlimit' : streamlimit,
       'streamcount' : streamcount,
       'mayadd' : (streamlimit > streamcount),
@@ -141,20 +129,31 @@ class inst_cam(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'camurls' : camurl.objects.all(),
       'streamlimit' : streamlimit,
       'streamcount' : streamcount,
@@ -174,20 +173,31 @@ class addschool(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'schoollimit' : schoollimit,
       'schoolcount' : schoolcount,
       'mayadd' : (schoollimit > schoolcount),
@@ -201,20 +211,30 @@ class linkworkers(TemplateView):
     camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
     detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
     eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', self.request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (self.request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
-      'debug' : settings.DEBUG,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'workerlist' : worker.objects.all(),
     })
     return context

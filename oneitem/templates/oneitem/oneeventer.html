@@ -52,11 +52,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 					        {{ field.label_tag }}
 					        {% if field.name == 'eve_school' %}
                   <select name="eve_school" id="id_eve_school">
-                    {% if dbline.eve_school.id == 1 %}
-                      <option value="1" selected>Standard</option>
-                    {% else %}  
-                      <option value="1">Standard</option>
-                    {% endif %}
                     {% for item in schoollist %}
                       {% if dbline.eve_school.id == item.id %}
                         <option value="{{ item.id }}" selected>{{ item.name }}</option>

@@ -68,14 +68,6 @@ def onecam(request, camnr, tokennr=0, token=None):
       'cam_feed_type' : dbline.cam_feed_type,
       'cam_url' : dbline.cam_url,
     })
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
@@ -85,10 +77,26 @@ def onecam(request, camnr, tokennr=0, token=None):
       'token' : token,
       'user' : request.user,
       'dbline' : dbline,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'myurl' : myurl,
       'form' : form,
     }
@@ -139,14 +147,6 @@ def onedetector(request, detectornr, tokennr=0, token=None):
       'det_max_size' : dbline.det_max_size,
       'det_max_rect' : dbline.det_max_rect,
     })
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
@@ -156,10 +156,26 @@ def onedetector(request, detectornr, tokennr=0, token=None):
       'token' : token,
       'user' : request.user,
       'dbline' : dbline,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'myurl' : myurl,
       'form' : form,
     }
@@ -204,15 +220,6 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       'eve_school' : dbline.eve_school,
       'eve_alarm_email' : dbline.eve_alarm_email,
     })
-    form.fields["eve_school"].queryset = school.objects.filter(active=True)
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', request.user, 'R')
-    templist = access.filter_items(school.objects.filter(active=True), 'S', request.user, 'R')
-    schoollist = []
-    for item in templist:
-      if ((item.id > 1) or (request.user.is_staff)) or (not worker.objects.get(id=1).use_websocket):
-        schoollist.append(item)
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
@@ -222,10 +229,26 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       'token' : token,
       'user' : request.user,
       'dbline' : dbline,
-      'camlist' : camlist,
-      'detectorlist' : detectorlist,
-      'eventerlist' : eventerlist,
-      'schoollist' : schoollist,
+      'camlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+        request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+        request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+        request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'R'
+      ),
+      'schoollist_write' : access.filter_items(
+        school.objects.filter(active=True), 'S', 
+        request.user, 'W'
+      ),
       'myurl' : myurl,
       'form' : form,
     }

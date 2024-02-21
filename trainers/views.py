@@ -63,8 +63,7 @@ def epochs(request, schoolnr, fitnr):
     return(HttpResponse('No Access'))
 
 def dashboard(request, schoolnr):
-  if (((schoolnr > 1) or (request.user.is_superuser)) 
-      and (access.check('S', schoolnr, request.user, 'R'))):
+  if access.check('S', schoolnr, request.user, 'R'):
     myschool = school.objects.get(pk = schoolnr)
     template = loader.get_template('trainers/dashboard.html')
     context = {
