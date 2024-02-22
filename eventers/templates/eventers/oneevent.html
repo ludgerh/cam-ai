@@ -44,8 +44,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   </div>
 </div>
 
-<h2 class="m-2">Event #{{ event.id }} details: Duration: {{ length }}</h2>
-<h2 class="m-2">{{ event.start|date:'d.m.Y H:i:s' }}</h2>
+<h2 class="m-2">Event #{{ event.id }}: {{ event.start|date:'d.m.Y H:i:s' }}, <span id="duration">Duration: {{ length }}</span></h2>
 
 <div class="accordion" id="eventaccordion">
   <div class="accordion-item">
@@ -159,6 +158,8 @@ $.fn.isInViewport = function() {
 
 vid = document.getElementById("video");
 video.addEventListener( "loadedmetadata", function () {
+  console.log(this.duration)
+  $('#duration').text(Math.round(this.duration) + ' Sec');
   xscale = ($(window).width() - 20) / this.videoWidth;
   yscale = ($(window).height() - 300) / this.videoHeight;
   let displaywidth;

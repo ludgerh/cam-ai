@@ -1,16 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import json
 import numpy as np
@@ -42,6 +44,7 @@ log_ini(logger, logname)
 redis = myredis()
 
 longbreak = djconf.getconfigfloat('long_brake', 1.0)
+is_public_server = djconf.getconfigbool('is_public_server', False)
 
 #*****************************************************************************
 # triggerConsumer
@@ -63,8 +66,8 @@ class triggerConsumer(WebsocketConsumer):
     for viewer in self.viewerlist:
       viewer.parent.take_view_count()
       if not redis.view_from_dev(viewer.parent.type, viewer.parent.id):
-        #viewer.inqueue.stop()
-        viewer.pop_from_onf(self.indexdict[viewer.parent.id])
+        if self.indexdict[viewer.parent.id]['show_cam']:
+          viewer.pop_from_onf(self.indexdict[viewer.parent.id]['onf'])
     for item in self.loglist:
       item.stop = timezone.now()
       item.active = False
@@ -85,6 +88,8 @@ class triggerConsumer(WebsocketConsumer):
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'starttrigger':
+        mystream = streams[params['idx']]
+        show_cam = not(self.scope['user'].is_superuser and is_public_server and mystream.dbline.encrypted)
         if self.scope['user'].id is None:
           if (params['tokennr'] and params['token']):
             if params['mode'] == 'C':
@@ -99,7 +104,6 @@ class triggerConsumer(WebsocketConsumer):
           go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
         if go_on:
           outx = params['width']
-          mystream = streams[params['idx']]
           if params['mode'] == 'C':
             if outx > mystream.dbline.cam_min_x_view:
               outx *= mystream.dbline.cam_scale_x_view
@@ -133,35 +137,37 @@ class triggerConsumer(WebsocketConsumer):
           self.queuedict[params['idx']] = myviewer.inqueue
           self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
 
-          def onf(onf_viewer):
-            indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
-            if not self.busydict[indicator]:
-              self.busydict[indicator] = True
-              ts = time()
-              frame = onf_viewer.inqueue.get()[1]
-              if params['mode'] == 'D':
-                if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                  frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
-              elif params['mode'] == 'C':
-                if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                  frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
-                if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
-                  if onf_viewer.drawpad.whitemarks:
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
-                  else:
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
-              frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
-              if (int(redis.get('CAM-AI:KBInt')) 
-                  or int(redis.get('CAM-AI:KillStream:'+str(params['idx'])))):
-                return()  
-              try:
-                self.send(bytes_data=indicator.encode()+frame)
-              except Disconnected:
-                logger.error('*** Could not send Frame, socket closed...')
+          if show_cam:
+            def onf(onf_viewer):
+              indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
+              if not self.busydict[indicator]:
+                self.busydict[indicator] = True
+                ts = time()
+                frame = onf_viewer.inqueue.get()[1]
+                if params['mode'] == 'D':
+                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
+                elif params['mode'] == 'C':
+                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
+                  if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
+                    if onf_viewer.drawpad.whitemarks:
+                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
+                    else:
+                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
+                frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
+                if (int(redis.get('CAM-AI:KBInt')) 
+                    or int(redis.get('CAM-AI:KillStream:'+str(params['idx'])))):
+                  return()  
+                try:
+                  self.send(bytes_data=indicator.encode()+frame)
+                except Disconnected:
+                  logger.error('*** Could not send Frame, socket closed...')
 
           myviewer.parent.add_view_count()
-          self.indexdict[params['idx']] = myviewer.push_to_onf(onf)
-          #myviewer.inqueue.register_callback()
+          self.indexdict[params['idx']] = {'show_cam' : show_cam, }
+          if show_cam:
+            self.indexdict[params['idx']]['onf'] = myviewer.push_to_onf(onf)
           self.viewerlist.append(myviewer)
           if self.scope['user'].is_authenticated:
             myuser = self.scope['user'].id
@@ -176,7 +182,10 @@ class triggerConsumer(WebsocketConsumer):
           )
           my_log_line.save()
           self.loglist.append(my_log_line)
-          outlist['data'] = {'outx' : self.outxdict[params['idx']], }
+          outlist['data'] = {
+            'outx' : self.outxdict[params['idx']], 
+            'show_cam' : show_cam,
+          }
           logger.debug('--> ' + str(outlist))
           self.send(json.dumps(outlist))
         else:

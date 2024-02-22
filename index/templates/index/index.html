@@ -13,6 +13,7 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+Printed: index.html v1.1.17 22.02.2024
 {% endcomment %}
 {% block content %}
 {% if emulatestatic %}
@@ -45,12 +46,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       {% endif %}
       {% if mode == 'D' %}
         <div>
-          <a href="/oneitem/detector/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
+          <a href="/oneitem/detector/{{ item.id }}/">
+          <img id="imagespace{{ item.id }}" /></a>
         </div>
       {% endif %}
       {% if mode == 'E' %}
         <div>
-          <a href="/oneitem/eventer/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
+          <a href="/oneitem/eventer/{{ item.id }}/">
+          <img id="imagespace{{ item.id }}" /></a>
         </div>
       {% endif %}
       </div>
@@ -97,13 +100,24 @@ $(document).ready(function() {
     }));
   })
   .then((result) => {
+    show_cam{{ item.id }} = result.show_cam;
     xinput{{ item.id }} = result.outx;
     yinput{{ item.id }} = 
       Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
 {% endfor %}
 {% for item in camlist %} 
-    vnr = '{{ mode }}' + String({{ item.id }}).padStart(9,'0');
-    trigger_Socket.socket.send(vnr);
+    if (show_cam{{ item.id }}) {
+      vnrcode = '{{ mode }}' + String({{ item.id }}).padStart(9,'0');
+      trigger_Socket.socket.send(vnrcode);
+    } else {
+      $('#imagespace{{ item.id }}').css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  imageElements[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+{% else %}
+      imageElements[{{ item.id }}].src 
+        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+{% endif %}
+    };
 {% endfor %}
     trigger_Socket.socket.onclose = function(e) {
       console.log('Trigger-Socket closed');
@@ -122,22 +136,22 @@ $(document).ready(function() {
         .catch(err => {console.log(err);});
       };
     };
+{% for item in camlist %} 
+    setInterval(() => {
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'mode' : '{{ mode }}',
+        'idx' : {{ item.id }},
+      })
+      .then((result) => {
+        $('#fpstag{{ item.id }}').text(result.fps);
+        $('#vnrtag{{ item.id }}').text(result.viewers);
+      })
+      .catch(err => {console.log(err);});
+    }, 5000);
+{% endfor %}
 	})
 	.catch(err => {console.log(err);});
-{% for item in camlist %} 
-  setInterval(() => {
-    c_view_Socket.sendandwait({
-      'command' : 'getcaminfo',
-      'mode' : '{{ mode }}',
-      'idx' : {{ item.id }},
-    })
-    .then((result) => {
-      $('#fpstag{{ item.id }}').text(result.fps);
-      $('#vnrtag{{ item.id }}').text(result.viewers);
-    })
-    .catch(err => {console.log(err);});
-  }, 5000);
-{% endfor %}
 });
 	
 </script>

@@ -1,16 +1,18 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 from django.db import models
 from django.utils import timezone
@@ -32,6 +34,7 @@ class event(models.Model):
   camera = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)
   done = models.BooleanField(default=False)
   videoclip = models.CharField(max_length=256, default='')
+  video_encrypted = models.BooleanField(default=True)
   double = models.BooleanField(default=False)
   hasarchive = models.BooleanField(default=False)
 
@@ -42,6 +45,7 @@ class event_frame(models.Model):
   time = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
   status = models.SmallIntegerField(default=0)
   name = models.CharField(max_length=100)
+  encrypted = models.BooleanField(default=True)
   x1 = models.IntegerField(default=0)
   x2 = models.IntegerField(default=0)
   y1 = models.IntegerField(default=0)

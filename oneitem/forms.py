@@ -16,26 +16,26 @@ from streams.models import stream
 
 class CamForm(forms.ModelForm):
 
-	class Meta:
-		model = stream
-		fields = (
+  class Meta:
+    model = stream
+    fields = (
       'name',
       'cam_pause', 
       'cam_fpslimit', 
       'cam_feed_type', 
       'cam_url', 
     )
-		widgets = { 
+    widgets = { 
       'cam_pause' : forms.CheckboxInput(),
-			'cam_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
-			'cam_url' : forms.TextInput(attrs={'size': 70}),
-		}
+      'cam_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
+      'cam_url' : forms.TextInput(attrs={'size': 70}),
+    }
 
 class DetectorForm(forms.ModelForm):
 
-	class Meta:
-		model = stream
-		fields = (
+  class Meta:
+    model = stream
+    fields = (
       'det_fpslimit', 
       'det_threshold', 
       'det_backgr_delay', 
@@ -44,31 +44,35 @@ class DetectorForm(forms.ModelForm):
       'det_max_size', 
       'det_max_rect',
     )
-		widgets = {
-			'det_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
-			'det_threshold' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 254}), 
-			'det_backgr_delay' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
-			'det_erosion' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
-			'det_dilation' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
-			'det_max_size' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
-			'det_max_rect' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
-		}
+    widgets = {
+      'det_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
+      'det_threshold' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 254}), 
+      'det_backgr_delay' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
+      'det_erosion' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
+      'det_dilation' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
+      'det_max_size' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
+      'det_max_rect' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
+    }
 
 class EventerForm(forms.ModelForm):
 
-	class Meta:
-		model = stream
-		fields = (
+  class Meta:
+    model = stream
+    fields = (
       'eve_fpslimit',
       'eve_margin', 
       'eve_event_time_gap', 
       'eve_school', 
       'eve_alarm_email',
     )
-		widgets = {
-			'eve_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
-			'eve_margin' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
-			'eve_event_time_gap' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 3600}), 
-			#'eve_school' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
-			'eve_alarm_email' : forms.TextInput(attrs={'size': 70}),
-		}		
+    widgets = {
+      'eve_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
+      'eve_margin' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
+      'eve_event_time_gap' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 3600}), 
+      'eve_alarm_email' : forms.TextInput(attrs={'size': 70}),
+    }		
+	  
+  def __init__(self, *args, **kwargs):
+    super(EventerForm, self).__init__(*args, **kwargs)
+    self.fields['eve_alarm_email'].required = False
+

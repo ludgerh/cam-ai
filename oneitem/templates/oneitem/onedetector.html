@@ -81,7 +81,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
       </div>
     </div>
-    <div class="accordion-item">
+    <div class="accordion-item" id="maskedit">
       <h2 class="accordion-header" id="headingTwo">
         <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
           Mask settings
@@ -188,21 +188,33 @@ $(document).ready(function() {
     }));
   })
   .then((result) => {
+    show_cam = result.show_cam;
     xinput = result.outx;
     yinput = 
       Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
-    trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
-		trigger_Socket.socket.onclose = function(e) {
-			console.log('Trigger-Socket closed');
-		};
-		trigger_Socket.socket.onmessage = function(e) {
-      if (typeof(e.data) === 'object') {
-		    blob = e.data.slice(10, e.data.size, "image/jpeg")
-		    let url = URL.createObjectURL(blob);
-		    imageElement.src = url;
-        trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
-      };
-		};
+    if (show_cam) {
+      trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
+		  trigger_Socket.socket.onclose = function(e) {
+			  console.log('Trigger-Socket closed');
+		  };
+		  trigger_Socket.socket.onmessage = function(e) {
+        if (typeof(e.data) === 'object') {
+		      blob = e.data.slice(10, e.data.size, "image/jpeg")
+		      let url = URL.createObjectURL(blob);
+		      imageElement.src = url;
+          trigger_Socket.socket.send('D{{ dbline.id|stringformat:"09d" }}');
+        };
+		  };
+    } else {
+      $('#maskedit').addClass('d-none');
+      $('#imagespace').css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  imageElement.src = "{% static 'camai/git/img/privacy.jpg' %}";
+{% else %}
+      imageElement.src 
+        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+{% endif %}
+    };  
 {% if may_write %}
 		$('#ch_show').prop('checked', false);
 		$('#ch_apply').prop('checked', ('{{ dbline.det_apply_mask }}' == 'True'));
