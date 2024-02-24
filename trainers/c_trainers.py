@@ -1,17 +1,18 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-# /trainers/c_trainers.py V0.9.14 11.06.2023
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import gc
 from multiprocessing import Process, Queue
@@ -29,6 +30,7 @@ from django.db.models import Max
 from tools.c_logger import log_ini
 from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
 from tf_workers.models import school
+from users.models import userinfo
 from .models import trainer as dbtrainer, trainframe, fit, epoch
 if djconf.getconfigbool('local_trainer', False):
   from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
@@ -203,6 +205,11 @@ class trainer():
                   break
                 except OperationalError:
                   connection.close()
+              myschool.l_rate_start = '1e-6'
+              myschool.save(update_fields=['l_rate_start'])
+              myuserinfo = userinfo.objects.get(id=myschool.creator.id)
+              myuserinfo.pay_tokens -= 1
+              myuserinfo.save(update_fields=['pay_tokens'])
             with self.mylock:
               self.job_queue_list.remove(myschool.id)
             gc.collect()

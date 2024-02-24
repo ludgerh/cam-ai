@@ -1,16 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import numpy as np
 import cv2 as cv
@@ -28,6 +30,7 @@ from django.db.utils import OperationalError
 from .models import event, event_frame, school
 from tools.l_tools import ts2filename, uniquename, np_mov_avg, djconf
 from tools.l_smtp import l_smtp
+from tools.l_crypt import l_crypt
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 from streams.models import stream
@@ -99,16 +102,16 @@ def resolve_rules(conditions, predictions):
 
 class c_event(list):
   last_frame_index = 0
+  crypt = None
 
-  def __init__(self, tf_worker, tf_w_index, frame, margin, xmax, ymax, 
-      schoolnr, eventer_id, eventer_name, logger):
+  def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, logger):
     super().__init__()
     self.tf_worker = tf_worker
-    self.eventer_id = eventer_id
-    self.eventer_name = eventer_name
+    self.eventer_id = eventer_dbl.id
+    self.eventer_name = eventer_dbl.name
     self.tf_w_index = tf_w_index
-    self.xmax = xmax
-    self.ymax = ymax
+    self.xmax = eventer_dbl.cam_xres - 1
+    self.ymax = eventer_dbl.cam_yres - 1
     self.margin = margin
     self.number_of_frames = djconf.getconfigint('frames_event', 32)
     self.isrecording = False
@@ -116,7 +119,7 @@ class c_event(list):
     self.to_email = ''
     self.ts = None
     self.savename = ''
-    self.schoolnr = schoolnr
+    self.schoolnr = eventer_dbl.eve_school.id
     self.dbline = event()
     self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
     while True:
@@ -132,9 +135,9 @@ class c_event(list):
     self.start = frame[2]
     self.end = frame[2]
     self.append(max(0, frame[3] - margin))
-    self.append(min(xmax, frame[4] + margin))
+    self.append(min(self.xmax, frame[4] + margin))
     self.append(max(0, frame[5] - margin))
-    self.append(min(ymax, frame[6] + margin))
+    self.append(min(self.ymax, frame[6] + margin))
     self.append([frame[7]]) #Predictions
     self.logger = logger
     index = self.get_new_frame_index(frame[2], True)
@@ -147,6 +150,15 @@ class c_event(list):
         connection.close()
     self.focus_max = np.max(frame[7][1:])
     self.focus_time = frame[2]
+    self.dbline.camera = eventer_dbl
+    if c_event.crypt is None:
+      if self.dbline.camera.encrypted:
+        if self.dbline.camera.crypt_key:
+          c_event.crypt = l_crypt(key=self.dbline.camera.crypt_key)
+        else:
+          c_event.crypt = l_crypt()
+          self.dbline.camera.crypt_key = c_event.crypt.key
+          self.dbline.camera.save(update_fields=['crypt_key'])
 
   def get_new_frame_index(self, timestamp, first=False):
     index = (round(timestamp * 10000000.0) % 36000000000)
@@ -246,24 +258,28 @@ class c_event(list):
       self.dbline.ymax=self[3]
       self.dbline.numframes=len(frames_to_save)
       self.dbline.done = not self.goes_to_school
-      self.dbline.camera = stream.objects.get(id = self.eventer_id)
       self.dbline.save()
       self.mailimages = []
       for item in frames_to_save:
-        pathadd = str(self.schoolnr)+'/'+str(randint(0,99))
+        pathadd = str(self.dbline.camera.id)+'/'+str(randint(0,99))
         if not path.exists(schoolpath+pathadd):
           makedirs(schoolpath+pathadd)
         filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[2], 
           noblank=True), 'bmp')
-        cv.imwrite(schoolpath+filename, item[1])
+        bmp_data =  cv.imencode('.bmp', item[1])[1].tobytes() 
+        if c_event.crypt is not None:
+          bmp_data = c_event.crypt.encrypt(bmp_data)
+        with open(schoolpath+filename, "wb") as file:
+          file.write(bmp_data)
         frameline = event_frame(
-          time=timezone.make_aware(datetime.fromtimestamp(item[2])),
-          name=filename,
-          x1=item[3],
-          x2=item[4],
-          y1=item[5],
-          y2=item[6],
-          event=self.dbline,
+          time = timezone.make_aware(datetime.fromtimestamp(item[2])),
+          name = filename,
+          encrypted = c_event.crypt is not None,
+          x1 = item[3],
+          x2 = item[4],
+          y1 = item[5],
+          y2 = item[6],
+          event = self.dbline,
         )
         frameline.save()
         self.mailimages.append(frameline.id)

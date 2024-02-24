@@ -1,18 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-# /tools/consumers.py V0.9.15d 05.07.2023
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import json
 import subprocess
@@ -40,7 +40,6 @@ from camai.passwords import db_password
 from camai.passwords import os_type, env_type 
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
-from tools.c_tools import image_size, reduce_image
 from tf_workers.models import school, worker
 from trainers.models import trainframe, trainer
 from eventers.models import event, event_frame

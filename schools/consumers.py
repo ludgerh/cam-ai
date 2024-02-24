@@ -1,23 +1,25 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import json
 import numpy as np
 import cv2 as cv
 from os import path, makedirs, remove
 from shutil import copy
-from PIL import Image
+#from PIL import Image
 from random import randint
 from logging import getLogger
 from datetime import datetime
@@ -36,6 +38,7 @@ from tools.djangodbasync import (filterlines, getoneline, savedbline,
   deldbline, updatefilter, deletefilter, getonelinedict, filterlinesdict,
   countfilter)
 from tools.c_logger import log_ini
+from tools.l_crypt import l_crypt
 from access.c_access import access
 from access.models import access_control
 from schools.c_schools import get_taglist, check_extratags_async
@@ -44,6 +47,7 @@ from tf_workers.models import school
 from eventers.models import event, event_frame
 from trainers.models import trainframe, img_size
 from users.models import userinfo
+from streams.models import stream
 
 logname = 'ws_schoolsconsumers'
 logger = getLogger(logname)
@@ -161,7 +165,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         for item in params['idxs']:
           try:
             if params['is_school']:
-              framedict = await getonelinedict(event_frame, {'id' : item, }, ['name', 'event'])
+              framedict = await getonelinedict(event_frame, {'id' : item, }, ['name', 'event', 'encrypted'])
               imagepath = schoolframespath + framedict['name']
               if self.schoolinfo is None:
                 eventdict = await getonelinedict(event, {'id' : framedict['event'], }, ['school'])
@@ -169,14 +173,19 @@ class schooldbutil(AsyncWebsocketConsumer):
                 xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], }
             else:
-              framedict = await getonelinedict(trainframe, {'id' : item, }, ['name', 'school'])
+              framedict = await getonelinedict(trainframe, {'id' : item, }, ['name', 'school', 'encrypted'])
               if self.schoolinfo is None:
                 schooldict = await getonelinedict(school, {'id' : framedict['school'], }, ['id', 'e_school', 'dir'])
                 xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schooldict, }
               imagepath = self.schoolinfo['schooldict']['dir'] + 'frames/' + framedict['name']
-            np_image = np.array(Image.open(imagepath))   
-            imglist.append(np_image)
+            with open(imagepath, "rb") as f:
+              myimage = f.read()
+            if framedict['encrypted']:
+              myimage = self.crypt.decrypt(myimage)  
+            myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+            myimage = cv.cvtColor(myimage, cv.COLOR_BGR2RGB)
+            imglist.append(myimage)
           except FileNotFoundError:
             logger.error('File not found: ' + imagepath)
         self.tf_worker.ask_pred(
@@ -336,6 +345,16 @@ class schooldbutil(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
+    elif params['command'] == 'setcrypt':
+      streamlinedict = await getonelinedict(stream, {'id' : params['stream'], }, ['encrypted', 'crypt_key'])
+      if streamlinedict['encrypted']:
+        self.crypt =  l_crypt(key=streamlinedict['crypt_key'])
+      else:
+        self.crypt = None  
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))
+
     elif params['command'] == 'settags':
       eventdict = await getonelinedict(event, {'id' : params['event'], }, ['id', 'school', 'done'])
       schoolnr = eventdict['school']
@@ -344,7 +363,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       if access.check('S', schoolnr, self.scope['user'], 'W'):
         if not path.exists(modelpath + 'frames/'):
           makedirs(modelpath + 'frames/')
-        framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', 'time', 'trainframe', ])
+        framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', 'time', 'trainframe', 'encrypted'])
         i = 0
         for item in framelines:
           pathadd = str(randint(0,99))+'/'
@@ -358,8 +377,11 @@ class schooldbutil(AsyncWebsocketConsumer):
           if eventdict['done']:
             await updatefilter(trainframe, {'id' : item['trainframe'], }, updatedict)
           else:
-            if not reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, school_x_max, school_y_max):
-              copy(schoolframespath + item['name'], modelpath + 'frames/' + newname)
+            if item['encrypted']:
+              do_crypt = self.crypt
+            else:
+              do_crypt = None  
+            reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, school_x_max, school_y_max, crypt=do_crypt)
             t = trainframe(made=item['time'],
               school=schoolnr,
               name=newname,
@@ -367,6 +389,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               checked=0,
               made_by_id=self.user.id,
             );
+            t.encrypted = False,
             t.c0=params['cblist'][i][0]
             t.c1=params['cblist'][i][1] 
             t.c2=params['cblist'][i][2]
@@ -378,12 +401,12 @@ class schooldbutil(AsyncWebsocketConsumer):
             t.c8=params['cblist'][i][8]
             t.c9=params['cblist'][i][9]
             trainframenr = await savedbline(t)
-            try:
-              sizeline = await img_size.objects.aget(x=0, y=0)
-            except img_size.DoesNotExist:
-              sizeline = img_size(x=0, y=0)
-              await sizeline.asave()
-            await t.img_sizes.aadd(sizeline)
+            #try:
+            #  sizeline = await img_size.objects.aget(x=0, y=0)
+            #except img_size.DoesNotExist:
+            #  sizeline = img_size(x=0, y=0)
+            #  await sizeline.asave()
+            #await t.img_sizes.aadd(sizeline)
             await t.asave()
             await updatefilter(event_frame, {'id' : item['id'], }, {'trainframe' : trainframenr, }) 
           i += 1

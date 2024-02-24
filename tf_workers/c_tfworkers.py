@@ -395,8 +395,10 @@ class tf_worker():
           else:   
             with self.model_buffers[schoolnr].bufferlock2:
               run_ok = (
-                ((self.model_buffers[schoolnr].ts + self.dbline.timeout) < time()) 
-                and len(self.model_buffers[schoolnr]))
+                schoolnr in self.model_buffers
+                and len(self.model_buffers[schoolnr])
+                and self.model_buffers[schoolnr].ts + self.dbline.timeout < time() 
+              )
               if run_ok:
                 self.process_buffer(schoolnr, self.logger, had_timeout=True)
             if not run_ok:

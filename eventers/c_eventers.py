@@ -495,8 +495,7 @@ class c_eventer(c_device):
                 break
             if found is None:
               new_event = c_event(self.tf_worker, self.tf_w_index, frame, 
-                margin, self.dbline.cam_xres-1, self.dbline.cam_yres-1, 
-                self.dbline.eve_school.id, self.id, self.dbline.name, self.logger)
+                margin, self.dbline, self.logger)
               with self.eventdict_lock:
                 self.eventdict[new_event.dbline.id] = new_event
             else: 

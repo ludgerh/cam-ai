@@ -1,22 +1,27 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
-from time import time, sleep
 import cv2 as cv
 import numpy as np
+from time import time, sleep
+from shutil import copy
 from tools.l_tools import djconf
 
-def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0):
+def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=None, 
+  outcrypt=None):
 # Frame Types:
 # 1 : opencv Data
 # 2 : BMP Data
@@ -24,7 +29,9 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0):
   if not typeout:
     typeout = typein
   if typein != 1:
-    frame = cv.imdecode(np.fromstring(frame, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+    if incrypt:
+      frame = incrypt.decrypt(frame)
+    frame = cv.imdecode(np.frombuffer(frame, dtype=np.uint8), cv.IMREAD_UNCHANGED)
   xin = frame.shape[1]
   yin = frame.shape[0]
   forcescale = False
@@ -143,10 +150,16 @@ def image_size(infile):
   yin = myimage.shape[0]
   return(xin, yin)
   
-def reduce_image(infile, outfile, x, y):
+def reduce_image(infile, outfile, x, y, crypt=None):
   if outfile is None:
     outfile = infile
-  myimage = cv.imread(infile)
+  if crypt:
+    with open(infile, "rb") as f:
+      myimage = f.read()
+    myimage = crypt.decrypt(myimage)
+    myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  else:    
+    myimage = cv.imread(infile)
   xin = myimage.shape[1]
   yin = myimage.shape[0]
   #print('In:', myimage.shape, x, y) 
@@ -158,7 +171,6 @@ def reduce_image(infile, outfile, x, y):
     myimage = cv.resize(myimage, (round(xin * scale), round(yin * scale)))  
     cv.imwrite(outfile, myimage)
     #print('Out:', myimage.shape) 
-    return(True)
   else:
-    return(False)
+    copy(infile, outfile)
   

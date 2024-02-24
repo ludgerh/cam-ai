@@ -42,129 +42,133 @@
         <input style="width: 24px; height: 24px;" type="checkbox" id="cbignorecheck" class="m-2">
         <label class="m-2" for="cbignorecheck">Ignore check-in</label>
       </div>  
-      <div class="col-sm-auto h4">
-        <input style="width: 24px; height: 24px;" type="checkbox" id="cbdonate" class="m-2">
-        <label class="m-2" for="cbdonate">Donate images and tagging</label>
-      </div>  
-      <div class="col-sm-auto h4">
-        <input style="width: 24px; height: 24px;" type="checkbox" id="save_new_model" class="m-2">
-        <label class="m-2" for="save_new_model">Save new Model</label>
-      </div>  
+      {% if show_all_options %}
+        <div class="col-sm-auto h4">
+          <input style="width: 24px; height: 24px;" type="checkbox" id="cbdonate" class="m-2">
+          <label class="m-2" for="cbdonate">Donate images and tagging</label>
+        </div>  
+        <div class="col-sm-auto h4">
+          <input style="width: 24px; height: 24px;" type="checkbox" id="save_new_model" class="m-2">
+          <label class="m-2" for="save_new_model">Save new Model</label>
+        </div>  
+      {% endif %}
     </div>  
   </div>
-  <div class="h2">
-    Model Settings:
-  </div>
-  <div class="container-fluid float-left">
-    <div class="row">
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="model_type">Model Type:</label>
-        <select id="model_type">
-        </select>
+  {% if show_all_options %}
+    <div class="h2">
+      Model Settings:
+    </div>
+    <div class="container-fluid float-left">
+      <div class="row">
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="model_type">Model Type:</label>
+          <select id="model_type">
+          </select>
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="model_train_type">Model Type for Training:</label>
+          <select id="model_train_type">
+          {% for item in model_types %}
+              <option value={{ item.name }}>{{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})</option>
+          {% endfor %}    
+          </select>
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="image_augmentation">Image Augmentation:</label>
+          <input class="m-2" type="number" id="image_augmentation" size="10" min="0.0" max="1.0" step="0.01">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="weight_constraint">Weight Constraint:</label>
+          <input class="m-2" type="number" id="weight_constraint" size="10" min="0.0" max="5.0" step="0.01">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="weight_decay">Weight Decay:</label>
+          <input class="m-2" type="number" id="weight_decay" size="10" min="0.0" max="1.0" step="0.01">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="dropout">Dropout:</label>
+          <input class="m-2" type="number" id="dropout" size="10" min="0.0" max="0.5" step="0.01">
+        </div>  
+        <div class="col-sm-auto h4">
+          <input style="width: 24px; height: 24px;" type="checkbox" id="stop_overfit" class="m-2">
+          <label class="m-2" for="stop_overfit">Stop Overfit</label>
+        </div>  
       </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="model_train_type">Model Type for Training:</label>
-        <select id="model_train_type">
-        {% for item in model_types %}
-            <option value={{ item.name }}>{{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})</option>
-        {% endfor %}    
-        </select>
+    </div>
+    <div class="h2">
+      Weight Settings:
+    </div>
+    <div class="container-fluid float-left">
+      <div class="row">
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="minweight">Min. weight:</label>
+          <input class="m-2" type="number" id="minweight" size="10" min="0.ü" max="10.0" step="0.01">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="maxweight">Max. weight:</label>
+          <input class="m-2" type="number" id="maxweight" size="10" min="0.0" max="10.0" step="0.01">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="weightboost">Weight boost</label>
+          <input class="m-2" type="number" id="weightboost" size="10" min="0.0" max="10.0" step="0.01">
+        </div>  
       </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="image_augmentation">Image Augmentation:</label>
-        <input class="m-2" type="number" id="image_augmentation" size="10" min="0.0" max="1.0" step="0.01">
+    </div>
+    <div class="h2">
+      Learning Rate Settings:
+    </div>
+    <div class="container-fluid float-left">
+      <div class="row">
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="start_lr">Starting Rate:</label>
+          <select id="start_lr" value="1e-6">
+            <option value="1e-3">1e-3 (0.001)</option>
+            <option value="1e-4">1e-4 (0.0001)</option>
+            <option value="1e-5">1e-5 (0.00001)</option>
+            <option value="1e-6">1e-6 (0.000001)</option>
+            <option value="1e-7">1e-7 (0.0000001)</option>
+          </select>
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="stop_lr">Stopping Rate:</label>
+          <select id="stop_lr" value="1e-6">
+            <option value="1e-3">1e-3 (0.001)</option>
+            <option value="1e-4">1e-4 (0.0001)</option>
+            <option value="1e-5">1e-5 (0.00001)</option>
+            <option value="1e-6">1e-6 (0.000001)</option>
+            <option value="1e-7">1e-7 (0.0000001)</option>
+          </select>
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="l_rate_patience">Patience</label>
+          <input class="m-2" type="number" id="l_rate_patience" size="10" min="3" max="1000" step="1">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="l_rate_delta_min">Min. Delta</label>
+          <input class="m-2" type="number" id="l_rate_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="l_rate_decrement">Decrement</label>
+          <input class="m-2" type="number" id="l_rate_decrement" size="10" min="0.01" max="0.99" step="0.00001">
+        </div>  
       </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="weight_constraint">Weight Constraint:</label>
-        <input class="m-2" type="number" id="weight_constraint" size="10" min="0.0" max="5.0" step="0.01">
+    </div>
+    <div class="h2">
+      Stopping Condition Settings:
+    </div>
+    <div class="container-fluid float-left">
+      <div class="row">
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="early_stop_patience">Patience</label>
+          <input class="m-2" type="number" id="early_stop_patience" size="10" min="3" max="1000" step="1">
+        </div>  
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="early_stop_delta_min">Min. Delta</label>
+          <input class="m-2" type="number" id="early_stop_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
+        </div>  
       </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="weight_decay">Weight Decay:</label>
-        <input class="m-2" type="number" id="weight_decay" size="10" min="0.0" max="1.0" step="0.01">
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="dropout">Dropout:</label>
-        <input class="m-2" type="number" id="dropout" size="10" min="0.0" max="0.5" step="0.01">
-      </div>  
-      <div class="col-sm-auto h4">
-        <input style="width: 24px; height: 24px;" type="checkbox" id="stop_overfit" class="m-2">
-        <label class="m-2" for="stop_overfit">Stop Overfit</label>
-      </div>  
-    </div>  
-  </div>
-  <div class="h2">
-    Weight Settings:
-  </div>
-  <div class="container-fluid float-left">
-    <div class="row">
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="minweight">Min. weight:</label>
-        <input class="m-2" type="number" id="minweight" size="10" min="0.ü" max="10.0" step="0.01">
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="maxweight">Max. weight:</label>
-        <input class="m-2" type="number" id="maxweight" size="10" min="0.0" max="10.0" step="0.01">
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="weightboost">Weight boost</label>
-        <input class="m-2" type="number" id="weightboost" size="10" min="0.0" max="10.0" step="0.01">
-      </div>  
-    </div>  
-  </div>
-  <div class="h2">
-    Learning Rate Settings:
-  </div>
-  <div class="container-fluid float-left">
-    <div class="row">
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="start_lr">Starting Rate:</label>
-        <select id="start_lr" value="1e-6">
-          <option value="1e-3">1e-3 (0.001)</option>
-          <option value="1e-4">1e-4 (0.0001)</option>
-          <option value="1e-5">1e-5 (0.00001)</option>
-          <option value="1e-6">1e-6 (0.000001)</option>
-          <option value="1e-7">1e-7 (0.0000001)</option>
-        </select>
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="stop_lr">Stopping Rate:</label>
-        <select id="stop_lr" value="1e-6">
-          <option value="1e-3">1e-3 (0.001)</option>
-          <option value="1e-4">1e-4 (0.0001)</option>
-          <option value="1e-5">1e-5 (0.00001)</option>
-          <option value="1e-6">1e-6 (0.000001)</option>
-          <option value="1e-7">1e-7 (0.0000001)</option>
-        </select>
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="l_rate_patience">Patience</label>
-        <input class="m-2" type="number" id="l_rate_patience" size="10" min="3" max="1000" step="1">
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="l_rate_delta_min">Min. Delta</label>
-        <input class="m-2" type="number" id="l_rate_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="l_rate_decrement">Decrement</label>
-        <input class="m-2" type="number" id="l_rate_decrement" size="10" min="0.01" max="0.99" step="0.00001">
-      </div>  
-    </div>  
-  </div>
-  <div class="h2">
-    Stopping Condition Settings:
-  </div>
-  <div class="container-fluid float-left">
-    <div class="row">
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="early_stop_patience">Patience</label>
-        <input class="m-2" type="number" id="early_stop_patience" size="10" min="3" max="1000" step="1">
-      </div>  
-      <div class="col-sm-auto h4">
-        <label class="m-2" for="early_stop_delta_min">Min. Delta</label>
-        <input class="m-2" type="number" id="early_stop_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
-      </div>  
-    </div>  
-  </div>
+    </div>
+  {% endif %}
 
   <div id="mymodal" class="modal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">

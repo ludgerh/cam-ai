@@ -31,6 +31,8 @@ if validate $1; then
   mv backup/eventers/c_alarm.py cam-ai/eventers/
   mv backup/plugins/ cam-ai/plugins
   mv backup/data/ cam-ai/data
+  mv backup/accounts/templates/django_registration/privacy.html cam-ai/accounts/templates/django_registration/
+  mv backup/accounts/templates/django_registration/terms.html cam-ai/accounts/templates/django_registration/
   cd cam-ai
   source ~/miniconda3/etc/profile.d/conda.sh
   conda activate tf

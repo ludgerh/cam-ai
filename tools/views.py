@@ -49,23 +49,23 @@ class health(TemplateView):
       'debug' : settings.DEBUG,
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'detectorlist' : access.filter_items(
         stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'eventerlist' : access.filter_items(
         stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist_write' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'W'
+        self.request.user, 'W'
       ),
       'recordingspath' : djconf.getconfig('recordingspath', datapath + 'recordings/'),
       'schoolframespath' : djconf.getconfig('schoolframespath', 
@@ -95,23 +95,23 @@ class scan_cams(TemplateView):
       'debug' : settings.DEBUG,
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'detectorlist' : access.filter_items(
         stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'eventerlist' : access.filter_items(
         stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist_write' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'W'
+        self.request.user, 'W'
       ),
       'streamlimit' : streamlimit,
       'streamcount' : streamcount,
@@ -136,23 +136,23 @@ class inst_cam(TemplateView):
       'debug' : settings.DEBUG,
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'detectorlist' : access.filter_items(
         stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'eventerlist' : access.filter_items(
         stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist_write' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'W'
+        self.request.user, 'W'
       ),
       'camurls' : camurl.objects.all(),
       'streamlimit' : streamlimit,
@@ -180,23 +180,23 @@ class addschool(TemplateView):
       'debug' : settings.DEBUG,
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'detectorlist' : access.filter_items(
         stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'eventerlist' : access.filter_items(
         stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist_write' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'W'
+        self.request.user, 'W'
       ),
       'schoollimit' : schoollimit,
       'schoolcount' : schoolcount,
@@ -217,23 +217,23 @@ class linkworkers(TemplateView):
       'emulatestatic' : emulatestatic,
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'detectorlist' : access.filter_items(
         stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'eventerlist' : access.filter_items(
         stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'R'
+        self.request.user, 'R'
       ),
       'schoollist_write' : access.filter_items(
         school.objects.filter(active=True), 'S', 
-        request.user, 'W'
+        self.request.user, 'W'
       ),
       'workerlist' : worker.objects.all(),
     })
