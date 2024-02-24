@@ -181,6 +181,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               imagepath = self.schoolinfo['schooldict']['dir'] + 'frames/' + framedict['name']
             with open(imagepath, "rb") as f:
               myimage = f.read()
+            #print(framedict['name']) 
             if framedict['encrypted']:
               myimage = self.crypt.decrypt(myimage)  
             myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
@@ -389,7 +390,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               checked=0,
               made_by_id=self.user.id,
             );
-            t.encrypted = False,
+            t.encrypted = False
             t.c0=params['cblist'][i][0]
             t.c1=params['cblist'][i][1] 
             t.c2=params['cblist'][i][2]
@@ -407,7 +408,6 @@ class schooldbutil(AsyncWebsocketConsumer):
             #  sizeline = img_size(x=0, y=0)
             #  await sizeline.asave()
             #await t.img_sizes.aadd(sizeline)
-            await t.asave()
             await updatefilter(event_frame, {'id' : item['id'], }, {'trainframe' : trainframenr, }) 
           i += 1
         await updatefilter(event, {'id' : eventdict['id'], }, {'done' : True, }) 

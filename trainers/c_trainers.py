@@ -207,7 +207,7 @@ class trainer():
                   connection.close()
               myschool.l_rate_start = '1e-6'
               myschool.save(update_fields=['l_rate_start'])
-              myuserinfo = userinfo.objects.get(id=myschool.creator.id)
+              myuserinfo = userinfo.objects.get(user=myschool.creator)
               myuserinfo.pay_tokens -= 1
               myuserinfo.save(update_fields=['pay_tokens'])
             with self.mylock:
