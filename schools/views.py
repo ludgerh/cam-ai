@@ -41,6 +41,7 @@ from trainers.models import trainframe
 datapath = djconf.getconfig('datapath', 'data/')
 schoolframespath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
 archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
+is_public_server = djconf.getconfigbool('is_public_server', False)
 crypter_dict = {}
 
 @login_required
@@ -94,7 +95,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
     if (crypt := frameline.encrypted):
       if not streamline.id in crypter_dict:
         crypter_dict[streamline.id] = l_crypt(key=streamline.crypt_key)
-    if request.user.is_superuser and crypt:   
+    if is_public_server and request.user.is_superuser and crypt:   
       filepath = 'camai/static/camai/git/img/privacy.jpg'
     else:
       filepath = schoolframespath + frameline.name
@@ -132,7 +133,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
     return(HttpResponse('No Access'))
   with open(filepath, "rb") as f:
     if crypt: 
-      if request.user.is_superuser:
+      if is_public_server and request.user.is_superuser:
         myframe = c_convert(f.read(), typein=3, typeout=outtype, xycontained=xycontained, 
           xout=x, yout=y)
       else:  

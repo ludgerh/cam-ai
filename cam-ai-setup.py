@@ -1,16 +1,18 @@
-# Copyright (C) 2023 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import subprocess
 import os
@@ -132,7 +134,8 @@ sql_query("drop user if exists 'root'@'%';")
 sql_query("drop database if exists test;")
 sql_query("drop database if exists `CAM-AI`;")
 sql_query("grant all on *.* to 'CAM-AI'@'localhost' identified by '" + cam_ai_db_pass + "' with grant option;")
-sql_query("create database `CAM-AI`")
+sql_query("flush privileges;")
+sql_query("create database `CAM-AI`;")
 print() 
 
 if True:
