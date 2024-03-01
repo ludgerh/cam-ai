@@ -60,7 +60,6 @@ def index(request, mode='C'):
   }
   return(HttpResponse(template.render(context)))
 
-@login_required
 def landing(request):
   template = loader.get_template('index/landing.html')
   context = {

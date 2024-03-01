@@ -21,6 +21,7 @@ from time import time, sleep
 from logging import getLogger
 from traceback import format_exc
 from zlib import compress
+from threading import Lock
 from django.utils import timezone
 from django.db import connection
 from django.db.utils import OperationalError
@@ -60,6 +61,7 @@ class triggerConsumer(WebsocketConsumer):
     self.queuedict = {}
     self.outxdict = {}
     self.busydict = {}
+    self.busy_lock = Lock()
     self.accept()
 
   def disconnect(self, close_code):
@@ -81,7 +83,8 @@ class triggerConsumer(WebsocketConsumer):
   def receive(self, text_data):
     logger.debug('<-- ' + str(text_data))
     if text_data[0] in {'C', 'D', 'E'}:
-      self.busydict[text_data] = False
+      with self.busy_lock:
+        self.busydict[text_data] = False
       return()
     params = json.loads(text_data)['data']
     try:
@@ -135,14 +138,18 @@ class triggerConsumer(WebsocketConsumer):
           outx = min(mystream.dbline.cam_xres, outx)
           self.outxdict[params['idx']] = round(outx)
           self.queuedict[params['idx']] = myviewer.inqueue
-          self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
-
+          with self.busy_lock:
+            self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
           if show_cam:
+          
             def onf(onf_viewer):  
               try:
                 indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
+                self.busy_lock.acquire()
+                print(indicator, self.busydict[indicator])  
                 if not self.busydict[indicator]:
                   self.busydict[indicator] = True
+                  self.busy_lock.release()
                   ts = time()
                   frame = onf_viewer.inqueue.get()[1]
                   if params['mode'] == 'D':
@@ -163,7 +170,9 @@ class triggerConsumer(WebsocketConsumer):
                   try:
                     self.send(bytes_data=indicator.encode()+frame)
                   except Disconnected:
-                    logger.error('*** Could not send Frame, socket closed...') 
+                    logger.error('*** Could not send Frame, socket closed...')
+                else: 
+                  self.busy_lock.release()
               except:
                 logger.error(format_exc())
                 logger.handlers.clear()

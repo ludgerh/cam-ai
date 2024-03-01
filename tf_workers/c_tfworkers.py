@@ -315,7 +315,8 @@ class tf_worker():
           self.model_buffers[schoolnr].append(received[2:])
           if not self.model_buffers[schoolnr].pause:
             with self.model_buffers[schoolnr].bufferlock2:
-              while len(self.model_buffers[schoolnr]) >= self.dbline.maxblock:
+              while (schoolnr in self.model_buffers 
+                  and len(self.model_buffers[schoolnr]) >= self.dbline.maxblock):
                 self.process_buffer(schoolnr, self.logger)
         elif (received[0] == 'register'):
           myuser = tf_user()

@@ -20,6 +20,7 @@ import os
 from requests import get as rget
 from django.conf import settings
 from django.contrib.auth import logout
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
@@ -36,7 +37,7 @@ from tools.l_tools import djconf
 from .models import camurl
 from .forms import UploadFileForm
 
-class health(TemplateView):
+class health(LoginRequiredMixin, TemplateView):
   template_name = 'tools/health.html'
 
   def get_context_data(self, **kwargs):
@@ -81,7 +82,7 @@ class health(TemplateView):
     else:
       return(HttpResponse('No Access'))
 
-class scan_cams(TemplateView):
+class scan_cams(LoginRequiredMixin, TemplateView):
   template_name = 'tools/scan_cams.html'
 
   def get_context_data(self, **kwargs):
@@ -121,7 +122,7 @@ class scan_cams(TemplateView):
     })
     return context
 
-class inst_cam(TemplateView):
+class inst_cam(LoginRequiredMixin, TemplateView):
   template_name = 'tools/inst_cam.html'
 
   def get_context_data(self, **kwargs):
@@ -165,7 +166,7 @@ class inst_cam(TemplateView):
     return context
 
 
-class addschool(TemplateView):
+class addschool(LoginRequiredMixin, TemplateView):
   template_name = 'tools/addschool.html'
 
   def get_context_data(self, **kwargs):
@@ -205,7 +206,7 @@ class addschool(TemplateView):
     })
     return context
 
-class linkworkers(TemplateView):
+class linkworkers(LoginRequiredMixin, TemplateView):
   template_name = 'tools/linkworkers.html'
 
   def get_context_data(self, **kwargs):
@@ -286,7 +287,7 @@ class upgrade(TemplateView):
     else:
       return(HttpResponse('No Access'))
       
-class backup(TemplateView):
+class backup(LoginRequiredMixin, TemplateView):
   template_name = 'tools/backup.html'
 
   def get_context_data(self, **kwargs):
@@ -313,7 +314,7 @@ def downbackup(request):
     return HttpResponse('No Access.')
 
       
-#class restore(TemplateView):
+#class restore(LoginRequiredMixin, TemplateView):
 #  template_name = 'tools/restore.html'
 
 #  def get_context_data(self, **kwargs):
