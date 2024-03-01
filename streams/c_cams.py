@@ -57,6 +57,10 @@ class c_cam(c_device):
     self.framewait = 0.0
     self.checkmp4busy = False
     self.mycam = None
+    self.cam_fps = 0.0
+    self.video_codec = -1
+    self.video_codec_name = '?'
+    self.audio_codec = -1
     
     if not path.exists(self.recordingspath):
       makedirs(self.recordingspath)
@@ -280,6 +284,8 @@ class c_cam(c_device):
       self.mp4_proc.join()
 
   def try_connect(self, maxcounter):
+    if self.dbline.cam_pause:
+      return()
     self.logger.info('[' + str(maxcounter) + '] Probing camera #' 
       + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
     if self.dbline.cam_feed_type == 1:

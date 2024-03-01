@@ -168,7 +168,7 @@ class c_event(list):
     return(index)
 
   def add_frame(self, frame):
-    s_factor = 0.01 # user changeable later: 0.0 -> No Shrinking 1.0 50%
+    s_factor = 0.2 # user changeable later: 0.0 -> No Shrinking 1.0 50%
     if (frame[3] - self.margin) <= self[0]:
       self[0] = max(0, frame[3] - self.margin)
     else:

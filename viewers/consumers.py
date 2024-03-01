@@ -138,31 +138,35 @@ class triggerConsumer(WebsocketConsumer):
           self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
 
           if show_cam:
-            def onf(onf_viewer):
-              indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
-              if not self.busydict[indicator]:
-                self.busydict[indicator] = True
-                ts = time()
-                frame = onf_viewer.inqueue.get()[1]
-                if params['mode'] == 'D':
-                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
-                elif params['mode'] == 'C':
-                  if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                    frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
-                  if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
-                    if onf_viewer.drawpad.whitemarks:
-                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
-                    else:
-                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
-                frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
-                if (int(redis.get('CAM-AI:KBInt')) 
-                    or int(redis.get('CAM-AI:KillStream:'+str(params['idx'])))):
-                  return()  
-                try:
-                  self.send(bytes_data=indicator.encode()+frame)
-                except Disconnected:
-                  logger.error('*** Could not send Frame, socket closed...')
+            def onf(onf_viewer):  
+              try:
+                indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
+                if not self.busydict[indicator]:
+                  self.busydict[indicator] = True
+                  ts = time()
+                  frame = onf_viewer.inqueue.get()[1]
+                  if params['mode'] == 'D':
+                    if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
+                  elif params['mode'] == 'C':
+                    if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
+                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
+                    if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
+                      if onf_viewer.drawpad.whitemarks:
+                        frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
+                      else:
+                        frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
+                  frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
+                  if (int(redis.get('CAM-AI:KBInt')) 
+                      or int(redis.get('CAM-AI:KillStream:'+str(params['idx'])))):
+                    return()  
+                  try:
+                    self.send(bytes_data=indicator.encode()+frame)
+                  except Disconnected:
+                    logger.error('*** Could not send Frame, socket closed...') 
+              except:
+                logger.error(format_exc())
+                logger.handlers.clear()
 
           myviewer.parent.add_view_count()
           self.indexdict[params['idx']] = {'show_cam' : show_cam, }

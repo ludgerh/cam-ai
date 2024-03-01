@@ -111,7 +111,12 @@ class c_eventer(c_device):
       self.dataqueue.stop()
       with self.eventdict_lock:
         for item in self.eventdict.values():
-          item.dbline.delete()
+          while True:
+            try:
+              item.dbline.delete()
+              break
+            except OperationalError:
+              connection.close()
       self.finished = True
     except:
       self.logger.error(format_exc())
@@ -267,14 +272,16 @@ class c_eventer(c_device):
                 colorcode= (0, 0, 255)
               else:
                 colorcode= (0, 255, 0)
-              displaylist = [(j, predictions[j]) for j in range(10)]
+              displaylist = [(j, predictions[j]) for j in range(10) if predictions[j] >= 0.5]
               displaylist.sort(key=lambda x: -x[1])
+              displaylist = displaylist[:3]
               cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
-              if item[2] < (self.dbline.cam_yres - item[3]):
-                y0 = item[3] + 30 * self.textheight
-              else:
-                y0 = item[2] - 70 * self.textheight
-              for j in range(3):
+              if displaylist:
+                if item[2] < (self.dbline.cam_yres - item[3]):
+                  y0 = item[3] + 30 * self.textheight
+                else:
+                  y0 = item[2] - (10 + (len(displaylist) - 1) * 30) * self.textheight
+              for j in range(len(displaylist)):
                 cv.putText(newimage, 
                   self.tag_list[displaylist[j][0]].name[:3]
                   +' - '+str(round(displaylist[j][1],2)), 

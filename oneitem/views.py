@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 try:  
   from camai.passwords import emulatestatic
 except  ImportError: # can be removed when everybody is up to date
@@ -29,7 +30,7 @@ from tools.tokens import checktoken
 from tf_workers.models import school, worker
 from .forms import CamForm , DetectorForm, EventerForm
 
-
+@login_required
 def onecam(request, camnr, tokennr=0, token=None):
   if request.user.id is None:
     if (tokennr and token):
@@ -104,6 +105,7 @@ def onecam(request, camnr, tokennr=0, token=None):
     }
   return(render(request, 'oneitem/onecam.html', context))
 
+@login_required
 def onedetector(request, detectornr, tokennr=0, token=None):
   if request.user.id is None:
     if (tokennr and token):
@@ -183,6 +185,7 @@ def onedetector(request, detectornr, tokennr=0, token=None):
     }
   return(render(request, 'oneitem/onedetector.html', context))
 
+@login_required
 def oneeventer(request, eventernr, tokennr=0, token=None):
   if request.user.id is None:
     if (tokennr and token):

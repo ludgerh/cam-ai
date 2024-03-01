@@ -42,6 +42,7 @@ class c_detector(c_device):
       self.finished = True
       self.cam_xres = self.dbline.cam_xres
       self.cam_yres = self.dbline.cam_yres
+      self.run_lock = False
       myscaledown = self.dbline.det_scaledown
       if not myscaledown:
         if (self.cam_xres >= 2560) or (self.cam_yres >= 2560):
@@ -139,6 +140,9 @@ class c_detector(c_device):
       frametime = input[2]
       if not (self.do_run and self.sl.greenlight(self.period, frametime)):
         return(None)
+      if self.run_lock: 
+        return(None)
+      self.run_lock = True
       frame = input[1]
       frameall = frame
       if self.firstdetect:
@@ -249,6 +253,7 @@ class c_detector(c_device):
           except OperationalError:
             connection.close()
         self.redis.fps_to_dev(self.type, self.dbline.id, fps)
+      self.run_lock = False
       return((3, buffer1, frametime))
     except:
       self.logger.error(format_exc())

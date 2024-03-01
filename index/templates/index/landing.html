@@ -1,0 +1,230 @@
+{% extends 'main/basis.html' %}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
+{% block content %}
+{% if emulatestatic %}
+  {% load static %}
+  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
+  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+{% else %}
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+    </script>
+{% endif %}
+<main>
+  <div class="container-fluid float-left">
+    {% for item in camlist %} 
+      <div class="row">
+        <div class="col-sm-auto box">
+          <h2>{{ item.id }}: {{ item.name }}</h2>
+          <h5>{{ item.cam_xres }}x{{ item.cam_yres }}, 
+            fps = <span id="fpstagC{{ item.id }}">?</span>
+          </h5>
+          <div>
+            <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespaceC{{ item.id }}" /></a>
+          </div>
+        </div>
+        <div class="col-sm-auto box">
+          <h2>Motion Detection</h2>
+          <h5>fps = <span id="fpstagD{{ item.id }}">?</span>
+          </h5>
+          <div>
+            <a href="/oneitem/detector/{{ item.id }}/">
+            <img id="imagespaceD{{ item.id }}" /></a>
+          </div>
+        </div>
+        <div class="col-sm-auto box">
+          <h2>Event Preview</h2>
+          <h5>fps = <span id="fpstagE{{ item.id }}">?</span>
+          </h5>
+          <div>
+            <a href="/oneitem/eventer/{{ item.id }}/">
+            <img id="imagespaceE{{ item.id }}" /></a>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</main>
+<script >
+
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let c_view_Socket;
+let trigger_Socket;
+let displaywidth = 375 // Screen width IPhone 7
+
+let imageElementsC = [];
+let imageElementsD = [];
+let imageElementsE = [];
+{% for item in camlist %} 
+  let displayheight{{ item.id }} = 
+    Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
+  let xinput{{ item.id }}
+  let yinput{{ item.id }}
+  let wait{{ item.id }} = 0;
+  imageElementsC[{{ item.id }}] = document.getElementById("imagespaceC{{ item.id }}");
+  imageElementsD[{{ item.id }}] = document.getElementById("imagespaceD{{ item.id }}");
+  imageElementsE[{{ item.id }}] = document.getElementById("imagespaceE{{ item.id }}");
+{% endfor %}
+
+$(document).ready(function() {
+{% for item in camlist %} 
+  $('#imagespaceC{{ item.id }}').attr('width', displaywidth+'px');
+  $('#imagespaceC{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
+  $('#imagespaceD{{ item.id }}').attr('width', displaywidth+'px');
+  $('#imagespaceD{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
+  $('#imagespaceE{{ item.id }}').attr('width', displaywidth+'px');
+  $('#imagespaceE{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
+{% endfor %}
+  WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
+  .then((result) => {
+    c_view_Socket = result;
+    return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/trigger/'));
+  })
+  .then((result) => {
+    trigger_Socket = result;
+{% for item in camlist %} 
+    return(trigger_Socket.sendandwait({
+      'command' : 'starttrigger',
+      'mode' : 'C',
+      'idx' : {{ item.id }},
+      'width' : displaywidth,
+    }));
+  })
+  .then((result) => {
+    show_camC{{ item.id }} = result.show_cam;
+    xinput{{ item.id }} = result.outx;
+    yinput{{ item.id }} = 
+      Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
+    return(trigger_Socket.sendandwait({
+      'command' : 'starttrigger',
+      'mode' : 'D',
+      'idx' : {{ item.id }},
+      'width' : displaywidth,
+    }));
+  })
+  .then((result) => {
+    show_camD{{ item.id }} = result.show_cam;
+    return(trigger_Socket.sendandwait({
+      'command' : 'starttrigger',
+      'mode' : 'E',
+      'idx' : {{ item.id }},
+      'width' : displaywidth,
+    }));
+  })
+  .then((result) => {
+    show_camE{{ item.id }} = result.show_cam;
+{% endfor %}
+{% for item in camlist %} 
+    if (show_camC{{ item.id }}) {
+      vnrcode = 'C' + String({{ item.id }}).padStart(9,'0');
+      trigger_Socket.socket.send(vnrcode);
+    } else {
+      $('#imagespaceC{{ item.id }}').css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  imageElementsC[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+{% else %}
+      imageElementsC[{{ item.id }}].src 
+        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+{% endif %}
+    };
+    if (show_camD{{ item.id }}) {
+      vnrcode = 'D' + String({{ item.id }}).padStart(9,'0');
+      trigger_Socket.socket.send(vnrcode);
+    } else {
+      $('#imagespaceD{{ item.id }}').css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  imageElementsD[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+{% else %}
+      imageElementsD[{{ item.id }}].src 
+        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+{% endif %}
+    };
+    if (show_camE{{ item.id }}) {
+      vnrcode = 'E' + String({{ item.id }}).padStart(9,'0');
+      trigger_Socket.socket.send(vnrcode);
+    } else {
+      $('#imagespaceE{{ item.id }}').css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  imageElementsE[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+{% else %}
+      imageElementsE[{{ item.id }}].src 
+        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+{% endif %}
+    };
+{% endfor %}
+    trigger_Socket.socket.onclose = function(e) {
+      console.log('Trigger-Socket closed');
+    };
+    trigger_Socket.socket.onmessage = function(e) {
+      if (typeof(e.data) === 'object') {
+		    blob = e.data.slice(10, e.data.size, "image/jpeg");
+		    indicator = e.data.slice(0, 10);
+		    let url = URL.createObjectURL(blob);
+        indicator.text()
+        .then((result) => {
+          mode = result[0];
+          vnr = parseInt(result.slice(1));
+		      if (mode == 'C') {
+		        imageElementsC[vnr].src = url;
+		      } else if (mode == 'D') {  
+		        imageElementsD[vnr].src = url;
+		      } else {
+		        imageElementsE[vnr].src = url;
+		      };  
+          trigger_Socket.socket.send(result);
+        })
+        .catch(err => {console.log(err);});
+      };
+    };
+{% for item in camlist %} 
+    setInterval(() => {
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'mode' : 'C',
+        'idx' : {{ item.id }},
+      })
+      .then((result) => {
+        $('#fpstagC{{ item.id }}').text(result.fps);
+      })
+      .catch(err => {console.log(err);});
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'mode' : 'D',
+        'idx' : {{ item.id }},
+      })
+      .then((result) => {
+        $('#fpstagD{{ item.id }}').text(result.fps);
+      })
+      .catch(err => {console.log(err);});
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'mode' : 'E',
+        'idx' : {{ item.id }},
+      })
+      .then((result) => {
+        $('#fpstagE{{ item.id }}').text(result.fps);
+      })
+      .catch(err => {console.log(err);});
+    }, 5000);
+{% endfor %}
+	})
+	.catch(err => {console.log(err);});
+});
+	
+</script>
+{% endblock %}
+

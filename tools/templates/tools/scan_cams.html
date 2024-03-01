@@ -100,11 +100,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </main>
 <script>
 
-{% if is_public_server %}  
 let ports = [80, 443, 554, 1935, 8000];
-{% else %}  
-let ports = [80, 8000];
-{% endif %}  
 
 let caminstSocket;
 let mynetwork;
@@ -178,7 +174,7 @@ $(document).ready(function() {
       $('#netlist').empty();
       $('#please_wait').removeClass("d-none");
       portarray = ports.concat([parseInt($('#custom_port').val())]).sort(function(a, b){return a-b});
-      console.log(portarray);
+      $(document).scrollTop($(document).height()); 
       caminstSocket.sendandwait({
         'command' : 'scanips',
         'camaddress' : $('#camdomain').val(),
@@ -212,6 +208,7 @@ $(document).ready(function() {
           newcard += '</div>';
           $('#netlist').append(newcard);
         };
+        $(document).scrollTop($(document).height()); 
         $('.select-button').click(function() {
           $('#netlist').empty();
           $('#ipaddress').val($(this).attr('ip'));
