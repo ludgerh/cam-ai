@@ -1,18 +1,20 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# c_eventer.py V1.1.3 21.01.2024
+c_eventer.py V2.1.0 02.03.2024
+"""
 
 import cv2 as cv
 import json
@@ -83,7 +85,7 @@ class c_eventer(c_device):
         self.logger.info('**** Eventer running GPU #' + str(self.dbline.eve_gpu_nr_cv))
       self.eventdict = {}
       self.eventdict_lock = t_lock()
-
+      self.display_lock = t_lock()
       self.vid_deque = deque()
       self.vid_str_dict = {}
       self.set_cam_counts()
@@ -109,6 +111,7 @@ class c_eventer(c_device):
         else:
           sleep(djconf.getconfigfloat('short_brake', 0.1))
       self.dataqueue.stop()
+      self.logger.info('### Getlock 114')
       with self.eventdict_lock:
         for item in self.eventdict.values():
           while True:
@@ -117,6 +120,7 @@ class c_eventer(c_device):
               break
             except OperationalError:
               connection.close()
+      self.logger.info('### Leavelock 123')
       self.finished = True
     except:
       self.logger.error(format_exc())
@@ -125,8 +129,6 @@ class c_eventer(c_device):
     self.logger.handlers.clear()
     self.tf_worker.stop_out(self.tf_w_index)
     self.tf_worker.unregister(self.tf_w_index)
-    #for thread in enumerate(): 
-    #  print(thread)
 
   def in_queue_handler(self, received):
     try:
@@ -236,10 +238,20 @@ class c_eventer(c_device):
   def merge_events(self):
     while True:
       changed = False
+      self.logger.info('### Getlock 243')
       with self.eventdict_lock:
-        for i, event_i in list(self.eventdict.items()):
-          for j, event_j in list(self.eventdict.items()):
-            if ((j > i) and hasoverlap(event_i, event_j)):
+        i_list = list(self.eventdict.items())
+      self.logger.info('### Leavelock 246')
+      j_list = i_list
+      for i, event_i in i_list:
+        for j, event_j in j_list:
+          if j > i:
+            self.logger.info('### Getlock 251')
+            event_i.event_lock.acquire()
+            event_j.event_lock.acquire()
+            if hasoverlap(event_i, event_j):
+              event_j.event_lock.release()
+              self.logger.info('### Leavelock 256')
               event_i[0] = min(event_i[0], event_j[0])
               event_i[1] = max(event_i[1], event_j[1])
               event_i[2] = min(event_i[2], event_j[2])
@@ -247,63 +259,86 @@ class c_eventer(c_device):
               event_i.start = min(event_i.start, event_j.start)
               event_i.end = max(event_i.end, event_j.end)
               event_i.merge_frames(event_j)
-              del self.eventdict[j]
+              event_i.event_lock.release()
+              self.logger.info('### Leavelock 265')
+              with self.eventdict_lock:
+                if j in self.eventdict:
+                  del self.eventdict[j]
               while True:
                 try:
                   event_j.dbline.delete()
                   break  
                 except OperationalError:
                   connection.close() 
+                except ValueError:
+                  self.logger.info('Value Error in Merge Events')
+                  break
               changed = True    
-        if not changed:
-          break
+            else:  
+              event_j.event_lock.release()
+              event_i.event_lock.release()
+              self.logger.info('### Leavelock 278')
+      if not changed:
+        break
 
   def display_events(self, frame):
     try:
       newimage = frame[1].copy()
-      with self.eventdict_lock:
-        for i, item in list(self.eventdict.items()):
-          if i in self.eventdict:
-            predictions = item.pred_read(max=1.0)
-            if self.dbline.eve_all_predictions or (self.nr_of_cond_ed > 0):
-              if self.nr_of_cond_ed <= 0:
-                self.last_cond_ed = 1
-              if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
-                colorcode= (0, 0, 255)
-              else:
-                colorcode= (0, 255, 0)
-              displaylist = [(j, predictions[j]) for j in range(10) if predictions[j] >= 0.5]
-              displaylist.sort(key=lambda x: -x[1])
-              displaylist = displaylist[:3]
-              cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
-              if displaylist:
-                if item[2] < (self.dbline.cam_yres - item[3]):
-                  y0 = item[3] + 30 * self.textheight
-                else:
-                  y0 = item[2] - (10 + (len(displaylist) - 1) * 30) * self.textheight
-              for j in range(len(displaylist)):
-                cv.putText(newimage, 
-                  self.tag_list[displaylist[j][0]].name[:3]
-                  +' - '+str(round(displaylist[j][1],2)), 
-                  (item[0]+2, y0 + j * 30 * self.textheight), 
-                  cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
-                  self.textthickness, cv.LINE_AA)
+      self.logger.info('display in')
+      self.logger.info('### Getlock 286')
+      with self.display_lock:
+        eventlist = list(self.eventdict.items())
+        for i, item in eventlist:
+          predictions = item.pred_read(max=1.0)
+          if self.dbline.eve_all_predictions or (self.nr_of_cond_ed > 0):
+            if self.nr_of_cond_ed <= 0:
+              self.last_cond_ed = 1
+            self.logger.info('111')
+            if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
+              colorcode= (0, 0, 255)
             else:
-              imax = -1
-              pmax = -1
-              for j in range(1,len(predictions)):
-                if predictions[j] >= 0.0:
-                  if predictions[j] > pmax:
-                    pmax = predictions[j]
-                    imax = j
-              if resolve_rules(self.cond_dict[1], predictions):
-                cv.rectangle(newimage, rect_btoa(item), (255, 0, 0), 
-                  self.linewidth)
-                cv.putText(newimage, self.tag_list[imax].name[:3], 
-                  (item[0]+10, item[2]+30), 
-                  cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
-                    self.textthickness, cv.LINE_AA)
-        self.viewer.inqueue.put(data=(3, newimage, frame[2]))
+              colorcode= (0, 255, 0)
+            self.logger.info('222')
+            displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list)) 
+              if predictions[j] >= 0.5]
+            self.logger.info('333')
+            displaylist.sort(key=lambda x: -x[1])
+            self.logger.info('444')
+            displaylist = displaylist[:3]
+            self.logger.info('555')
+            cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
+            self.logger.info('666')
+            if displaylist:
+              if item[2] < (self.dbline.cam_yres - item[3]):
+                y0 = item[3] + 30 * self.textheight
+              else:
+                y0 = item[2] - (10 + (len(displaylist) - 1) * 30) * self.textheight
+            self.logger.info('777')
+            for j in range(len(displaylist)):
+              cv.putText(newimage, 
+                self.tag_list[displaylist[j][0]].name[:3]
+                +' - '+str(round(displaylist[j][1],2)), 
+                (item[0]+2, y0 + j * 30 * self.textheight), 
+                cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
+                self.textthickness, cv.LINE_AA)
+            self.logger.info('888')
+          else:
+            imax = -1
+            pmax = -1
+            for j in range(1,len(predictions)):
+              if predictions[j] >= 0.0:
+                if predictions[j] > pmax:
+                  pmax = predictions[j]
+                  imax = j
+            if resolve_rules(self.cond_dict[1], predictions):
+              cv.rectangle(newimage, rect_btoa(item), (255, 0, 0), 
+                self.linewidth)
+              cv.putText(newimage, self.tag_list[imax].name[:3], 
+                (item[0]+10, item[2]+30), 
+                cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
+                  self.textthickness, cv.LINE_AA)
+      self.viewer.inqueue.put(data=(3, newimage, frame[2]))
+      self.logger.info('display out')
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
@@ -370,14 +405,16 @@ class c_eventer(c_device):
         is_ready = True
         if (item.goes_to_school or item.isrecording or item.to_email):
           if item.isrecording:
-            if (self.vid_deque and (item.end <= (self.vid_deque[-1][2] - self.dbline.cam_latency))):
+            if (self.vid_deque and 
+                (item.end <= (self.vid_deque[-1][2] - self.dbline.cam_latency))):
               my_vid_list = []
               my_vid_str = ''
               my_vid_start = None
               for v_item in self.vid_deque:
                 if (item.start <= v_item[2]):
                   if not my_vid_start:
-                    my_vid_start = (v_item[2] - 10.5) #10 seconds video length plus average trigger delay from checkmp4
+                    #10 seconds video length plus average trigger delay from checkmp4
+                    my_vid_start = (v_item[2] - 10.5)
                   my_vid_end = v_item[2]
                   my_vid_list.append(v_item[1])
                   my_vid_str += str(v_item[0])
@@ -424,8 +461,10 @@ class c_eventer(c_device):
                 with self.webm_lock:
                   the_end = int(self.redis.get('webm_queue:' + str(self.id) + ':end'))
                   the_end += 1
-                  self.redis.set('webm_queue:' + str(self.id) + ':item:' + str(the_end), savepath)
-                  self.redis.set('webm_queue:' + str(self.id) + ':end', str(the_end))
+                  self.redis.set('webm_queue:' + str(self.id) + ':item:' + str(the_end), 
+                    savepath)
+                  self.redis.set('webm_queue:' + str(self.id) + ':end', 
+                    str(the_end))
             else:  
               is_ready = False
           if is_ready:
@@ -437,9 +476,15 @@ class c_eventer(c_device):
               break  
             except OperationalError:
               connection.close()  
+            except ValueError:
+              self.logger.info('Value Error in Merge Events')
+              break
         if is_ready:
+          self.logger.info('### Getlock 474')
           with self.eventdict_lock:
-            del self.eventdict[i]
+            with self.display_lock:
+              del self.eventdict[i]
+          self.logger.info('### Leavelock 477')
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
@@ -447,7 +492,7 @@ class c_eventer(c_device):
   def inserter(self):
     try:
       detector_buffer = deque()
-      detector_to = time()
+      detector_to = None
       while (not self.tf_worker.check_ready(self.tf_w_index)):
         sleep(djconf.getconfigfloat('long_brake', 1.0))
       local_ts = time()
@@ -459,6 +504,7 @@ class c_eventer(c_device):
         if self.detectorqueue.empty():
           frame = None
         else:
+          
           image, numbers = self.detectorqueue.get()
           np_image = np.frombuffer(image, dtype=np.uint8)
           np_image = np_image.reshape(numbers[5]-numbers[4], numbers[3]-numbers[2], 3)
@@ -466,7 +512,9 @@ class c_eventer(c_device):
         if frame:
           if not self.dbline.cam_xres:
             self.dbline.refresh_from_db(fields=['cam_xres', 'cam_yres', ])
-          if len(detector_buffer) < 16 and (new_time := time()) - detector_to < 0.1:
+          if detector_to is None:
+            detector_to = frame[2]
+          if len(detector_buffer) < 16 and (new_time := frame[2]) - detector_to < 0.1:
             detector_buffer.append(frame)
             continue
           detector_to = new_time
@@ -490,26 +538,35 @@ class c_eventer(c_device):
                 ))
               for i in range(len(imglist)):
                 detector_buffer[i].append(predictions[i])
-            #print('Inserter Time:', time() - ts)  
+          self.logger.info('Inserter in')
           margin = self.dbline.eve_margin
-          for item in detector_buffer:
-            frame = item
-            found = None
-            for i, item in list(self.eventdict.items()):
-              if hasoverlap((frame[3]-margin, frame[4]+margin, 
-                  frame[5]-margin, frame[6]+margin), item):
-                found = item
-                break
-            if found is None:
-              new_event = c_event(self.tf_worker, self.tf_w_index, frame, 
-                margin, self.dbline, self.logger)
-              with self.eventdict_lock:
-                self.eventdict[new_event.dbline.id] = new_event
-            else: 
-              with self.eventdict_lock:
-                found.add_frame(frame) 
-          detector_buffer.clear()
-          self.merge_events()
+          with self.display_lock:
+            for frame in detector_buffer:
+              found = None
+              for i, item in list(self.eventdict.items()):
+                if hasoverlap((frame[3]-margin, frame[4]+margin, 
+                    frame[5]-margin, frame[6]+margin), item):
+                  found = item
+                  break
+              if found is None:
+                new_event = c_event(self.tf_worker, self.tf_w_index, frame, 
+                  margin, self.dbline, self.logger)
+                self.logger.info('### Getlock 541')
+                with self.eventdict_lock:
+                  self.eventdict[new_event.dbline.id] = new_event
+                self.logger.info('### Leavelock 544')
+              else: 
+                self.logger.info('### Getlock 546')
+                with found.event_lock:
+                  self.logger.info('+++ Add_Frame')
+                  found.add_frame(frame) 
+                  self.logger.info('--- Add_Frame')
+                self.logger.info('### Leavelock 549')
+            detector_buffer.clear()
+            self.logger.info('+++++ Merge Events')
+            self.merge_events()
+            self.logger.info('----- Merge Events')
+          self.logger.info('Inserter out')
         else:  
           sleep(djconf.getconfigfloat('short_brake', 0.1))
     except:

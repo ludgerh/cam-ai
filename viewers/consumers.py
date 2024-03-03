@@ -93,19 +93,7 @@ class triggerConsumer(WebsocketConsumer):
       if params['command'] == 'starttrigger':
         mystream = streams[params['idx']]
         show_cam = not(self.scope['user'].is_superuser and is_public_server and mystream.dbline.encrypted)
-        if self.scope['user'].id is None:
-          if (params['tokennr'] and params['token']):
-            if params['mode'] == 'C':
-              go_on = checktoken((params['tokennr'], params['token']), 'CAR', params['idx'])
-            elif params['mode'] == 'D':
-              go_on = checktoken((params['tokennr'], params['token']), 'DER', params['idx'])
-            elif params['mode'] == 'E':
-              go_on = checktoken((params['tokennr'], params['token']), 'ETR', params['idx'])
-          else:
-            go_on = False
-        else:
-          go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
-        if go_on:
+        if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
           outx = params['width']
           if params['mode'] == 'C':
             if outx > mystream.dbline.cam_min_x_view:
@@ -146,8 +134,9 @@ class triggerConsumer(WebsocketConsumer):
               try:
                 indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
                 self.busy_lock.acquire()
-                print(indicator, self.busydict[indicator])  
-                if not self.busydict[indicator]:
+                if self.busydict[indicator]:
+                  self.busy_lock.release()
+                else: 
                   self.busydict[indicator] = True
                   self.busy_lock.release()
                   ts = time()
@@ -171,8 +160,6 @@ class triggerConsumer(WebsocketConsumer):
                     self.send(bytes_data=indicator.encode()+frame)
                   except Disconnected:
                     logger.error('*** Could not send Frame, socket closed...')
-                else: 
-                  self.busy_lock.release()
               except:
                 logger.error(format_exc())
                 logger.handlers.clear()

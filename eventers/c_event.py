@@ -20,7 +20,7 @@ from datetime import datetime
 from random import randint
 from os import path, makedirs
 from time import sleep, time
-from threading import Thread
+from threading import Thread, Lock as t_lock
 from collections import OrderedDict
 from traceback import format_exc
 from django.db import connection
@@ -128,6 +128,12 @@ class c_event(list):
         break
       except OperationalError:
         connection.close()
+    while True:
+      try:
+        self.dbline.save()
+        break
+      except OperationalError:
+        connection.close()
     xytemp = self.tf_worker.get_xy(self.dbline.school.id, self.tf_w_index)
     self.xdim = xytemp[0]
     self.ydim = xytemp[1]
@@ -159,6 +165,7 @@ class c_event(list):
           c_event.crypt = l_crypt()
           self.dbline.camera.crypt_key = c_event.crypt.key
           self.dbline.camera.save(update_fields=['crypt_key'])
+    self.event_lock = t_lock()      
 
   def get_new_frame_index(self, timestamp, first=False):
     index = (round(timestamp * 10000000.0) % 36000000000)
@@ -168,35 +175,49 @@ class c_event(list):
     return(index)
 
   def add_frame(self, frame):
-    s_factor = 0.2 # user changeable later: 0.0 -> No Shrinking 1.0 50%
-    if (frame[3] - self.margin) <= self[0]:
-      self[0] = max(0, frame[3] - self.margin)
-    else:
-      self[0] = round(((frame[3] - self.margin) * s_factor + self[0]) 
-        / (s_factor+1.0))
-    if (frame[4] + self.margin) >= self[1]:
-      self[1] = min(self.xmax, frame[4] + self.margin)
-    else:
-      self[1] = round(((frame[4] + self.margin) * s_factor + self[1]) 
-        / (s_factor+1.0))
-    if (frame[5] - self.margin) <= self[2]:
-      self[2] = max(0, frame[5] - self.margin)
-    else:
-      self[2] = round(((frame[5] - self.margin) * s_factor + self[2]) 
-        / (s_factor+1.0))
-    if (frame[6] + self.margin) >= self[3]:
-      self[3] = min(self.ymax, frame[6] + self.margin)
-    else:
-      self[3] = round(((frame[6] + self.margin) * s_factor + self[3]) 
-        / (s_factor+1.0))
-    self.end = frame[2]
-    self[4].append(frame[7]) 
-    index = self.get_new_frame_index(frame[2])
-    self.frames[index] = frame
-    if (new_max := np.max(frame[7][1:])) > self.focus_max:
-      self.focus_max = new_max
-      self.focus_time = frame[2]
-    
+    try:
+      print('aaa')
+      s_factor = 0.2 # user changeable later: 0.0 -> No Shrinking 1.0 50%
+      print('bbb')
+      if (frame[3] - self.margin) <= self[0]:
+        self[0] = max(0, frame[3] - self.margin)
+      else:
+        self[0] = round(((frame[3] - self.margin) * s_factor + self[0]) 
+          / (s_factor+1.0))
+      print('ccc')
+      if (frame[4] + self.margin) >= self[1]:
+        self[1] = min(self.xmax, frame[4] + self.margin)
+      else:
+        self[1] = round(((frame[4] + self.margin) * s_factor + self[1]) 
+          / (s_factor+1.0))
+      print('ddd')
+      if (frame[5] - self.margin) <= self[2]:
+        self[2] = max(0, frame[5] - self.margin)
+      else:
+        self[2] = round(((frame[5] - self.margin) * s_factor + self[2]) 
+          / (s_factor+1.0))
+      print('eee')
+      if (frame[6] + self.margin) >= self[3]:
+        self[3] = min(self.ymax, frame[6] + self.margin)
+      else:
+        self[3] = round(((frame[6] + self.margin) * s_factor + self[3]) 
+          / (s_factor+1.0))
+      print('fff')
+      self.end = frame[2]
+      print('ggg')
+      self[4].append(frame[7]) 
+      print('hhh')
+      index = self.get_new_frame_index(frame[2])
+      print('iii')
+      self.frames[index] = frame
+      print('jjj')
+      if (new_max := np.max(frame[7][1:])) > self.focus_max:
+        self.focus_max = new_max
+        self.focus_time = frame[2]
+      print('kkk')
+    except:
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def merge_frames(self, the_other_one):
     self.frames = {**self.frames, **the_other_one.frames}
