@@ -32,6 +32,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <h2>{{ item.id }}: {{ item.name }}</h2>
           <h5>{{ item.cam_xres }}x{{ item.cam_yres }}, 
             fps = <span id="fpstagC{{ item.id }}">?</span>
+            {% if user.is_superuser %}
+              views = <span id="vnrtagC{{ item.id }}">?</span>
+			      {% endif %}
           </h5>
           <div>
             <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespaceC{{ item.id }}" /></a>
@@ -40,6 +43,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="col-sm-auto box">
           <h2>Motion Detection</h2>
           <h5>fps = <span id="fpstagD{{ item.id }}">?</span>
+          {% if user.is_superuser %}
+            views = <span id="vnrtagD{{ item.id }}">?</span>
+		      {% endif %}
           </h5>
           <div>
             <a href="/oneitem/detector/{{ item.id }}/"><img id="imagespaceD{{ item.id }}" /></a>
@@ -48,6 +54,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="col-sm-auto box">
           <h2>Event Preview</h2>
           <h5>fps = <span id="fpstagE{{ item.id }}">?</span>
+          {% if user.is_superuser %}
+            views = <span id="vnrtagE{{ item.id }}">?</span>
+		      {% endif %}
           </h5>
           <div>
             <a href="/oneitem/eventer/{{ item.id }}/"><img id="imagespaceE{{ item.id }}" /></a>
@@ -197,6 +206,9 @@ $(document).ready(function() {
       })
       .then((result) => {
         $('#fpstagC{{ item.id }}').text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtagC{{ item.id }}').text(result.viewers);
+        {% endif %}
       })
       .catch(err => {console.log(err);});
       c_view_Socket.sendandwait({
@@ -206,6 +218,9 @@ $(document).ready(function() {
       })
       .then((result) => {
         $('#fpstagD{{ item.id }}').text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtagD{{ item.id }}').text(result.viewers);
+        {% endif %}
       })
       .catch(err => {console.log(err);});
       c_view_Socket.sendandwait({
@@ -215,6 +230,9 @@ $(document).ready(function() {
       })
       .then((result) => {
         $('#fpstagE{{ item.id }}').text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtagE{{ item.id }}').text(result.viewers);
+        {% endif %}
       })
       .catch(err => {console.log(err);});
     }, 5000);

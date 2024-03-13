@@ -154,11 +154,11 @@ class l_buffer:
       
   def empty(self): 
     with self.my_lock:
-      if self.redis.llen(self.storage[0]):
-        return(False)
-      if self.redis.llen(self.storage[1]):
-        return(False)
-    return(True)   
+      if self.redis.llen(self.storage[0]) and self.redis.llen(self.storage[1]):
+        result = False
+      else:  
+        result = True
+    return(result)   
     
   def qsize(self):
     return(max(

@@ -12,6 +12,8 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+c_event.py V2.1.0 03.03.2024
 """
 
 import numpy as np
@@ -20,7 +22,7 @@ from datetime import datetime
 from random import randint
 from os import path, makedirs
 from time import sleep, time
-from threading import Thread, Lock as t_lock
+from threading import Thread
 from collections import OrderedDict
 from traceback import format_exc
 from django.db import connection
@@ -101,7 +103,6 @@ def resolve_rules(conditions, predictions):
 
 
 class c_event(list):
-  last_frame_index = 0
   crypt = None
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, logger):
@@ -146,8 +147,8 @@ class c_event(list):
     self.append(min(self.ymax, frame[6] + margin))
     self.append([frame[7]]) #Predictions
     self.logger = logger
-    index = self.get_new_frame_index(frame[2], True)
-    self.frames = OrderedDict([(index, frame)])
+    self.frames = OrderedDict([(0, frame)])
+    self.last_frame_index = 1
     while True:
       try:
         self.dbline.save()
@@ -165,63 +166,44 @@ class c_event(list):
           c_event.crypt = l_crypt()
           self.dbline.camera.crypt_key = c_event.crypt.key
           self.dbline.camera.save(update_fields=['crypt_key'])
-    self.event_lock = t_lock()      
-
-  def get_new_frame_index(self, timestamp, first=False):
-    index = (round(timestamp * 10000000.0) % 36000000000)
-    while index <= self.last_frame_index:
-      index += 1
-    self.last_frame_index = index
-    return(index)
 
   def add_frame(self, frame):
     try:
-      print('aaa')
       s_factor = 0.2 # user changeable later: 0.0 -> No Shrinking 1.0 50%
-      print('bbb')
       if (frame[3] - self.margin) <= self[0]:
         self[0] = max(0, frame[3] - self.margin)
       else:
         self[0] = round(((frame[3] - self.margin) * s_factor + self[0]) 
           / (s_factor+1.0))
-      print('ccc')
       if (frame[4] + self.margin) >= self[1]:
         self[1] = min(self.xmax, frame[4] + self.margin)
       else:
         self[1] = round(((frame[4] + self.margin) * s_factor + self[1]) 
           / (s_factor+1.0))
-      print('ddd')
       if (frame[5] - self.margin) <= self[2]:
         self[2] = max(0, frame[5] - self.margin)
       else:
         self[2] = round(((frame[5] - self.margin) * s_factor + self[2]) 
           / (s_factor+1.0))
-      print('eee')
       if (frame[6] + self.margin) >= self[3]:
         self[3] = min(self.ymax, frame[6] + self.margin)
       else:
         self[3] = round(((frame[6] + self.margin) * s_factor + self[3]) 
           / (s_factor+1.0))
-      print('fff')
       self.end = frame[2]
-      print('ggg')
       self[4].append(frame[7]) 
-      print('hhh')
-      index = self.get_new_frame_index(frame[2])
-      print('iii')
-      self.frames[index] = frame
-      print('jjj')
+      self.frames[self.last_frame_index] = frame
+      self.last_frame_index += 1
       if (new_max := np.max(frame[7][1:])) > self.focus_max:
         self.focus_max = new_max
         self.focus_time = frame[2]
-      print('kkk')
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
   def merge_frames(self, the_other_one):
     self.frames = {**self.frames, **the_other_one.frames}
-    self.frames = OrderedDict(sorted(self.frames.items(), key=lambda x: x[0]))
+    self.frames = OrderedDict(sorted(self.frames.items(), key=lambda x: x[1][2]))
     if the_other_one.focus_max > self.focus_max:
       self.focus_max = the_other_one.focus_max
       self.focus_time = the_other_one.focus_time
@@ -270,7 +252,8 @@ class c_event(list):
       #self.logger.info('*** Saving Event: '+str(self.dbline.id))
       self.frames_filter(self.number_of_frames, cond_dict)
       frames_to_save = self.frames.values()
-      self.dbline.p_string=self.eventer_name+'('+str(self.eventer_id)+'): '+self.p_string()
+      self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
+        + self.p_string())
       self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
       self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
       self.dbline.xmin=self[0]
@@ -357,10 +340,12 @@ class c_event(list):
       html_text += 'We had some movement. <br> \n' 
       if self.savename:
         html_text += '<br>Here is the movie (click on the image): <br> \n' 
-        html_text += '<a href="' + clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
+        html_text += ('<a href="' + clienturl + 'schools/getbigmp4/' 
+          + str(self.dbline.id) + '/')
         html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
         html_text += '" target="_blank">'
-        html_text += '<img src="' + clienturl + 'eventers/eventjpg/' + str(self.dbline.id) + '/'
+        html_text += ('<img src="' + clienturl + 'eventers/eventjpg/' 
+          + str(self.dbline.id) + '/')
         html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.jpg'
         html_text += '" style="width: 400px; height: auto"</a> <br>\n'
       html_text += 'Here are the images: <br> \n'
@@ -368,7 +353,8 @@ class c_event(list):
         html_text += '<a href="' + clienturl + 'schools/getbigbmp/0/' + str(item) + '/'
         html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
         html_text += '" target="_blank">'
-        html_text += '<img src="' + clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
+        html_text += ('<img src="' + clienturl + 'schools/getbmp/0/' + str(item) 
+          + '/3/1/200/200/')
         html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
         html_text += '" style="width: 200px; height: 200px; object-fit: contain"</a> \n'
       html_text += '<br> \n'
@@ -379,5 +365,6 @@ class c_event(list):
         receiver,
         plain_text,
         html_text,)
-      Thread(target=self.smtp_send_mail, name='SMTPSendThread', args=(mysmtp, receiver,)).start()
+      Thread(target=self.smtp_send_mail, name='SMTPSendThread', 
+        args=(mysmtp, receiver,)).start()
 

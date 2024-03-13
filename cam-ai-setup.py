@@ -171,7 +171,7 @@ if True:
   subprocess.call(['sudo', 'apt', '-y', 'install', 'ffmpeg']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'libgeos-dev']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'redis']) 
-  subprocess.call(['sudo', 'apt', '-y', 'install', 'pkg-config']) 
+  subprocess.call(['sudo', 'apt', '-y', 'install', 'sudo nano pkg-config']) 
   if env_type == 'venv':
     subprocess.call(['sudo', 'apt', '-y', 'install', 'python3-venv']) 
   else:
@@ -196,6 +196,7 @@ if True:
   subprocess.call(['sudo', 'sed', '-i', '$a#save 900 1' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 300 10' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 60 10000' , '/etc/redis/redis.conf']) 
+  subprocess.call(['sudo', 'sed', '-i', '$asave ""' , '/etc/redis/redis.conf']) 
   
   #subprocess.call(['sudo', 'touch', '/etc/sudoers.d/010_CAM-AI_reboot_privilege']) 
   #subprocess.call(['sudo', 'sed', '-i', '$acam_ai ALL=(root) NOPASSWD: /sbin/reboot' , '/etc/sudoers.d/010_CAM-AI_reboot_privilege']) 
@@ -249,7 +250,7 @@ for line in sourcefile:
       line = 'env_type = "' + env_type + '"\n'
   targetfile.write(line)
 if not os.path.exists('eventers/c_alarm.py'):
-  copy('camai/passwords.py.example','eventers/c_alarm.py')
+  copy('eventers/c_alarm.py.example','eventers/c_alarm.py')
 targetfile = open('camai/passwords.py-new', 'w')
 sourcefile.close()
 targetfile.close()

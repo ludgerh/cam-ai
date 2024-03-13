@@ -1,18 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-# /tf_workers/c_tfworkers.py V1.0.15 09.01.2024
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import json
 import numpy as np
@@ -185,6 +185,7 @@ class tf_worker():
     #*** Client Var
     self.run_out_procs = {}
     self.pred_out_dict = {}
+    self.pred_out_lock = Lock()
     self.very_short_brake = djconf.getconfigfloat('very_short_brake', 0.001)
     self.ws_ts = None
 
@@ -663,10 +664,15 @@ class tf_worker():
       elif (received[0] == 'put_xy'):
         self.xy = received[1]
       elif (received[0] == 'pred_to_send'):
-        while self.pred_out_dict[received[2][0]] is not None: 
-          sleep(djconf.getconfigfloat('very_short_brake', 0.001))
-        
-        self.pred_out_dict[received[2][0]] = received[1]
+        while True:
+          self.pred_out_lock.acquire()
+          if self.pred_out_dict[received[2][0]] is None:
+            self.pred_out_dict[received[2][0]] = received[1]
+            self.pred_out_lock.release()
+            break
+          else: 
+            self.pred_out_lock.release() 
+            sleep(djconf.getconfigfloat('very_short_brake', 0.001))
       else:
         raise QueueUnknownKeyword(received[0])
     #print('Finished:', received)
@@ -703,13 +709,14 @@ class tf_worker():
     return(self.xy)
 
   def ask_pred(self, school, img_list, userindex):
-    self.pred_out_dict[userindex] = None
-    self.inqueue.put((
-      'imglist', 
-      school, 
-      img_list, 
-      userindex, 
-    ))
+    with  self.pred_out_lock:
+      self.pred_out_dict[userindex] = None
+      self.inqueue.put((
+        'imglist', 
+        school, 
+        img_list, 
+        userindex, 
+      ))
 
   def client_check_model(self, schoolnr, test_pred = False):
     self.inqueue.put((
@@ -720,11 +727,17 @@ class tf_worker():
 
 
   def get_from_outqueue(self, userindex):
-    while ((userindex not in self.pred_out_dict) 
-        or (self.pred_out_dict[userindex] is None)):
-      sleep(djconf.getconfigfloat('very_short_brake', 0.001))
-    result = self.pred_out_dict[userindex]
-    self.pred_out_dict[userindex] = None
+    while True:
+      self.pred_out_lock.acquire()
+      if ((userindex not in self.pred_out_dict) 
+          or (self.pred_out_dict[userindex] is None)):
+        self.pred_out_lock.release()
+        sleep(djconf.getconfigfloat('very_short_brake', 0.01))
+      else:  
+        result = self.pred_out_dict[userindex]
+        self.pred_out_dict[userindex] = None
+        self.pred_out_lock.release()
+        break
     return(result)
 
   def stop_out(self, index):

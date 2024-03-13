@@ -68,8 +68,8 @@ class triggerConsumer(WebsocketConsumer):
     for viewer in self.viewerlist:
       viewer.parent.take_view_count()
       if not redis.view_from_dev(viewer.parent.type, viewer.parent.id):
-        if self.indexdict[viewer.parent.id]['show_cam']:
-          viewer.pop_from_onf(self.indexdict[viewer.parent.id]['onf'])
+        if self.indexdict[viewer.parent.type][viewer.parent.id]['show_cam']:
+          viewer.pop_from_onf(self.indexdict[viewer.parent.type][viewer.parent.id]['onf'])
     for item in self.loglist:
       item.stop = timezone.now()
       item.active = False
@@ -165,9 +165,11 @@ class triggerConsumer(WebsocketConsumer):
                 logger.handlers.clear()
 
           myviewer.parent.add_view_count()
-          self.indexdict[params['idx']] = {'show_cam' : show_cam, }
+          if params['mode'] not in self.indexdict:
+            self.indexdict[params['mode']] = {}
+          self.indexdict[params['mode']][params['idx']] = {'show_cam' : show_cam, }
           if show_cam:
-            self.indexdict[params['idx']]['onf'] = myviewer.push_to_onf(onf)
+            self.indexdict[params['mode']][params['idx']]['onf'] = myviewer.push_to_onf(onf)
           self.viewerlist.append(myviewer)
           if self.scope['user'].is_authenticated:
             myuser = self.scope['user'].id
@@ -213,18 +215,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}
 
     if params['command'] == 'getcaminfo':
-      if self.scope['user'].id is None:
-        if (params['tokennr'] and params['token']):
-          if params['mode'] == 'C':
-            go_on = await self.mychecktoken((params['tokennr'], params['token']), 'CAR', params['idx'])
-          elif params['mode'] == 'D':
-            go_on = await self.mychecktoken((params['tokennr'], params['token']), 'DER', params['idx'])
-          elif params['mode'] == 'E':
-            go_on = await self.mychecktoken((params['tokennr'], params['token']), 'ETR', params['idx'])
-        else:
-          go_on = False
-      else:
-        go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
+      go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
       if go_on:
         outlist['data'] = {}
         outlist['data']['fps'] = round(redis.fps_from_dev(params['mode'], params['idx']), 2)

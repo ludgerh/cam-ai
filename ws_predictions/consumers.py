@@ -87,8 +87,11 @@ class predictionsConsumer(WebsocketConsumer):
           logger.debug('<-- ' + str(intext))
           indict=json.loads(intext)
           if indict['code'] == 'auth':
-            self.user = User.objects.get(username=indict['name'])
-            if self.user.check_password(indict['pass']):
+            try:
+              self.user = User.objects.get(username=indict['name'])
+            except User.DoesNotExist:
+              self.user = None  
+            if self.user and self.user.check_password(indict['pass']):
               logger.debug('Success!')
               if not (indict['ws_id'] in self.datacache):
                 self.datacache[indict['ws_id']] = {}
@@ -105,17 +108,19 @@ class predictionsConsumer(WebsocketConsumer):
                   self.mydatacache['tf_w_index'])
                 del self.mydatacache['tf_w_index']
               logger.info('Successful websocket-login: WS-ID: ' 
-                + str(indict['ws_id']) + ' - WS-Name: ' 
-                + str(indict['ws_name']) + ' - Worker-Number: ' 
-                + str(indict['worker_nr']) + ' - Software-Version: ' 
-                + indict['soft_ver'])
+                + str(indict['ws_id']) 
+                + ' - WS-Name: ' + str(indict['ws_name']) 
+                + ' - Worker-Number: ' + str(indict['worker_nr']) 
+                + ' - Software-Version: ' + indict['soft_ver'])
               self.ws_id = indict['ws_id']
               self.ws_name = indict['ws_name']
               self.worker_nr = indict['worker_nr']
               self.authed = True
             else:
-              logger.warning('Failure of websocket-login: ' 
-                + str(indict['ws_id']) + '-' + str(indict['worker_nr']) 
+              logger.warning('Failure of websocket-login:  WS-ID: ' 
+                + str(indict['ws_id']) 
+                + ' - WS-Name: ' + str(indict['ws_name']) 
+                + ' - Worker-Number: ' + str(indict['worker_nr']) 
                 + ' - Software-Version: ' + indict['soft_ver'])
               self.close() 
           elif indict['code'] == 'get_xy':

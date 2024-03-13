@@ -61,9 +61,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <h2>Camera: {{ dbline.name }}</h2>
           <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
             fps = <span id="fpstag">?</span>
-{% comment %}
-            views = <span id="vnrtag">?</span>
-{% endcomment %}
+            {% if user.is_superuser %}
+              views = <span id="vnrtag">?</span>
+					  {% endif %}
           </h5>
           <img class="noselect img-rounded" id="imagespace" />
         </div>
@@ -656,7 +656,9 @@ $(document).ready(function() {
       })
       .then((result) => {
         $('#fpstag').text(result.fps);
-        $('#vnrtag').text(result.viewers);
+        {% if user.is_superuser %}
+          $('#vnrtag').text(result.viewers);
+        {% endif %}
       })
       .catch(err => {console.log(err);});
     }, 5000);

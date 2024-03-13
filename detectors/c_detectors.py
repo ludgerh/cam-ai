@@ -131,7 +131,7 @@ class c_detector(c_device):
     try:
       if input is None:
         return(None)
-      #print('Queuesize:', self.myeventer.detectorqueue.qsize())
+      #print('Queuesize', self.id, ':', self.myeventer.detectorqueue.qsize())
       if self.myeventer.detectorqueue.qsize() > 2 * self.dbline.det_max_rect:
         if not self.warning_done:
           self.logger.warning('Detector #' + str(self.id)
@@ -219,7 +219,6 @@ class c_detector(c_device):
                 rect_list.append(rectb)
                 recta = rect_btoa(rectb)
       rect_list = merge_rects(rect_list)
-      sendtime = frametime
       for rect in rect_list[:self.dbline.det_max_rect]:
         recta = rect_btoa(rect)
         cv.rectangle(buffer1, recta, (200), self.linewidth)
@@ -230,9 +229,8 @@ class c_detector(c_device):
             aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
             self.myeventer.detectorqueue.put(
               bytedata = aoi.tobytes(),
-              objdata = (3, sendtime, rect[0], rect[1], rect[2], rect[3]),
+              objdata = (3, frametime, rect[0], rect[1], rect[2], rect[3]),
             )  
-          sendtime += 0.000001
         else:
           self.background = np.float32(frame)
       if self.dbline.det_backgr_delay == 0:
