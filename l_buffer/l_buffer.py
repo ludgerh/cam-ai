@@ -23,6 +23,9 @@ shutdown.
 call = Callback (True or False)
 When using this, stop() must be called from the getting process to finalize 
 shutdown.
+
+queue = Set up Redis Queue
+If None, the values are not buffered
 """
 
 import pickle
@@ -34,12 +37,13 @@ from threading import Thread
 from tools.c_redis import saferedis
 from traceback import format_exc
 
-class l_buffer:
+class l_buffer():
   redis_list = []
 
-  def __init__(self, itemtype=None, block=False, call=None):
+  def __init__(self, itemtype=None, block=False, call=None, queue=None):
     self.block = block
     self.call = call
+    self.queue = queue
     self.redis = saferedis()
     self.itemtype = itemtype    
     self.blockdelay = 0.01  
@@ -49,7 +53,10 @@ class l_buffer:
     l_buffer.redis_list.append(i)
     if itemtype is None:
       self.my_lock = Lock()
-      self.storage = ('l_buffer:'+str(i)+':bytes', 'l_buffer:'+str(i)+':object')
+      self.storage = (
+        'l_buffer:' + str(i) + ':bytes', 
+        'l_buffer:' + str(i) + ':object',
+      )
       self.redis.delete(self.storage[0])
       self.redis.delete(self.storage[1])
     else:
@@ -94,12 +101,15 @@ class l_buffer:
       self.blockdelay = 0.01  
     if self.itemtype is None:
       with self.my_lock:
-        if (objdata := self.redis.rpop(self.storage[1])):
-          objdata = pickle.loads(objdata)
-        result = (
-          self.redis.rpop(self.storage[0]),
-          objdata,
-        )
+        if self.queue:
+          bytedata = self.redis.rpop(self.storage[0])
+          objdata = self.redis.rpop(self.storage[1])
+        else:
+          bytedata = self.redis.get(self.storage[0])
+          objdata = self.redis.get(self.storage[1])
+      if objdata:
+        objdata = pickle.loads(objdata)
+      result = (bytedata, objdata)
     elif self.itemtype == 0:
       result = np.frombuffer(self.redis.get(self.storage[0]), dtype=np.uint8)
     elif self.itemtype == 1:
@@ -121,20 +131,23 @@ class l_buffer:
         float(self.redis.get(self.storage[2]))
       )
     if self.block:
-      self.redis.delete(self.storage[0])
+      if not self.queue:
+        self.redis.delete(self.storage[0])
     return(result)
 
-  def put(self, bytedata=None, objdata=None, data=None):
+  def put(self, bytedata=b'', objdata=None, data=None):
     if self.itemtype is None:
+      if objdata:
+        objdata = pickle.dumps(objdata)
+      else:
+        objdata = b''  
       with self.my_lock:
-        if bytedata:
+        if self.queue:
           self.redis.lpush(self.storage[0], bytedata)
-        else:
-          self.redis.lpush(self.storage[0], b'')
-        if objdata:
-          self.redis.lpush(self.storage[1], pickle.dumps(objdata))
-        else:
-          self.redis.lpush(self.storage[1], b'')
+          self.redis.lpush(self.storage[1], objdata)
+        else:  
+          self.redis.set(self.storage[0], bytedata)
+          self.redis.set(self.storage[1], objdata)
     if self.itemtype == 0:
       self.redis.set(self.storage[0], data.tobytes())
     elif self.itemtype == 1:
@@ -154,21 +167,41 @@ class l_buffer:
       
   def empty(self): 
     with self.my_lock:
-      if self.redis.llen(self.storage[0]) and self.redis.llen(self.storage[1]):
-        result = False
+      if self.queue:
+        result = not self.redis.llen(self.storage[0])
       else:  
-        result = True
+        result =  not self.redis.get(self.storage[0])
     return(result)   
     
   def qsize(self):
-    return(max(
-      self.redis.llen(self.storage[0]), 
-      self.redis.llen(self.storage[1]), 
-    ))  
+    if self.queue:
+      result = self.redis.llen(self.storage[0])
+    else:  
+      if self.redis.get(self.storage[0]):
+        result = 1
+      else:
+        result = 0  
+    return(result)  
 
   def stop(self):
     if self.call:
       self.send_death_pill()
       self.do_run = False
       self.thread.join()
+      
+class c_buffer(l_buffer):
+  
+  def put(self, frame):
+    bytes = frame[1].tobytes()
+    objects = [frame[0], frame[1].shape[0], frame[1].shape[1]] + list(frame[2:])
+    super().put(bytedata=bytes, objdata=objects)
+    
+  def get(self):
+    frame = super().get()
+    if frame:
+      np_image = np.frombuffer(frame[0], dtype=np.uint8)
+      np_image = np_image.reshape(frame[1][1], frame[1][2], 3)
+      frame = [frame[1][0], np_image] + frame[1][3:]
+    return(frame)
+
         

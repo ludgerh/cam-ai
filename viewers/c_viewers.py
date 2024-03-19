@@ -15,7 +15,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from threading import Lock
-from l_buffer.l_buffer import l_buffer
+from l_buffer.l_buffer import c_buffer
 from drawpad.drawpad import drawpad
 
 #from threading import enumerate
@@ -25,7 +25,7 @@ class c_viewer():
   def __init__(self, parent, logger):
     self.logger = logger
     self.parent = parent
-    self.inqueue = l_buffer(1, call=self.callback)
+    self.inqueue = c_buffer(call=self.callback)
     self.onf_dict_lock = Lock()
     self.onf_dict = {}
     if self.parent.type in {'C', 'D'}:

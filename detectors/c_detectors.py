@@ -25,12 +25,14 @@ from django.db import connection
 from django.db.utils import OperationalError
 from tools.l_tools import djconf
 from tools.c_tools import rect_atob, rect_btoa, hasoverlap, merge_rects
+from tools.c_redis import myredis
 from tools.c_logger import log_ini
-from l_buffer.l_buffer import l_buffer
+from l_buffer.l_buffer import l_buffer, c_buffer
 from viewers.c_viewers import c_viewer
 from streams.c_devices import c_device
 from streams.models import stream
 
+redis = myredis()
 
 class c_detector(c_device):
   def __init__(self, *args, **kwargs):
@@ -38,22 +40,14 @@ class c_detector(c_device):
       self.type = 'D'
       super().__init__(*args, **kwargs)
       self.mode_flag = self.dbline.det_mode_flag
-      self.dataqueue = l_buffer(1, block=True)
+      self.dataqueue = c_buffer(block=True)
       self.firstdetect = True
       self.ts_background = time()
       self.finished = True
       self.cam_xres = self.dbline.cam_xres
       self.cam_yres = self.dbline.cam_yres
       self.run_lock = False
-      myscaledown = self.dbline.det_scaledown
-      if not myscaledown:
-        if (self.cam_xres >= 2560) or (self.cam_yres >= 2560):
-          myscaledown = 4
-        elif (self.cam_xres >= 1280) or (self.cam_yres >= 1280):
-          myscaledown = 2
-        else:
-          myscaledown = 1
-      self.scaledown = myscaledown   
+      self.scaledown = self.get_scale_down()
       if self.dbline.det_view:
         self.viewer = c_viewer(self, self.logger)
       else:
@@ -84,19 +78,19 @@ class c_detector(c_device):
         self.dbline.det_fmax_size = received[1]
       elif (received[0] == 'set_max_rect'):
         self.dbline.det_max_rect = received[1]
+      elif (received[0] == 'reset'):
+        while self.run_lock:
+          sleep(djconf.getconfigfloat('short_brake', 0.1))
+        self.run_lock = True  
+        self.dbline.refresh_from_db()
+        self.scaledown = self.get_scale_down()
+        self.firstdetect = True
+        self.run_lock = False
       else:
         return(False)
       return(True)
 
   def run(self):
-    self.xres = self.cam_xres // self.scaledown
-    self.yres = self.cam_yres // self.scaledown
-    if self.scaledown >= 4:
-      self.linewidth = 3
-    elif self.scaledown >= 2:
-      self.linewidth = 4
-    else:
-      self.linewidth = 5
     super().run()
 
   def runner(self):
@@ -118,7 +112,7 @@ class c_detector(c_device):
           sleep(djconf.getconfigfloat('short_brake', 0.1))
         else:
           if self.dbline.det_view and self.redis.view_from_dev('D', self.dbline.id):
-            self.viewer.inqueue.put(data=frameline)
+            self.viewer.inqueue.put(frameline)
       self.dataqueue.stop()
       self.finished = True
     except:
@@ -180,10 +174,7 @@ class c_detector(c_device):
         buffer2 = cv.erode(buffer1,kernel,iterations =1)
       else:
         buffer2 = buffer1
-      if self.scaledown > 1:
-      	dilation = round(self.dbline.det_dilation / self.scaledown)
-      else:
-      	dilation = self.dbline.det_dilation
+      dilation = self.dbline.det_dilation
       if (dilation > 0) :
         kernel = np.ones((dilation*2 + 1,dilation*2 + 1),np.uint8)
         buffer3 = cv.dilate(buffer2,kernel,iterations =1)
@@ -258,9 +249,28 @@ class c_detector(c_device):
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
-
-  def getviewer(self):
-    pass
+      
+  def get_scale_down(self): 
+    result = self.dbline.det_scaledown
+    if not result:
+      if (self.cam_xres >= 2560) or (self.cam_yres >= 2560):
+        result = 4
+      elif (self.cam_xres >= 1280) or (self.cam_yres >= 1280):
+        result = 2
+      else:
+        result = 1
+    self.xres = self.cam_xres // result
+    self.yres = self.cam_yres // result
+    if result >= 4:
+      self.linewidth = 3
+    elif result >= 2:
+      self.linewidth = 4
+    else:
+      self.linewidth = 5 
+    return(result)      
+      
+  def reset(self):  
+    self.inqueue.put(('reset', ))
 
   def stop(self):
     self.dataqueue.stop()
