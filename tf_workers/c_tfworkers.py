@@ -716,7 +716,7 @@ class tf_worker():
       if ((userindex not in self.pred_out_dict) 
           or (self.pred_out_dict[userindex] is None)):
         self.pred_out_lock.release()
-        sleep(djconf.getconfigfloat('very_short_brake', 0.01))
+        sleep(djconf.getconfigfloat('short_brake', 0.01))
       else:  
         result = self.pred_out_dict[userindex]
         self.pred_out_dict[userindex] = None

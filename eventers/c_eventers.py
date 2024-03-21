@@ -228,6 +228,8 @@ class c_eventer(c_device):
           self.linewidth = round(4.0 / self.scaling)
           self.textheight = round(0.51 / self.scaling)
           self.textthickness = round(2.0 / self.scaling)
+      else:
+        sleep(djconf.getconfigfloat('short_brake', 0.01))
       if (time() - self.run_one_ts) > 1.0:
         self.run_one_ts = time()
         for i, item in list(self.eventdict.items()): 
@@ -536,8 +538,14 @@ class c_eventer(c_device):
               np_image = cv.cvtColor(item[1], cv.COLOR_BGR2RGB)
               imglist.append(np_image)
             if self.tf_w_index is not None:
+              while True:
+                try:
+                  school_id = self.dbline.eve_school.id
+                  break
+                except OperationalError:
+                  connection.close()
               self.tf_worker.ask_pred(
-                self.dbline.eve_school.id, 
+                school_id, 
                 imglist, 
                 self.tf_w_index,
               )

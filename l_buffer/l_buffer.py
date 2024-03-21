@@ -40,36 +40,23 @@ from traceback import format_exc
 class l_buffer():
   redis_list = []
 
-  def __init__(self, itemtype=None, block=False, call=None, queue=None):
+  def __init__(self, block=False, call=None, queue=None):
     self.block = block
     self.call = call
     self.queue = queue
-    self.redis = saferedis()
-    self.itemtype = itemtype    
+    self.redis = saferedis() 
     self.blockdelay = 0.01  
     i = 0
     while i in l_buffer.redis_list:
       i += 1
     l_buffer.redis_list.append(i)
-    if itemtype is None:
-      self.my_lock = Lock()
-      self.storage = (
-        'l_buffer:' + str(i) + ':bytes', 
-        'l_buffer:' + str(i) + ':object',
-      )
-      self.redis.delete(self.storage[0])
-      self.redis.delete(self.storage[1])
-    else:
-      if self.itemtype == 0:
-        storagedim = 1
-      elif self.itemtype == 1:
-        self.first_time = True
-        storagedim = 5
-      self.storage = []  
-      for j in range(storagedim):      
-        self.storage.append('l_buffer:'+str(i)+':'+str(j))
-      for item in self.storage:
-        self.redis.delete(item)
+    self.my_lock = Lock()
+    self.storage = (
+      'l_buffer:' + str(i) + ':bytes', 
+      'l_buffer:' + str(i) + ':object',
+    )
+    self.redis.delete(self.storage[0])
+    self.redis.delete(self.storage[1])
     if self.call:
       self.do_run = True
       self.p = self.redis.pubsub(ignore_subscribe_messages=True)
@@ -89,7 +76,7 @@ class l_buffer():
       sleep(0.01) 
     
   def get(self):
-    if self.block or (self.itemtype == 1 and self.first_time):
+    if self.block:
       ts1 = time()
       while (not self.redis.exists(self.storage[0])):
         if time() - ts1 > 5:
@@ -97,67 +84,35 @@ class l_buffer():
         else:  
           sleep(self.blockdelay)
           if self.blockdelay < 1.0:
-            self.blockdelay += 0.01       
+            self.blockdelay += 0.01  
       self.blockdelay = 0.01  
-    if self.itemtype is None:
-      with self.my_lock:
-        if self.queue:
-          bytedata = self.redis.rpop(self.storage[0])
-          objdata = self.redis.rpop(self.storage[1])
-        else:
-          bytedata = self.redis.get(self.storage[0])
-          objdata = self.redis.get(self.storage[1])
-      if objdata:
-        objdata = pickle.loads(objdata)
-      result = (bytedata, objdata)
-    elif self.itemtype == 0:
-      result = np.frombuffer(self.redis.get(self.storage[0]), dtype=np.uint8)
-    elif self.itemtype == 1:
-      if self.first_time:
-        self.shape = (
-          int(self.redis.get(self.storage[3])),
-          int(self.redis.get(self.storage[4])),
-          3,
-        )
-        self.first_time = False
-      while (redis_result := self.redis.get(self.storage[0])) is None:
-        sleep(1.0)
-      result = (
-        int(redis_result),
-        np.frombuffer(
-          self.redis.get(self.storage[1]), 
-          dtype=np.uint8).reshape(self.shape
-        ),
-        float(self.redis.get(self.storage[2]))
-      )
+    with self.my_lock:
+      if self.queue:
+        bytedata = self.redis.rpop(self.storage[0])
+        objdata = self.redis.rpop(self.storage[1])
+      else:
+        bytedata = self.redis.get(self.storage[0])
+        objdata = self.redis.get(self.storage[1])
+    if objdata:
+      objdata = pickle.loads(objdata)
+    result = (bytedata, objdata)
     if self.block:
       if not self.queue:
         self.redis.delete(self.storage[0])
     return(result)
 
   def put(self, bytedata=b'', objdata=None, data=None):
-    if self.itemtype is None:
-      if objdata:
-        objdata = pickle.dumps(objdata)
-      else:
-        objdata = b''  
-      with self.my_lock:
-        if self.queue:
-          self.redis.lpush(self.storage[0], bytedata)
-          self.redis.lpush(self.storage[1], objdata)
-        else:  
-          self.redis.set(self.storage[0], bytedata)
-          self.redis.set(self.storage[1], objdata)
-    if self.itemtype == 0:
-      self.redis.set(self.storage[0], data.tobytes())
-    elif self.itemtype == 1:
-      if self.first_time:
-        self.redis.set(self.storage[4], data[1].shape[1])
-        self.redis.set(self.storage[3], data[1].shape[0])
-        self.first_time = False
-      self.redis.set(self.storage[2], data[2])
-      self.redis.set(self.storage[1], data[1].tobytes())
-      self.redis.set(self.storage[0], data[0])
+    if objdata:
+      objdata = pickle.dumps(objdata)
+    else:
+      objdata = b''  
+    with self.my_lock:
+      if self.queue:
+        self.redis.lpush(self.storage[0], bytedata)
+        self.redis.lpush(self.storage[1], objdata)
+      else:  
+        self.redis.set(self.storage[0], bytedata)
+        self.redis.set(self.storage[1], objdata)
     if self.call: 
       self.redis.publish(self.storage[0], 'T') #Trigger
       
