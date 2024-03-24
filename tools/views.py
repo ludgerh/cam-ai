@@ -41,9 +41,6 @@ class health(LoginRequiredMixin, TemplateView):
   template_name = 'tools/health.html'
 
   def get_context_data(self, **kwargs):
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
     context = super().get_context_data(**kwargs)
     datapath = djconf.getconfig('datapath', 'data/')
     context.update({
@@ -81,16 +78,12 @@ class health(LoginRequiredMixin, TemplateView):
       return(super().get(request, *args, **kwargs))
     else:
       return(HttpResponse('No Access'))
-
-class scan_cams(LoginRequiredMixin, TemplateView):
-  template_name = 'tools/scan_cams.html'
+      
+class cam_inst_view(LoginRequiredMixin, TemplateView):   
 
   def get_context_data(self, **kwargs):
     streamlimit = userinfo.objects.get(user = self.request.user.id).allowed_streams
     streamcount = stream.objects.filter(creator = self.request.user.id, active = True, ).count()
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -122,49 +115,23 @@ class scan_cams(LoginRequiredMixin, TemplateView):
     })
     return context
 
-class inst_cam(LoginRequiredMixin, TemplateView):
-  template_name = 'tools/inst_cam.html'
+class inst_cam_easy(cam_inst_view):
+  template_name = 'tools/inst_cam_easy.html'
+
+class inst_cam_expert(cam_inst_view):
+  template_name = 'tools/inst_cam_expert.html'  
 
   def get_context_data(self, **kwargs):
-    streamlimit = userinfo.objects.get(user = self.request.user.id).allowed_streams
-    streamcount = stream.objects.filter(creator = self.request.user.id, active = True, ).count()
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
     context = super().get_context_data(**kwargs)
     context.update({
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
-      'debug' : settings.DEBUG,
-      'camlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        self.request.user, 'R'
-      ),
-      'detectorlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        self.request.user, 'R'
-      ),
-      'eventerlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        self.request.user, 'R'
-      ),
-      'schoollist' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'R'
-      ),
-      'schoollist_write' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'W'
-      ),
       'camurls' : camurl.objects.all(),
-      'streamlimit' : streamlimit,
-      'streamcount' : streamcount,
-      'mayadd' : (streamlimit > streamcount),
       'ipaddress' : kwargs['ip'],
       'ports' : json.loads(kwargs['ports']),
     })
     return context
 
+class scan_cam_expert(cam_inst_view):
+  template_name = 'tools/scan_cam_expert.html'
 
 class addschool(LoginRequiredMixin, TemplateView):
   template_name = 'tools/addschool.html'
@@ -172,9 +139,6 @@ class addschool(LoginRequiredMixin, TemplateView):
   def get_context_data(self, **kwargs):
     schoollimit = userinfo.objects.get(user = self.request.user.id).allowed_schools
     schoolcount = school.objects.filter(creator = self.request.user.id, active = True, ).count()
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -210,9 +174,6 @@ class linkworkers(LoginRequiredMixin, TemplateView):
   template_name = 'tools/linkworkers.html'
 
   def get_context_data(self, **kwargs):
-    camlist = access.filter_items(stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', self.request.user, 'R')
-    detectorlist = access.filter_items(stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', self.request.user, 'R')
-    eventerlist = access.filter_items(stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', self.request.user, 'R')
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),

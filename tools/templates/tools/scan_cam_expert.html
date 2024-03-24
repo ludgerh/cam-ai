@@ -173,7 +173,10 @@ $(document).ready(function() {
     $('#scan-button').click(function() {
       $('#netlist').empty();
       $('#please_wait').removeClass("d-none");
-      portarray = ports.concat([parseInt($('#custom_port').val())]).sort(function(a, b){return a-b});
+      portarray = ports;
+      if ($('#custom_port').val()) {
+        portarray = portarray.concat([parseInt($('#custom_port').val())]).sort(function(a, b){return a-b});
+      }  
       $(document).scrollTop($(document).height()); 
       caminstSocket.sendandwait({
         'command' : 'scanips',
@@ -201,7 +204,7 @@ $(document).ready(function() {
                   newcard += '<h6 class="card-subtitle mb-2">ISAPI is not activated</h6>';
                 };
               };  
-              newcard += '<a href="/tools/inst_cam/' + item.address.ip + '/' + JSON.stringify(item.address.ports) + '/" >';
+              newcard += '<a href="/tools/inst_cam_expert/' + item.address.ip + '/' + JSON.stringify(item.address.ports) + '/" >';
               newcard += '<button class="btn btn-primary m-2 select-button" ip="'+item.address.ip+'" type="button">Install this one</button>';
               newcard += '</a>';
             newcard += '</div>';

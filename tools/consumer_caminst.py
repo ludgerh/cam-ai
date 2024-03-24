@@ -1,16 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import json
 #from pprint import pprint
@@ -70,7 +72,7 @@ class caminst(AsyncWebsocketConsumer):
     await self.accept()
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + text_data)
+    logger.info('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -110,7 +112,7 @@ class caminst(AsyncWebsocketConsumer):
       )
       #pprint(e.all_results)
       outlist['data'] = e.all_results
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
       
     elif params['command'] == 'scanoneip':
@@ -123,7 +125,7 @@ class caminst(AsyncWebsocketConsumer):
       p = Popen(cmds, stdout=PIPE)
       output, _ = p.communicate()
       outlist['data'] = json.loads(output)
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'installcam':
@@ -168,7 +170,7 @@ class caminst(AsyncWebsocketConsumer):
       while (not (newstream.id in streams)):
         sleep(long_brake)
       outlist['data'] = {'id' : newstream.id, }
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'validate_domain':
