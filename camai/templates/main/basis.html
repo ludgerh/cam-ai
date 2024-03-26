@@ -183,16 +183,30 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
       </div>
     {% else %}
-      <div class="container">
-          <a class="navbar-brand text-primary" href="https://cam-ai.de">
-            <h2>
-            {% if debug %}
-              <img src="{% static 'git/img/4.png' %}" style="width:120px;height:60px;">
-            {% else %}
-             <img src="https://static.cam-ai.de/assets/logos/4.png" style="width:120px;height:60px;">
-            {% endif %}
-            Artificial Intelligence for cameras....<br>
-            ...to learn more click here.</h1></a>
+      <div class="container-fluid float-left">
+        <div class="row menurow">
+          <div class="col-sm-auto">
+            <a href="cam-ai.de">
+              {% if emulatestatic %}
+              {% load static %}
+                <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
+              {% else %}
+                <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:auto;height:auto;">
+              {% endif %}
+            </a>
+          </div>
+          <div class="col-sm-auto">
+            <a class="btn btn-link m-2 " style="border: 0; background-color= #F0F4F7; color: #475B63;" href="https://cam-ai.de">
+             <h5>Make your camera smart! Learn more on our website</h5>
+            </a>
+          </div>
+          <div class="col-sm-auto">
+            <a class="btn btn-primary m-2 back back" href="/account/register/">Register</a>
+          </div>
+          <div class="col-sm-auto">
+            <a class="btn btn-primary m-2" href="/account/login/">Log in &#8205; <i class="bi bi-box-arrow-right"></i></a>
+          </div>
+        </div>
       </div>
     {% endif %}
 
