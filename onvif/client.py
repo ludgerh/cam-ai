@@ -224,7 +224,7 @@ class ONVIFCamera(object):
     use_services_template = {'devicemgmt': True, 'ptz': True, 'media': True,
                          'imaging': True, 'events': True, 'analytics': True }
     def __init__(self, host, port ,user, passwd, wsdl_dir=os.path.join(os.path.dirname(os.path.dirname(__file__)), "wsdl"),
-                 encrypt=True, daemon=False, no_cache=False, adjust_time=False, transport=None):
+                 encrypt=True, daemon=False, no_cache=False, adjust_time=False, transport=None, force_host=False):
         os.environ.pop('http_proxy', None)
         os.environ.pop('https_proxy', None)
         self.host = host
@@ -237,6 +237,7 @@ class ONVIFCamera(object):
         self.no_cache = no_cache
         self.adjust_time = adjust_time
         self.transport = transport
+        self.force_host = force_host
 
         # Active service client container
         self.services = { }
@@ -268,6 +269,17 @@ class ONVIFCamera(object):
             try:
                 if name.lower() in SERVICES and capability is not None:
                     ns = SERVICES[name.lower()]['ns']
+                    if self.force_host:
+                        retrieved = capabilities[name].XAddr
+                        scheme = retrieved.split("//")[0]
+                        right = retrieved.split("//")[1]
+                        address = right.split("/")[0]
+                        ip_address = address.split(":")[0]
+                        port_address = address.split(":")[1]
+                        if (self.host != ip_address or self.port != port_address):
+                            remaining = '/'.join(right.split('/')[1:])
+                            new_address= scheme + '//' + self.host + ':' + str(self.port) + '/' + remaining
+                        capabilities[name].XAddr=new_address
                     self.xaddrs[ns] = capability['XAddr']
             except Exception:
                 logger.exception('Unexpected service type')
@@ -342,7 +354,6 @@ class ONVIFCamera(object):
 
         name = name.lower()
         xaddr, wsdl_file, binding_name = self.get_definition(name, portType)
-
         with self.services_lock:
             service = ONVIFService(xaddr, self.user, self.passwd,
                                    wsdl_file, self.encrypt,

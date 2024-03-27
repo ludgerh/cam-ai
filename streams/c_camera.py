@@ -146,7 +146,7 @@ class search_executor(ThreadPoolExecutor):
     myresult = f.result()
     if myresult and 'address' in myresult:
       for port in myresult['address']['ports']:
-        if port in {80, 2020, 8000}:
+        if port in {80, 2020, 8000, 8080}:
           try:
             myonvif = ONVIFCamera(
               myresult['address']['ip'], 
@@ -154,6 +154,7 @@ class search_executor(ThreadPoolExecutor):
               self.uname, 
               self.upass, 
               wsdl_dir,
+              force_host = True,
             ) 
             myresult['onvif']= {}
             myresult['onvif']['port'] = port 
@@ -174,8 +175,19 @@ class search_executor(ThreadPoolExecutor):
             }
             params['ProfileToken'] = myprofile.token
             myresult['onvif']['urlstart'] = media_service.GetStreamUri(params)['Uri']
-            netloc = urlparse(myresult['onvif']['urlstart']).netloc
-            myresult['onvif']['stream_port'] = netloc.split(':')[1]
+            retrieved = media_service.GetStreamUri(params)['Uri']
+            scheme = retrieved.split("//")[0]
+            right = retrieved.split("//")[1]
+            address = right.split("/")[0]
+            ip_address = address.split(":")[0]
+            port_address = address.split(":")[1]
+            if self.url != ip_address:
+                remaining = '/'.join(right.split('/')[1:])
+                new_address= scheme + '//' + self.url + ':' + port_address + '/' + remaining
+                myresult['onvif']['urlstart'] = new_address
+            else:    
+              myresult['onvif']['urlstart'] = media_service.GetStreamUri(params)['Uri']
+            myresult['onvif']['stream_port'] = port_address
             myresult['onvif']['urlscheme'] = myresult['onvif']['urlstart'].replace('://', '://{user}:{pass}@')
             myresult['onvif']['user'] = self.uname
             myresult['onvif']['pass'] = self.upass
@@ -207,7 +219,7 @@ class search_executor(ThreadPoolExecutor):
                   myresult['isapi']['user'] = self.uname
                   myresult['isapi']['pass'] = self.upass
                   myresult['isapi']['urlstart'] = 'rtsp://'+myresult['address']['ip'] + ':554/ISAPI/streaming/channels/101'
-                  netloc = urlparse(myresult['onvif']['urlstart']).netloc
+                  netloc = urlparse(myresult['isapi']['urlstart']).netloc
                   myresult['isapi']['stream_port'] = netloc.split(':')[1]
                   myresult['isapi']['urlscheme'] = myresult['isapi']['urlstart'].replace('://', '://{user}:{pass}@')
                   username = self.uname
@@ -254,7 +266,6 @@ class search_executor(ThreadPoolExecutor):
             pass     
     self.all_results.append(myresult)
     self.thread_count -= 1
-    #print('***** Callback finished: ', self.thread_count)
       
 class ptz_base():
   

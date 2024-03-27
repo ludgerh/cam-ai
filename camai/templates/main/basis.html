@@ -67,7 +67,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                 <div class="dropdown-divider"></div>
                 {% spaceless %}
                   {% for item in camlist %}
-                    <li><a class="dropdown-item" href="/oneitem/cam/{{ item.id }}/">{{ item.name }}</a></li>
+                    {% if not item.demo %}
+                      <li><a class="dropdown-item" href="/oneitem/cam/{{ item.id }}/">{{ item.name }}</a></li>
+                    {% endif %}
                   {% endfor %}
                   <div class="dropdown-divider"></div>
                   <a class="dropdown-item" href="/tools/inst_cam_easy/">Install new camera</a>
@@ -87,7 +89,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                 <div class="dropdown-divider"></div>
                 {% spaceless %}
                   {% for item in detectorlist %}
-                    <li><a class="dropdown-item" href="/oneitem/detector/{{ item.id }}/">{{ item.name }}</a></li>
+                    {% if not item.demo %}
+                      <li><a class="dropdown-item" href="/oneitem/detector/{{ item.id }}/">{{ item.name }}</a></li>
+                    {% endif %}
                   {% endfor %}
                 {% endspaceless %}
               </ul>
@@ -105,7 +109,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                 {% endif %}
                 {% spaceless %}
                   {% for item in eventerlist %}
-                    <li><a class="dropdown-item" href="/oneitem/eventer/{{ item.id }}/">{{ item.name }}</a></li>
+                    {% if not item.demo %}
+                      <li><a class="dropdown-item" href="/oneitem/eventer/{{ item.id }}/">{{ item.name }}</a></li>
+                    {% endif %}
                   {% endfor %}
                 {% endspaceless %}
               </ul>

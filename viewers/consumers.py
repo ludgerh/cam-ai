@@ -21,7 +21,7 @@ from time import time, sleep
 from logging import getLogger
 from traceback import format_exc
 from zlib import compress
-from threading import Lock
+from threading import Event
 from django.utils import timezone
 from django.db import connection
 from django.db.utils import OperationalError
@@ -61,7 +61,6 @@ class triggerConsumer(WebsocketConsumer):
     self.queuedict = {}
     self.outxdict = {}
     self.busydict = {}
-    self.busy_lock = Lock()
     self.accept()
 
   def disconnect(self, close_code):
@@ -83,8 +82,7 @@ class triggerConsumer(WebsocketConsumer):
   def receive(self, text_data):
     logger.debug('<-- ' + str(text_data))
     if text_data[0] in {'C', 'D', 'E'}:
-      with self.busy_lock:
-        self.busydict[text_data] = False
+      self.busydict[text_data].clear()
       return()
     params = json.loads(text_data)['data']
     try:
@@ -92,7 +90,8 @@ class triggerConsumer(WebsocketConsumer):
 
       if params['command'] == 'starttrigger':
         mystream = streams[params['idx']]
-        show_cam = not(self.scope['user'].is_superuser and is_public_server and mystream.dbline.encrypted)
+        show_cam = not(self.scope['user'].is_superuser 
+          and is_public_server and mystream.dbline.encrypted)
         if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
           outx = params['width']
           if params['mode'] == 'C':
@@ -126,40 +125,44 @@ class triggerConsumer(WebsocketConsumer):
           outx = min(mystream.dbline.cam_xres, outx)
           self.outxdict[params['idx']] = round(outx)
           self.queuedict[params['idx']] = myviewer.inqueue
-          with self.busy_lock:
-            self.busydict[params['mode']+str(params['idx']).zfill(9)] = True
+          busy_idx = params['mode']+str(params['idx']).zfill(9)
+          self.busydict[busy_idx] = Event()
+          self.busydict[busy_idx].set()
           if show_cam:
           
             def onf(onf_viewer):  
               try:
                 indicator = onf_viewer.parent.type+str(onf_viewer.parent.id).zfill(9)
-                self.busy_lock.acquire()
-                if self.busydict[indicator]:
-                  self.busy_lock.release()
-                else: 
-                  self.busydict[indicator] = True
-                  self.busy_lock.release()
+                if not self.busydict[indicator].is_set():
+                  self.busydict[indicator].set()
                   ts = time()
                   frame = onf_viewer.inqueue.get()[1]
                   if params['mode'] == 'D':
-                    if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), 0.3, 0)
+                    if (onf_viewer.drawpad.show_mask 
+                        and (onf_viewer.drawpad.mask is not None)):
+                      frame = cv.addWeighted(frame, 1, 
+                        (255-onf_viewer.drawpad.mask), 0.3, 0)
                   elif params['mode'] == 'C':
-                    if onf_viewer.drawpad.show_mask and (onf_viewer.drawpad.mask is not None):
-                      frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.mask), -0.3, 0)
+                    if (onf_viewer.drawpad.show_mask 
+                        and (onf_viewer.drawpad.mask is not None)):
+                      frame = cv.addWeighted(frame, 1, 
+                        (255-onf_viewer.drawpad.mask), -0.3, 0)
                     if onf_viewer.drawpad.edit_active and onf_viewer.drawpad.ringlist:
                       if onf_viewer.drawpad.whitemarks:
-                        frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), 1, 0)
+                        frame = cv.addWeighted(frame, 1, 
+                          (255-onf_viewer.drawpad.screen), 1, 0)
                       else:
-                        frame = cv.addWeighted(frame, 1, (255-onf_viewer.drawpad.screen), -1.0, 0)
-                  frame = c_convert(frame, typein=1, typeout=3, xout=self.outxdict[onf_viewer.parent.id])
+                        frame = cv.addWeighted(frame, 1, 
+                          (255-onf_viewer.drawpad.screen), -1.0, 0)
+                  frame = c_convert(frame, typein=1, typeout=3, 
+                    xout=self.outxdict[onf_viewer.parent.id])
                   if (int(redis.get('CAM-AI:KBInt')) 
                       or int(redis.get('CAM-AI:KillStream:'+str(params['idx'])))):
                     return()  
                   try:
                     self.send(bytes_data=indicator.encode()+frame)
                   except Disconnected:
-                    logger.error('*** Could not send Frame, socket closed...')
+                    logger.warning('*** Could not send Frame, socket closed...')
               except:
                 logger.error(format_exc())
                 logger.handlers.clear()
@@ -169,7 +172,8 @@ class triggerConsumer(WebsocketConsumer):
             self.indexdict[params['mode']] = {}
           self.indexdict[params['mode']][params['idx']] = {'show_cam' : show_cam, }
           if show_cam:
-            self.indexdict[params['mode']][params['idx']]['onf'] = myviewer.push_to_onf(onf)
+            self.indexdict[params['mode']][params['idx']]['onf'] = myviewer.push_to_onf(
+              onf, )
           self.viewerlist.append(myviewer)
           if self.scope['user'].is_authenticated:
             myuser = self.scope['user'].id
@@ -218,12 +222,13 @@ class c_viewConsumer(AsyncWebsocketConsumer):
       go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
       if go_on:
         outlist['data'] = {}
-        outlist['data']['fps'] = round(redis.fps_from_dev(params['mode'], params['idx']), 2)
+        outlist['data']['fps'] = round(redis.fps_from_dev(params['mode'], 
+          params['idx']), 2)
         outlist['data']['viewers'] = redis.view_from_dev(params['mode'], params['idx'])
         logger.debug('--> ' + str(outlist))
         try:
           await self.send(json.dumps(outlist))	
         except Disconnected:
-          print('*** Could not send Cam Info , socket closed...')
+          logger.warning('*** Could not send Cam Info , socket closed...')
       else:
         await self.close()

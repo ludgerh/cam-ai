@@ -23,6 +23,7 @@ class stream(models.Model):
   active = models.BooleanField(default=True)
   name = models.CharField(max_length=100, default='New Stream')
   made = models.DateTimeField(default=timezone.now)
+  demo = models.BooleanField(default=False)
   lastused = models.DateTimeField(default=timezone.now)
   creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_DEFAULT, default=1)
   encrypted = models.BooleanField(default=True)
@@ -84,6 +85,7 @@ class stream(models.Model):
   eve_max_x_view = models.IntegerField(default=0)
   eve_scale_x_view = models.FloatField(default=1.0)
   eve_shrink_factor = models.FloatField("shrink factor", default=0.2) # 0.0 -> No Shrinking 1.0 50%
+  eve_sync_factor = models.FloatField("sync factor", default=0.0) # in seconds
   eve_alarm_email = models.CharField("alarm email", max_length=255, default='')
   eve_event_time_gap = models.IntegerField("new event gap", default=60)
   eve_margin = models.IntegerField("frame margin", default=20)

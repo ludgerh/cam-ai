@@ -179,6 +179,7 @@ $(document).ready(function() {
         'upass' : $('#passinput').val(),
       })  
       .then((result) => {
+        console.log
         if (result[0].address) {
           if (result[0].isapi) {
             if (result[0].isapi.info) {
@@ -202,7 +203,7 @@ $(document).ready(function() {
             }; 
           } else {
             if (result[0].onvif) {
-              if (result[0].isapi.info) {
+              if (result[0].onvif.info) {
                 $('#onvif_manufacturer').text(result[0].onvif.info.Manufacturer);
                 $('#onvif_model').text(result[0].onvif.info.Model);
                 $('#onvif_list').removeClass("d-none");

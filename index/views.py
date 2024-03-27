@@ -37,15 +37,15 @@ def index(request, mode='C'):
     'debug' : settings.DEBUG,
     'mode' : mode,
     'camlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0, demo=0), 'C', 
       request.user, 'R'
     ),
     'detectorlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+      stream.objects.filter(active=True).filter(det_mode_flag__gt=0, demo=0), 'D', 
       request.user, 'R'
     ),
     'eventerlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0, demo=0), 'E', 
       request.user, 'R'
     ),
     'schoollist' : access.filter_items(
@@ -67,15 +67,15 @@ def landing(request):
     'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'camlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
+      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0).order_by('-id'), 'C', 
       request.user, 'R'
     ),
     'detectorlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
+      stream.objects.filter(active=True).filter(det_mode_flag__gt=0).order_by('-id'), 'D', 
       request.user, 'R'
     ),
     'eventerlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
+      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0).order_by('-id'), 'E', 
       request.user, 'R'
     ),
     'schoollist' : access.filter_items(

@@ -23,7 +23,7 @@ from time import sleep
 from validators.domain import domain
 from validators.ip_address import ipv4, ipv6
 from tools.djangodbasync import filterlinesdict, savedbline, getonelinedict, countfilter
-from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.generic.websocket import WebsocketConsumer
 from tools.c_logger import log_ini
 from tools.c_redis import myredis
 from tools.l_tools import djconf
@@ -47,32 +47,24 @@ is_public_server = djconf.getconfigbool('is_public_server', False)
 cv_gpu_nr = djconf.getconfigint('cv_gpu_nr', 0)
 video_fps_limit = djconf.getconfigfloat('video_fps_limit', 0.0)
 
-class caminst(AsyncWebsocketConsumer):
+class caminst(WebsocketConsumer):
     
-  async def check_create_stream_priv(self):
+  def check_create_stream_priv(self):
     if self.scope['user'].is_superuser:
       return(True)
     else:
-      limit = await getonelinedict(
-        userinfo, 
-        {'user' : self.scope['user'].id, }, 
-        ['allowed_streams',]
-      )
-      limit = limit['allowed_streams']
-      streamcount = await countfilter(
-        dbstream, 
-        {'creator' : self.scope['user'].id, 'active' : True,},
-      )
+      limit = userinfo.objects.get(user=self.scope['user']).allowed_streams
+      streamcount = dbstream.objects.filter(creator=self.scope['user']).count()
       return(streamcount < limit)  
     
 
-  async def connect(self):
+  def connect(self):
     self.myip = get_ip_address()
     self.mynet = get_ip_network(self.myip)
-    await self.accept()
+    self.accept()
 
-  async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+  def receive(self, text_data):
+    logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -82,7 +74,7 @@ class caminst(AsyncWebsocketConsumer):
         'myip' : str(self.myip),
       }
       logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
+      self.send(json.dumps(outlist))	
 
     elif params['command'] == 'scanips':
       if 'network' in params:
@@ -110,14 +102,13 @@ class caminst(AsyncWebsocketConsumer):
         url=params['camaddress'], 
         max_workers=20,
       )
-      #pprint(e.all_results)
       outlist['data'] = e.all_results
-      logger.info('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
+      logger.debug('--> ' + str(outlist))
+      self.send(json.dumps(outlist))	
       
     elif params['command'] == 'scanoneip':
-      if not await self.check_create_stream_priv():
-        await self.close()
+      if not self.check_create_stream_priv():
+        self.close()
       cmds = ['ffprobe', '-v', 'fatal']
       if params['camurl'][:4].upper() == 'RTSP':
         cmds += ['-rtsp_transport',  'tcp']
@@ -125,14 +116,13 @@ class caminst(AsyncWebsocketConsumer):
       p = Popen(cmds, stdout=PIPE)
       output, _ = p.communicate()
       outlist['data'] = json.loads(output)
-      logger.info('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
+      logger.debug('--> ' + str(outlist))
+      self.send(json.dumps(outlist))	
 
     elif params['command'] == 'installcam':
-      if not await self.check_create_stream_priv():
-        await self.close()
-      myschools = await filterlinesdict(school, {'active' : True, }, ['id', ])
-      myschool = myschools[0]['id']
+      if not self.check_create_stream_priv():
+        self.close()
+      myschool = school.objects.filter(active=True).first()
       newstream = dbstream()
       if 'name' in params:
         newstream.name = params['name']
@@ -153,25 +143,26 @@ class caminst(AsyncWebsocketConsumer):
       newstream.cam_ffmpeg_fps = video_fps_limit
       newstream.det_gpu_nr_cv = cv_gpu_nr
       newstream.eve_gpu_nr_cv = cv_gpu_nr
-      newstream.eve_school_id = myschool
+      newstream.eve_school = myschool
       newstream.creator = self.scope['user']
-      newlineid = await savedbline(newstream)
+      newstream.save()
+      newlineid = newstream.id
       if not self.scope['user'].is_superuser:
         myaccess = access_control()
         myaccess.vtype = 'X'
         myaccess.vid = newlineid
         myaccess.u_g_nr = self.scope['user'].id
         myaccess.r_w = 'W'
-        await savedbline(myaccess)
-        await access.read_list_async()
+        myaccess.save()
+        access.read_list()
       while redis.get_start_stream_busy():
         sleep(long_brake)
       redis.set_start_stream_busy(newstream.id)
       while (not (newstream.id in streams)):
         sleep(long_brake)
       outlist['data'] = {'id' : newstream.id, }
-      logger.info('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
+      logger.debug('--> ' + str(outlist))
+      self.send(json.dumps(outlist))	
 
     elif params['command'] == 'validate_domain':
       mydomain = params['domain']
@@ -187,5 +178,5 @@ class caminst(AsyncWebsocketConsumer):
         result = False #No correct IP nor domain
       outlist['data'] = {'result' : result, 'domain' : mydomain, } 
       logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))	
+      self.send(json.dumps(outlist))	
       
