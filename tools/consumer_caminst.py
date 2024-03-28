@@ -67,7 +67,7 @@ class acaminst(AsyncWebsocketConsumer):
     await self.accept() 
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
     
@@ -113,7 +113,7 @@ class acaminst(AsyncWebsocketConsumer):
       while (not (newstream.id in streams)):
         await asleep(long_brake)
       outlist['data'] = {'id' : newstream.id, } 
-      logger.info('--> ' + str(outlist)) 
+      logger.debug('--> ' + str(outlist)) 
       await self.send(json.dumps(outlist))	
 
 
