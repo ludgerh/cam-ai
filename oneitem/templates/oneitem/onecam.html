@@ -249,28 +249,24 @@ $(document).ready(function() {
 			'command' : 'setcbstatus',
 			'ch_show' : $('#ch_show').prop('checked'),
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#ch_apply').change((evt) => {
 		oneitemSocket.sendandwait({
 			'command' : 'setcbstatus',
 			'ch_apply' : $('#ch_apply').prop('checked'),
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#ch_edit').change((evt) => {
 		oneitemSocket.sendandwait({
 			'command' : 'setcbstatus',
 			'ch_edit' : $('#ch_edit').prop('checked'),
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#ch_white').change((evt) => {
 		oneitemSocket.sendandwait({
 			'command' : 'setcbstatus',
 			'ch_white' : $('#ch_white').prop('checked'),
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#mask_select').change((evt) => {
 	  if ($('#mask_select').val() == 'C') {
@@ -285,14 +281,12 @@ $(document).ready(function() {
 			'command' : 'm_select_change',
 			'new_val' : $('#mask_select').val(),
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#bt_new').click((evt) => {
 		oneitemSocket.sendandwait({
 			'command' : 'setbtevent',
 			'bt_new' : 'click',
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#id_cam_fpslimit, '
     +'#id_cam_feed_type, '
@@ -309,7 +303,6 @@ $(document).ready(function() {
 				$(evt.target).addClass('bluegrey');
 			};
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#id_cam_pause').change(function(evt) {
 		oneitemSocket.sendandwait({
@@ -322,7 +315,6 @@ $(document).ready(function() {
 				$(evt.target).addClass('bluegrey');
 			};
 		})
-		.catch(err => {console.log(err);});
 	});
 	$('#conditions').children(':even').click((evt) => {
 		let bstr_row = $(evt.target).closest('.row').next();
@@ -394,7 +386,6 @@ $(document).ready(function() {
       .then((result) => {
         window.location.href = window.location.protocol + '//' + window.location.host;
       })
-      .catch(err => {console.log(err);});
     });
 		return(oneitemSocket.sendandwait({
 			'command' : 'setmyitem',
@@ -415,7 +406,6 @@ $(document).ready(function() {
       //.then((result) => {
       //  $('#zoominput').val(result[2]);
       //})
-	    //.catch(err => {console.log(err);});
       $('#zoominput').val(10);
 	    $('#zoominput').attr({
         'max' : ptz_data.zoom.max, 
@@ -439,7 +429,6 @@ $(document).ready(function() {
 			    'command' : 'zoom_abs',
 			    'y' : parseInt($('#zoominput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#zoomminus').click(function() {
 	      if ($('#zoominput').val() > parseInt($('#zoominput').attr('min'))) {
@@ -449,14 +438,12 @@ $(document).ready(function() {
 			    'command' : 'zoom_abs',
 			    'y' : parseInt($('#zoominput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#zoominput').change(function() {
 		    oneitemSocket.sendandwait({
 			    'command' : 'zoom_abs',
 			    'y' : parseInt($('#zoominput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-up-left').click(function() {
 		    oneitemSocket.sendandwait({
@@ -464,7 +451,6 @@ $(document).ready(function() {
 			    'x' : parseInt($('#speedinput').val()),
 			    'y' : parseInt($('#speedinput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-up').click(function() {
 		    oneitemSocket.sendandwait({
@@ -472,7 +458,6 @@ $(document).ready(function() {
 			    'x' : 0,
 			    'y' : parseInt($('#speedinput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-up-right').click(function() {
 		    oneitemSocket.sendandwait({
@@ -480,7 +465,6 @@ $(document).ready(function() {
 			    'x' : 0 - parseInt($('#speedinput').val()),
 			    'y' : parseInt($('#speedinput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-down-left').click(function() {
 		    oneitemSocket.sendandwait({
@@ -488,7 +472,6 @@ $(document).ready(function() {
 			    'x' : parseInt($('#speedinput').val()),
 			    'y' : 0 - parseInt($('#speedinput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-down').click(function() {
 		    oneitemSocket.sendandwait({
@@ -496,7 +479,6 @@ $(document).ready(function() {
 			    'x' : 0,
 			    'y' : 0 - parseInt($('#speedinput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-down-right').click(function() {
 		    oneitemSocket.sendandwait({
@@ -504,7 +486,6 @@ $(document).ready(function() {
 			    'x' : 0 - parseInt($('#speedinput').val()),
 			    'y' : 0 - parseInt($('#speedinput').val()),
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-left').click(function() {
 		    oneitemSocket.sendandwait({
@@ -512,7 +493,6 @@ $(document).ready(function() {
 			    'x' : parseInt($('#speedinput').val()),
 			    'y' : 0,
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	    $('#arrow-right').click(function() {
 		    oneitemSocket.sendandwait({
@@ -520,7 +500,6 @@ $(document).ready(function() {
 			    'x' : 0 - parseInt($('#speedinput').val()),
 			    'y' : 0,
 		    })
-		    .catch(err => {console.log(err);});
 	    });
 	  };
     $(document).on('keydown',((e)=>{
@@ -563,12 +542,10 @@ $(document).ready(function() {
 			'ch_apply' : $('#ch_apply').prop('checked'),
 			'ch_edit' : $('#ch_edit').prop('checked'),
 		})
-	  .catch(err => {console.log(err);});
 		oneitemSocket.sendandwait({
 			'command' : 'm_select_change',
 			'new_val' : $('#mask_select').val(),
 		})
-		.catch(err => {console.log(err);});
 {% endif %}
 	})
 	.then(() => {
@@ -584,7 +561,6 @@ $(document).ready(function() {
 				'x' : x,
 				'y' : y,
 			})
-			.catch(err => {console.log(err);});
 			overimage = true;
 		});
 		$(document).mouseup((evt) => {
@@ -596,7 +572,6 @@ $(document).ready(function() {
 	      'x' : x,
 	      'y' : y,
       })
-      .catch(err => {console.log(err);});
 			//};
 			overimage = false;
 		});
@@ -610,7 +585,6 @@ $(document).ready(function() {
           'x' : x,
           'y' : y,
         })
-        .catch(err => {console.log(err);});
         //};
       };  
 		});
@@ -623,7 +597,6 @@ $(document).ready(function() {
 				  'x' : x,
 				  'y' : y,
 			  })
-			  .catch(err => {console.log(err);});
 			};
 		});
 		if (ptz_active) {
@@ -641,7 +614,6 @@ $(document).ready(function() {
           .then((result) => {
             $('#zoominput').val(result[2]);
           })
-			    .catch(err => {console.log(err);});
         };  
       });
     };  
@@ -660,10 +632,8 @@ $(document).ready(function() {
           $('#vnrtag').text(result.viewers);
         {% endif %}
       })
-      .catch(err => {console.log(err);});
     }, 5000);
 	})
-	.catch(err => {console.log(err);});
 });
 	
 </script>

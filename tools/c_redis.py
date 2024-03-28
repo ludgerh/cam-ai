@@ -224,7 +224,11 @@ class myredis(saferedis):
     return(self.get('C:'+str(idx)+':ptz'))  
     
   def get_ptz(self, idx):
-    return(json.loads(self.get_ptz_json(idx)))
+    result = self.get_ptz_json(idx)
+    if result:
+      return(json.loads(result))
+    else:
+      return(None)  
     
   def set_ptz_pos(self, idx, value):
     self.set('C:'+str(idx)+':ptzpos', str(json.dumps(value)))

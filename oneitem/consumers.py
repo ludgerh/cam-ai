@@ -98,7 +98,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         )
         self.scaling = params['scaling']
         outlist['data'] = {}
-        outlist['data']['ptz'] = redis.get_ptz(self.idx)
+        if (redis_data := redis.get_ptz(self.idx)):
+          outlist['data']['ptz'] = redis_data
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
       else:

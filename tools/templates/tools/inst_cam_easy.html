@@ -81,6 +81,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let ports = [80, 2020, 8000, 8080];
 
 let caminstSocket;
+let acaminstSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
@@ -118,7 +119,7 @@ function install_cam(control_mode, cam_info, cam_address) {
       if (control_mode == 2) {
         model_string = cam_info.info.Manufacturer + ' ' + cam_info.info.Model;
       };  
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'installcam',
         'camurl' : url_str,
         'videocodec' : video_codec,
@@ -147,6 +148,14 @@ $(document).ready(function() {
   )
   .then((result) => {
     caminstSocket = result;
+    return(WSAsync(
+      ws_scheme + '//'
+      + window.location.host
+      + '/ws/acaminst/'
+    ));
+  })
+  .then((result) => {
+    acaminstSocket = result;
     $('#camaddress').keyup(function() {
       caminstSocket.sendandwait({
         'command' : 'validate_domain',
