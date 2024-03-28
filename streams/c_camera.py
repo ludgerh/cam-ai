@@ -497,6 +497,7 @@ class c_camera():
           self.control_user, 
           self.control_pass, 
           wsdl_dir,
+          force_host = True,
         )
         self.deviceinfo = self.myonvif.devicemgmt.GetDeviceInformation()
         media_service = self.myonvif.create_media_service()

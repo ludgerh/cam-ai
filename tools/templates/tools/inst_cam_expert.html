@@ -181,6 +181,7 @@ Collecting Information. Please wait a while...
 <script>
 
 let caminstSocket;
+let acaminstSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 let control_mode = 0;
@@ -223,6 +224,14 @@ $(document).ready(function() {
   )
   .then((result) => {
     caminstSocket = result;
+    return(WSAsync(
+      ws_scheme + '//'
+      + window.location.host
+      + '/ws/acaminst/'
+    ));
+  })
+  .then((result) => {
+    acaminstSocket = result;
     $('.scan-button').click(function() {
       $('#please_wait').removeClass("d-none");
       caminstSocket.sendandwait({
@@ -358,7 +367,7 @@ $(document).ready(function() {
         control_port = $('#onvif_port').text();
         cam_name = $('#onvif_model').text();
       };  
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'installcam',
         'camurl' : $('#camurl').val(),
         'videocodec' : $('#videoselect').val(),

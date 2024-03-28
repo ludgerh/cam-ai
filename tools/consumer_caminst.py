@@ -58,7 +58,8 @@ class acaminst(AsyncWebsocketConsumer):
     if self.scope['user'].is_superuser:
       return(True)
     else:
-      limit = await userinfo.objects.aget(user=self.scope['user']).allowed_streams
+      userinfo_obj = await userinfo.objects.aget(user=self.scope['user'])
+      limit = userinfo_obj.allowed_streams
       streamcount = await dbstream.objects.filter(creator=self.scope['user']).acount()
       return(streamcount < limit) 
 
@@ -111,8 +112,8 @@ class acaminst(AsyncWebsocketConsumer):
       redis.set_start_stream_busy(newstream.id)
       while (not (newstream.id in streams)):
         await asleep(long_brake)
-      outlist['data'] = {'id' : newstream.id, }
-      logger.debug('--> ' + str(outlist))
+      outlist['data'] = {'id' : newstream.id, } 
+      logger.info('--> ' + str(outlist)) 
       await self.send(json.dumps(outlist))	
 
 
