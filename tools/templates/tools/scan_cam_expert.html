@@ -102,7 +102,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 let ports = [80, 443, 554, 1935, 8000];
 
-let caminstSocket;
+let acaminstSocket;
 let mynetwork;
 let myip;
 
@@ -125,11 +125,11 @@ $(document).ready(function() {
   WSAsync(
     ws_scheme + '//'
     + window.location.host
-    + '/ws/caminst/'
+    + '/ws/acaminst/'
   )
   .then((result) => {
-    caminstSocket = result;
-    return(caminstSocket.sendandwait({
+    acaminstSocket = result;
+    return(acaminstSocket.sendandwait({
       'command' : 'getnetandip',
     }));
   })
@@ -155,7 +155,7 @@ $(document).ready(function() {
       }); 
     });
     $('#camdomain').change(function() {
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'validate_domain',
         'domain' : $('#camdomain').val(),
       })  
@@ -167,7 +167,6 @@ $(document).ready(function() {
           $('#scan-button').attr('disabled','disabled');
         };  
       })
-      .catch(err => {console.log(err);});
     });
     $('#camdomain').trigger('change');
     $('#scan-button').click(function() {
@@ -178,7 +177,7 @@ $(document).ready(function() {
         portarray = portarray.concat([parseInt($('#custom_port').val())]).sort(function(a, b){return a-b});
       }  
       $(document).scrollTop($(document).height()); 
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'scanips',
         'camaddress' : $('#camdomain').val(),
         'portaddr' : portarray,
@@ -217,11 +216,9 @@ $(document).ready(function() {
           $('#ipaddress').val($(this).attr('ip'));
         });
       })
-      .catch(err => {console.log(err);});
     });
     
   })  
-  .catch(err => {console.log(err);});
 });
 </script>
 {% else %}

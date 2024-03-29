@@ -96,17 +96,9 @@ class search_executor(ThreadPoolExecutor):
       if str(item) != self.ip:
         f = self.submit(self.scan_one, item)
         f.add_done_callback(self.callback)
-    #print('***** Shutdown')
+    
+  def stop(self):
     self.shutdown()
-    #print('***** Shutdown done')
-    #>>> Probably not necessary, shutdown waits for callbacks
-    while True:
-      sleep(1.0)
-      count = self.thread_count
-      if not count:
-        break  
-    #>>>
-    #print('***** Done')
     if len(self.all_results) > 1: #Domain String entered
       self.all_results.sort(key = sortfunc)
         
@@ -263,8 +255,9 @@ class search_executor(ThreadPoolExecutor):
                   break
               break
           except:
-            pass     
-    self.all_results.append(myresult)
+            pass           
+    if self.url or (myresult and 'address' in myresult):
+      self.all_results.append(myresult)
     self.thread_count -= 1
       
 class ptz_base():

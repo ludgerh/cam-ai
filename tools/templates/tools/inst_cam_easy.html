@@ -80,7 +80,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 let ports = [80, 2020, 8000, 8080];
 
-let caminstSocket;
 let acaminstSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
@@ -88,7 +87,7 @@ let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 function install_cam(control_mode, cam_info, cam_address) {
   url_str =  cam_info.urlscheme.replace('{user}', $('#userinput').val());
   url_str = url_str.replace('{pass}', $('#passinput').val());
-  caminstSocket.sendandwait({
+  acaminstSocket.sendandwait({
     'command' : 'scanoneip',
     'camurl' : url_str,
   })  
@@ -144,20 +143,12 @@ $(document).ready(function() {
   WSAsync(
     ws_scheme + '//'
     + window.location.host
-    + '/ws/caminst/'
+    + '/ws/acaminst/'
   )
-  .then((result) => {
-    caminstSocket = result;
-    return(WSAsync(
-      ws_scheme + '//'
-      + window.location.host
-      + '/ws/acaminst/'
-    ));
-  })
   .then((result) => {
     acaminstSocket = result;
     $('#camaddress').keyup(function() {
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'validate_domain',
         'domain' : $('#camaddress').val(),
       })  
@@ -180,7 +171,7 @@ $(document).ready(function() {
       $('#onvif_list').addClass("d-none");
       $('#search_result').addClass("d-none");
       $(document).scrollTop($(document).height()); 
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'scanips',
         'camaddress' : $('#camaddress').val(),
         'portaddr' : ports,

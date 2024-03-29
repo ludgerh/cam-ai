@@ -35,10 +35,25 @@ class c_access():
 
   @database_sync_to_async
   def read_list_async(self):
-    self.checklist = list(access_control.objects.all())
-
-  def read_list(self):
-    self.checklist = list(access_control.objects.all())
+    self.checklist = list(access_control.objects.all())  
+    
+  def check_with_list(self, type, id, user_id, mode):
+    mychecklist = self.checklist
+    mychecklist = [item for item in mychecklist if (item.vtype.upper()==type.upper() 
+      or ((type.upper() in {'C','D','E'}) and (item.vtype.upper()=='X')) or item.vtype=='0')]
+    mychecklist = [item for item in mychecklist if (item.vid==id or item.vid==0)]
+    mychecklist = [item for item in mychecklist if ((item.u_g.upper()=='U') and (
+      ((user_id != -1) and ((item.u_g_nr==user_id) or (item.u_g_nr==0) or (item.u_g_nr == -1)))
+      or ((user_id == -1) and (item.u_g_nr == -1))))]
+    mychecklist = [item for item in mychecklist if (item.r_w.upper()==mode.upper() or item.r_w=='0' or item.r_w.upper()=='W')]
+    if len(mychecklist) > 0:
+      return(True)
+    else:
+      return(False)
+      
+  @database_sync_to_async
+  def check_with_list_async(self, type, id, user_id, mode): 
+    return(self.check_with_list(type, id, user_id, mode))  
 
   def check(self, type, id, user, mode):
     while True:
@@ -51,21 +66,26 @@ class c_access():
         user = dbuser.objects.get(id=user) 
         break
     if (user is None) or (user.id is None):
-      userid = -1
+      user_id = -1
     else:
-      userid = user.id
-    mychecklist = self.checklist
-    mychecklist = [item for item in mychecklist if (item.vtype.upper()==type.upper() 
-      or ((type.upper() in {'C','D','E'}) and (item.vtype.upper()=='X')) or item.vtype=='0')]
-    mychecklist = [item for item in mychecklist if (item.vid==id or item.vid==0)]
-    mychecklist = [item for item in mychecklist if ((item.u_g.upper()=='U') and (
-      ((userid != -1) and ((item.u_g_nr==userid) or (item.u_g_nr==0) or (item.u_g_nr == -1)))
-      or ((userid == -1) and (item.u_g_nr == -1))))]
-    mychecklist = [item for item in mychecklist if (item.r_w.upper()==mode.upper() or item.r_w=='0' or item.r_w.upper()=='W')]
-    if len(mychecklist) > 0:
-      return(True)
+      user_id = user.id
+    return(self.check_with_list(type, id, user_id, mode))  
+
+  async def check_async(self, type, id, user, mode):
+    while True:
+      try:
+        if user.is_superuser:
+          return(True)
+        else:
+          break  
+      except AttributeError: 
+        user = await dbuser.objects.aget(id=user) 
+        break  
+    if (user is None) or (user.id is None):
+      user_id = -1
     else:
-      return(False)
+      user_id = user.id
+    return(await self.check_with_list_async(type, id, user_id, mode))  
 
   def filter_items(self, input, type, user, mode):
     output = []
