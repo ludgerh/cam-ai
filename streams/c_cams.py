@@ -1,18 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-# c_cams.py V0.9.3
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import sys
 import cv2 as cv
@@ -255,20 +255,19 @@ class c_cam(c_device):
           while self.do_run and (counter > 0):
             counter -= 1
             sleep(djconf.getconfigfloat('long_brake', 1.0))
-      self.mydetector.getviewer()
       while self.do_run:
         frameline = self.run_one()
         if frameline is not None:
           if (self.dbline.cam_view 
               and self.redis.view_from_dev('C', self.dbline.id)):
-            self.viewer.inqueue.put(data=frameline)
+            self.viewer.inqueue.put(frameline)
           if (self.dbline.det_mode_flag 
               and (self.redis.view_from_dev('D', self.dbline.id) 
               or self.redis.data_from_dev('D', self.dbline.id))):
-            self.mydetector.dataqueue.put(data=frameline)
+            self.mydetector.dataqueue.put(frameline)
           if (self.dbline.eve_mode_flag 
               and self.redis.view_from_dev('E', self.dbline.id)): 
-            self.mydetector.myeventer.dataqueue.put(data=frameline)
+            self.mydetector.myeventer.dataqueue.put(frameline)
       self.finished = True
     except:
       self.logger.error(format_exc())
@@ -553,7 +552,12 @@ class c_cam(c_device):
       self.ff_proc.send_signal(SIGTERM)
       self.ff_proc.wait()
       self.ff_proc = None
-    self.dbline.refresh_from_db()
+    while True:
+      try:
+        self.dbline.refresh_from_db()
+        break
+      except OperationalError:
+        connection.close()
     self.newprocess() 
     self.logger.info('Cam #'+str(self.dbline.id)+' is on')
 

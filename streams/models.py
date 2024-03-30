@@ -33,7 +33,7 @@ class stream(models.Model):
   cam_view = models.BooleanField(default=True)
   cam_xres = models.IntegerField(default=0)
   cam_yres = models.IntegerField(default=0)
-  cam_fpslimit = models.FloatField("FPS limit", default=2)
+  cam_fpslimit = models.FloatField("FPS limit", default=2.0)
   cam_fpsactual = models.FloatField(default=0)
   cam_min_x_view = models.IntegerField(default=0)
   cam_max_x_view = models.IntegerField(default=0)
@@ -59,7 +59,7 @@ class stream(models.Model):
   det_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
   det_view = models.BooleanField(default=True)
-  det_fpslimit = models.FloatField("FPS limit", default=0)
+  det_fpslimit = models.FloatField("FPS limit", default=2.0)
   det_fpsactual = models.FloatField(default=0)
   det_min_x_view = models.IntegerField(default=0)
   det_max_x_view = models.IntegerField(default=0)
@@ -78,11 +78,12 @@ class stream(models.Model):
   eve_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
   eve_view = models.BooleanField(default=True)
-  eve_fpslimit = models.FloatField("FPS limit", default=0)
+  eve_fpslimit = models.FloatField("FPS limit", default=2.0)
   eve_fpsactual = models.FloatField(default=0)
   eve_min_x_view = models.IntegerField(default=0)
   eve_max_x_view = models.IntegerField(default=0)
   eve_scale_x_view = models.FloatField(default=1.0)
+  eve_shrink_factor = models.FloatField("shrink factor", default=0.2) # 0.0 -> No Shrinking 1.0 50%
   eve_alarm_email = models.CharField("alarm email", max_length=255, default='')
   eve_event_time_gap = models.IntegerField("new event gap", default=60)
   eve_margin = models.IntegerField("frame margin", default=20)

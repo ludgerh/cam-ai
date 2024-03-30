@@ -135,9 +135,6 @@ class c_event(list):
         break
       except OperationalError:
         connection.close()
-    xytemp = self.tf_worker.get_xy(self.dbline.school.id, self.tf_w_index)
-    self.xdim = xytemp[0]
-    self.ydim = xytemp[1]
     self.tag_list = get_taglist(self.schoolnr)
     self.start = frame[2]
     self.end = frame[2]
@@ -149,6 +146,7 @@ class c_event(list):
     self.logger = logger
     self.frames = OrderedDict([(0, frame)])
     self.last_frame_index = 1
+    self.shrink_factor = eventer_dbl.eve_shrink_factor
     while True:
       try:
         self.dbline.save()
@@ -169,7 +167,7 @@ class c_event(list):
 
   def add_frame(self, frame):
     try:
-      s_factor = 0.2 # user changeable later: 0.0 -> No Shrinking 1.0 50%
+      s_factor = self.shrink_factor
       if (frame[3] - self.margin) <= self[0]:
         self[0] = max(0, frame[3] - self.margin)
       else:
@@ -234,61 +232,64 @@ class c_event(list):
         predline += str(self.tag_list[i].name)[:3]
     return(predline+']')
 
-  def frames_filter(self, outlength, cond_dict):
-    frames_in = len(self.frames)
+  def frames_filter(self, outlength, cond_dict):  
     sortindex = [x for x in self.frames if (
       resolve_rules(cond_dict[2],  self.frames[x][7])
         or resolve_rules(cond_dict[3], self.frames[x][7])
         or resolve_rules(cond_dict[4],  self.frames[x][7])
-    )]
+    )] 
     if len(sortindex) > outlength:
-      sortindex.sort(key=lambda x: np.max(self.frames[x][7][1:]), reverse=True)
-      sortindex = sorted(sortindex[:outlength])
+      sortindex.sort(key=lambda x: np.max(self.frames[x][7][1:]), reverse=True) #prediction
+      sortindex = sortindex[:outlength]
+      sortindex.sort(key=lambda x: self.frames[x][2]) #timestamp
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
-    #if len(self.frames) == 0:
 
   def save(self, cond_dict):
     try:
       #self.logger.info('*** Saving Event: '+str(self.dbline.id))
       self.frames_filter(self.number_of_frames, cond_dict)
-      frames_to_save = self.frames.values()
-      self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
-        + self.p_string())
-      self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
-      self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
-      self.dbline.xmin=self[0]
-      self.dbline.xmax=self[1]
-      self.dbline.ymin=self[2]
-      self.dbline.ymax=self[3]
-      self.dbline.numframes=len(frames_to_save)
-      self.dbline.done = not self.goes_to_school
-      self.dbline.save()
-      self.mailimages = []
-      for item in frames_to_save:
-        pathadd = str(self.dbline.camera.id)+'/'+str(randint(0,99))
-        if not path.exists(schoolpath+pathadd):
-          makedirs(schoolpath+pathadd)
-        filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[2], 
-          noblank=True), 'bmp')
-        bmp_data =  cv.imencode('.bmp', item[1])[1].tobytes() 
-        if c_event.crypt is not None:
-          bmp_data = c_event.crypt.encrypt(bmp_data)
-        with open(schoolpath+filename, "wb") as file:
-          file.write(bmp_data)
-        frameline = event_frame(
-          time = timezone.make_aware(datetime.fromtimestamp(item[2])),
-          name = filename,
-          encrypted = c_event.crypt is not None,
-          x1 = item[3],
-          x2 = item[4],
-          y1 = item[5],
-          y2 = item[6],
-          event = self.dbline,
-        )
-        frameline.save()
-        self.mailimages.append(frameline.id)
-      if len(self.to_email) > 0:
-        self.send_emails()
+      if len(self.frames):
+        frames_to_save = self.frames.values()
+        self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
+          + self.p_string())
+        self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
+        self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
+        self.dbline.xmin=self[0]
+        self.dbline.xmax=self[1]
+        self.dbline.ymin=self[2]
+        self.dbline.ymax=self[3]
+        self.dbline.numframes=len(frames_to_save)
+        self.dbline.done = not self.goes_to_school
+        self.dbline.save()
+        self.mailimages = []
+        for item in frames_to_save:
+          pathadd = str(self.dbline.camera.id)+'/'+str(randint(0,99))
+          if not path.exists(schoolpath+pathadd):
+            makedirs(schoolpath+pathadd)
+          filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[2], 
+            noblank=True), 'bmp')
+          bmp_data =  cv.imencode('.bmp', item[1])[1].tobytes() 
+          if c_event.crypt is not None:
+            bmp_data = c_event.crypt.encrypt(bmp_data)
+          with open(schoolpath+filename, "wb") as file:
+            file.write(bmp_data)
+          frameline = event_frame(
+            time = timezone.make_aware(datetime.fromtimestamp(item[2])),
+            name = filename,
+            encrypted = c_event.crypt is not None,
+            x1 = item[3],
+            x2 = item[4],
+            y1 = item[5],
+            y2 = item[6],
+            event = self.dbline,
+          )
+          frameline.save()
+          self.mailimages.append(frameline.id)
+        if len(self.to_email) > 0:
+          self.send_emails()
+        return(True)  
+      else:
+        return(False)  
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()

@@ -131,6 +131,7 @@ def onedetector(request, detectornr, tokennr=0, token=None):
       streams[detectornr].dbline.det_erosion = form.cleaned_data['det_erosion']
       streams[detectornr].dbline.det_max_size = form.cleaned_data['det_max_size']
       streams[detectornr].dbline.det_max_rect = form.cleaned_data['det_max_rect']
+      streams[detectornr].dbline.det_scaledown = form.cleaned_data['det_scaledown']
       streams[detectornr].dbline.save(update_fields=[
         'det_fpslimit', 
         'det_threshold',
@@ -139,7 +140,9 @@ def onedetector(request, detectornr, tokennr=0, token=None):
         'det_erosion',
         'det_max_size',
         'det_max_rect',
+        'det_scaledown',
       ])
+      mydetector.reset()
       return HttpResponseRedirect(myurl+str(detectornr)+'/')
   else:
     form = DetectorForm(initial={
@@ -150,6 +153,7 @@ def onedetector(request, detectornr, tokennr=0, token=None):
       'det_erosion' : dbline.det_erosion,
       'det_max_size' : dbline.det_max_size,
       'det_max_rect' : dbline.det_max_rect,
+      'det_scaledown' : dbline.det_scaledown,
     })
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -207,21 +211,25 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       streams[eventernr].dbline.eve_fpslimit = form.cleaned_data['eve_fpslimit']
       streams[eventernr].dbline.eve_margin = form.cleaned_data['eve_margin']
       streams[eventernr].dbline.eve_event_time_gap = form.cleaned_data['eve_event_time_gap']
+      streams[eventernr].dbline.eve_shrink_factor = form.cleaned_data['eve_shrink_factor']
       streams[eventernr].dbline.eve_school = form.cleaned_data['eve_school']
       streams[eventernr].dbline.eve_alarm_email = form.cleaned_data['eve_alarm_email']
       streams[eventernr].dbline.save(update_fields=[
         'eve_fpslimit', 
         'eve_margin',
         'eve_event_time_gap',
+        'eve_shrink_factor',
         'eve_school',
         'eve_alarm_email',
       ])
+      myeventer.reset()
       return HttpResponseRedirect(myurl+str(eventernr)+'/')
   else:
     form = EventerForm(initial={
       'eve_fpslimit' : dbline.eve_fpslimit,
       'eve_margin' : dbline.eve_margin,
       'eve_event_time_gap' : dbline.eve_event_time_gap,
+      'eve_shrink_factor' : dbline.eve_shrink_factor,
       'eve_school' : dbline.eve_school,
       'eve_alarm_email' : dbline.eve_alarm_email,
     })

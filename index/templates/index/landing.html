@@ -76,6 +76,17 @@ let displaywidth = 375 // Screen width IPhone 7
 let imageElementsC = [];
 let imageElementsD = [];
 let imageElementsE = [];
+
+function isInViewport(el) {
+  let rect = el.getBoundingClientRect();
+  return (
+    rect.top >= 0 &&
+    rect.left >= 0 &&
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+  );
+};
+
 {% for item in camlist %} 
   let displayheight{{ item.id }} = 
     Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
@@ -186,13 +197,20 @@ $(document).ready(function() {
           mode = result[0];
           vnr = parseInt(result.slice(1));
 		      if (mode == 'C') {
-		        imageElementsC[vnr].src = url;
+		        checkelement = imageElementsC[vnr];
 		      } else if (mode == 'D') {  
-		        imageElementsD[vnr].src = url;
+		        checkelement = imageElementsD[vnr];
 		      } else {
-		        imageElementsE[vnr].src = url;
+		        checkelement = imageElementsE[vnr];
 		      };  
-          trigger_Socket.socket.send(result);
+		      checkelement.src = url;
+		      if (isInViewport(checkelement)) {
+            trigger_Socket.socket.send(result);
+		      } else { 
+            setTimeout(function() {
+              trigger_Socket.socket.send(result);
+            }, 5000);  
+		      };
         })
         .catch(err => {console.log(err);});
       };

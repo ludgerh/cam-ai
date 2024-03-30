@@ -77,49 +77,38 @@ class model_buffer(deque):
     self.ts = time()
     self.xdim = xdim
     self.ydim = ydim
-    self.bufferlock1 = Lock()
-    self.bufferlock2 = Lock()
+    self.bufferlock = Lock()
     self.websocket = websocket
     self.pause = True
 
   def append(self, initem):
     # structure of initem:
-    # initem[0] = np.imagelist, initem[1] = userindex,
-    # initem[2] = frame_id_list, iniitem[3] = eventnr
-    # structure of list outitem:
-    # outitem[0] = np.image, outitem[1] = userindex,
-    # outitem[2] = frame_id, outitem[3] = entnr
+    # initem[0] = np.imagelist, initem[1] = userindex
+    # structure of outitem:
+    # outitem[0] = np.image, outitem[1] = userindex
     if self.pause:
       ('short_brake', 0.01)
-    else:      
-      framecount = len(initem[0])
-      imagelist = initem[0]
-      with self.bufferlock1:
-        for i in range(framecount):
-          frame = imagelist[i]
+    else:  
+      with self.bufferlock:
+        for frame in initem[0]:
           if self.websocket:
             if ((frame.shape[1] * frame.shape[0]) > (self.xdim * self.ydim)):
               frame = cv.resize(frame, (self.xdim, self.ydim))
           else:
             frame = cv.resize(frame, (self.xdim, self.ydim))
-          outitem = [frame]
-          outitem.append(initem[1])
-          super().append(outitem)
-      self.ts = time()
+          super().append((frame, initem[1]))
 
   def get(self, maxcount):
-    tempres0 = []
-    tempres1 = []
+    result = []
     while True:
-      with self.bufferlock1:
+      with self.bufferlock:
         if not len(self):
           break
         initem = self.popleft()
-      tempres0.append(initem[0])
-      tempres1.append(initem[1])
-      if len(tempres0) >= maxcount:
-        break
-    return(tempres0, tempres1)
+      result.append(initem)
+      if len(result) >= maxcount:
+        break 
+    return(result)
 
 class tf_user(object):
   clientset = set()
@@ -284,7 +273,7 @@ class tf_worker():
     try:
       while True:
         received = self.inqueue.get()
-        #('TFW in', received)
+        #print('TFW in', received)
         if (received[0] == 'stop'):
           self.do_run = False
           while not self.inqueue.empty():
@@ -314,11 +303,6 @@ class tf_worker():
             )
             self.model_buffers[schoolnr].pause = False
           self.model_buffers[schoolnr].append(received[2:])
-          if not self.model_buffers[schoolnr].pause:
-            with self.model_buffers[schoolnr].bufferlock2:
-              while (schoolnr in self.model_buffers 
-                  and len(self.model_buffers[schoolnr]) >= self.dbline.maxblock):
-                self.process_buffer(schoolnr, self.logger)
         elif (received[0] == 'register'):
           myuser = tf_user()
           self.users[myuser.id] = myuser
@@ -395,15 +379,14 @@ class tf_worker():
           if self.model_buffers[schoolnr].pause:
             sleep(djconf.getconfigfloat('long_brake', 1.0)) 
           else:   
-            with self.model_buffers[schoolnr].bufferlock2:
-              run_ok = (
-                schoolnr in self.model_buffers
-                and len(self.model_buffers[schoolnr])
-                and self.model_buffers[schoolnr].ts + self.dbline.timeout < time() 
-              )
-              if run_ok:
-                self.process_buffer(schoolnr, self.logger, had_timeout=True)
-            if not run_ok:
+            new_time = time()
+            if (schoolnr in self.model_buffers
+                and (len(self.model_buffers[schoolnr]) >= self.dbline.maxblock
+                or new_time > self.model_buffers[schoolnr].ts + self.dbline.timeout)):
+              self.model_buffers[schoolnr].ts = new_time  
+              while self.do_run and len(self.model_buffers[schoolnr]):
+                self.process_buffer(schoolnr, self.logger)
+            else:
               sleep(djconf.getconfigfloat('short_brake', 0.01))
     self.finished = True
     self.logger.info('Finished Process '+self.logname+'...')
@@ -548,10 +531,9 @@ class tf_worker():
         self.myschool_cache[schoolnr] = (myschool, time())
 
       ts_one = time()
-      mybuffer.ts = time()
       slice_to_process = mybuffer.get(self.dbline.maxblock)
-      framelist = slice_to_process[0]
-      framesinfo = slice_to_process[1:]
+      framelist = [item[0] for item in slice_to_process]
+      framesinfo = [item[1] for item in slice_to_process]
       self.check_allmodels(schoolnr, logger)
       if self.dbline.gpu_sim >= 0: #GPU Simulation with random
         if self.dbline.gpu_sim > 0:
@@ -619,18 +601,17 @@ class tf_worker():
             self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
         else:
           logger.warning('Defective image in c_tfworkers / processbuffer') 
-          predictions = None
-              
+          predictions = None    
       if predictions is not None:
         starting = 0
         for i in range(len(framelist)):
           if ((i == len(framelist) - 1) 
-              or (framesinfo[0][i] != framesinfo[0][i+1])):
-            if (framesinfo[0][starting] in self.users):
-              self.my_output.put(framesinfo[0][starting], (
+              or (framesinfo[i] != framesinfo[i+1])):
+            if (framesinfo[starting] in self.users):
+              self.my_output.put(framesinfo[starting], (
                 'pred_to_send', 
                 predictions[starting:i+1], 
-                framesinfo[0][starting:i+1],
+                framesinfo[starting],
               ))
             starting = i + 1
         if self.dbline.savestats > 0: #Later to be written in DB
@@ -664,10 +645,13 @@ class tf_worker():
       elif (received[0] == 'put_xy'):
         self.xy = received[1]
       elif (received[0] == 'pred_to_send'):
+        #print('Out to queue', index, ':', received)
         while True:
           self.pred_out_lock.acquire()
-          if self.pred_out_dict[received[2][0]] is None:
-            self.pred_out_dict[received[2][0]] = received[1]
+          if  received[2] not in self.pred_out_dict:
+            self.pred_out_dict[received[2]] = None
+          if self.pred_out_dict[received[2]] is None:
+            self.pred_out_dict[received[2]] = received[1]
             self.pred_out_lock.release()
             break
           else: 
@@ -710,7 +694,7 @@ class tf_worker():
 
   def ask_pred(self, school, img_list, userindex):
     with  self.pred_out_lock:
-      self.pred_out_dict[userindex] = None
+      #self.pred_out_dict[userindex] = None
       self.inqueue.put((
         'imglist', 
         school, 
@@ -732,7 +716,7 @@ class tf_worker():
       if ((userindex not in self.pred_out_dict) 
           or (self.pred_out_dict[userindex] is None)):
         self.pred_out_lock.release()
-        sleep(djconf.getconfigfloat('very_short_brake', 0.01))
+        sleep(djconf.getconfigfloat('short_brake', 0.01))
       else:  
         result = self.pred_out_dict[userindex]
         self.pred_out_dict[userindex] = None

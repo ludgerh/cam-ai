@@ -27,6 +27,7 @@ from setproctitle import setproctitle
 from collections import deque
 from time import time, sleep
 from threading import Thread, Lock as t_lock
+from queue import SimpleQueue
 from multiprocessing import Process, Lock as p_lock
 from subprocess import run
 from django.forms.models import model_to_dict
@@ -36,7 +37,7 @@ from tools.l_tools import djconf
 from tools.c_logger import log_ini
 from tools.c_tools import hasoverlap, rect_btoa
 from viewers.c_viewers import c_viewer
-from l_buffer.l_buffer import l_buffer
+from l_buffer.l_buffer import l_buffer, c_buffer
 from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school
 from streams.c_devices import c_device
@@ -61,8 +62,8 @@ class c_eventer(c_device):
       self.viewer = None
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
-    self.dataqueue = l_buffer(1, block=True)
-    self.detectorqueue = l_buffer()
+    self.dataqueue = c_buffer(block=True)
+    self.detectorqueue = l_buffer(queue=True)
     self.buffer_ts = time()
     self.display_ts = 0
     self.nr_of_cond_ed = 0
@@ -70,7 +71,6 @@ class c_eventer(c_device):
     self.tag_list = get_taglist(self.dbline.eve_school.id)
     datapath = djconf.getconfig('datapath', 'data/')
     self.recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
-    self.last_display = 0
 
   def runner(self):
     super().runner()
@@ -95,6 +95,13 @@ class c_eventer(c_device):
     self.finished = False
     self.do_run = True
     self.scaling = None
+    
+    self.frame_queue = SimpleQueue()
+    self.active_pred_count = 0
+    self.active_pred_lock = t_lock()
+    self.motion_frame = [0,0,0.0]
+    self.run_one_ts = time()
+    self.pred_deque = deque()
 
     Thread(target=self.inserter, name='InserterThread').start()
     
@@ -104,7 +111,10 @@ class c_eventer(c_device):
     self.webm_proc = Process(target=self.make_webm).start()
     try:
       while self.do_run:
-        frameline = self.dataqueue.get()
+        if self.redis.view_from_dev('E', self.dbline.id): 
+          frameline = self.dataqueue.get()
+        else:
+          frameline = [None, 0, time()]  
         if (self.do_run and (frameline is not None) 
             and self.sl.greenlight(self.period, frameline[2])):
           self.run_one(frameline) 
@@ -120,6 +130,7 @@ class c_eventer(c_device):
             except OperationalError:
               connection.close()
       self.finished = True
+      self.logger.info('Finished Process '+self.logname+'...')
       self.logger.handlers.clear()
       self.tf_worker.stop_out(self.tf_w_index)
       self.tf_worker.unregister(self.tf_w_index)
@@ -195,6 +206,8 @@ class c_eventer(c_device):
         elif (received[0] == 'setdscrwidth'):
           self.scrwidth = received[1]
           self.scaling = None
+        elif (received[0] == 'reset'):
+          self.dbline.refresh_from_db()
         else:
           return(False)
         return(True)
@@ -203,19 +216,55 @@ class c_eventer(c_device):
       self.logger.handlers.clear()
 
   def run_one(self, frame):
-    if (not self.redis.view_from_dev('E', self.dbline.id)):
+    if self.redis.check_if_counts_zero('E', self.dbline.id):
       sleep(djconf.getconfigfloat('long_brake', 1.0))
     else:
-      myframe = frame[1]
-      if self.scaling is None:
-        if myframe.shape[1] > self.scrwidth:
-          self.scaling = self.scrwidth / myframe.shape[1]
+      if frame[0]:
+        if self.scaling is None:
+          if frame[1].shape[1] > self.scrwidth:
+            self.scaling = self.scrwidth / frame[1].shape[1]
+          else:
+            self.scaling = 1.0  
+          self.linewidth = round(4.0 / self.scaling)
+          self.textheight = round(0.51 / self.scaling)
+          self.textthickness = round(2.0 / self.scaling)
+      else:
+        sleep(djconf.getconfigfloat('short_brake', 0.01))
+      if (time() - self.run_one_ts) > 1.0:
+        self.run_one_ts = time()
+        for i, item in list(self.eventdict.items()): 
+          self.check_events(i, item) 
+      while self.motion_frame[2] <= frame[2]:
+        #print(self.motion_frame[2], frame[2], self.motion_frame[2] - frame[2], self.active_pred_count)
+        if self.active_pred_count:
+          if not self.pred_deque:
+            predictions = self.tf_worker.get_from_outqueue(self.tf_w_index)
+            for i in range(predictions.shape[0]):
+              self.pred_deque.append(predictions[i]) 
+          self.motion_frame = self.frame_queue.get()
+          #print('*****', self.motion_frame[2:])
+          self.motion_frame.append(self.pred_deque.popleft())
+          with self.active_pred_lock:
+            self.active_pred_count -= 1
+          margin = self.dbline.eve_margin
+          found = None
+          for i, item in list(self.eventdict.items()):
+            if hasoverlap((self.motion_frame[3]-margin, self.motion_frame[4]+margin, 
+                self.motion_frame[5]-margin, self.motion_frame[6]+margin), item):
+              found = item
+              break
+          if found is None:
+            new_event = c_event(self.tf_worker, self.tf_w_index, self.motion_frame, 
+              margin, self.dbline, self.logger)
+            with self.eventdict_lock:
+              self.eventdict[new_event.dbline.id] = new_event
+          else: 
+            found.add_frame(self.motion_frame) 
+          self.merge_events()
         else:
-          self.scaling = 1.0  
-        self.linewidth = round(4.0 / self.scaling)
-        self.textheight = round(0.51 / self.scaling)
-        self.textthickness = round(2.0 / self.scaling)
-      self.display_events(frame)
+          break
+      if frame[0]:
+        self.display_events(frame)
       if self.dbline.eve_view:
         fps = self.som.gettime()
         if fps:
@@ -306,7 +355,7 @@ class c_eventer(c_device):
                 (item[0]+10, item[2]+30), 
                 cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
                   self.textthickness, cv.LINE_AA)
-      self.viewer.inqueue.put(data=(3, newimage, frame[2]))
+      self.viewer.inqueue.put((3, newimage, frame[2]))
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
@@ -371,7 +420,7 @@ class c_eventer(c_device):
         else:
           item.to_email = ''
         is_ready = True
-        if (item.goes_to_school or item.isrecording or item.to_email):
+        if item.goes_to_school or item.isrecording or item.to_email:
           if item.isrecording:
             if (self.vid_deque and 
                 (item.end <= (self.vid_deque[-1][2] - self.dbline.cam_latency))):
@@ -436,7 +485,13 @@ class c_eventer(c_device):
             else:  
               is_ready = False
           if is_ready:
-            item.save(self.cond_dict)
+            if not item.save(self.cond_dict):
+              while True:
+                try:
+                  item.dbline.delete()
+                  break  
+                except OperationalError:
+                  connection.close()  
         else:
           while True:
             try:
@@ -444,9 +499,6 @@ class c_eventer(c_device):
               break  
             except OperationalError:
               connection.close()  
-            except ValueError:
-              self.logger.warning('Value Error in Merge Events')
-              break
         if is_ready:
           with self.eventdict_lock:
             with self.display_lock:
@@ -461,12 +513,7 @@ class c_eventer(c_device):
       detector_to = None
       while (not self.tf_worker.check_ready(self.tf_w_index)):
         sleep(djconf.getconfigfloat('long_brake', 1.0))
-      local_ts = time()
       while self.do_run:
-        if (time() - local_ts) > 1.0:
-          local_ts = time()
-          for i, item in list(self.eventdict.items()): 
-            self.check_events(i, item)  
         if self.detectorqueue.empty():
           frame = None
         else:
@@ -474,13 +521,15 @@ class c_eventer(c_device):
           np_image = np.frombuffer(image, dtype=np.uint8)
           np_image = np_image.reshape(numbers[5]-numbers[4], numbers[3]-numbers[2], 3)
           frame = [numbers[0], np_image] + list(numbers[1:])
+          self.frame_queue.put(frame)
         if frame:
           if not self.dbline.cam_xres:
             self.dbline.refresh_from_db(fields=['cam_xres', 'cam_yres', ])
           if detector_to is None:
             detector_to = frame[2]
+          detector_buffer.append(frame)
           if len(detector_buffer) < 16 and (new_time := frame[2]) - detector_to < 0.1:
-            detector_buffer.append(frame)
+            detector_to = new_time
             continue
           detector_to = new_time
           if detector_buffer:
@@ -489,37 +538,20 @@ class c_eventer(c_device):
               np_image = cv.cvtColor(item[1], cv.COLOR_BGR2RGB)
               imglist.append(np_image)
             if self.tf_w_index is not None:
+              while True:
+                try:
+                  school_id = self.dbline.eve_school.id
+                  break
+                except OperationalError:
+                  connection.close()
               self.tf_worker.ask_pred(
-                self.dbline.eve_school.id, 
+                school_id, 
                 imglist, 
                 self.tf_w_index,
               )
-              predictions = np.empty((0, len(self.tag_list)), np.float32)
-              while (predictions.shape[0] < len(imglist)):
-                predictions = np.vstack((
-                  predictions, 
-                  self.tf_worker.get_from_outqueue(self.tf_w_index)
-                ))
-              for i in range(len(imglist)):
-                detector_buffer[i].append(predictions[i]) 
-          margin = self.dbline.eve_margin
-          with self.display_lock:
-            for frame in detector_buffer:
-              found = None
-              for i, item in list(self.eventdict.items()):
-                if hasoverlap((frame[3]-margin, frame[4]+margin, 
-                    frame[5]-margin, frame[6]+margin), item):
-                  found = item
-                  break
-              if found is None:
-                new_event = c_event(self.tf_worker, self.tf_w_index, frame, 
-                  margin, self.dbline, self.logger)
-                with self.eventdict_lock:
-                  self.eventdict[new_event.dbline.id] = new_event
-              else: 
-                found.add_frame(frame) 
+              with self.active_pred_lock:
+                self.active_pred_count += len(detector_buffer)
             detector_buffer.clear()
-            self.merge_events()
         else:  
           sleep(djconf.getconfigfloat('short_brake', 0.1))
     except:
@@ -550,7 +582,10 @@ class c_eventer(c_device):
 	    result += 'above or equal '+str(i['y'])
     elif i['c_type'] in {3,5}:
 	    result += 'below or equal '+str(i['y'])
-    return(result)
+    return(result)   
+      
+  def reset(self):  
+    self.inqueue.put(('reset', ))
 
   def stop(self):
     self.redis.set('webm_queue:' + str(self.id) + ':start', 'stop')

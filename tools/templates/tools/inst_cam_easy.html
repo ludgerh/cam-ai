@@ -1,0 +1,270 @@
+{% extends 'main/basis.html' %}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
+{% block content %}
+{% if mayadd %}
+{% if emulatestatic %}
+  {% load static %}
+  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
+  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+{% else %}
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+{% endif %}
+  <div class="h2 m-2">
+    Welcome! This is your camera installation assistant.
+  </div>
+  <div>
+    <div class="h2 m-2">
+      Camera address:
+      <input class="mb-3 m-2" type="text" id="camaddress" size="30">
+    </div>
+    <div class="h2 m-2">
+      Explanation: This is the place in the internet, where we can find your camera (IP or domain). Examples: '123.45.67.98', 'mydomain.com'...
+    </div>
+    <div class="h2 m-2">
+      Camera Username:
+      <input class="mb-3 m-2" type="text" id="userinput" size="30">
+    </div>
+    <div class="h2 m-2">
+      Camera Password:
+      <input class="mb-3 m-2" type="password" id="passinput" size="30">
+    </div>
+    <div class="h2 m-2">
+      Explanation: These are username and password from the camera configuration...
+    </div>
+  </div>
+  <div>
+    <button class="btn btn-primary m-2" id="scan-button" type="button" disabled>Connectivity Check</button>
+  </div>
+  <div class="h2 m-2 d-none" id="info_text"></div>
+  <div class="h3 m-2 d-none" id="isapi_list">
+    <div>
+      <strong>Model: </strong><span id="isapi_model">?</span>
+    </div>  
+    <div>
+      <strong>Device Name: </strong><span id="isapi_devicename">?</span>
+    </div>   
+    <div>
+      <strong>Device Location: </strong><span id="isapi_devicelocation">?</span>
+    </div>  
+    <div>
+      <strong>Activated: </strong><span id="isapi_activated">?</span>
+    </div> 
+    <button class="btn btn-primary m-2" type="button" id="use_isapi">Install this camera</button>
+  </div>
+  <div class="h3 m-2 d-none" id="onvif_list">
+    <div>
+      <strong>Manufacturer: </strong><span id="onvif_manufacturer">?</span>
+    </div>  
+    <div>
+      <strong>Model: </strong><span id="onvif_model">?</span>
+    </div>  
+    <button class="btn btn-primary m-2" type="button" id="use_onvif">Install this camera</button>
+  </div>
+  <div class="h2 m-2 d-none" id="search_result"></div>
+<script>
+
+let ports = [80, 2020, 8000, 8080];
+
+let caminstSocket;
+
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+
+function install_cam(control_mode, cam_info, cam_address) {
+  url_str =  cam_info.urlscheme.replace('{user}', $('#userinput').val());
+  url_str = url_str.replace('{pass}', $('#passinput').val());
+  caminstSocket.sendandwait({
+    'command' : 'scanoneip',
+    'camurl' : url_str,
+  })  
+  .then((result) => {
+    if(Object.keys(result).length === 0) {
+      display = 'We did not get a proper response on port ' + cam_info.stream_port + '.<br>';
+      display += 'Make sure your router forwards this port to your camera.<br>';
+      $('#search_result').html(display);
+    } else {
+      for (item of result.streams) {
+        if (item.codec_type == 'video') {
+          video_codec = item.index;
+          x_resolution = item.coded_width;
+          y_resolution = item.coded_height;
+          break;
+        };
+      };
+      audio_codec = null;
+      for (item of result.streams) {
+        if (item.codec_type == 'audio') {
+          audio_codec = item.index;
+          break;
+        };
+      };
+      if (control_mode == 1) {
+        model_string = cam_info.info.model;
+      };  
+      if (control_mode == 2) {
+        model_string = cam_info.info.Manufacturer + ' ' + cam_info.info.Model;
+      };  
+      caminstSocket.sendandwait({
+        'command' : 'installcam',
+        'camurl' : url_str,
+        'videocodec' : video_codec,
+        'audiocodec' : audio_codec,
+        'xresolution' : x_resolution,
+        'yresolution' : y_resolution,
+        'control_mode' : control_mode,
+        'control_user' : cam_info.user,
+        'control_pass' : cam_info.pass,
+        'control_ip' : cam_address.ip,
+        'control_port' : cam_info.port,
+        'cam_name' : model_string,
+      })  
+      .then((result) => {
+        window.location.href = window.location.protocol + '//' + window.location.host;
+      })
+    };
+  });
+};  
+
+$(document).ready(function() {
+  WSAsync(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/caminst/'
+  )
+  .then((result) => {
+    caminstSocket = result;
+    $('#camaddress').keyup(function() {
+      caminstSocket.sendandwait({
+        'command' : 'validate_domain',
+        'domain' : $('#camaddress').val(),
+      })  
+      .then((result) => {
+        $('#camaddress').val(result.domain);
+        if (result.result) {
+          $('#scan-button').removeAttr('disabled');
+        } else {  
+          $('#scan-button').attr('disabled','disabled');
+        };  
+      })
+    });
+    $('#camaddress').trigger('change');
+    $('#scan-button').click(function() {
+      $('#netlist').empty();
+      $('#info_text').text('Testing connectivity. Please wait a while...');
+      $('#info_text').removeClass("d-none");
+      $(document).scrollTop($(document).height()); 
+      $('#isapi_list').addClass("d-none");
+      $('#onvif_list').addClass("d-none");
+      $('#search_result').addClass("d-none");
+      $(document).scrollTop($(document).height()); 
+      caminstSocket.sendandwait({
+        'command' : 'scanips',
+        'camaddress' : $('#camaddress').val(),
+        'portaddr' : ports,
+        'uname' : $('#userinput').val(),
+        'upass' : $('#passinput').val(),
+      })  
+      .then((result) => {
+        if (result[0].address) {
+          if (result[0].isapi) {
+            if (result[0].isapi.info) {
+              $('#isapi_model').text(result[0].isapi.info.model);
+              $('#isapi_devicename').text(result[0].isapi.info.deviceName);
+              $('#isapi_devicelocation').text(result[0].isapi.info.deviceLocation);
+              $('#isapi_activated').text(result[0].isapi.activated);
+              $('#isapi_list').removeClass("d-none");
+              $('#info_text').html('We found an ISAPI compatible camera on port ' + result[0].isapi.port + ':');
+              $(document).scrollTop($(document).height()); 
+              $('#use_isapi').click(function() {
+                $('#search_result').text('Launching camera. Please wait a while...');
+                $('#search_result').removeClass("d-none");
+                $(document).scrollTop($(document).height()); 
+                install_cam(1, result[0].isapi, result[0].address);
+              });
+            } else {
+              display = 'We found an ISAPI compatible camera, but your username and/or password seem to be wrong.<br>';
+              display += 'Try again with the right credentials.<br>';
+              $('#info_text').html(display);
+            }; 
+          } else {
+            if (result[0].onvif) {
+              if (result[0].isapi.info) {
+                $('#onvif_manufacturer').text(result[0].onvif.info.Manufacturer);
+                $('#onvif_model').text(result[0].onvif.info.Model);
+                $('#onvif_list').removeClass("d-none");
+                $('#info_text').html('We found an ONVIF compatible camera on port ' + result[0].onvif.port + ':');
+                $(document).scrollTop($(document).height()); 
+                $('#use_onvif').click(function() {
+                  $('#search_result').text('Launching camera. Please wait a while...');
+                  $('#search_result').removeClass("d-none");
+                  $(document).scrollTop($(document).height()); 
+                  install_cam(2, result[0].onvif, result[0].address);
+                });
+              } else {
+                display = 'We found an ONVIF compatible camera, but your username and/or password seem to be wrong.<br>';
+                display += 'Try again with the right credentials.<br>';
+                $('#info_text').html(display);
+              }; 
+            } else {
+              display = 'We found the system you addressed, but we got no proper answer for our ISAPI and/or ONVIF requests.<br>';
+              display += 'Make sure the system you are trying to connect is a compatible camera.<br>';
+              display += 'Make sure your router forwards the right ISAPI or ONVIF port to your camera.<br>';
+              $('#info_text').html(display);
+              $(document).scrollTop($(document).height()); 
+            };  
+          };
+        } else {
+          if (result[0].error) {
+            if (result[0].error == 'domain_error') {
+              display = 'The domain you entered cannot be resolved.<br>';
+              display += 'Make sure you have no spelling mistakes in your "Camera address" field.<br>';
+              display += 'Make sure the domain you used is valid and working.<br>';
+              display += 'If you don´t have a domain, try with your routers IP address.<br>';
+              $('#info_text').html(display);
+            } else {
+              if (result[0].error == 'ip_error') {
+                display = 'The system you try to reach for seems to be offline.<br>';
+                display += 'If you used a domain, make sure it is valid and working.<br>';
+                display += 'Make sure there is no firewall in the way.<br>';
+                display += 'Make sure your router forwards the right ISAPI or ONVIF port to your camera.<br>';
+                $('#info_text').html(display);
+              } else {
+                $('#info_text').html('Unknown error code: ' + result[0].error);
+              };  
+            };
+          } else {
+            $('#info_text').html('Unknown error, no error code.');
+          };
+          $(document).scrollTop($(document).height()); 
+        };
+      });    
+    });
+    
+  })  
+});
+</script>
+{% else %}
+<main>
+  <div class="h2">
+  You can create {{ streamlimit }} camera streams.<br>
+  You already have {{ streamcount }}.<br>
+  Please delete one or more to create a new one.
+  </div>
+</main>
+{% endif %}
+
+{% endblock %}

@@ -1,30 +1,37 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import json
 import xml.etree.ElementTree as ET
 from time import sleep
 from random import randint
-from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror
+from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
+  timeout, gaierror)
 from concurrent.futures import ThreadPoolExecutor
 from requests import get as rget, put as rput
 from requests.auth import HTTPDigestAuth
 from ipaddress import ip_network, ip_address
+from urllib.parse import urlparse
 from psutil import net_if_addrs
 from onvif import ONVIFCamera, exceptions, init_log
 from subprocess import Popen, PIPE
 from tools.c_redis import myredis
+
+import sys
+import traceback
 
 # Constants:
 # stream type
@@ -125,16 +132,21 @@ class search_executor(ThreadPoolExecutor):
           except herror:
             result['address']['name'] = 'name unknown'
           result['address']['ports'] = [port]
-      except:
-        pass
+      except gaierror:
+        result['error'] = 'domain_error'
+      except timeout:
+        result['error'] = 'ip_error'
+      except OSError:
+        result['error'] = 'ip_error'
       finally:
         socketdict[port].close()
     return(result)
     
   def callback(self, f):
-    if (myresult := f.result()):
+    myresult = f.result()
+    if myresult and 'address' in myresult:
       for port in myresult['address']['ports']:
-        if port in {80, 8000}:
+        if port in {80, 2020, 8000}:
           try:
             myonvif = ONVIFCamera(
               myresult['address']['ip'], 
@@ -162,6 +174,8 @@ class search_executor(ThreadPoolExecutor):
             }
             params['ProfileToken'] = myprofile.token
             myresult['onvif']['urlstart'] = media_service.GetStreamUri(params)['Uri']
+            netloc = urlparse(myresult['onvif']['urlstart']).netloc
+            myresult['onvif']['stream_port'] = netloc.split(':')[1]
             myresult['onvif']['urlscheme'] = myresult['onvif']['urlstart'].replace('://', '://{user}:{pass}@')
             myresult['onvif']['user'] = self.uname
             myresult['onvif']['pass'] = self.upass
@@ -193,6 +207,8 @@ class search_executor(ThreadPoolExecutor):
                   myresult['isapi']['user'] = self.uname
                   myresult['isapi']['pass'] = self.upass
                   myresult['isapi']['urlstart'] = 'rtsp://'+myresult['address']['ip'] + ':554/ISAPI/streaming/channels/101'
+                  netloc = urlparse(myresult['onvif']['urlstart']).netloc
+                  myresult['isapi']['stream_port'] = netloc.split(':')[1]
                   myresult['isapi']['urlscheme'] = myresult['isapi']['urlstart'].replace('://', '://{user}:{pass}@')
                   username = self.uname
                   password = self.upass
@@ -236,7 +252,7 @@ class search_executor(ThreadPoolExecutor):
               break
           except:
             pass     
-      self.all_results.append(myresult)
+    self.all_results.append(myresult)
     self.thread_count -= 1
     #print('***** Callback finished: ', self.thread_count)
       
