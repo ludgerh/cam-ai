@@ -709,6 +709,11 @@ class tf_worker():
       test_pred,
     ))
 
+  def outqueue_empty(self, userindex):
+    with self.pred_out_lock:
+      result = ((userindex not in self.pred_out_dict) 
+        or (self.pred_out_dict[userindex] is None))
+    return(result)
 
   def get_from_outqueue(self, userindex):
     while True:

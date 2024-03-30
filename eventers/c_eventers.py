@@ -207,7 +207,12 @@ class c_eventer(c_device):
           self.scrwidth = received[1]
           self.scaling = None
         elif (received[0] == 'reset'):
-          self.dbline.refresh_from_db()
+          while True:
+            try:
+              self.dbline.refresh_from_db()
+              break
+            except OperationalError:
+              connection.close()
         else:
           return(False)
         return(True)
@@ -234,7 +239,7 @@ class c_eventer(c_device):
         self.run_one_ts = time()
         for i, item in list(self.eventdict.items()): 
           self.check_events(i, item) 
-      while self.motion_frame[2] <= frame[2]:
+      while self.motion_frame[2] <= frame[2] + self.dbline.eve_sync_factor:
         #print(self.motion_frame[2], frame[2], self.motion_frame[2] - frame[2], self.active_pred_count)
         if self.active_pred_count:
           if not self.pred_deque:

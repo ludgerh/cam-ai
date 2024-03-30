@@ -17,44 +17,46 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import json
 import numpy as np
 import cv2 as cv
+from asyncio import sleep as asleep
 from logging import getLogger
 from traceback import format_exc
 from django.contrib.auth.models import User
-from channels.generic.websocket import WebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.l_tools import djconf
 from access.c_access import access
 from tf_workers.c_tfworkers import tf_workers
-from tf_workers.models import school
+from tf_workers.models import worker
 from schools.c_schools import get_taglist
 
 logname = 'ws_predictionsconsumers'
 logger = getLogger(logname)
 log_ini(logger, logname)
 taglist = get_taglist(1)
+medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
       
 #*****************************************************************************
 # predictionsConsumer
 #*****************************************************************************
 
-class predictionsConsumer(WebsocketConsumer):
+class predictionsConsumer(AsyncWebsocketConsumer):
   datacache = {}
 
-  def connect(self):
-    self.accept()
+  async def connect(self):
     self.authed = False
     self.permitted_schools = set()
     self.user = None
     self.ws_id = 0
     self.worker_nr = 0
     self.ws_name = 'undefined'
+    await self.accept()
 
-  def disconnect(self, close_code):
+  async def disconnect(self, close_code):
     logger.info('Websocket-logout: WS-ID: ' + str(self.ws_id) 
       + ' - WS-Name: '  + str(self.ws_name) 
       + ' - Worker-Number: ' + str(self.worker_nr))
 
-  def checkschooldata(self, myschool):
+  async def checkschooldata(self, myschool):
     if not('schooldata' in self.mydatacache):
       self.mydatacache['schooldata'] = {}
     if myschool in self.mydatacache['schooldata']:
@@ -65,8 +67,8 @@ class predictionsConsumer(WebsocketConsumer):
         if 'tf_w_index' in self.mydatacache:
           return(xytemp)
     self.mydatacache['schooldata'][myschool] = {}
-    self.mydatacache['workernr'] = (
-      school.objects.get(id=myschool).tf_worker.id)
+    tf_worker_object = await worker.objects.aget(school__id=myschool)  
+    self.mydatacache['workernr'] = tf_worker_object.id
     self.mydatacache['tf_w_index'] = (
       tf_workers[self.mydatacache['workernr']].register())
     tf_workers[self.mydatacache['workernr']].run_out(
@@ -77,7 +79,7 @@ class predictionsConsumer(WebsocketConsumer):
     self.mydatacache['schooldata'][myschool]['ydim'] = xytemp[1]
     return(xytemp)
 
-  def receive(self, text_data=None, bytes_data=None):
+  async def receive(self, text_data=None, bytes_data=None):
     try:
       if text_data:
         if text_data == 'Ping':
@@ -88,7 +90,7 @@ class predictionsConsumer(WebsocketConsumer):
           indict=json.loads(intext)
           if indict['code'] == 'auth':
             try:
-              self.user = User.objects.get(username=indict['name'])
+              self.user = await User.objects.aget(username=indict['name'])
             except User.DoesNotExist:
               self.user = None  
             if self.user and self.user.check_password(indict['pass']):
@@ -122,47 +124,47 @@ class predictionsConsumer(WebsocketConsumer):
                 + ' - WS-Name: ' + str(indict['ws_name']) 
                 + ' - Worker-Number: ' + str(indict['worker_nr']) 
                 + ' - Software-Version: ' + indict['soft_ver'])
-              self.close() 
+              await self.close() 
           elif indict['code'] == 'get_xy':
             myschool = indict['scho']
-            xytemp = self.checkschooldata(myschool)
+            xytemp = await self.checkschooldata(myschool)
             logger.debug('--> ' + str(xytemp))
-            self.send(json.dumps(xytemp))
+            await self.send(json.dumps(xytemp))
           elif indict['code'] == 'imgl':
             if not('schooldata' in self.mydatacache):
               self.mydatacache['schooldata'] = {}
             if not self.authed:
-              self.close()
+              await self.close()
             myschool = indict['scho']
             if not (myschool in self.mydatacache['schooldata']):
               self.mydatacache['schooldata'][myschool] = {}
             if not (myschool in self.permitted_schools):
-              if access.check('S', myschool, self.user, 'R'):
+              if await access.check_async('S', myschool, self.user, 'R'):
                 self.permitted_schools.add(myschool)
               else:
-                self.close()
+                await self.close()
             try:
               self.mydatacache['schooldata'][myschool]['imglist'] = []
             except KeyError:
               logger.warning('KeyError while initializing ImgList')
           elif indict['code'] == 'done':
             myschool = indict['scho'] 
-            self.checkschooldata(myschool)
+            await self.checkschooldata(myschool)
             if ('imglist' in self.mydatacache['schooldata'][myschool]):
               if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
-                tf_workers[self.mydatacache['workernr']].client_check_model(
-                  myschool, test_pred = False)
                 tf_workers[self.mydatacache['workernr']].ask_pred(
                   myschool, 
                   self.mydatacache['schooldata'][myschool]['imglist'], 
                   self.mydatacache['tf_w_index'],
                 )
+                my_worker = tf_workers[self.mydatacache['workernr']]
                 predictions = np.empty((0, len(taglist)), np.float32)
                 while (predictions.shape[0] 
                     < len(self.mydatacache['schooldata'][myschool]['imglist'])):
+                  while my_worker.outqueue_empty(self.mydatacache['tf_w_index']):
+                    await asleep(medium_brake)
                   predictions = np.vstack((predictions, 
-                    tf_workers[self.mydatacache['workernr']].get_from_outqueue(
-                      self.mydatacache['tf_w_index'])))
+                    my_worker.get_from_outqueue(self.mydatacache['tf_w_index'])))
                 predictions = predictions.tolist()
               else:
                 logger.warning('Defective image in ws_predictions / consumers') 
@@ -171,7 +173,7 @@ class predictionsConsumer(WebsocketConsumer):
               logger.warning('Incomplete image data in ws_predictions / consumers') 
               predictions = None   
             logger.debug('--> ' + str(predictions))
-            self.send(json.dumps(predictions))
+            await self.send(json.dumps(predictions))
       else: #bytes_data
         myschool = int.from_bytes(bytes_data[:8], 'big')
         if self.mydatacache['schooldata'][myschool]['imglist'] is not None:

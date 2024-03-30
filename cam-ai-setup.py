@@ -40,7 +40,7 @@ print()
 
 release_code = platform.release()
 env_type = None
-if release_code[:6] == '6.1.0-':
+if release_code[:2] == '6.':
   if '-amd64' in release_code:
     os_code = 'debian12'
     env_type = 'conda'
@@ -283,7 +283,7 @@ print('You can now start the server by entering this:')
 print('./runserver.sh')
 print()
 print('And then surf to your new server in the browser using:')
-print('http://cam-ai-raspi:8000/')
+print('http://cam-ai-raspi:8000/index/C/')
 print()
 print('Have a nice day...')
 

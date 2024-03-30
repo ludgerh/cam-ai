@@ -212,6 +212,7 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       streams[eventernr].dbline.eve_margin = form.cleaned_data['eve_margin']
       streams[eventernr].dbline.eve_event_time_gap = form.cleaned_data['eve_event_time_gap']
       streams[eventernr].dbline.eve_shrink_factor = form.cleaned_data['eve_shrink_factor']
+      streams[eventernr].dbline.eve_sync_factor = form.cleaned_data['eve_sync_factor']
       streams[eventernr].dbline.eve_school = form.cleaned_data['eve_school']
       streams[eventernr].dbline.eve_alarm_email = form.cleaned_data['eve_alarm_email']
       streams[eventernr].dbline.save(update_fields=[
@@ -219,6 +220,7 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
         'eve_margin',
         'eve_event_time_gap',
         'eve_shrink_factor',
+        'eve_sync_factor',
         'eve_school',
         'eve_alarm_email',
       ])
@@ -230,6 +232,7 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       'eve_margin' : dbline.eve_margin,
       'eve_event_time_gap' : dbline.eve_event_time_gap,
       'eve_shrink_factor' : dbline.eve_shrink_factor,
+      'eve_sync_factor' : dbline.eve_sync_factor,
       'eve_school' : dbline.eve_school,
       'eve_alarm_email' : dbline.eve_alarm_email,
     })

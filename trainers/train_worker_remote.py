@@ -80,17 +80,16 @@ class train_once_remote():
         'school' : self.myschool.e_school,
       } 
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      remotesearch = json.loads(self.ws.recv())
+      remoteset = set()
+      remotedict = {}
+      while (item := json.loads(self.ws.recv())):
+        remotedict[item[0]] = item[1]
+        remoteset.add(item[0])
       self.ws_ts = time()
       pingproc = MultiTimer(interval=2, 
         function=self.send_ping, 
         runonstart=False)
       pingproc.start()
-      remoteset = set()
-      remotedict = {}
-      for item in remotesearch:
-        remotedict[item[0]] = item[1]
-        remoteset.add(item[0])
       filterdict = {'school' : self.myschool.id, }
       if not self.myschool.ignore_checked:
         filterdict['checked'] = True

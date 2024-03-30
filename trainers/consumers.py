@@ -88,31 +88,21 @@ class remotetrainer(AsyncWebsocketConsumer):
     if bytes_data: 
       cod_x = self.myschooldict['model_xin']
       cod_y = self.myschooldict['model_yin']
-      if self.client_soft_version >= version_flat('1.0.10'):
-        filepath = (self.myschooldict['dir'] 
-          + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
-          + '/' + self.frameinfo['name'][:-4]+'.jpg')
-        codpath = filepath[:-4]+'.cod'
-        mydir = path.dirname(filepath) 
-        if not path.exists(mydir):
-          makedirs(mydir)
-        imgdata = cv.imdecode(np.frombuffer(bytes_data, dtype=np.uint8), (cv.IMREAD_COLOR))
-        if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
-          imgdata = cv.resize(imgdata, (cod_x, cod_y))
-          cv.imwrite(filepath, imgdata)
-          rename(filepath, codpath)
-        else:
-          with open(codpath, 'wb') as f:
-            f.write(bytes_data)
+      filepath = (self.myschooldict['dir'] 
+        + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
+        + '/' + self.frameinfo['name'][:-4]+'.jpg')
+      codpath = filepath[:-4]+'.cod'
+      mydir = path.dirname(filepath) 
+      if not path.exists(mydir):
+        makedirs(mydir)
+      imgdata = cv.imdecode(np.frombuffer(bytes_data, dtype=np.uint8), (cv.IMREAD_COLOR))
+      if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
+        imgdata = cv.resize(imgdata, (cod_x, cod_y))
+        cv.imwrite(filepath, imgdata)
+        rename(filepath, codpath)
       else:
-        filepath = self.myschooldict['dir'] + 'frames/' + self.frameinfo['name']
-        mydir = path.dirname(filepath) 
-        if not path.exists(mydir):
-          makedirs(mydir)
-        with open(filepath, 'wb') as f:
+        with open(codpath, 'wb') as f:
           f.write(bytes_data)
-        cod_x = 0
-        cod_y = 0  
       try:  
         frameline = await trainframe.objects.aget(
           name=self.frameinfo['name'], 
@@ -155,28 +145,21 @@ class remotetrainer(AsyncWebsocketConsumer):
         logger.debug('Failure!')
         self.close() 
     elif indict['code'] == 'namecheck':
-      if self.client_soft_version >= version_flat('1.0.10'):
-        try:
-          sizeline = await img_size.objects.aget(x=self.myschooldict['model_xin'],
-            y=self.myschooldict['model_yin'])
-        except img_size.DoesNotExist:
-          sizeline = img_size(x=self.myschooldict['model_xin'],
-            y=self.myschooldict['model_yin'])
-          await sizeline.asave()
-        myframes = await filterlinesdict(trainframe, 
-          {'school' : indict['school'], 'img_sizes' : sizeline, }, 
-          ['name', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 
-            'c8', 'c9',], )
-      else:  
-        myframes = await filterlinesdict(trainframe, 
-          {'school' : indict['school'], }, 
-          ['name', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 
-            'c8', 'c9',], )
-      result = [(item['name'], seq_to_int((item['c0'], item['c1'], 
-          item['c2'], item['c3'], item['c4'], item['c5'], item['c6'], 
-          item['c7'], item['c8'], item['c9'])))
-        for item in myframes]  
-      await self.send(json.dumps(result))
+      try:
+        sizeline = await img_size.objects.aget(x=self.myschooldict['model_xin'],
+          y=self.myschooldict['model_yin'])
+      except img_size.DoesNotExist:
+        sizeline = img_size(x=self.myschooldict['model_xin'],
+          y=self.myschooldict['model_yin'])
+        await sizeline.asave()
+      async for item in trainframe.objects.filter(
+        school=indict['school'],
+        img_sizes=sizeline,
+      ):
+        result =  (item.name, seq_to_int((item.c0, item.c1, item.c2, item.c3, item.c4, 
+          item.c5, item.c6, item.c7, item.c8, item.c9)))
+        await self.send(json.dumps(result))
+      await self.send(json.dumps(None))
     elif indict['code'] == 'setversion':
       self.myschooldict = await getonelinedict(school, 
         {'id' : indict['school'], }, 

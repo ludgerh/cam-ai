@@ -73,7 +73,7 @@ def classroom(request, streamnr):
       'emulatestatic' : emulatestatic,
       'school' : myschool,
       'stream' : mystream,
-      'events' : event.objects.filter(camera_id=streamnr, done=False, xmax__gt=-1).order_by('-id'),
+      'events' : event.objects.filter(camera_id=streamnr, done=False, xmax__gt=-1).order_by('-id')[:100],
       'debug' : settings.DEBUG,
       'may_write_stream' : access.check('C', streamnr, request.user, 'W'),
       'may_write_school' : access.check('S', myschool.id, request.user, 'W'),

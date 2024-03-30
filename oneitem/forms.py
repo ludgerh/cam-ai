@@ -68,6 +68,7 @@ class EventerForm(forms.ModelForm):
       'eve_margin', 
       'eve_event_time_gap', 
       'eve_shrink_factor',
+      'eve_sync_factor',
       'eve_school', 
       'eve_alarm_email',
     )
@@ -76,6 +77,7 @@ class EventerForm(forms.ModelForm):
       'eve_margin' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100}), 
       'eve_event_time_gap' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 3600}), 
       'eve_shrink_factor' : forms.NumberInput(attrs={'size': 10, 'min' : 0.01, 'max' : 1.0, 'step' : 0.01}), 
+      'eve_sync_factor' : forms.NumberInput(attrs={'size': 10, 'min' : -2.0, 'max' : 2.0, 'step' : 0.01}), 
       'eve_alarm_email' : forms.TextInput(attrs={'size': 70}),
     }		
 	  

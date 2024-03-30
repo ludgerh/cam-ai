@@ -180,7 +180,7 @@ Collecting Information. Please wait a while...
 
 <script>
 
-let caminstSocket;
+let acaminstSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 let control_mode = 0;
@@ -219,13 +219,13 @@ $(document).ready(function() {
   WSAsync(
     ws_scheme + '//'
     + window.location.host
-    + '/ws/caminst/'
+    + '/ws/acaminst/'
   )
   .then((result) => {
-    caminstSocket = result;
+    acaminstSocket = result;
     $('.scan-button').click(function() {
       $('#please_wait').removeClass("d-none");
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'scanips',
         'portaddr' : {{ ports }},
         'camaddress' : '{{ ipaddress }}',
@@ -294,7 +294,7 @@ $(document).ready(function() {
     $('.check-button').click(function() {
       $('#search_result').addClass("d-none");
       $('#codecdiv').addClass("d-none");
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'scanoneip',
         'camurl' : $('#camurl').val(),
       })  
@@ -358,7 +358,7 @@ $(document).ready(function() {
         control_port = $('#onvif_port').text();
         cam_name = $('#onvif_model').text();
       };  
-      caminstSocket.sendandwait({
+      acaminstSocket.sendandwait({
         'command' : 'installcam',
         'camurl' : $('#camurl').val(),
         'videocodec' : $('#videoselect').val(),
