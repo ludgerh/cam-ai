@@ -34,7 +34,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </div>
 <script>
 
-let admintoolsSocket;
+let aadmintoolsSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
@@ -42,13 +42,13 @@ $(document).ready(function() {
   WSAsync(
     ws_scheme + '//'
     + window.location.host
-    + '/ws/admintools/'
+    + '/ws/aadmintools/'
   )
   .then((result) => {
-    admintoolsSocket = result;
+    aadmintoolsSocket = result;
     $('.make-button').click(function() {
       $('.make-button').addClass('btn-warning');
-      admintoolsSocket.sendandwait({
+      aadmintoolsSocket.sendandwait({
         'command' : 'makeschool',
         'name' : $('#schoolname').val(),
         'remote_ai' : true,

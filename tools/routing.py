@@ -20,7 +20,7 @@ from . import consumers, consumer_caminst
 
 websocket_urlpatterns = [
   re_path(r'ws/health/$', consumers.health.as_asgi()),
-  re_path(r'ws/tools_async/$', consumers.tools_async.as_asgi()),
   re_path(r'ws/admintools/$', consumers.admintools.as_asgi()),
+  re_path(r'ws/aadmintools/$', consumers.admin_tools_async.as_asgi()),
   re_path(r'ws/acaminst/$', consumer_caminst.acaminst.as_asgi()),
 ]

@@ -16,6 +16,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 import subprocess
+import asyncio
+import aiofiles
+import aiofiles.os
+import aiohttp
+import aioshutil
+import io
 from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
@@ -485,40 +491,301 @@ def compress_backup(redis_key):
         transmitted = percentage
   chdir(basepath)
   
-class tools_async(AsyncWebsocketConsumer):
+class admin_tools_async(AsyncWebsocketConsumer):
 
   backup_proc_dict = {}
 
   async def connect(self):
+    await self.accept()
+    
+  async def check_create_school_priv(self):
     if self.scope['user'].is_superuser:
-      await self.accept()
+      return(True)
+    else:
+      userinfo_obj = await userinfo.objects.aget(user=self.scope['user'])
+      limit = userinfo_obj.allowed_schools
+      schoolcount = await school.objects.filter(creator=self.scope['user']).acount()
+      return(schoolcount < limit) 
 
   async def receive(self, text_data):
     logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
-    
-    if params['command'] == 'backup':
-      count = 0
-      while count in self.backup_proc_dict:
-        count += 1 
-      redis_key = 'CAM-AI.backup.zip'+str(count)
-      if redis.exists(redis_key):
-        redis.delete(redis_key)
-      self.backup_proc_dict[count] = Process(target=compress_backup, args=[redis_key])
-      self.backup_proc_dict[count].start()
-      while self.backup_proc_dict[count].is_alive():
-        if redis.exists(redis_key):
-          outlist['data'] = redis.get(redis_key).decode("utf-8")
-          outlist['callback'] = True
-          await self.send(json.dumps(outlist))	
-          redis.delete(redis_key)
-        else:  
-          await asleep(long_brake) 
-      outlist['data'] = 'OK'
-      del outlist['callback']
+
+#*****************************************************************************
+# functions for the client
+#*****************************************************************************
+
+    if params['command'] == 'makeschool':
+      if not await self.check_create_school_priv():
+        await self.close()
+      if using_websocket or remote_trainer:
+        from aiohttp import ClientSession
+      myschool = school()
+      myschool.name = params['name']
+      myschool.creator = self.scope['user']
+      await myschool.asave()
+      myworker = await worker.objects.aget(school__id=myschool.id)  
+      schooldir = schoolsdir + 'model' + str(myschool.id) + '/'
+      myschool.dir = schooldir
+      await myschool.asave(update_fields=('dir', ))
+      await aiofiles.os.makedirs(schooldir+'frames', exist_ok=True)
+      await aiofiles.os.makedirs(schooldir+'model', exist_ok=True)
+      if using_websocket or remote_trainer:
+        async with ClientSession() as session:
+          async with session.ws_connect(myworker.wsserver + 'ws/schoolutil/') as ws:
+            outdict = {
+              'code' : 'makeschool',
+              'name' : 'CL' + str(myworker.wsid)+': ' + params['name'],
+              'pass' : myworker.wspass,
+              'user' : myworker.wsid,
+            }
+            await ws.send_str(json.dumps(outdict))
+            message = await ws.receive()
+            resultdict = json.loads(message.data)
+      if not using_websocket:
+        handle_src = await aiofiles.open(
+          schoolsdir + 'model1/model/' + model_type + '.h5', mode='r')
+        handle_dst = await aiofiles.open(
+          schooldir + 'model/' + model_type + '.h5', mode='w')
+        stat_src = await aiofiles.os.stat(
+          schoolsdir + 'model1/model/' + model_type + '.h5')
+        n_bytes = stat_src.st_size
+        fd_src = handle_src.fileno()
+        fd_dst = handle_dst.fileno()
+        await aiofiles.os.sendfile(fd_dst, fd_src, 0, n_bytes)
+      mytrainer = await trainer.objects.aget(school__id=myschool.id) 
+      mytrainer.active=True    
+      if using_websocket or remote_trainer:
+        if resultdict['status'] == 'OK':
+          myschool.e_school = resultdict['school']
+          await myschool.asave(update_fields=('e_school', ))
+          if remote_trainer:
+            trainer_type = 2
+          else:
+            trainer_type = 3  
+          mytrainer.t_type=trainer_type
+          mytrainer.wsserver=myworker.wsserver
+          mytrainer.wsname=myworker.wsname
+          mytrainer.wspass=myworker.wspass
+          await mytrainer.asave(update_fields=(
+            't_type',
+            'wsserver',
+            'wsname',
+            'wspass',
+            'active',
+          ))
+          while redis.get_start_trainer_busy():
+            sleep(long_brake)
+          redis.set_start_trainer_busy(mytrainer.id)
+      else:
+        resultdict = {'status' : 'OK', }
+        myschool.model_type = model_type
+        await myschool.asave(update_fields=('model_type', ))
+        mytrainer.t_type=1
+        await mytrainer.asave(update_fields=('t_type', 'active', ))
+      if resultdict['status'] == 'OK':
+        if not self.scope['user'].is_superuser:
+          myaccess = access_control()
+          myaccess.vtype = 'S'
+          myaccess.vid = myschool.id
+          myaccess.u_g_nr = self.scope['user'].id
+          myaccess.r_w = 'W'
+          await myaccess.save()
+          await access.read_list_async()
+      else:
+        myschool.active = False
+        await myschool.asave(update_fields=('active', ))
+      outlist['data'] = resultdict
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
+
+    elif params['command'] == 'linkworker':
+      if not self.scope['user'].is_superuser:
+        await self.close()
+      from aiohttp import ClientSession
+      async with ClientSession() as session:
+        async with session.ws_connect(params['server'] + 'ws/aadmintools/') as ws:
+          outdict = {
+            'command' : 'linkserver',
+            'user' : params['user'],
+            'pass' : params['pass'],
+          }
+          await ws.send_str(json.dumps({
+            'tracker' : 0, 
+            'data' : outdict, 
+          }))
+          message = await ws.receive()
+          resultdict = json.loads(message.data)
+      if resultdict['data']['status'] == 'new': 
+        myworker = await worker.objects.aget(id=params['workernr'])
+        myworker.gpu_sim=-1
+        myworker.use_websocket=using_websocket
+        myworker.wsserver=params['server']
+        myworker.wsname=resultdict['data']['user']
+        myworker.wspass=params['pass']
+        myworker.wsid=resultdict['data']['idx']
+        await myworker.asave(update_fields=(
+          'gpu_sim',
+          'use_websocket',
+          'wsserver',
+          'wsname',
+          'wspass',
+          'wsid',
+        ))
+        while redis.get_start_worker_busy():
+          sleep(long_brake)
+        redis.set_start_worker_busy(params['workernr'])
+        myschools = school.objects.filter(tf_worker=params['workernr'])
+        streamlist = []
+        async for item1 in myschools:
+          mystreams = dbstream.objects.filter(eve_school=item1, active=True, )
+          async for item2 in mystreams:
+            streamlist.append(item2.id)
+        for i in streamlist:
+          while redis.get_start_stream_busy(): 
+            sleep(long_brake)
+          redis.set_start_stream_busy(i)
+      outlist['data'] = resultdict['data']['status'] 
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      
+    elif params['command'] == 'checkserver':
+      outlist['data'] = {} 
+      if not self.scope['user'].is_superuser:
+        await self.close() 
+      from aiohttp import ClientSession
+      from aiohttp.client_exceptions import ClientConnectorError
+      try:
+        async with ClientSession() as session:
+          async with session.ws_connect(params['server'] + 'ws/aadmintools/') as ws:
+            outdict = {
+              'command' : 'getinfo',
+            }
+            await ws.send_str(json.dumps({
+              'tracker' : 0, 
+              'data' : outdict, 
+            }))
+            message = await ws.receive()
+            resultdict = json.loads(message.data)
+          outlist['data']['status'] = 'connect'
+          outlist['data']['info'] = resultdict['data']
+      except (ClientConnectorError, OSError):
+        outlist['data']['status'] = 'noanswer'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
+#*****************************************************************************
+# functions for the server
+#*****************************************************************************
+    
+    elif params['command'] == 'backup':
+      if self.scope['user'].is_superuser:
+        count = 0
+        while count in self.backup_proc_dict:
+          count += 1 
+        redis_key = 'CAM-AI.backup.zip'+str(count)
+        if redis.exists(redis_key):
+          redis.delete(redis_key)
+        self.backup_proc_dict[count] = Process(target=compress_backup, args=[redis_key])
+        self.backup_proc_dict[count].start()
+        while self.backup_proc_dict[count].is_alive():
+          if redis.exists(redis_key):
+            outlist['data'] = redis.get(redis_key).decode("utf-8")
+            outlist['callback'] = True
+            await self.send(json.dumps(outlist))	
+            redis.delete(redis_key)
+          else:  
+            await asleep(long_brake) 
+        outlist['data'] = 'OK'
+        del outlist['callback']
+        logger.debug('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
+      else:
+        await self.close()
+
+    elif params['command'] == 'linkserver':
+      outlist['data'] = {}
+      try:
+        myuser = await User.objects.aget(username = params['user'])
+      except User.DoesNotExist:
+        myuser = None
+      if myuser:
+        if myuser.check_password(params['pass']):
+          outlist['data']['status'] = 'new'
+          outlist['data']['idx'] = myuser.id
+          outlist['data']['user'] = params['user']
+        else:
+          outlist['data']['status'] = 'noauth'
+      else:
+        outlist['data']['status'] = 'missing'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      
+    elif params['command'] == 'getinfo':
+      filename = textpath+'serverinfo.html'
+      try:
+        async with aiofiles.open(filename, mode='r', encoding='UTF-8') as f:
+          result = await f.read()
+      except FileNotFoundError:
+        result = 'No Info: ' + textpath + 'serverinfo.html does not exist...'
+      outlist['data'] = result
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      
+    if params['command'] == 'shutdown':
+      if not self.scope['user'].is_superuser:
+        await self.close()
+      redis.set_shutdown_command(1)
+      while redis.get_watch_status():
+        await asleep(long_brake) 
+      ossystem('sudo shutdown now')
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      
+    elif params['command'] == 'upgrade':
+      if not self.scope['user'].is_superuser:
+        await self.close()
+      basepath = getcwd() 
+      chdir('..')
+      async with aiohttp.ClientSession() as session:
+        async with session.get(params['url']) as result:
+          response = await result.content.read()
+      with ZipFile(io.BytesIO(response)) as z:
+        z.extractall("temp/expanded")
+      zipresult = glob('temp/expanded/ludgerh-cam-ai-*')[0]
+      print(zipresult)
+      if await aiofiles.os.path.exists('temp/backup'):
+        await aioshutil.rmtree('temp/backup')
+      await aioshutil.move(basepath, 'temp/backup') 
+      await aioshutil.move(zipresult, basepath)
+      await aioshutil.copy('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
+      await aioshutil.copy('temp/backup/eventers/c_alarm.py', basepath + '/eventers/c_alarm.py')
+      await aioshutil.copy('temp/backup/' + datapath, basepath + '/' + datapath)
+      if env_type == 'venv':
+        await aioshutil.move('temp/backup/env', basepath + '/env')
+      chdir(basepath)
+      if env_type == 'venv':
+        cmd = 'source env/bin/activate; '
+      else: #conda
+        cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
+        cmd += 'conda activate tf; '
+      cmd += 'pip install --upgrade pip; '
+      cmd += 'pip install -r requirements.' + os_type + '; '
+      cmd += 'python manage.py migrate; '
+      result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
+      p = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, executable='/bin/bash')
+      output, _ = await p.communicate()
+      for line in output.decode().split('\n'):
+        logger.info(line);
+      redis.set_shutdown_command(2)
+      outlist['data'] = 'OK'
+      logger.info('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+      while redis.get_watch_status():
+        await asleep(long_brake) 
+        print('?????')
 
 #*****************************************************************************
 # admintools
@@ -543,211 +810,10 @@ class admintools(WebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
 #*****************************************************************************
-# functions for the client
-#*****************************************************************************
-
-    if params['command'] == 'makeschool':
-      if not self.check_create_school_priv():
-        self.close()
-      if using_websocket or remote_trainer:
-        from websocket import WebSocket
-      myschool = school()
-      myschool.name = params['name']
-      myschool.creator = self.scope['user']
-      myschool.save()
-      myworker = myschool.tf_worker
-      schooldir = schoolsdir + 'model' + str(myschool.id) + '/'
-      myschool.dir = schooldir
-      myschool.save(update_fields=('dir', ))
-      try:
-        makedirs(schooldir+'frames')
-      except FileExistsError:
-        logger.warning('Dir already exists: '+schooldir+'frames')
-      try:
-        makedirs(schooldir+'model')
-      except FileExistsError:
-        logger.warning('Dir already exists: '+schooldir+'model')
-      if using_websocket or remote_trainer:
-        ws = WebSocket()
-        ws.connect(myworker.wsserver + 'ws/schoolutil/')
-        outdict = {
-          'code' : 'makeschool',
-          'name' : 'CL' + str(myworker.wsid)+': ' + params['name'],
-          'pass' : myworker.wspass,
-          'user' : myworker.wsid,
-        }
-        ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        resultdict = json.loads(ws.recv())
-        ws.close()
-      if not using_websocket:
-        copyfile(schoolsdir + 'model1/model/' + model_type + '.h5', 
-          schooldir + 'model/' + model_type + '.h5')
-      mytrainer = myschool.trainer
-      mytrainer.active=True    
-      if using_websocket or remote_trainer:
-        if resultdict['status'] == 'OK':
-          myschool.e_school = resultdict['school']
-          myschool.save(update_fields=('e_school', ))
-          if remote_trainer:
-            trainer_type = 2
-          else:
-            trainer_type = 3  
-          mytrainer.t_type=trainer_type
-          mytrainer.wsserver=myworker.wsserver
-          mytrainer.wsname=myworker.wsname
-          mytrainer.wspass=myworker.wspass
-          mytrainer.save(update_fields=(
-            't_type',
-            'wsserver',
-            'wsname',
-            'wspass',
-            'active',
-          ))
-          while redis.get_start_trainer_busy():
-            sleep(long_brake)
-          redis.set_start_trainer_busy(myschool.trainer.id)
-      else:
-        resultdict = {'status' : 'OK', }
-        myschool.model_type = model_type
-        myschool.save(update_fields=('model_type', ))
-        mytrainer.t_type=1
-        mytrainer.save(update_fields=('t_type', 'active', ))
-      if resultdict['status'] == 'OK':
-        if not self.scope['user'].is_superuser:
-          myaccess = access_control()
-          myaccess.vtype = 'S'
-          myaccess.vid = myschool.id
-          myaccess.u_g_nr = self.scope['user'].id
-          myaccess.r_w = 'W'
-          myaccess.save()
-          access.read_list()
-      else:
-        myschool.active = False
-        myschool.save(update_fields=('active', ))
-      outlist['data'] = resultdict
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))	
-
-    elif params['command'] == 'linkworker':
-      if not self.scope['user'].is_superuser:
-        self.close()
-      from websocket import WebSocket
-      ws = WebSocket()
-      ws.connect(params['server'] + 'ws/admintools/')
-      outdict = {
-        'command' : 'linkserver',
-        'user' : params['user'],
-        'pass' : params['pass'],
-      }
-      ws.send(json.dumps({
-        'tracker' : 0, 
-        'data' : outdict, 
-      }), opcode=1) #1 = Text
-      resultdict = json.loads(ws.recv())
-      ws.close()
-      if resultdict['data']['status'] == 'new': 
-        myworker = worker.objects.get(id=params['workernr'])
-        myworker.gpu_sim=-1
-        myworker.use_websocket=using_websocket
-        myworker.wsserver=params['server']
-        myworker.wsname=resultdict['data']['user']
-        myworker.wspass=params['pass']
-        myworker.wsid=resultdict['data']['idx']
-        myworker.save(update_fields=(
-          'gpu_sim',
-          'use_websocket',
-          'wsserver',
-          'wsname',
-          'wspass',
-          'wsid',
-        ))
-        while redis.get_start_worker_busy():
-          sleep(long_brake)
-        redis.set_start_worker_busy(params['workernr'])
-        myschools = school.objects.filter(tf_worker=params['workernr'])
-        streamlist = []
-        for item1 in myschools:
-          mystreams = dbstream.objects.filter(eve_school=item1)
-          for item2 in mystreams:
-            streamlist.append(item2.id)
-        for i in streamlist:
-          while redis.get_start_stream_busy(): 
-            sleep(long_brake)
-          redis.set_start_stream_busy(i)
-      outlist['data'] = resultdict['data']['status'] 
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))	
-      
-    elif params['command'] == 'checkserver':
-      outlist['data'] = {} 
-      if not self.scope['user'].is_superuser:
-        self.close() 
-      from websocket import WebSocket
-      from websocket._exceptions import WebSocketAddressException
-      ws = WebSocket()
-      try:
-        ws.connect(params['server'] + 'ws/admintools/')
-        outdict = {
-          'command' : 'getinfo',
-        }
-        ws.send(json.dumps({
-          'tracker' : 0, 
-          'data' : outdict, 
-        }), opcode=1) #1 = Text
-        resultdict = json.loads(ws.recv())
-        ws.close()
-        outlist['data']['status'] = 'connect'
-        outlist['data']['info'] = resultdict['data']
-      except (WebSocketAddressException, OSError):
-        outlist['data']['status'] = 'noanswer'
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))	
-
-#*****************************************************************************
 # functions for the server
 #*****************************************************************************
-
-    elif params['command'] == 'linkserver':
-      outlist['data'] = {}
-      try:
-        myuser = User.objects.get(username = params['user'])
-      except User.DoesNotExist:
-        myuser = None
-      if myuser:
-        if myuser.check_password(params['pass']):
-          outlist['data']['status'] = 'new'
-          outlist['data']['idx'] = myuser.id
-          outlist['data']['user'] = params['user']
-        else:
-          outlist['data']['status'] = 'noauth'
-      else:
-        outlist['data']['status'] = 'missing'
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))	
       
-    elif params['command'] == 'getinfo':
-      filename = textpath+'serverinfo.html'
-      try:
-        with open(filename, 'r', encoding='UTF-8') as f:
-          result = f.read()
-      except FileNotFoundError:
-        result = 'No Info: ' + textpath + 'serverinfo.html does not exist...'
-      outlist['data'] = result
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))	
-      
-    elif params['command'] == 'shutdown':
-      if not self.scope['user'].is_superuser:
-        self.close()
-      redis.set_shutdown_command(1)
-      while redis.get_watch_status():
-        sleep(long_brake) 
-      ossystem('sudo shutdown now')
-      outlist['data'] = 'OK'
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))	
-      
-    elif params['command'] == 'upgrade': #this needs to get out of sync consumer
+    if params['command'] == 'upgrade':
       if not self.scope['user'].is_superuser:
         self.close()
       basepath = getcwd() 
