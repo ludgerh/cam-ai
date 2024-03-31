@@ -785,7 +785,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))	
       while redis.get_watch_status():
         await asleep(long_brake) 
-        print('?????')
 
 #*****************************************************************************
 # admintools
