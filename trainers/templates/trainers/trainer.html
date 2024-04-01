@@ -1,17 +1,19 @@
-{# Copyright (C) 2023 Ludger Hellerhoff, ludger@cam-ai.de #}
-{# This program is free software; you can redistribute it and/or #}
-{# modify it under the terms of the GNU General Public License #}
-{# as published by the Free Software Foundation; either version 3 #}
-{# of the License, or (at your option) any later version. #}
-{# This program is distributed in the hope that it will be useful, #}
-{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
-{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
-{# See the GNU General Public License for more details. #}
-{# You should have received a copy of the GNU General Public License #}
-{# along with this program; if not, write to the Free Software #}
-{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
-
 {% extends 'schools/basis.html' %}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
 {% block content %}
 
 {% if emulatestatic %}
@@ -184,36 +186,36 @@ function refresh_all() {
     }));
   })
   .then((result) => {
-    result = JSON.parse(result[0]);
+    result = result[0];
     if ((result.length != fit_length) || (last_status != result[result.length - 1].fields.status)) {
       graph_labels.length = 0;
       graph_data.datasets[0].data.length = 0;
       graph_data.datasets[1].data.length = 0;
       newaddition = '';
       result.forEach(function(item, index) {
-        datestring = item.fields.made;
-        if (item.fields.status == 'Done') {
+        datestring = item.made;
+        if (item.status == 'Done') {
           graph_labels.push(datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4));
-          graph_data.datasets[0].data.push(item.fields.val_cmetrics);
-          graph_data.datasets[1].data.push(item.fields.val_hit100);
+          graph_data.datasets[0].data.push(item.val_cmetrics);
+          graph_data.datasets[1].data.push(item.val_hit100);
         };
         newaddition += '<tr>';
         newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
-        newaddition += '<td>'+(parseInt(item.fields.nr_tr)+parseInt(item.fields.nr_va))+'</td>';
-        newaddition += '<td>'+Math.round(item.fields.minutes)+'</td>';
-        newaddition += '<td>'+item.fields.epochs+'</td>';
-        newaddition += '<td>'+item.fields.loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.hit100.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.cmetrics.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.val_loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.val_hit100.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.val_cmetrics.toPrecision(4)+'</td>';
-        newaddition += '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.pk+'/">'+item.fields.status+'</a></td>';
+        newaddition += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
+        newaddition += '<td>'+Math.round(item.minutes)+'</td>';
+        newaddition += '<td>'+item.epochs+'</td>';
+        newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.hit100.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.cmetrics.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_hit100.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_cmetrics.toPrecision(4)+'</td>';
+        newaddition += '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.id+'/">'+item.status+'</a></td>';
         newaddition += '</tr>';
         $('#tablebody').empty();
         $('#tablebody').append(newaddition);
       });
-      last_status = result[result.length - 1].fields.status;
+      last_status = result[result.length - 1].status;
       mygraph.destroy();
       mygraph = new Chart(
         document.getElementById('myChart'),
@@ -224,7 +226,6 @@ function refresh_all() {
     };
     //setTimeout(refresh_all, 10000);
   })
-  .catch(err => {console.log(err);});
 };
 
 $(document).ready(function() {
@@ -258,10 +259,8 @@ $(document).ready(function() {
         taglines = result;
         refresh_all();
       })
-      .catch(err => {console.log(err);});
     };
   })
-  .catch(err => {console.log(err);});
 });
 
 </script>

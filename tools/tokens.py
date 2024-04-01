@@ -1,3 +1,19 @@
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+
 from string import ascii_letters
 from random import choice
 from datetime import datetime
@@ -15,6 +31,19 @@ def maketoken(cat, idx, info='...'):
     info = info,
   )
   mytoken.save()
+  result = (mytoken.id, password)
+  return(result)
+
+async def maketoken_async(cat, idx, info='...'):
+  password = ''.join(choice(ascii_letters) for i in range(20))
+  mytoken = token(
+    passwd = password,
+    made = timezone.make_aware(datetime.fromtimestamp(time())),
+    cat = cat,
+    idx = idx,
+    info = info,
+  )
+  await mytoken.asave()
   result = (mytoken.id, password)
   return(result)
 

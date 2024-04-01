@@ -15,6 +15,8 @@
 import json
 import cv2 as cv
 import numpy as np
+import asyncio
+import aiofiles.os
 from os import remove, path, makedirs, rename
 from time import time, sleep
 from datetime import datetime
@@ -31,7 +33,7 @@ from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, updatefilter, getoneline, 
   filterlinesdict, savedbline, deletefilter)
 from access.c_access import access
-from tools.tokens import maketoken
+from tools.tokens import maketoken_async
 from tf_workers.models import school, worker
 from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
 from .c_trainers import trainers
@@ -47,37 +49,6 @@ medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
 #*****************************************************************************
 
 class remotetrainer(AsyncWebsocketConsumer):
-
-  @database_sync_to_async
-  def checkfitdone(self, mode, schoolnr):
-    if mode == 'init':
-      try:    
-        fitline = fit.objects.filter(school = schoolnr).latest('id')
-        self.lastfit = fitline.id
-        model_type = school.objects.get(id=schoolnr).model_type
-      except fit.DoesNotExist:
-        self.lastfit = 0
-        model_type = default_modeltype
-      return(model_type)
-    elif mode == 'sync':
-      while True:
-        try:
-          fitline = fit.objects.filter(school = schoolnr).latest('id').id
-        except fit.DoesNotExist:
-          fitline = 0
-        if fitline > self.lastfit:
-          self.lastfit = fitline
-          break
-        else:
-          sleep(1.0)
-      mytoken = maketoken('MOD', schoolnr, 'Download School #'+str(schoolnr))
-      dlurl = settings.CLIENT_URL
-      dlurl += 'trainers/downmodel/'
-      dlurl += str(schoolnr) + '/' + str(mytoken[0]) + '/' + mytoken[1] +'/'
-      return(dlurl)
-    elif mode == 'check':
-      fitline = fit.objects.get(id=self.lastfit)
-      return(fitline.status =='Done')
 
   async def connect(self):
     self.frameinfo = {}
@@ -132,25 +103,29 @@ class remotetrainer(AsyncWebsocketConsumer):
       await frameline.asave()
       await self.send('OK')
       return()
+      
     if text_data == 'Ping':
       return()
-    logger.debug('<-- ' + text_data)
+      
+    logger.info('<-- ' + text_data)
     indict = json.loads(text_data)	
+    
     if indict['code'] == 'auth':
-      self.user = await getoneline(User, {'username' : indict['name'], })
+      self.user = await User.objects.aget(username=indict['name'])
       if self.user.check_password(indict['pass']):
         logger.debug('Success!')
         self.authed = True
       if not self.authed:
         logger.debug('Failure!')
-        self.close() 
+        await self.close() 
+        
     elif indict['code'] == 'namecheck':
       try:
-        sizeline = await img_size.objects.aget(x=self.myschooldict['model_xin'],
-          y=self.myschooldict['model_yin'])
+        sizeline = await img_size.objects.aget(x=self.myschoolline.model_xin,
+          y=self.myschoolline.model_yin)
       except img_size.DoesNotExist:
-        sizeline = img_size(x=self.myschooldict['model_xin'],
-          y=self.myschooldict['model_yin'])
+        sizeline = img_size(x=self.myschoolline.model_xin,
+          y=self.myschoolline.model_yin)
         await sizeline.asave()
       async for item in trainframe.objects.filter(
         school=indict['school'],
@@ -160,36 +135,67 @@ class remotetrainer(AsyncWebsocketConsumer):
           item.c5, item.c6, item.c7, item.c8, item.c9)))
         await self.send(json.dumps(result))
       await self.send(json.dumps(None))
+      
     elif indict['code'] == 'setversion':
-      self.myschooldict = await getonelinedict(school, 
-        {'id' : indict['school'], }, 
-        ['id', 'dir', 'model_xin', 'model_yin'], ) 
+      self.myschoolline = await school.objects.aget(id=indict['school'])
       self.client_soft_version = version_flat(indict['version'])
-      result = (self.myschooldict['model_xin'], self.myschooldict['model_yin'])
+      result = (self.myschoolline.model_xin, self.myschoolline.model_yin)
       await self.send(json.dumps(result))
+      
     elif indict['code'] == 'send':
       self.frameinfo['name'] = indict['name']
       self.frameinfo['tags'] = indict['tags']
       self.frameinfo['code'] = indict['framecode']
+      
     elif indict['code'] == 'delete':
-      await deletefilter(trainframe, {'name' : indict['name'], }, )
-      bmppath = self.myschooldict['dir'] + 'frames/' + indict['name']
-      if path.exists(bmppath):
-        remove(bmppath)
-      codpath = (self.myschooldict['dir'] 
+      frameline = await trainframe.objects.aget(name=indict['name'])
+      await frameline.adelete()
+      if await aiofiles.os.path.exists(bmppath):
+        await aiofiles.os.remove(bmppath)
+      codpath = (self.myschoolline.dir
         + 'coded/' 
-        + str(self.myschooldict['model_xin']) 
-        + 'x' + str(self.myschooldict['model_yin']) 
+        + str(self.myschoolline.model_xin) 
+        + 'x' + str(self.myschoolline.model_yin) 
         + '/' + indict['name'][:-4]+'.cod')
-      if path.exists(codpath):
-        remove(codpath)
+      if await aiofiles.os.path.exists(codpath):
+        await aiofiles.os.remove(codpath)
       await self.send('OK')
+      
     elif indict['code'] == 'trainnow':
-      await updatefilter(school, 
-        {'id' : self.myschooldict['id'], }, 
-        {'extra_runs' : 1, })
+      schoolline = await school.objects.aget(id=self.myschoolline.id)
+      schoolline.extra_runs = 1
+      await schoolline.asave(update_fields=['extra_runs'])
+        
     elif indict['code'] == 'checkfitdone':
-      result = await self.checkfitdone(indict['mode'], indict['school'])
+      if indict['mode'] == 'init':
+        try:    
+          fitline = await fit.objects.filter(school = self.myschoolline.id).alatest('id')
+          self.lastfit = fitline.id
+          model_type = self.myschoolline.model_type
+        except fit.DoesNotExist:
+          self.lastfit = 0
+          model_type = default_modeltype
+        result = model_type
+      elif indict['mode'] == 'sync':
+        while True:
+          try:
+            fitline = await fit.objects.filter(school = self.myschoolline.id).alatest('id')
+            fitline = fitline.id
+          except fit.DoesNotExist:
+            fitline = 0
+          if fitline > self.lastfit:
+            self.lastfit = fitline
+            break
+          else:
+            await asyncio.sleep(1.0)
+        mytoken = await maketoken_async('MOD', self.myschoolline.id, 'Download School #'+str(self.myschoolline.id))
+        dlurl = settings.CLIENT_URL
+        dlurl += 'trainers/downmodel/'
+        dlurl += str(self.myschoolline.id) + '/' + str(mytoken[0]) + '/' + mytoken[1] +'/'
+        result = dlurl
+      elif indict['mode'] == 'check':
+        fitline = await fit.objects.aget(id=self.lastfit)
+        result = fitline.status =='Done' 
       logger.debug('--> ' + str(result))
       await self.send(json.dumps(result))	
 
@@ -226,78 +232,10 @@ class trainerutil(AsyncWebsocketConsumer):
     if self.trainernr is not None:
       if self.didrunout:
         trainers[self.trainernr].stop_out(self.schoolnr)
-      if self.dblinedict['t_type'] in {2, 3}:
+      if self.trainerline.t_type in {2, 3}:
         self.ws.close()
+        self.ws_session.close()
     logger.debug('Disconnected, Code:'+ str(code))
-
-  @database_sync_to_async
-  def getschoolinfo(self, schoolnr):
-    countlist1 = trainframe.objects.filter(school=schoolnr)
-    result = {}
-    result['nr_total'] = countlist1.count()
-    countlist = countlist1.filter(checked=True)
-    result['nr_checked'] = countlist.count()
-    result['nr_trained'] = countlist.filter(code='TR').count()
-    result['nr_validated'] = countlist.filter(code='VA').count()
-    result['nr_not_trained'] = countlist.filter(train_status__lt=2).count()
-    result['nr_not_checked'] = result['nr_total'] - result['nr_checked']
-    result['recog0'] = countlist1.filter(c0=1).count()
-    result['recog1'] = countlist1.filter(c1=1).count()
-    result['recog2'] = countlist1.filter(c2=1).count()
-    result['recog3'] = countlist1.filter(c3=1).count()
-    result['recog4'] = countlist1.filter(c4=1).count()
-    result['recog5'] = countlist1.filter(c5=1).count()
-    result['recog6'] = countlist1.filter(c6=1).count()
-    result['recog7'] = countlist1.filter(c7=1).count()
-    result['recog8'] = countlist1.filter(c8=1).count()
-    result['recog9'] = countlist1.filter(c9=1).count()
-    return(result)
-
-  @database_sync_to_async
-  def getfitinfo(self, schoolnr):
-    all_fits = list(fit.objects.filter(school=schoolnr))
-    if len(all_fits):
-      self.working = (all_fits[-1].status != 'Done')
-      if (not self.working) and (not self.one_more):
-        result = all_fits[self.fit_list_done:]
-        added_one = False
-      else:  
-        if self.fit_list_done:
-          result = all_fits[self.fit_list_done - 1:]
-          added_one = True
-        else:
-          result = all_fits[self.fit_list_done:]
-          added_one = False
-        self.one_more = self.working
-      self.fit_list_done = len(all_fits)
-    else:
-      result = []  
-      added_one = False
-    result = serializers.serialize(
-      'json', 
-      result, 
-      fields=(
-        'made', 'nr_tr', 'nr_va', 'minutes', 'epochs', 'loss', 'cmetrics', 'val_loss', 
-        'val_cmetrics', 'hit100', 'val_hit100', 'status', 'model_type', 
-        'model_image_augmentation', 'model_weight_decay','model_weight_constraint', 
-        'model_dropout', 'l_rate_start', 'l_rate_stop', 'l_rate_delta_min', 
-        'l_rate_patience', 'l_rate_decrement', 'weight_min', 'weight_max', 
-        'weight_boost', 'early_stop_delta_min', 'early_stop_patience', 
-      ),
-    )
-    return((result, added_one))
-
-  @database_sync_to_async
-  def getepochsinfo(self, fitnr):
-    result = serializers.serialize(
-      'json', 
-      list(epoch.objects.filter(fit=fitnr)), 
-      fields=(
-        'loss', 'cmetrics', 'val_loss', 'val_cmetrics', 
-        'hit100', 'val_hit100', 'seconds', 'learning_rate',
-      ),
-    )
-    return(result)
 
   async def receive(self, text_data):
     if text_data == 'Ping':
@@ -307,64 +245,129 @@ class trainerutil(AsyncWebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
     if params['command'] == 'getschoolinfo':
-      if self.dblinedict['t_type'] in {2, 3}:
-        infolocal = await self.getschoolinfo(params['school'])
+      countlist1 = trainframe.objects.filter(school=params['school'])
+      infolocal = {}
+      infolocal['nr_total'] = await countlist1.acount()
+      countlist = countlist1.filter(checked=True)
+      infolocal['nr_checked'] = await countlist.acount()
+      infolocal['nr_trained'] = await countlist.filter(code='TR').acount()
+      infolocal['nr_validated'] = await countlist.filter(code='VA').acount()
+      infolocal['nr_not_trained'] = await countlist.filter(train_status__lt=2).acount()
+      infolocal['nr_not_checked'] = infolocal['nr_total'] - infolocal['nr_checked']
+      infolocal['recog0'] = await countlist1.filter(c0=1).acount()
+      infolocal['recog1'] = await countlist1.filter(c1=1).acount()
+      infolocal['recog2'] = await countlist1.filter(c2=1).acount()
+      infolocal['recog3'] = await countlist1.filter(c3=1).acount()
+      infolocal['recog4'] = await countlist1.filter(c4=1).acount()
+      infolocal['recog5'] = await countlist1.filter(c5=1).acount()
+      infolocal['recog6'] = await countlist1.filter(c6=1).acount()
+      infolocal['recog7'] = await countlist1.filter(c7=1).acount()
+      infolocal['recog8'] = await countlist1.filter(c8=1).acount()
+      infolocal['recog9'] = await countlist1.filter(c9=1).acount()
+      if self.trainerline.t_type in {2, 3}:
         temp = json.loads(text_data)
-        temp['data']['school']=self.schoollinedict['e_school']
-        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-        inforemote = json.loads(self.ws.recv())['data']
+        temp['data']['school']=self.schoolline.e_school
+        await self.ws.send_str(json.dumps(temp))
+        returned = await self.ws.receive()
+        inforemote = json.loads(returned.data)['data']
         infolocal['nr_trained'] = inforemote['nr_trained']
         infolocal['nr_validated'] = inforemote['nr_validated']
-        outlist['data'] = infolocal
-      else:
-        outlist['data'] = await self.getschoolinfo(params['school'])
+      outlist['data'] = infolocal
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))				
 
     elif params['command'] == 'getfitinfo':
-      if self.dblinedict['t_type'] in {2, 3}:
+      if self.trainerline.t_type in {2, 3}:
         temp = json.loads(text_data)
-        temp['data']['school']=self.schoollinedict['e_school']
-        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-        outlist['data'] = json.loads(self.ws.recv())['data']
+        temp['data']['school']=self.schoolline.e_school
+        await self.ws.send_str(json.dumps(temp))
+        returned = await self.ws.receive()
+        outlist['data'] = json.loads(returned.data)['data']
       else:
-        outlist['data'] = await self.getfitinfo(params['school'])
+        all_fits = fit.objects.filter(school=params['school'])
+        result = [] 
+        if await all_fits.acount():
+          returned = await all_fits.alast()
+          self.working = (returned.status != 'Done')
+          if (not self.working) and (not self.one_more):
+            query_set= all_fits[self.fit_list_done:]
+            added_one = False
+          else:  
+            if self.fit_list_done:
+              query_set = all_fits[self.fit_list_done - 1:]
+              added_one = True
+            else:
+              query_set = all_fits[self.fit_list_done:]
+              added_one = False
+            self.one_more = self.working
+          self.fit_list_done = await all_fits.acount()
+          async for item in query_set:
+            result.append({
+              'id':item.id, 'made':item.made.strftime("%Y-%m-%d"), 
+              'nr_tr':item.nr_tr, 'nr_va':item.nr_va, 'minutes':item.minutes, 
+              'epochs':item.epochs, 'loss':item.loss, 'cmetrics':item.cmetrics, 
+              'val_loss':item.val_loss, 'val_cmetrics':item.val_cmetrics, 
+              'hit100':item.hit100, 'val_hit100':item.val_hit100, 'status':item.status, 
+              'model_type':item.model_type, 
+              'model_image_augmentation':item.model_image_augmentation, 
+              'model_weight_decay':item.model_weight_decay,
+              'model_weight_constraint':item.model_weight_constraint, 
+              'model_dropout':item.model_dropout, 'l_rate_start':item.l_rate_start, 
+              'l_rate_stop':item.l_rate_stop, 'l_rate_delta_min':item.l_rate_delta_min, 
+              'l_rate_patience':item.l_rate_patience, 
+              'l_rate_decrement':item.l_rate_decrement, 'weight_min':item.weight_min, 
+              'weight_max':item.weight_max, 'weight_boost':item.weight_boost, 
+              'early_stop_delta_min':item.early_stop_delta_min, 
+              'early_stop_patience':item.early_stop_patience,
+            })
+        else:
+          added_one = False  
+        outlist['data'] = (result, added_one)
       logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))					
-
-    elif params['command'] == 'checkfitdone':
-      if self.dblinedict['t_type'] in {2, 3}:
-        self.ws.send(text_data, opcode=1) #1 = Text
-        outlist['data'] = json.loads(self.ws.recv())['data']
-      else:
-        outlist['data'] = await self.checkfitdone(params['fitnr'])
-      logger.debug('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))						
+      await self.send(json.dumps(outlist))			
 
     elif params['command'] == 'getepochsinfo':
-      if self.dblinedict['t_type'] in {2, 3}:
+      if self.trainerline.t_type in {2, 3}:
         temp = json.loads(text_data)
-        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-        outlist['data'] = json.loads(self.ws.recv())['data']
+        await self.ws.send_str(json.dumps(temp))
+        returned = await self.ws.receive()
+        outlist['data'] = json.loads(returned.data)['data']
       else:
-        outlist['data'] = await self.getepochsinfo(params['fitnr'])
+        result = []
+        async for item in epoch.objects.filter(fit=params['fitnr']):
+          result.append({
+            'loss':item.loss, 'cmetrics':item.cmetrics, 'val_loss':item.val_loss, 
+            'val_cmetrics':item.val_cmetrics, 'hit100':item.hit100, 
+            'val_hit100':item.val_hit100, 'seconds':item.seconds, 
+            'learning_rate':item.learning_rate,
+          })
+        outlist['data'] = result
+    
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))								
 
     elif params['command'] == 'getparams':
-      if self.dblinedict['t_type'] in {2, 3}:
-        self.ws.send(text_data, opcode=1) #1 = Text
-        outlist['data'] = json.loads(self.ws.recv())['data']
+      if self.trainerline.t_type in {2, 3}:
+        await self.ws.send_str(text_data)
+        returned = await self.ws.recv()
+        outlist['data'] = json.loads(returned.data)['data']
       else:
-        paramline = await getonelinedict(fit, 
-          {'id' : params['fitnr'], }, 
-          ['model_type', 'model_image_augmentation', 'model_weight_decay', 
-            'model_weight_constraint', 'model_dropout', 'l_rate_start', 
-            'l_rate_stop', 'l_rate_delta_min', 'l_rate_patience', 
-            'l_rate_decrement', 'weight_min', 'weight_max', 
-            'weight_boost', 'early_stop_delta_min', 'early_stop_patience', 
-          ])
-        outlist['data'] = paramline
+        line = await fit.objects.aget(id=params['fitnr'])
+        result = {
+          'model_type':line.model_type, 
+          'model_image_augmentation':line.model_image_augmentation, 
+          'model_weight_decay':line.model_weight_decay, 
+          'model_weight_constraint':line.model_weight_constraint, 
+          'model_dropout':line.model_dropout, 'l_rate_start':line.l_rate_start, 
+          'l_rate_stop':line.l_rate_stop, 'l_rate_delta_min':line.l_rate_delta_min, 
+          'l_rate_patience':line.l_rate_patience, 
+          'l_rate_decrement':line.l_rate_decrement, 'weight_min':line.weight_min, 
+          'weight_max':line.weight_max, 'weight_boost':line.weight_boost, 
+          'early_stop_delta_min':line.early_stop_delta_min, 
+          'early_stop_patience':line.early_stop_patience,
+        } 
+          
+        outlist['data'] = result
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))							
 
@@ -373,39 +376,33 @@ class trainerutil(AsyncWebsocketConsumer):
       if self.scope['user'].is_authenticated:
         myuser = self.scope['user']
       else:
-        myuser = await getoneline(User, {'username' : params['name'], })
+        myuser = await User.objects.aget(username=params['name'])
         if myuser.check_password(params['pass']):
           self.authed = True
         if not self.authed:
-          self.close() 
-      if access.check('S', self.schoolnr, myuser, 'R'):
-        self.maywrite = access.check('S', self.schoolnr, myuser, 'W')
-        self.schoollinedict = await getonelinedict(school, 
-          {'id' : self.schoolnr, }, 
-          ['dir', 'trainer', 'tf_worker', 'e_school', ])
-        self.trainernr = self.schoollinedict['trainer']
-        tf_workerlinedict = await getonelinedict(worker, 
-          {'id' : self.schoollinedict['tf_worker'], }, 
-          ['wsname', 'wspass', ])
-        self.dblinedict = await getonelinedict(dbtrainer, 
-          {'id' : self.trainernr, }, 
-          ['t_type', 'wsserver', ], )
-        if self.dblinedict['t_type'] in {2, 3}:
-          from websocket import WebSocket #, enableTrace
-          #enableTrace(True)
+          await self.close() 
+      if await access.check_async('S', self.schoolnr, myuser, 'R'):
+        self.maywrite = await access.check_async('S', self.schoolnr, myuser, 'W')
+        self.schoolline = await school.objects.aget(id=self.schoolnr)
+        tf_workerline = await worker.objects.aget(school__id=self.schoolnr)
+        self.trainerline = await dbtrainer.objects.aget(school__id=self.schoolnr)
+        self.trainernr = self.trainerline.id
+        if self.trainerline.t_type in {2, 3}:
+          import aiohttp
+          self.ws_session = aiohttp.ClientSession()
+          self.ws = await self.ws_session.ws_connect(self.trainerline.wsserver + 'ws/trainerutil/')
           self.ws_ts = time()
-          self.ws = WebSocket()
-          self.ws.connect(self.dblinedict['wsserver'] + 'ws/trainerutil/')
           temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          temp['data']['name']=tf_workerlinedict['wsname']
-          temp['data']['pass']=tf_workerlinedict['wspass']
+          temp['data']['school']=self.schoolline.e_school
+          temp['data']['name']=tf_workerline.wsname
+          temp['data']['pass']=tf_workerline.wspass
           temp['data']['dorunout']=params['dorunout']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
-            self.close()	
+          await self.ws.send_str(json.dumps(temp))
+          returned = await self.ws.receive()
+          if json.loads(returned.data)['data'] != 'OK':
+            await self.close()	
       else:
-        self.close()
+        await self.close()
       if params['dorunout']:
         outlist['data'] = trainers[self.trainernr].run_out(self.schoolnr)
         self.didrunout = True
@@ -418,11 +415,12 @@ class trainerutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))						
 
     elif params['command'] == 'getqueueinfo':
-      if self.dblinedict['t_type'] in {2, 3}:
+      if self.trainerline.t_type in {2, 3}:
         temp = json.loads(text_data)
-        temp['data']['school']=self.schoollinedict['e_school']
-        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-        outlist['data'] = json.loads(self.ws.recv())['data']
+        temp['data']['school']=self.schoolline.e_school
+        await self.ws.send_str(json.dumps(temp))
+        returned = await self.ws.receive()
+        outlist['data'] = json.loads(returned.data)['data']
       else:
         if 'school' in params:
           joblist = trainers[self.trainernr].getqueueinfo(params['school'])
@@ -438,9 +436,9 @@ class trainerutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'trainnow': 
       if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {'extra_runs' : 1, })
+        schoolline = await school.objects.aget(id=self.schoolnr)
+        schoolline.extra_runs = 1
+        await schoolline.asave(update_fields=['extra_runs'])
         outlist['data'] = 'OK' 
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
@@ -448,33 +446,33 @@ class trainerutil(AsyncWebsocketConsumer):
         self.close()		
         
     elif params['command'] == 'get_for_dashboard':  	
-      if self.dblinedict['t_type'] in {2, 3}:
+      if self.trainerline.t_type in {2, 3}:
         temp = json.loads(text_data)
-        temp['data']['school']=self.schoollinedict['e_school']
-        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-        answer = json.loads(self.ws.recv())['data']
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {params['item'] : answer, }) 
+        temp['data']['school']=self.schoolline.e_school
+        await self.ws.send_str(json.dumps(temp))
+        returned = await self.ws.receive()
+        answer = json.loads(returned.data)['data']
+        schoolline = await school.objects.aget(id=self.schoolnr)
+        setattr(schoolline, params['item'], answer)
+        await schoolline.asave(update_fields=[params['item']])
         outlist['data'] = answer
       else:  
-        schooldict = await getonelinedict(school, 
-          {'id' : self.schoolnr, }, 
-          [params['item']]) 
-        outlist['data'] = schooldict[params['item']]
+        schoolline = await school.objects.aget(id=self.schoolnr)
+        outlist['data'] = getattr(schoolline, params['item'])
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))						
 
     elif params['command'] == 'set_from_dashboard':
       if self.maywrite:
-        await updatefilter(school, 
-          {'id' : self.schoolnr, }, 
-          {params['item'] : params['value'], }) 
-        if self.dblinedict['t_type'] in {2, 3}:
+        schoolline = await school.objects.aget(id=self.schoolnr)
+        setattr(schoolline, params['item'], params['value'])
+        await schoolline.asave(update_fields=[params['item']])
+        if self.trainerline.t_type in {2, 3}:
           temp = json.loads(text_data)
-          temp['data']['school']=self.schoollinedict['e_school']
-          self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-          if json.loads(self.ws.recv())['data'] != 'OK':
+          temp['data']['school']=self.schoolline.e_school
+          await self.ws.send_str(json.dumps(temp))
+          returned = await self.ws.receive()
+          if json.loads(returned.data)['data'] != 'OK':
             self.close()	
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
@@ -483,19 +481,20 @@ class trainerutil(AsyncWebsocketConsumer):
         self.close()						
 
     elif params['command'] == 'getavailmodels':
-      if self.dblinedict['t_type'] == 3:
+      if self.trainerline.t_type == 3:
         temp = json.loads(text_data)
-        temp['data']['school']=self.schoollinedict['e_school']
-        self.ws.send(json.dumps(temp), opcode=1) #1 = Text
-        outlist['data'] = json.loads(self.ws.recv())['data']
+        temp['data']['school']=self.schoolline.e_school
+        await self.ws.send_str(json.dumps(temp))
+        returned = await self.ws.receive()
+        outlist['data'] = json.loads(returned.data)['data']
       else:
-        modeldir = self.schoollinedict['dir']
+        modeldir = self.schoolline.dir
         outlist['data'] = []
-        model_type_dict = await filterlinesdict(model_type, fields=['name', ])
-        for item in  model_type_dict:
-          search_path = modeldir + 'model/' + item['name']
+        model_type_lines = model_type.objects.all()
+        async for item in  model_type_lines:
+          search_path = modeldir + 'model/' + item.name
           if path.exists(search_path + '.h5'):
-            outlist['data'].append(item['name'])
+            outlist['data'].append(item.name)
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			
 

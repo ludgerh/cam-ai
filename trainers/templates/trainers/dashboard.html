@@ -1,17 +1,19 @@
-{# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de #}
-{# This program is free software; you can redistribute it and/or #}
-{# modify it under the terms of the GNU General Public License #}
-{# as published by the Free Software Foundation; either version 3 #}
-{# of the License, or (at your option) any later version. #}
-{# This program is distributed in the hope that it will be useful, #}
-{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
-{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
-{# See the GNU General Public License for more details. #}
-{# You should have received a copy of the GNU General Public License #}
-{# along with this program; if not, write to the Free Software #}
-{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
-
 {% extends 'schools/basis.html' %}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
 {% block content %}
 
 {% if emulatestatic %}
@@ -297,44 +299,44 @@ function refresh_all() {
   .then((result) => {
     added_one = result[1]
     old_epoch = 0;
-    result = JSON.parse(result[0]);
+    result = result[0];
     if (added_one) {
       $('#tablebody tr:last').remove();
     };
     new_epoch = false;
     result.forEach(function(item, index) {
-      datestring = item.fields.made;
-      if (item.fields.epochs > old_epoch) {
-        old_epoch = item.fields.epochs;
+      datestring = item.made;
+      if (item.epochs > old_epoch) {
+        old_epoch = item.epochs;
         new_epoch = true;
       }
       newaddition = '<tr>';
       newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
-      newaddition += '<td>'+(parseInt(item.fields.nr_tr)+parseInt(item.fields.nr_va))+'</td>';
-      newaddition += '<td>'+item.fields.model_type+'</td>';
-      newaddition += '<td>'+item.fields.model_image_augmentation.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.model_weight_decay.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.model_weight_constraint.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.model_dropout.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.l_rate_start+'</td>';
-      newaddition += '<td>'+item.fields.l_rate_stop+'</td>';
-      newaddition += '<td>'+item.fields.l_rate_delta_min.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.l_rate_patience.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.l_rate_decrement.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.weight_min.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.weight_max.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.weight_boost.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.early_stop_delta_min.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.fields.early_stop_patience.toPrecision(2)+'</td>';
-      newaddition += '<td>'+Math.round(item.fields.minutes)+'</td>';
-      newaddition += '<td>'+item.fields.epochs+'</td>';
-      newaddition += '<td>'+item.fields.loss.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.fields.hit100.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.fields.cmetrics.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.fields.val_loss.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.fields.val_hit100.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.fields.val_cmetrics.toPrecision(3)+'</td>';
-      newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/'+item.pk+'/" target="_blank">'+item.fields.status+'</a></td>';
+      newaddition += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
+      newaddition += '<td>'+item.model_type+'</td>';
+      newaddition += '<td>'+item.model_image_augmentation.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.model_weight_decay.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.model_weight_constraint.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.model_dropout.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.l_rate_start+'</td>';
+      newaddition += '<td>'+item.l_rate_stop+'</td>';
+      newaddition += '<td>'+item.l_rate_delta_min.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.l_rate_patience.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.l_rate_decrement.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.weight_min.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.weight_max.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.weight_boost.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.early_stop_delta_min.toPrecision(2)+'</td>';
+      newaddition += '<td>'+item.early_stop_patience.toPrecision(2)+'</td>';
+      newaddition += '<td>'+Math.round(item.minutes)+'</td>';
+      newaddition += '<td>'+item.epochs+'</td>';
+      newaddition += '<td>'+item.loss.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.hit100.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.cmetrics.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.val_loss.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.val_hit100.toPrecision(3)+'</td>';
+      newaddition += '<td>'+item.val_cmetrics.toPrecision(3)+'</td>';
+      newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/'+item.id+'/" target="_blank">'+item.status+'</a></td>';
       item_save = item.pk;
       newaddition += '</tr>';
       $('#tablebody').append(newaddition);
@@ -344,7 +346,6 @@ function refresh_all() {
     };  
     setTimeout(refresh_all, 10000);
   })
-  .catch(err => {console.log(err);});
 };
 
 $(document).ready(function() {
@@ -373,7 +374,6 @@ $(document).ready(function() {
           $('#model_type').append('<option value='+item+'>'+item+'</option>');
         });
       })
-      .catch(err => {console.log(err);});
       $('#train_button').click(function() {
         modal_visible = true;
         $('.modal-title').text('Synchronizing the Training Data');
@@ -387,7 +387,6 @@ $(document).ready(function() {
         .then((result) => {
           $('#train_button').removeClass('btn-warning');
         })
-        .catch(err => {console.log(err);});
       });
       init_var('#trigger', 'trigger');
       init_bool_var('#cbignorecheck', 'ignore_checked');
@@ -419,7 +418,6 @@ $(document).ready(function() {
       $('#mymodal').modal('show');
     };
   })
-  .catch(err => {console.log(err);});
 });
 
 </script>

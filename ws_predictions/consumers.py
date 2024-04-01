@@ -161,7 +161,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
                 predictions = np.empty((0, len(taglist)), np.float32)
                 while (predictions.shape[0] 
                     < len(self.mydatacache['schooldata'][myschool]['imglist'])):
-                  while my_worker.outqueue_empty(self.mydatacache['tf_w_index']):
+                  while 'tf_w_index' not in self.mydatacache or my_worker.outqueue_empty(self.mydatacache['tf_w_index']):
                     await asleep(medium_brake)
                   predictions = np.vstack((predictions, 
                     my_worker.get_from_outqueue(self.mydatacache['tf_w_index'])))

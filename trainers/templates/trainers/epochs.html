@@ -1,16 +1,18 @@
-{# Copyright (C) 2023 by the CAM-AI authors, info@cam-ai.de #}
-{# More information and complete source: https://github.com/ludgerh/cam-ai #}
-{# This program is free software; you can redistribute it and/or #}
-{# modify it under the terms of the GNU General Public License #}
-{# as published by the Free Software Foundation; either version 3 #}
-{# of the License, or (at your option) any later version. #}
-{# This program is distributed in the hope that it will be useful, #}
-{# but WITHOUT ANY WARRANTY; without even the implied warranty of #}
-{# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. #}
-{# See the GNU General Public License for more details. #}
-{# You should have received a copy of the GNU General Public License #}
-{# along with this program; if not, write to the Free Software #}
-{# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. #}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
 
 <!doctype html>
 <html lang="en">
@@ -198,7 +200,6 @@ function refresh_all() {
     'fitnr' : {{ fitnr }},
   })
   .then((result) => {
-    result = JSON.parse(result);
     if (result.length != fit_length) {
       graph_labels.length = 0;
       graph_data.datasets[0].data.length = 0;
@@ -210,20 +211,20 @@ function refresh_all() {
       result.forEach(function(item, index) {
         counter += 1;
         graph_labels.push(counter);
-        graph_data.datasets[0].data.push(item.fields.val_cmetrics);
-        graph_data.datasets[1].data.push(item.fields.val_hit100);
-        graph_data.datasets[2].data.push(item.fields.loss);
-        graph_data.datasets[3].data.push(item.fields.val_loss);
+        graph_data.datasets[0].data.push(item.val_cmetrics);
+        graph_data.datasets[1].data.push(item.val_hit100);
+        graph_data.datasets[2].data.push(item.loss);
+        graph_data.datasets[3].data.push(item.val_loss);
         newaddition += '<tr>';
         newaddition += '<td>'+counter+'</td>';
-        newaddition += '<td>'+Math.round(item.fields.seconds)+'</td>';
-        newaddition += '<td>'+item.fields.learning_rate.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.hit100.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.cmetrics.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.val_loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.val_hit100.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.fields.val_cmetrics.toPrecision(4)+'</td>';
+        newaddition += '<td>'+Math.round(item.seconds)+'</td>';
+        newaddition += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.hit100.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.cmetrics.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_hit100.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_cmetrics.toPrecision(4)+'</td>';
         newaddition += '</tr>';
         $('#tablebody').empty();
         $('#tablebody').append(newaddition);
@@ -238,7 +239,6 @@ function refresh_all() {
     };
     setTimeout(refresh_all, 10000);
   })
-  .catch(err => {console.log(err);});
 };
 
 $(document).ready(function() {
@@ -268,10 +268,8 @@ $(document).ready(function() {
         $('#params').html(result);
         refresh_all();
       })
-      .catch(err => {console.log(err);});
     };
   })
-  .catch(err => {console.log(err);});
 });
 
 </script>

@@ -760,9 +760,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await aioshutil.rmtree('temp/backup')
       await aioshutil.move(basepath, 'temp/backup') 
       await aioshutil.move(zipresult, basepath)
-      await aioshutil.copy('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
-      await aioshutil.copy('temp/backup/eventers/c_alarm.py', basepath + '/eventers/c_alarm.py')
-      await aioshutil.copy('temp/backup/' + datapath, basepath + '/' + datapath)
+      await aioshutil.move('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
+      await aioshutil.move('temp/backup/eventers/c_alarm.py', basepath + '/eventers/c_alarm.py')
+      await aioshutil.move('temp/backup/' + datapath, basepath + '/' + datapath)
       if env_type == 'venv':
         await aioshutil.move('temp/backup/env', basepath + '/env')
       chdir(basepath)
