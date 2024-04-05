@@ -93,7 +93,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       self.tf_worker.unregister(self.tf_w_index) 
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']
 
     if ((params['command'] == 'gettags') 
@@ -345,7 +345,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       async for item in framelines:
         result.append(item.id)
       outlist['data'] = result
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
     elif params['command'] == 'setcrypt':
@@ -469,7 +469,6 @@ class schooldbutil(AsyncWebsocketConsumer):
         eventline = await event.objects.aget(id=params['event_nr'])
         streamline = await stream.objects.aget(event__id=eventline.id)
         if await access.check_async('C', streamline.id, self.scope['user'], 'W'):
-          print('?????', params['nr_todel'])
           framefile = schoolframespath + frameline.name
           if await aiofiles.os.path.exists(framefile):
             await aiofiles.os.remove(framefile)
@@ -509,7 +508,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         eventline.done = True
         await eventline.asave(update_fields=('done', ))
       outlist['data'] = 'OK'
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			
 
     elif params['command'] == 'setonetag':
@@ -520,7 +519,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         setattr(frameline, fieldtochange, params['value'])
         await frameline.asave(update_fields=(fieldtochange, ))
         outlist['data'] = 'OK'
-        logger.info('--> ' + str(outlist))
+        logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))		
 
 #*****************************************************************************
@@ -539,7 +538,7 @@ class schoolutil(AsyncWebsocketConsumer):
       return((schoolcount, limit))
 
   async def receive(self, text_data=None, bytes_data=None):
-    logger.info('<-- ' + str(text_data))
+    logger.debug('<-- ' + str(text_data))
     indict=json.loads(text_data)
     if indict['code'] == 'makeschool':
       userline = await dbuser.objects.aget(id=indict['user'])
