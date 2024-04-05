@@ -101,19 +101,18 @@ getimages = function() {
 		      'event' : $(this).attr('id'),
 	      })
 	      .then((result) => {
-          framelines[$(this).attr('id')] = result;
-		      for (let j=0; j<framelines[$(this).attr('id')].length; j++) {
-			      indices[$(this).attr('id')].push(framelines[$(this).attr('id')][j].id);
-            mycard = $('<div id="card'+framelines[$(this).attr('id')][j].id+'" class="card m-1 p-0" style="width: 212px; height: auto;">'
+	        for (const item of result) {
+			      indices[$(this).attr('id')].push(item);
+            mycard = $('<div id="card'+item+'" class="card m-1 p-0" style="width: 212px; height: auto;">'
               + '<a href="/schools/getbigbmp/0/'
-			        + framelines[$(this).attr('id')][j].id + '/'
+			        + item + '/'
 			        + '" target="_blank">'
 			        + '<img src="/schools/getbmp/0/'
-			        + framelines[$(this).attr('id')][j].id + '/3/1/210/210/'
+			        + item + '/3/1/210/210/'
               +'" style="width: 210px; height: 210px; object-fit: contain"</a>'
             + '</div>');
             mycard.appendTo($(this));
-          };
+	        };
 	        SchoolDBUtilSocket.sendandwait({
 		        'command' : 'getpredictions',
 		        'idxs' : indices[$(this).attr('id')],
@@ -121,7 +120,7 @@ getimages = function() {
             'is_school' : true,
 	        })
           .then((predictions) => {
-		        for (let j=0; j<framelines[$(this).attr('id')].length; j++) {
+		        for (let j=0; j<predictions.length; j++) {
 		          cblines = '<div class="checklist h4">';
 		          for (let k=0; k<taglines.length; k++) {
 {% if may_write_school %}
@@ -138,7 +137,7 @@ getimages = function() {
 			        };
 			        cblines += '</div>';
               cblines = $(cblines)
-              cblines.appendTo($('#card'+framelines[$(this).attr('id')][j].id));
+              cblines.appendTo($('#card'+indices[$(this).attr('id')][j]));
 {% if may_write_school %}
 			        cblines.children('input:checkbox').change(function(evt) {
                 let k = $(evt.target).data('k');
@@ -159,7 +158,6 @@ getimages = function() {
             };
 {% endif %}
           })
-          .catch(err => {console.log(err);});
 {% if may_write_school %}
           buttonline = '<h4>Who / what is this?<br>';
 		      buttonline += '<select id="myselect'+$(this).attr('id')+'" class="btn btn-primary">';
@@ -257,6 +255,7 @@ getimages = function() {
 				      'command' : 'settags',
 				      'event' : $(this).attr('idnr'),
 				      'cblist' : cblist,
+		          'school' : {{ school.id }},
 			      })
 			      .then((result) => {
 				      if (result === 'OK') {
@@ -273,11 +272,9 @@ getimages = function() {
 					      };
 				      }
 			      })
-			      .catch(err => {console.log(err);});
 		      });
 {% endif %}
         })
-	      .catch(err => {console.log(err);});
       };
     };
   });
@@ -296,7 +293,6 @@ $(document).ready(function () {
         $('#'+$(this).attr('id')+'.eventrow').remove(); 
       }
     })
-    .catch(err => {console.log(err);});
   });
 {% endif %}
 	WSAsync(
@@ -331,7 +327,6 @@ $(document).ready(function () {
 		taglines = result;
     getimages();
 	})
-	.catch(err => {console.log(err);});
 	
 });
 

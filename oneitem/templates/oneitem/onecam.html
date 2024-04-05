@@ -396,7 +396,7 @@ $(document).ready(function() {
 	})
 	.then((result) => {
 	  ptz_data = result.ptz;
-	  ptz_active = Object.keys(ptz_data).length > 0;
+	  ptz_active = Boolean(ptz_data) && (Object.keys(ptz_data).length > 0);
 	  if (ptz_active) {
 	    $('#ptz-control').removeClass('d-none');
 	    $('#speedinput').val(200);

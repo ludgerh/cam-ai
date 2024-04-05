@@ -258,7 +258,7 @@ class c_eventer(c_device):
                 self.motion_frame[5]-margin, self.motion_frame[6]+margin), item):
               found = item
               break
-          if found is None:
+          if found is None or found.check_out_ts:
             new_event = c_event(self.tf_worker, self.tf_w_index, self.motion_frame, 
               margin, self.dbline, self.logger)
             with self.eventdict_lock:
@@ -295,17 +295,19 @@ class c_eventer(c_device):
         i_list = list(self.eventdict.items())
       j_list = i_list
       for i, event_i in i_list:
-        for j, event_j in j_list:
-          if j > i:
-            if hasoverlap(event_i, event_j):
-              event_i[0] = min(event_i[0], event_j[0])
-              event_i[1] = max(event_i[1], event_j[1])
-              event_i[2] = min(event_i[2], event_j[2])
-              event_i[3] = max(event_i[3], event_j[3])
-              event_i.start = min(event_i.start, event_j.start)
-              event_i.end = max(event_i.end, event_j.end)
-              event_i.merge_frames(event_j)
-              del_set.add(j) 
+        if not event_i.check_out_ts:
+          for j, event_j in j_list:
+            if j > i:
+              if not event_j.check_out_ts:
+                if hasoverlap(event_i, event_j):
+                  event_i[0] = min(event_i[0], event_j[0])
+                  event_i[1] = max(event_i[1], event_j[1])
+                  event_i[2] = min(event_i[2], event_j[2])
+                  event_i[3] = max(event_i[3], event_j[3])
+                  event_i.start = min(event_i.start, event_j.start)
+                  event_i.end = max(event_i.end, event_j.end)
+                  event_i.merge_frames(event_j)
+                  del_set.add(j) 
       if del_set:     
         with self.eventdict_lock:
           for j in del_set:
@@ -320,46 +322,47 @@ class c_eventer(c_device):
       with self.display_lock:
         eventlist = list(self.eventdict.items())
         for i, item in eventlist:
-          predictions = item.pred_read(max=1.0)
-          if self.dbline.eve_all_predictions or (self.nr_of_cond_ed > 0):
-            if self.nr_of_cond_ed <= 0:
-              self.last_cond_ed = 1
-            if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
-              colorcode= (0, 0, 255)
-            else:
-              colorcode= (0, 255, 0)
-            displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list)) 
-              if predictions[j] >= 0.5]
-            displaylist.sort(key=lambda x: -x[1])
-            displaylist = displaylist[:3]
-            cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
-            if displaylist:
-              if item[2] < (self.dbline.cam_yres - item[3]):
-                y0 = item[3] + 30 * self.textheight
+          if not item.check_out_ts:
+            predictions = item.pred_read(max=1.0)
+            if self.dbline.eve_all_predictions or (self.nr_of_cond_ed > 0):
+              if self.nr_of_cond_ed <= 0:
+                self.last_cond_ed = 1
+              if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
+                colorcode= (0, 0, 255)
               else:
-                y0 = item[2] - (10 + (len(displaylist) - 1) * 30) * self.textheight
-            for j in range(len(displaylist)):
-              cv.putText(newimage, 
-                self.tag_list[displaylist[j][0]].name[:3]
-                +' - '+str(round(displaylist[j][1],2)), 
-                (item[0]+2, y0 + j * 30 * self.textheight), 
-                cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
-                self.textthickness, cv.LINE_AA)
-          else:
-            imax = -1
-            pmax = -1
-            for j in range(1,len(predictions)):
-              if predictions[j] >= 0.0:
-                if predictions[j] > pmax:
-                  pmax = predictions[j]
-                  imax = j
-            if resolve_rules(self.cond_dict[1], predictions):
-              cv.rectangle(newimage, rect_btoa(item), (255, 0, 0), 
-                self.linewidth)
-              cv.putText(newimage, self.tag_list[imax].name[:3], 
-                (item[0]+10, item[2]+30), 
-                cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
+                colorcode= (0, 255, 0)
+              displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list)) 
+                if predictions[j] >= 0.5]
+              displaylist.sort(key=lambda x: -x[1])
+              displaylist = displaylist[:3]
+              cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
+              if displaylist:
+                if item[2] < (self.dbline.cam_yres - item[3]):
+                  y0 = item[3] + 30 * self.textheight
+                else:
+                  y0 = item[2] - (10 + (len(displaylist) - 1) * 30) * self.textheight
+              for j in range(len(displaylist)):
+                cv.putText(newimage, 
+                  self.tag_list[displaylist[j][0]].name[:3]
+                  +' - '+str(round(displaylist[j][1],2)), 
+                  (item[0]+2, y0 + j * 30 * self.textheight), 
+                  cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
                   self.textthickness, cv.LINE_AA)
+            else:
+              imax = -1
+              pmax = -1
+              for j in range(1,len(predictions)):
+                if predictions[j] >= 0.0:
+                  if predictions[j] > pmax:
+                    pmax = predictions[j]
+                    imax = j
+              if resolve_rules(self.cond_dict[1], predictions):
+                cv.rectangle(newimage, rect_btoa(item), (255, 0, 0), 
+                  self.linewidth)
+                cv.putText(newimage, self.tag_list[imax].name[:3], 
+                  (item[0]+10, item[2]+30), 
+                  cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
+                    self.textthickness, cv.LINE_AA)
       self.viewer.inqueue.put((3, newimage, frame[2]))
     except:
       self.logger.error(format_exc())
@@ -402,8 +405,9 @@ class c_eventer(c_device):
 
   def check_events(self, i, item):
     try:
-      check_to = (item.end < time() - self.dbline.eve_event_time_gap 
-        or item.end > item.start + 180.0)
+      if (item.end < time() - self.dbline.eve_event_time_gap 
+          or item.end > item.start + 120.0):
+        item.check_out_ts = item.end
       if self.cond_dict[5]:
         predictions = item.pred_read(max=1.0)
       else:
@@ -411,7 +415,7 @@ class c_eventer(c_device):
       if resolve_rules(self.cond_dict[5], predictions):
         alarm(self.dbline.id, self.dbline.name, predictions, 
           self.dbline.eve_school.id, self.logger) 
-      if check_to:
+      if item.check_out_ts:
         if predictions is None and self.cond_dict[2]:
           predictions = item.pred_read(max=1.0)
         item.goes_to_school = resolve_rules(self.cond_dict[2], predictions)
@@ -428,7 +432,7 @@ class c_eventer(c_device):
         if item.goes_to_school or item.isrecording or item.to_email:
           if item.isrecording:
             if (self.vid_deque and 
-                (item.end <= (self.vid_deque[-1][2] - self.dbline.cam_latency))):
+                (item.check_out_ts <= (self.vid_deque[-1][2]))):
               my_vid_list = []
               my_vid_str = ''
               my_vid_start = None

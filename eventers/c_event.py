@@ -156,6 +156,7 @@ class c_event(list):
     self.focus_max = np.max(frame[7][1:])
     self.focus_time = frame[2]
     self.dbline.camera = eventer_dbl
+    self.check_out_ts = None
     if c_event.crypt is None:
       if self.dbline.camera.encrypted:
         if self.dbline.camera.crypt_key:

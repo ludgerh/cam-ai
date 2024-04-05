@@ -17,6 +17,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import json
 import numpy as np
 import cv2 as cv
+import aiofiles
+import aiofiles.os
+import aioshutil
 from os import path, makedirs, remove
 from shutil import copy
 #from PIL import Image
@@ -29,11 +32,12 @@ from django.core import serializers
 from django.db.models import Q
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
+from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.hashers import check_password
-from tools.l_tools import ts2filename, djconf, uniquename
-from tools.c_tools import reduce_image
+from tools.l_tools import ts2filename, djconf, uniquename_async
+from tools.c_tools import reduce_image_async
 from tools.djangodbasync import (filterlines, getoneline, savedbline, 
   deldbline, updatefilter, deletefilter, getonelinedict, filterlinesdict,
   countfilter)
@@ -43,7 +47,7 @@ from access.c_access import access
 from access.models import access_control
 from schools.c_schools import get_taglist, check_extratags_async
 from tf_workers.c_tfworkers import tf_workers
-from tf_workers.models import school
+from tf_workers.models import school, worker
 from eventers.models import event, event_frame
 from trainers.models import trainframe, img_size
 from users.models import userinfo
@@ -71,24 +75,6 @@ class schooldbutil(AsyncWebsocketConsumer):
     return([line.description for line in get_taglist(myschool)])
 
   @database_sync_to_async
-  def gettrainimages(self, page_nr):
-    lines = []
-    for line in self.trainpage.page(page_nr):
-      if line.made_by is None:
-        made_by = ''
-      else:
-        made_by = line.made_by.username
-      lines.append({
-      'id' : line.id, 
-      'name' : line.name, 
-      'made_by' : made_by,
-      'cs' : [line.c0,line.c1,line.c2,line.c3,line.c4,line.c5,line.c6,
-        line.c7,line.c8,line.c9,],
-      'made' : line.made.strftime("%d.%m.%Y %H:%M:%S %Z"),
-      })
-    return(lines)
-
-  @database_sync_to_async
   def getshortlist(self, page_nr):
     return(list(self.trainpage.get_elided_page_range(page_nr)))
 
@@ -107,7 +93,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       self.tf_worker.unregister(self.tf_w_index) 
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + text_data)
+    logger.info('<-- ' + text_data)
     params = json.loads(text_data)['data']
 
     if ((params['command'] == 'gettags') 
@@ -133,14 +119,30 @@ class schooldbutil(AsyncWebsocketConsumer):
           filterdict['c'+str(i)] = 0
       else:
         filterdict['c'+str(params['class'])] = 1
-      allresults = await filterlines(trainframe, filterdict)
-      self.trainpage = Paginator(allresults, params['pagesize'])
+      
+      framelines = trainframe.objects.filter(**filterdict)
+      self.trainpage = Paginator(framelines, params['pagesize'])
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
     if params['command'] == 'gettrainimages' :
-      outlist['data'] = await self.gettrainimages(params['page_nr'])
+      lines = []
+      async for line in self.trainpage.page(params['page_nr']).object_list:
+        made_by_nr = await sync_to_async(lambda: line.made_by)()
+        if made_by_nr is None:
+          made_by = ''
+        else:
+          made_by = made_by_nr.username
+        lines.append({
+        'id' : line.id, 
+        'name' : line.name, 
+        'made_by' : made_by,
+        'cs' : [line.c0,line.c1,line.c2,line.c3,line.c4,line.c5,line.c6,
+          line.c7,line.c8,line.c9,],
+        'made' : line.made.strftime("%d.%m.%Y %H:%M:%S %Z"),
+        })
+      outlist['data'] = lines
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
@@ -154,35 +156,32 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))
 
     elif params['command'] == 'gettags':
-
       outlist['data'] = await self.gettags(params['school'])
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
     elif params['command'] == 'getpredictions':
-      if access.check('S', params['school'], self.scope['user'], 'R'):
+      if await access.check_async('S', params['school'], self.scope['user'], 'R'):
         imglist = []
         for item in params['idxs']:
           try:
             if params['is_school']:
-              framedict = await getonelinedict(event_frame, {'id' : item, }, ['name', 'event', 'encrypted'])
-              imagepath = schoolframespath + framedict['name']
+              frameline = await event_frame.objects.aget(id=item)
+              imagepath = schoolframespath + frameline.name
               if self.schoolinfo is None:
-                eventdict = await getonelinedict(event, {'id' : framedict['event'], }, ['school'])
-                schooldict = await getonelinedict(school, {'id' : eventdict['school'], }, ['id', 'e_school', 'dir'])
-                xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
+                schoolline = await school.objects.aget(id=params['school'])
+                xytemp = self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
                 self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], }
             else:
-              framedict = await getonelinedict(trainframe, {'id' : item, }, ['name', 'school', 'encrypted'])
+              frameline = await trainframe.objects.aget(id=item,)
               if self.schoolinfo is None:
-                schooldict = await getonelinedict(school, {'id' : framedict['school'], }, ['id', 'e_school', 'dir'])
-                xytemp = self.tf_worker.get_xy(schooldict['id'], self.tf_w_index)
-                self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schooldict, }
-              imagepath = self.schoolinfo['schooldict']['dir'] + 'frames/' + framedict['name']
-            with open(imagepath, "rb") as f:
-              myimage = f.read()
-            #print(framedict['name']) 
-            if framedict['encrypted']:
+                schoolline = await school.objects.aget(id=frameline.school)
+                xytemp = self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
+                self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schoolline, }
+              imagepath = self.schoolinfo['schooldict'].dir + 'frames/' + frameline.name
+            async with aiofiles.open(imagepath, mode = "rb") as f:
+              myimage = await f.read()
+            if frameline.encrypted:
               myimage = self.crypt.decrypt(myimage)  
             myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
             myimage = cv.cvtColor(myimage, cv.COLOR_BGR2RGB)
@@ -202,22 +201,22 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))
 
     elif params['command'] == 'checktrainframe':
-      mytrainframe = await getoneline(trainframe, {'id' : params['img'], })
-      if access.check('S', mytrainframe.school, self.user, 'W'):
-        mytrainframe.checked = True
-        await savedbline(mytrainframe, ['checked'])
+      frameline = await trainframe.objects.aget(id=params['img'],)
+      if await access.check_async('S', frameline.school, self.user, 'W'):
+        frameline.checked = True
+        await frameline.asave(update_fields=('checked', ))
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
     elif params['command'] == 'deltrainframe':
-      trainframedict = await getonelinedict(trainframe, {'id' : params['img'], }, ['name', 'school'])
-      if access.check('S', trainframedict['school'], self.user, 'W'):
-        await deletefilter(trainframe, {'id' : params['img'], })
-        schooldict = await getonelinedict(school, {'id' : trainframedict['school'], }, ['dir'])
-        framefile = schooldict['dir'] + 'frames/' + trainframedict['name']
-        if path.exists(framefile):
-          remove(framefile)
+      frameline = await trainframe.objects.aget(id=params['img'],)
+      if await access.check_async('S', frameline.school, self.user, 'W'):
+        schoolline = await school.objects.aget(id=frameline.school)
+        await frameline.adelete()
+        framefile = schoolline.dir + 'frames/' + frameline.name
+        if await aiofiles.os.path.exists(framefile):
+          aiofiles.os.remove(framefile)
         else:
           logger.warning('deltrainframe - Delete did not find: ' + framefile)
       outlist['data'] = 'OK'
@@ -225,7 +224,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))
 
     elif params['command'] == 'checkall':
-      if access.check('S', params['school'], self.user, 'W'):
+      if await access.check_async('S', params['school'], self.user, 'W'):
         filterdict = {'school' : params['school']}
         if params['class'] == -2:
           pass
@@ -236,13 +235,13 @@ class schooldbutil(AsyncWebsocketConsumer):
           filterdict['c'+str(params['class'])] = 1
         filterdict['id__gte'] = params['min_id']
         filterdict['id__lte'] = params['max_id']
-        await updatefilter(trainframe, filterdict, {'checked' : 1}, )
+        await trainframe.objects.filter(**filterdict).aupdate({'checked' : 1})
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
     elif params['command'] == 'deleteall':
-      if access.check('S', params['school'], self.user, 'W'):
+      if await access.check_async('S', params['school'], self.user, 'W'):
         filterdict = {'school' : params['school']}
         if params['class'] == -2:
           pass
@@ -264,14 +263,14 @@ class schooldbutil(AsyncWebsocketConsumer):
           else:
             filterdict = None
         if filterdict is not None:
-          schooldict = await getonelinedict(school, {'id' : params['school'], }, ['dir'])
-          filepath = schooldict['dir']
-          list_for_del = await filterlinesdict(trainframe, filterdict)
-          await deletefilter(trainframe, filterdict)
-          for item in list_for_del:
-            framefile = filepath + 'frames/' + item['name']
-            if path.exists(framefile):
-              remove(framefile)
+          schoolline = await school.objects.aget(id=params['school'])
+          filepath = schoolline.dir
+          framelines = trainframe.objects.filter(**filterdict)
+          async for item in framelines:
+            await item.adelete()
+            framefile = filepath + 'frames/' + item.name
+            if await aiofiles.os.path.exists(framefile):
+              aiofiles.os.remove(framefile)
             else:
               logger.warning('deleteall - Delete did not find: ' + framefile)
         outlist['data'] = 'OK'
@@ -279,6 +278,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))
 
     elif params['command'] == 'copyall':
+      # disabled. need check before being reactivated
       if access.check('S', params['school'], self.user, 'W'):
         filterdict = {'school' : params['school']}
         if params['class'] == -2:
@@ -330,8 +330,9 @@ class schooldbutil(AsyncWebsocketConsumer):
       if ('logout' in params) and params['logout'] and (self.myschool > 0):
         await self.disconnect(None)
       if self.myschool > 0:
-        schooldict = await getonelinedict(school, {'id' : self.myschool, }, ['tf_worker'])
-        self.tf_worker = tf_workers[schooldict['tf_worker']]
+        schoolline = await school.objects.aget(id=self.myschool)
+        workerline = await worker.objects.aget(school__id=schoolline.id)
+        self.tf_worker = tf_workers[workerline.id]
         self.tf_w_index = self.tf_worker.register()
         self.tf_worker.run_out(self.tf_w_index)
       outlist['data'] = 'OK'
@@ -339,17 +340,18 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))
 
     elif params['command'] == 'getschoolframes':
-      framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', 'time'])
-      for item in framelines:
-        item['time'] = item['time'].now().strftime('%d.%m.%Y %H:%M:%S')
-      outlist['data'] = framelines
-      logger.debug('--> ' + str(outlist))
+      framelines = event_frame.objects.filter(event__id=params['event'])
+      result = []
+      async for item in framelines:
+        result.append(item.id)
+      outlist['data'] = result
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
     elif params['command'] == 'setcrypt':
-      streamlinedict = await getonelinedict(stream, {'id' : params['stream'], }, ['encrypted', 'crypt_key'])
-      if streamlinedict['encrypted']:
-        self.crypt =  l_crypt(key=streamlinedict['crypt_key'])
+      streamline = await stream.objects.aget(id=params['stream'])
+      if streamline.encrypted:
+        self.crypt =  l_crypt(key=streamline.crypt_key)
       else:
         self.crypt = None  
       outlist['data'] = 'OK'
@@ -357,39 +359,45 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))
 
     elif params['command'] == 'settags':
-      eventdict = await getonelinedict(event, {'id' : params['event'], }, ['id', 'school', 'done'])
-      schoolnr = eventdict['school']
-      schooldict = await getonelinedict(school, {'id' : schoolnr, }, ['dir'])
-      modelpath = schooldict['dir']
-      if access.check('S', schoolnr, self.scope['user'], 'W'):
-        if not path.exists(modelpath + 'frames/'):
-          makedirs(modelpath + 'frames/')
-        framelines = await filterlinesdict(event_frame, {'event__id' : params['event'], }, ['id', 'name', 'time', 'trainframe', 'encrypted'])
+      schoolline = await school.objects.aget(id=params['school'])
+      modelpath = schoolline.dir
+      if await access.check_async('S', params['school'], self.scope['user'], 'W'):
+        eventline = await event.objects.aget(id=params['event']) 
+        framelines = event_frame.objects.filter(event=eventline)
         i = 0
-        for item in framelines:
+        async for item in framelines:
           pathadd = str(randint(0,99))+'/'
-          if not path.exists(modelpath + 'frames/' + pathadd):
-            makedirs(modelpath + 'frames/' + pathadd)
-          ts = datetime.timestamp(item['time'])
-          newname = uniquename(modelpath + 'frames/', pathadd+ts2filename(ts, noblank=True), 'bmp')
-          updatedict = {}
-          for j in range(10):
-            updatedict['c'+str(j)] = params['cblist'][i][j]
-          if eventdict['done']:
-            await updatefilter(trainframe, {'id' : item['trainframe'], }, updatedict)
+          await aiofiles.os.makedirs(modelpath + 'frames/' + pathadd, exist_ok=True)
+          ts = datetime.timestamp(item.time)
+          newname = await uniquename_async(modelpath + 'frames/', pathadd+ts2filename(ts, noblank=True), 'bmp')
+          if eventline.done:
+            t = await trainframe.objects.aget(id=item.trainframe)
+            updatelist = []
+            for j in range(10):
+              tagname = 'c'+str(j)
+              updatelist.append(tagname)
+              setattr(item, tagname, params['cblist'][i][j])
+            await t.asave(update_fields=updatelist)
           else:
-            if item['encrypted']:
+            if item.encrypted:
               do_crypt = self.crypt
             else:
               do_crypt = None  
-            reduce_image(schoolframespath + item['name'], modelpath + 'frames/' + newname, school_x_max, school_y_max, crypt=do_crypt)
-            t = trainframe(made=item['time'],
-              school=schoolnr,
+            await reduce_image_async(
+              schoolframespath + item.name, 
+              modelpath + 'frames/' + newname, 
+              school_x_max, 
+              school_y_max, 
+              crypt=do_crypt
+            )
+            t = trainframe(
+              made=item.time,
+              school=params['school'],
               name=newname,
               code='NE',
               checked=0,
               made_by_id=self.user.id,
-            );
+            )
             t.encrypted = False
             t.c0=params['cblist'][i][0]
             t.c1=params['cblist'][i][1] 
@@ -401,16 +409,12 @@ class schooldbutil(AsyncWebsocketConsumer):
             t.c7=params['cblist'][i][7]
             t.c8=params['cblist'][i][8]
             t.c9=params['cblist'][i][9]
-            trainframenr = await savedbline(t)
-            #try:
-            #  sizeline = await img_size.objects.aget(x=0, y=0)
-            #except img_size.DoesNotExist:
-            #  sizeline = img_size(x=0, y=0)
-            #  await sizeline.asave()
-            #await t.img_sizes.aadd(sizeline)
-            await updatefilter(event_frame, {'id' : item['id'], }, {'trainframe' : trainframenr, }) 
-          i += 1
-        await updatefilter(event, {'id' : eventdict['id'], }, {'done' : True, }) 
+            await t.asave()
+            item.trainframe = t.id
+            item.asave(update_fields=('trainframe', ))
+          i += 1 
+        eventline.done = True  
+        await eventline.asave(update_fields=('done', ))
 
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
@@ -419,40 +423,40 @@ class schooldbutil(AsyncWebsocketConsumer):
     elif params['command'] == 'delevent':
       try:
         if params['eventnr'] == -1:
-          eventdicts = await filterlinesdict(event, {'camera__id' : params['streamnr'], 'xmax__gt' : 0, }, ['id', 'camera', 'videoclip'])
+          eventlines = event.objects.filter(camera__id=params['streamnr'], xmax__gt=0)
           streamnr =  params['streamnr']
         elif params['eventnr'] == 0:
-          eventdicts = await filterlinesdict(event, {'camera__id' : params['streamnr'], 'xmax__gt' : 0, 'done' : True, }, ['id', 'camera', 'videoclip'])
+          eventlines = event.objects.filter(camera__id=params['streamnr'], xmax__gt=0, done=True)
           streamnr =  params['streamnr']
         else:
-          eventdicts = await filterlinesdict(event, {'id' : params['eventnr'], }, ['id', 'camera', 'videoclip'])
-          streamnr = eventdicts[0]['camera']
-        if access.check('C', streamnr, self.scope['user'], 'W'):
-          for eitem in eventdicts:
-            framelines = await filterlinesdict(event_frame, {'event__id' : eitem['id'], }, ['id', 'name', ])
-            for fitem in framelines:
-              framefile = schoolframespath + fitem['name']
-              if path.exists(framefile):
-                remove(framefile)
+          eventlines = event.objects.filter(id=params['eventnr'])
+          streamnr =  params['streamnr']
+        if await access.check_async('C', streamnr, self.scope['user'], 'W'):
+          async for eventline in eventlines:
+            framelines = event_frame.objects.filter(event__id=eventline.id)
+            async for frameline in framelines:
+              framefile = schoolframespath + frameline.name
+              if await aiofiles.os.path.exists(framefile):
+                await aiofiles.os.remove(framefile)
               else:
                 logger.warning('delevent - Delete did not find: ' + framefile)
-              await deletefilter(event_frame, {'id' : fitem['id'], })
-            if eitem['videoclip']:
-              if (await countfilter(event, {'videoclip' : eitem['videoclip'], })) <= 1:
-                videofile = recordingspath + eitem['videoclip']
-                if path.exists(videofile + '.mp4'):
-                  remove(videofile + '.mp4')
+              await frameline.adelete()
+            if eventline.videoclip:
+              if await event.objects.filter(videoclip=eventline.videoclip).acount() <= 1:
+                videofile = recordingspath + eventline.videoclip
+                if await aiofiles.os.path.exists(videofile + '.mp4'):
+                  await aiofiles.os.remove(videofile + '.mp4')
                 else:
                   logger.warning('delevent - Delete did not find: ' + videofile + '.mp4')
-                if path.exists(videofile + '.webm'):
-                  remove(videofile + '.webm')
+                if await aiofiles.os.path.exists(videofile + '.webm'):
+                  await aiofiles.os.remove(videofile + '.webm')
                 else:
                   logger.warning('delevent - Delete did not find: ' + videofile + '.webm')
-                if path.exists(videofile + '.jpg'):
-                  remove(videofile + '.jpg')
+                if await aiofiles.os.path.exists(videofile + '.jpg'):
+                  await aiofiles.os.remove(videofile + '.jpg')
                 else:
                   logger.warning('delevent - Delete did not find: ' + videofile + '.jpg')
-            await deletefilter(event, {'id' : eitem['id'], })
+            await eventline.adelete()
       except event.DoesNotExist:
         logger.warning('delevent - Did not find DB line: ' + str(params['eventnr']))
       outlist['data'] = 'OK'
@@ -460,57 +464,63 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))			
 
     elif params['command'] == 'delitem':
-      if params['dtype'] == '0':
-        framedict = await getonelinedict(event_frame, {'id' : params['nr_todel'], }, ['id', 'name', 'event'])
-        eventdict = await getonelinedict(event, {'id' : framedict['event'], }, ['id', 'camera', 'numframes'])
-        mycamera = eventdict['camera']
-        if access.check('C', mycamera, self.scope['user'], 'W'):
-          framefile = schoolframespath + framedict['name']
-          if path.exists(framefile):
-            remove(framefile)
+      if params['dtype'] == 0:
+        frameline = await event_frame.objects.aget(id=params['nr_todel'])
+        eventline = await event.objects.aget(id=params['event_nr'])
+        streamline = await stream.objects.aget(event__id=eventline.id)
+        if await access.check_async('C', streamline.id, self.scope['user'], 'W'):
+          print('?????', params['nr_todel'])
+          framefile = schoolframespath + frameline.name
+          if await aiofiles.os.path.exists(framefile):
+            await aiofiles.os.remove(framefile)
           else:
             logger.warning('delitem - Delete did not find: ' + framefile)
-          await deletefilter(event_frame, {'id' : framedict['id'], })
-          await updatefilter(event, {'id' : eventdict['id'], }, {'numframes' : (eventdict['numframes'] - 1), })
-      elif params['dtype'] == '1':
-        eventdict = await getonelinedict(event, {'id' : int(params['nr_todel']), }, ['id', 'camera', 'videoclip'])
-        mycamera = eventdict['camera']
-        if access.check('C', mycamera, self.scope['user'], 'W'):
-          if (await countfilter(event, {'videoclip' : eventdict['videoclip'], })) <= 1:
-            videofile = recordingspath + eventdict['videoclip']
-            if path.exists(videofile + '.mp4'):
-              remove(videofile + '.mp4')
+          await frameline.adelete()
+          eventline.numframes -= 1
+          await eventline.asave(update_fields=('numframes', ))
+      elif params['dtype'] == 1:
+        eventline = await event.objects.aget(id=params['nr_todel'])
+        streamline = await stream.objects.aget(event__id=eventline.id)
+        if await access.check_async('C', streamline.id, self.scope['user'], 'W'):
+          if await event.objects.filter(videoclip=eventline.videoclip).acount() <= 1:
+            videofile = recordingspath + eventline.videoclip
+            if await aiofiles.os.path.exists(videofile + '.mp4'):
+              await aiofiles.os.remove(videofile + '.mp4')
             else:
               logger.warning('delitem - Delete did not find: ' + videofile + '.mp4')
-            if path.exists(videofile + '.webm'):
-              remove(videofile + '.webm')
+            if await aiofiles.os.path.exists(videofile + '.webm'):
+              await aiofiles.os.remove(videofile + '.webm')
             else:
               logger.warning('delitem - Delete did not find: ' + videofile + '.webm')
-            if path.exists(videofile + '.jpg'):
-              remove(videofile + '.jpg')
+            if await aiofiles.os.path.exists(videofile + '.jpg'):
+              await aiofiles.os.remove(videofile + '.jpg')
             else:
               logger.warning('delitem - Delete did not find: ' + videofile + '.jpg')
-          await updatefilter(event, {'id' : eventdict['id'], }, {'videoclip' : '', 'hasarchive' : False, })
+          eventline.videoclip = ''
+          await eventline.asave(update_fields=('videoclip', ))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
     elif params['command'] == 'remfrschool':
-      eventdict = await getonelinedict(event, {'id' : int(params['event']), }, ['id', 'school'])
-      myschool = eventdict['school']
-      if access.check('S', myschool, self.scope['user'], 'W'):
-        await updatefilter(event, {'id' : eventdict['id'], }, {'done' : True, })
+      eventline = await event.objects.aget(id=params['event'])
+      streamline = await stream.objects.aget(event__id=eventline.id)
+      if await access.check_async('C', streamline.id, self.scope['user'], 'W'):
+        eventline.done = True
+        await eventline.asave(update_fields=('done', ))
       outlist['data'] = 'OK'
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			
 
     elif params['command'] == 'setonetag':
-      framedict = await getonelinedict(trainframe, {'id' : int(params['img']), }, ['school'])
-      if access.check('S', framedict['school'], self.scope['user'], 'W'):
+      frameline = await trainframe.objects.aget(id=params['img'],)
+      schoolline = await school.objects.aget(id=params['school'],)
+      if access.check('S', schoolline.id, self.scope['user'], 'W'):
         fieldtochange = 'c'+params['cnt']
-        await updatefilter(trainframe, {'id' : int(params['img']), }, {fieldtochange : params['value'], 'made_by_id' : self.user.id, })
+        setattr(frameline, fieldtochange, params['value'])
+        await frameline.asave(update_fields=(fieldtochange, ))
         outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))		
 
 #*****************************************************************************
@@ -523,17 +533,17 @@ class schoolutil(AsyncWebsocketConsumer):
     if self.scope['user'].is_superuser:
       return(True)
     else:
-      limit = await getonelinedict(userinfo, {'user' : userid, }, ['allowed_schools',])
-      limit = limit['allowed_schools']
-      schoolcount = await countfilter(school, {'creator' : userid, 'active' : True,})
+      userinfoline = await userinfo.objects.aget(user=userid)
+      limit = userinfoline.allowed_schools
+      schoolcount = await school.objects.filter(creator__id=userid, active=True).acount()
       return((schoolcount, limit))
 
   async def receive(self, text_data=None, bytes_data=None):
-    logger.debug('<-- ' + str(text_data))
+    logger.info('<-- ' + str(text_data))
     indict=json.loads(text_data)
     if indict['code'] == 'makeschool':
-      userdict = await getonelinedict(dbuser, {'id' : indict['user'], }, ['password', ])
-      hash = userdict['password']
+      userline = await dbuser.objects.aget(id=indict['user'])
+      hash = userline.password
       if not check_password(indict['pass'], hash):
         result = {'status' : 'noauth'}
         await self.send(json.dumps(result))
@@ -546,7 +556,7 @@ class schoolutil(AsyncWebsocketConsumer):
       quota = (quota[0] + 1, quota[1])
       newschool = school()
       newschool.name = indict['name']
-      await savedbline(newschool)
+      await newschool.asave()
       result = {'status' : 'OK', 'school' : newschool.id, 'quota' : quota }
       newaccess = access_control()
       newaccess.vtype = 'S'
@@ -554,21 +564,15 @@ class schoolutil(AsyncWebsocketConsumer):
       newaccess.u_g = 'U'
       newaccess.u_g_nr = indict['user']
       newaccess.r_w = 'W'
-      await savedbline(newaccess)
+      await newaccess.asave()
       await access.read_list_async()
       schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
-      try:
-        makedirs(schooldir+'frames')
-      except FileExistsError:
-        logger.warning('Dir already exists: '+schooldir+'frames')
-      try:
-        makedirs(schooldir+'model')
-      except FileExistsError:
-        logger.warning('Dir already exists: '+schooldir+'model')
-      copy(schoolsdir + 'model1/model/' + newschool.model_type + '.h5',
+      await aiofiles.os.makedirs(schooldir+'frames', exist_ok=True)
+      await aiofiles.os.makedirs(schooldir+'model', exist_ok=True)
+      await aioshutil.copy(schoolsdir + 'model1/model/' + newschool.model_type + '.h5',
         schooldir + 'model/' + newschool.model_type + '.h5')
-      await updatefilter(school, 
-        {'id' : newschool.id, }, 
-        {'dir' : schooldir, 'creator_id' : indict['user']})
+      newschool.dir = schooldir
+      newschool.creator_id = indict['user']
+      await newschool.asave(update_fields = ('dir', 'creator_id'))
       await self.send(json.dumps(result))				
 

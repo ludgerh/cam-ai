@@ -253,7 +253,8 @@ $(document).ready(function() {
       SchoolDBUtilSocket.sendandwait({
 			  'command' : 'delitem',
 			  'nr_todel' : nr_todel,
-        'dtype' : dtype,
+			  'event_nr' : {{ event.id }},
+        'dtype' : parseInt(dtype),
 		  })
 		  .then((result) => {
 			  if (result === 'OK') {

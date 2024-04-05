@@ -61,7 +61,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         'set_mask', 
         self.mydetectordrawpad.ringlist
       ))
-      await deletefilter(mask, {'stream_id' : self.idx, 'mtype' : 'D', })
+      masklines = mask.objects.filter(stream_id=self.idx, mtype='D',)
+      async for item in masklines:
+        await item.adelete()
       for ring in self.mydetectordrawpad.ringlist:
         m = mask(
           name='New Ring',
@@ -69,7 +71,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           stream_id=self.idx,
           mtype='D',
         )
-        await savedbline(m)
+        await m.asave()
       
 
   async def receive(self, text_data):
@@ -78,7 +80,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}
 
     if params['command'] == 'setmyitem':
-      if access.check(params['mode'], params['itemid'], self.scope['user'], 'R'):
+      if await access.check_async(params['mode'], params['itemid'], self.scope['user'], 'R'):
         self.mode = params['mode']
         self.idx = params['itemid']
         self.mycamitem = streams[params['itemid']].mycam
@@ -91,7 +93,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.mydrawpad = self.myitem.viewer.drawpad
         elif self.mode == 'E':
           self.myitem = streams[params['itemid']].mydetector.myeventer
-        self.may_write = access.check(
+        self.may_write = await access.check_async(
           params['mode'], 
           int(params['itemid']), 
           self.scope['user'], 'W'
@@ -184,14 +186,14 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
             if self.mydrawpad.mtype == 'C':
               myline.cam_apply_mask = params['ch_apply']
-              await savedbline(myline, ["cam_apply_mask"])
+              await myline.asave(update_fields=(("cam_apply_mask"), ))
             elif self.mydrawpad.mtype == 'D':
               myline.det_apply_mask = params['ch_apply']
-              await savedbline(myline, ["det_apply_mask"])
+              await myline.asave(update_fields=(("det_apply_mask"), ))
           elif self.mode == 'D':
             self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
             myline.det_apply_mask = params['ch_apply']
-            await savedbline(myline, ["det_apply_mask"])
+            await myline.asave(update_fields=(("det_apply_mask"), ))
         if 'ch_white' in params:
           self.myitem.viewer.drawpad.whitemarks = params['ch_white']
       outlist['data'] = 'OK'
@@ -303,7 +305,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'delcondition': #xxx
       if self.may_write:
-        await deletefilter(evt_condition, {'id' : params['c_nr']})
+        filterline = await evt_condition.objects.aget(id=params['c_nr'])
+        await filterline.adelete()
         self.myitem.inqueue.put(
           ('del_condition', int(params['reaction']), int(params['c_nr'])))
       outlist['data'] = 'OK'
@@ -312,8 +315,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
     elif params['command'] == 'getcondition': #xxx
       if self.may_write:
-        mydata = await getoneline(evt_condition, {'id' : params['c_nr'], })
-      outlist['data'] = model_to_dict(mydata, exclude=[])
+        filterline = await evt_condition.objects.aget(id=params['c_nr'])
+      outlist['data'] = model_to_dict(filterline, exclude=[])
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
@@ -337,12 +340,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
-    elif params['command'] == 'cond_to_str': #xxx
+    elif params['command'] == 'cond_to_str': 
       outlist['data'] = self.myitem.build_string(params['condition'])
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
-    elif params['command'] == 'savecondition': #xxx
+    elif params['command'] == 'savecondition': 
       if self.may_write:
         self.myitem.inqueue.put((
           'save_condition', 
@@ -353,11 +356,11 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           float(params['y']),
         ))
         if params['save_db']:
-          dbline = await getoneline(evt_condition, {'id' : params['c_nr'], })
+          dbline = await evt_condition.objects.aget(id=params['c_nr'])
           dbline.c_type = int(params['c_type'])
           dbline.x = int(params['x'])
           dbline.y = float(params['y'])
-          await savedbline(dbline, ['c_type', 'x', 'y', ])
+          await dbline.asave(update_fields=('c_type', 'x', 'y'))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
@@ -368,7 +371,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           and_or=int(params['and_or']), 
           reaction=int(params['reaction']), 
           eventer_id=self.myitem.dbline.id)
-        await savedbline(dbline)
+        await dbline.asave()
         newitem = model_to_dict(dbline)
         self.myitem.inqueue.put(('new_condition', int(params['reaction']), newitem))
         outlist['data'] = newitem
@@ -382,9 +385,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         self.myitem.inqueue.put((
           'save_conditions', params['reaction'], params['conditions']))
         cond_dict = json.loads(params['conditions'])
-        await deletefilter(
-          evt_condition, 
-          {'eventer_id' : self.myitem.dbline.id, 'reaction' : params['reaction'], }, )
+        conditionlines = evt_condition.objects.filter(eventer_id=self.myitem.dbline.id, reaction=params['reaction'])
+        async for item in conditionlines:
+          await item.adelete()
         for item in cond_dict:
           db_line = evt_condition(
             eventer_id = self.myitem.dbline.id,
@@ -395,9 +398,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             y = item['y'],
             bracket = item['bracket'],
           )
-          await savedbline(db_line)
+          await db_line.asave()
         outlist['data'] = 'OK'
-        
       else:
         outlist['data'] = 'No Access'
       logger.debug('--> ' + str(outlist))
@@ -407,7 +409,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       if self.may_write:
         if params['itemid'] in streams:
           streams[params['itemid']].stop()
-        await updatefilter(stream, {'id' : params['itemid'], }, {'active' : False, })
+        streamline = await stream.objects.aget(id=params['itemid'])
+        streamline.active = False
+        await streamline.asave(update_fields=(("active"), ))
         outlist['data'] = 'OK'
       else:
         outlist['data'] = 'No Access'

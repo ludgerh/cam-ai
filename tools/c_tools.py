@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import cv2 as cv
 import numpy as np
+import aiofiles
 from time import time, sleep
 from shutil import copy
 from tools.l_tools import djconf
@@ -150,6 +151,19 @@ def image_size(infile):
   yin = myimage.shape[0]
   return(xin, yin)
   
+def do_reduction(image, x, y, crypt):
+  xin = image.shape[1]
+  yin = image.shape[0]
+  #print('In:', image.shape, x, y, xin, yin) 
+  if (xin > x) or (yin > y):
+    if (x / xin) > (y / yin):
+      scale = x / xin
+    else:
+      scale = y / yin
+    return(cv.resize(image, (round(xin * scale), round(yin * scale)))) 
+  else:  
+    return(image) 
+  
 def reduce_image(infile, outfile, x, y, crypt=None):
   if outfile is None:
     outfile = infile
@@ -160,15 +174,20 @@ def reduce_image(infile, outfile, x, y, crypt=None):
     myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
   else:    
     myimage = cv.imread(infile)
-  xin = myimage.shape[1]
-  yin = myimage.shape[0]
-  #print('In:', myimage.shape, x, y, xin, yin) 
-  if (xin > x) or (yin > y):
-    if (x / xin) > (y / yin):
-      scale = x / xin
-    else:
-      scale = y / yin
-    myimage = cv.resize(myimage, (round(xin * scale), round(yin * scale)))  
+  myimage = do_reduction(myimage, x, y, crypt) 
   cv.imwrite(outfile, myimage)
-  #print('Out:', myimage.shape) 
+  #print('Out:', outfile, myimage.shape, crypt) 
   
+async def reduce_image_async(infile, outfile, x, y, crypt=None):
+  if outfile is None:
+    outfile = infile
+  async with aiofiles.open(infile, mode="rb") as f:
+    myimage = await f.read()
+  if crypt:
+    myimage = crypt.decrypt(myimage)
+  myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  myimage = do_reduction(myimage, x, y, crypt) 
+  #print('Out:', outfile, myimage.shape, crypt) 
+  myimage = cv.imencode('.bmp', myimage)[1].tobytes()
+  async with aiofiles.open(outfile, mode="wb") as f:
+    await f.write(myimage)
