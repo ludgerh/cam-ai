@@ -502,6 +502,7 @@ $(document).ready(function() {
       if (action == 'delone') {
         SchoolDButilSocket.sendandwait({
           'command' : 'deltrainframe',
+          'school' : {{ schoolnr }},
           'img' : $(this).attr('img'),
         })
         .then((result) => {

@@ -18,6 +18,7 @@ import json
 import cv2 as cv
 import numpy as np
 import asyncio
+import aiofiles
 import aiofiles.os
 from os import remove, path, makedirs, rename
 from time import time, sleep
@@ -59,32 +60,33 @@ class remotetrainer(AsyncWebsocketConsumer):
 
   async def receive(self, text_data =None, bytes_data=None):
     if bytes_data: 
-      cod_x = self.myschooldict['model_xin']
-      cod_y = self.myschooldict['model_yin']
-      filepath = (self.myschooldict['dir'] 
+      cod_x = self.myschoolline.model_xin
+      cod_y = self.myschoolline.model_yin
+      filepath = (self.myschoolline.dir
         + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
         + '/' + self.frameinfo['name'][:-4]+'.jpg')
       codpath = filepath[:-4]+'.cod'
       mydir = path.dirname(filepath) 
-      if not path.exists(mydir):
+      if not await aiofiles.os.path.exists(mydir):
         makedirs(mydir)
       imgdata = cv.imdecode(np.frombuffer(bytes_data, dtype=np.uint8), (cv.IMREAD_COLOR))
       if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
         imgdata = cv.resize(imgdata, (cod_x, cod_y))
-        cv.imwrite(filepath, imgdata)
-        rename(filepath, codpath)
+        imgdata = cv.imencode('.jpg', imgdata)[1].tobytes()
+        async with aiofiles.open(codpath, mode="wb") as f:
+          await f.write(imgdata)
       else:
-        with open(codpath, 'wb') as f:
-          f.write(bytes_data)
+        async with aiofiles.open(codpath, mode="wb") as f:
+          await f.write(bytes_data)
       try:  
         frameline = await trainframe.objects.aget(
           name=self.frameinfo['name'], 
-          school=self.myschooldict['id'],
+          school=self.myschoolline.id,
         )
       except trainframe.DoesNotExist:  
         frameline = trainframe(
           made = timezone.make_aware(datetime.fromtimestamp(time())),
-          school = self.myschooldict['id'],
+          school = self.myschoolline.id,
           name = self.frameinfo['name'],
           code = self.frameinfo['code'],
           c0 = self.frameinfo['tags'][0], c1 = self.frameinfo['tags'][1],
@@ -109,7 +111,7 @@ class remotetrainer(AsyncWebsocketConsumer):
     if text_data == 'Ping':
       return()
       
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     indict = json.loads(text_data)	
     
     if indict['code'] == 'auth':
@@ -151,6 +153,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       
     elif indict['code'] == 'delete':
       frameline = await trainframe.objects.aget(name=indict['name'])
+      bmppath = self.myschoollinedir + 'frames/' + indict['name']
       await frameline.adelete()
       if await aiofiles.os.path.exists(bmppath):
         await aiofiles.os.remove(bmppath)
@@ -495,7 +498,7 @@ class trainerutil(AsyncWebsocketConsumer):
         model_type_lines = model_type.objects.all()
         async for item in  model_type_lines:
           search_path = modeldir + 'model/' + item.name
-          if path.exists(search_path + '.h5'):
+          if await aiofiles.os.path.exists(search_path + '.h5'):
             outlist['data'].append(item.name)
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))			

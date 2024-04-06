@@ -211,8 +211,8 @@ class schooldbutil(AsyncWebsocketConsumer):
 
     elif params['command'] == 'deltrainframe':
       frameline = await trainframe.objects.aget(id=params['img'],)
-      if await access.check_async('S', frameline.school, self.user, 'W'):
-        schoolline = await school.objects.aget(id=frameline.school)
+      if await access.check_async('S', params['school'], self.user, 'W'):
+        schoolline = await school.objects.aget(id=params['school'])
         await frameline.adelete()
         framefile = schoolline.dir + 'frames/' + frameline.name
         if await aiofiles.os.path.exists(framefile):
@@ -235,7 +235,9 @@ class schooldbutil(AsyncWebsocketConsumer):
           filterdict['c'+str(params['class'])] = 1
         filterdict['id__gte'] = params['min_id']
         filterdict['id__lte'] = params['max_id']
-        await trainframe.objects.filter(**filterdict).aupdate({'checked' : 1})
+        framelines = trainframe.objects.filter(**filterdict)
+        #import pdb; pdb.set_trace()
+        await framelines.aupdate(checked=1)
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))

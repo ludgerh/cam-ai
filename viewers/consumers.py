@@ -219,7 +219,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}
 
     if params['command'] == 'getcaminfo':
-      go_on = access.check(params['mode'], params['idx'], self.scope['user'], 'R')
+      go_on = await access.check_async(params['mode'], params['idx'], self.scope['user'], 'R')
       if go_on:
         outlist['data'] = {}
         outlist['data']['fps'] = round(redis.fps_from_dev(params['mode'], 
