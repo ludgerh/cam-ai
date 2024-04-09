@@ -104,10 +104,11 @@ $(document).ready(function() {
     xinput{{ item.id }} = result.outx;
     yinput{{ item.id }} = 
       Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
+    onf_nr{{ item.id }} = result.on_frame_nr; 
 {% endfor %}
 {% for item in camlist %} 
     if (show_cam{{ item.id }}) {
-      vnrcode = '{{ mode }}' + String({{ item.id }}).padStart(9,'0');
+      vnrcode = '{{ mode }}' + String({{ item.id }}).padStart(6,'0') + String(onf_nr{{ item.id }}).padStart(6,'0');
       trigger_Socket.socket.send(vnrcode);
     } else {
       $('#imagespace{{ item.id }}').css({'object-fit':'cover'});
@@ -124,16 +125,15 @@ $(document).ready(function() {
     };
     trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-		    blob = e.data.slice(10, e.data.size, "image/jpeg");
-		    indicator = e.data.slice(0, 10);
+		    blob = e.data.slice(13, e.data.size, "image/jpeg");
+		    indicator = e.data.slice(0, 13);
 		    let url = URL.createObjectURL(blob);
         indicator.text()
         .then((result) => {
-          vnr = parseInt(result.slice(1));
+          vnr = parseInt(result.slice(1,7));
 		      imageElements[vnr].src = url;
           trigger_Socket.socket.send(result);
         })
-        .catch(err => {console.log(err);});
       };
     };
 {% for item in camlist %} 
@@ -149,11 +149,9 @@ $(document).ready(function() {
           $('#vnrtag{{ item.id }}').text(result.viewers);
         {% endif %}
       })
-      .catch(err => {console.log(err);});
     }, 5000);
 {% endfor %}
 	})
-	.catch(err => {console.log(err);});
 });
 	
 </script>

@@ -127,6 +127,7 @@ $(document).ready(function() {
     xinput{{ item.id }} = result.outx;
     yinput{{ item.id }} = 
       Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
+    onf_nrC{{ item.id }} = result.on_frame_nr; 
     return(trigger_Socket.sendandwait({
       'command' : 'starttrigger',
       'mode' : 'D',
@@ -136,6 +137,7 @@ $(document).ready(function() {
   })
   .then((result) => {
     show_camD{{ item.id }} = result.show_cam;
+    onf_nrD{{ item.id }} = result.on_frame_nr; 
     return(trigger_Socket.sendandwait({
       'command' : 'starttrigger',
       'mode' : 'E',
@@ -145,10 +147,11 @@ $(document).ready(function() {
   })
   .then((result) => {
     show_camE{{ item.id }} = result.show_cam;
+    onf_nrE{{ item.id }} = result.on_frame_nr; 
 {% endfor %}
 {% for item in camlist %} 
     if (show_camC{{ item.id }}) {
-      vnrcode = 'C' + String({{ item.id }}).padStart(9,'0');
+      vnrcode = 'C' + String({{ item.id }}).padStart(6,'0') + String(onf_nrC{{ item.id }}).padStart(6,'0');
       trigger_Socket.socket.send(vnrcode);
     } else {
       $('#imagespaceC{{ item.id }}').css({'object-fit':'cover'});
@@ -160,7 +163,7 @@ $(document).ready(function() {
 {% endif %}
     };
     if (show_camD{{ item.id }}) {
-      vnrcode = 'D' + String({{ item.id }}).padStart(9,'0');
+      vnrcode = 'D' + String({{ item.id }}).padStart(6,'0') + String(onf_nrD{{ item.id }}).padStart(6,'0');
       trigger_Socket.socket.send(vnrcode);
     } else {
       $('#imagespaceD{{ item.id }}').css({'object-fit':'cover'});
@@ -172,7 +175,7 @@ $(document).ready(function() {
 {% endif %}
     };
     if (show_camE{{ item.id }}) {
-      vnrcode = 'E' + String({{ item.id }}).padStart(9,'0');
+      vnrcode = 'E' + String({{ item.id }}).padStart(6,'0') + String(onf_nrE{{ item.id }}).padStart(6,'0');
       trigger_Socket.socket.send(vnrcode);
     } else {
       $('#imagespaceE{{ item.id }}').css({'object-fit':'cover'});
@@ -189,13 +192,13 @@ $(document).ready(function() {
     };
     trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-		    blob = e.data.slice(10, e.data.size, "image/jpeg");
-		    indicator = e.data.slice(0, 10);
+		    blob = e.data.slice(13, e.data.size, "image/jpeg");
+		    indicator = e.data.slice(0, 13);
 		    let url = URL.createObjectURL(blob);
         indicator.text()
         .then((result) => {
           mode = result[0];
-          vnr = parseInt(result.slice(1));
+          vnr = parseInt(result.slice(1,7));
 		      if (mode == 'C') {
 		        checkelement = imageElementsC[vnr];
 		      } else if (mode == 'D') {  
@@ -212,7 +215,6 @@ $(document).ready(function() {
             }, 5000);  
 		      };
         })
-        .catch(err => {console.log(err);});
       };
     };
 {% for item in camlist %} 
@@ -228,7 +230,6 @@ $(document).ready(function() {
           $('#vnrtagC{{ item.id }}').text(result.viewers);
         {% endif %}
       })
-      .catch(err => {console.log(err);});
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
         'mode' : 'D',
@@ -240,7 +241,6 @@ $(document).ready(function() {
           $('#vnrtagD{{ item.id }}').text(result.viewers);
         {% endif %}
       })
-      .catch(err => {console.log(err);});
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
         'mode' : 'E',
@@ -252,11 +252,9 @@ $(document).ready(function() {
           $('#vnrtagE{{ item.id }}').text(result.viewers);
         {% endif %}
       })
-      .catch(err => {console.log(err);});
     }, 5000);
 {% endfor %}
 	})
-	.catch(err => {console.log(err);});
 });
 	
 </script>

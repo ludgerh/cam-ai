@@ -189,7 +189,6 @@ function timedRefresh(bytebuffer) {
       ctx.drawImage(result, 0,0, displaywidth, displayheight)
       wait = 0;
     })
-		.catch(err => {console.log(err);});
   };
 };
 
@@ -429,7 +428,6 @@ function reset_triggers(first = false) {
           $(this).removeClass('btn-warning');
 			  };
 		  })
-		  .catch(err => {console.log(err);});
     });
   };
 };
@@ -456,7 +454,6 @@ $(document).ready(function() {
 				$(evt.target).addClass('bluegrey');
 			};
 		})
-		.catch(err => {console.log(err);});
 	});
 
 	$('#conditions').children(':even').click((evt) => {
@@ -473,7 +470,6 @@ $(document).ready(function() {
 						bstr_row.removeClass('d-none');
 					};
 				})
-				.catch(err => {console.log(err);});
 			} else {
 				oneitemSocket.sendandwait({
 					'command' : 'cond_close',
@@ -484,7 +480,6 @@ $(document).ready(function() {
 						bstr_row.addClass('d-none');
 					};
 				})
-				.catch(err => {console.log(err);});
 			};
 		} else {
 			bstr_row.toggleClass('d-none');
@@ -527,18 +522,24 @@ $(document).ready(function() {
     show_cam = result.show_cam;
     xinput = result.outx;
     yinput = 
-      Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }})
+      Math.round(xinput * {{ dbline.cam_yres }} /  {{ dbline.cam_xres }});
+    onf_nr = result.on_frame_nr; 
     if (show_cam) {
-      trigger_Socket.socket.send('E{{ dbline.id|stringformat:"09d" }}');
+      vnrcode = 'E' + String({{ dbline.id }}).padStart(6,'0') + String(onf_nr).padStart(6,'0');
+      trigger_Socket.socket.send(vnrcode);
 		  trigger_Socket.socket.onclose = function(e) {
 			  console.log('Trigger-Socket closed');
 		  };
 		  trigger_Socket.socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
-		      blob = e.data.slice(10, e.data.size, "image/jpeg")
+		      indicator = e.data.slice(0, 13);
+		      blob = e.data.slice(13, e.data.size, "image/jpeg")
 		      let url = URL.createObjectURL(blob);
 		      imageElement.src = url;
-          trigger_Socket.socket.send('E{{ dbline.id|stringformat:"09d" }}');
+		      indicator.text()
+          .then((result) => {
+            trigger_Socket.socket.send(result);
+          })
         };
 		  };
     } else {
@@ -589,10 +590,8 @@ $(document).ready(function() {
           $('#vnrtag').text(result.viewers);
         {% endif %}
       })
-      .catch(err => {console.log(err);});
     }, 5000);
 	})
-	.catch(err => {console.log(err);});
 });
 	
 </script>
