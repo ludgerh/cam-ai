@@ -53,8 +53,9 @@ class drawpad():
     
   async def load_ringlist(self):
     self.ringlist = []
-    for item in await filterlinesdict(mask, {'stream_id' : self.myid, 'mtype' : self.mtype, }, ['definition', ]):
-      self.ringlist.append(loads(item['definition']))
+    filterlines = mask.objects.filter(stream_id=self.myid, mtype=self.mtype)
+    async for item in filterlines:
+      self.ringlist.append(loads(item.definition))
 
   def draw_rings(self, radius=None, colour=None):
     if radius is None:
@@ -132,7 +133,10 @@ class drawpad():
     self.mypoint = self.point_clicked(x, y) 
 
   def move_point(self, x, y):
-    buffer = self.ringlist[self.mypoint[0]][self.mypoint[1]]
+    try:
+      buffer = self.ringlist[self.mypoint[0]][self.mypoint[1]]
+    except IndexError:
+      return() 
     self.draw_rings(colour=self.backgr)
     self.ringlist[self.mypoint[0]][self.mypoint[1]] = (round(x), round(y))
     testring = LinearRing(self.ringlist[self.mypoint[0]])
@@ -149,10 +153,9 @@ class drawpad():
     if self.mypoint is not None:
       self.mousemovehandler(x, y)
       self.mask_from_polygons()
-      await deletefilter(mask, {
-        'stream_id' : self.myid,
-        'mtype' : self.mtype,
-      })
+      masklines = mask.objects.filter(stream_id=self.myid, mtype=self.mtype)
+      async for item in masklines:
+        await item.adelete()
       for ring in self.ringlist:
         m = mask(
           name='New Ring',
@@ -160,7 +163,7 @@ class drawpad():
           stream_id=self.myid,
           mtype=self.mtype
         )
-        await savedbline(m)
+        await m.asave()
       self.mypoint = None
 
   async def dblclickhandler(self, x, y):
@@ -169,10 +172,9 @@ class drawpad():
       del self.ringlist[self.mypoint[0]]
       self.mask_from_polygons()
       self.make_screen()
-      await deletefilter(mask, {
-        'stream_id' : self.myid,
-        'mtype' : self.mtype,
-      })
+      masklines = mask.objects.filter(stream_id=self.myid, mtype=self.mtype)
+      async for item in masklines:
+        await item.adelete()
       for ring in self.ringlist:
         m = mask(
           name='New Ring',
@@ -180,5 +182,5 @@ class drawpad():
           stream_id=self.myid,
           mtype=self.mtype
         )
-        await savedbline(m)
+        await m.asave()
       self.draw_rings()

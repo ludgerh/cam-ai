@@ -343,17 +343,23 @@ $(document).ready(function() {
     xinput = result.outx;
     yinput = 
       Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }});
+    onf_nr = result.on_frame_nr; 
     if (show_cam) {
-      trigger_Socket.socket.send('C{{ dbline.id|stringformat:"09d" }}');
+      vnrcode = 'C' + String({{ dbline.id }}).padStart(6,'0') + String(onf_nr).padStart(6,'0');
+      trigger_Socket.socket.send(vnrcode);
 		  trigger_Socket.socket.onclose = function(e) {
 			  console.log('Trigger-Socket closed');
 		  };
 		  trigger_Socket.socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
-		      blob = e.data.slice(10, e.data.size, "image/jpeg")
+		      indicator = e.data.slice(0, 13);
+		      blob = e.data.slice(13, e.data.size, "image/jpeg")
 		      let url = URL.createObjectURL(blob);
 		      imageElement.src = url;
-          trigger_Socket.socket.send('C{{ dbline.id|stringformat:"09d" }}');
+		      indicator.text()
+          .then((result) => {
+            trigger_Socket.socket.send(result);
+          })
         };
 		  };
     } else {
@@ -396,7 +402,7 @@ $(document).ready(function() {
 	})
 	.then((result) => {
 	  ptz_data = result.ptz;
-	  ptz_active = Object.keys(ptz_data).length > 0;
+	  ptz_active = Boolean(ptz_data) && (Object.keys(ptz_data).length > 0);
 	  if (ptz_active) {
 	    $('#ptz-control').removeClass('d-none');
 	    $('#speedinput').val(200);

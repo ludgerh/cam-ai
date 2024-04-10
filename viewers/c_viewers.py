@@ -14,11 +14,18 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from threading import Lock
+import cv2 as cv
+import asyncio
+from threading import Lock, Event
+from time import time
 from l_buffer.l_buffer import c_buffer
+from tools.c_tools import c_convert
+from tools.c_redis import myredis
 from drawpad.drawpad import drawpad
 
 #from threading import enumerate
+
+redis = myredis()
 
 class c_viewer():
 
@@ -26,27 +33,75 @@ class c_viewer():
     self.logger = logger
     self.parent = parent
     self.inqueue = c_buffer(call=self.callback)
-    self.onf_dict_lock = Lock()
-    self.onf_dict = {}
+    self.client_dict_lock = Lock()
+    self.client_dict = {}
+    self.event_loop = None #see consumers
     if self.parent.type in {'C', 'D'}:
       self.drawpad = drawpad(self, self.logger)
+          
+  async def onf(self, client_nr):  
+    if not self.client_dict[client_nr]['busy'].is_set():
+      self.client_dict[client_nr]['busy'].set()
+      ts = time()
+      frame = self.inqueue.get()[1]
+      if self.parent.type == 'D':
+        if (self.drawpad.show_mask 
+            and (self.drawpad.mask is not None)):
+          frame = cv.addWeighted(frame, 1, 
+            (255-self.drawpad.mask), 0.3, 0)
+      elif self.parent.type == 'C':
+        if (self.drawpad.show_mask 
+            and (self.drawpad.mask is not None)):
+          frame = cv.addWeighted(frame, 1, 
+            (255-self.drawpad.mask), -0.3, 0)
+        if self.drawpad.edit_active and self.drawpad.ringlist:
+          if self.drawpad.whitemarks:
+            frame = cv.addWeighted(frame, 1, 
+              (255-self.drawpad.screen), 1, 0)
+          else:
+            frame = cv.addWeighted(frame, 1, 
+              (255-self.drawpad.screen), -1.0, 0)
+      frame = c_convert(frame, typein=1, typeout=3, 
+        xout=self.client_dict[client_nr]['outx'])
+      if (int(redis.get('CAM-AI:KBInt')) 
+          or int(redis.get('CAM-AI:KillStream:' + str(self.parent.id)))):
+        return()  
+      try:
+        await self.client_dict[client_nr]['socket'].send(bytes_data = (
+          self.client_dict[client_nr]['index'].encode()+frame
+        ))
+      except Disconnected:
+        logger.warning('*** Could not send Frame, socket closed...')    
 
   def callback(self):   
-    with self.onf_dict_lock:
-      for item in self.onf_dict.values():
-        item(self)
+    with self.client_dict_lock:
+      for item in self.client_dict:
+        self.onf(item)
+        asyncio.run_coroutine_threadsafe(self.onf(item), self.event_loop)
+        
 
-  def push_to_onf(self, onf):
+  def push_to_onf(self, outx, websocket):
+    self.parent.add_view_count()
     count = 0
-    with self.onf_dict_lock:
-      while count in self.onf_dict:
+    with self.client_dict_lock:
+      while count in self.client_dict:
         count += 1
-      self.onf_dict[count] = onf
+      client_info = {
+        'index' : self.parent.type + str(self.parent.id).zfill(6) + str(count).zfill(6),
+        'busy' : Event(),
+        'outx' : outx,
+        'socket' : websocket,
+      }
+      client_info['busy'].set()
+      self.client_dict[count] = client_info
     return(count)
 
-  def pop_from_onf(self, count):
-    with self.onf_dict_lock:
-      del self.onf_dict[count]
+  def pop_from_onf(self, client_nr):
+    with self.client_dict_lock:
+      del self.client_dict[client_nr]
+      
+  def clear_busy(self, client_nr):
+    self.client_dict[client_nr]['busy'].clear()   
 
   def stop(self):
     self.inqueue.stop()

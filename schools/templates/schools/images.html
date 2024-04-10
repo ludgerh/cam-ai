@@ -175,12 +175,15 @@ let get_images_active = false;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
-$.fn.isInViewport = function() {
-  var elementTop = $(this).offset().top;
-  var elementBottom = elementTop + $(this).outerHeight();
-  var viewportTop = $(window).scrollTop();
-  var viewportBottom = viewportTop + window.innerHeight;
-  return elementBottom > viewportTop && elementTop < viewportBottom;
+function isInViewport(elementid) {
+  element = document.getElementById(elementid)
+  let rect = element.getBoundingClientRect();
+  return (
+    rect.top >= 0 &&
+    rect.left >= 0 &&
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+  );
 };
 
 $('#selectclass').change(function() {
@@ -260,7 +263,6 @@ function draw_all_cards() {
     do_run = 1;
     getimages();
   })
-  .catch(err => {console.log(err);});
 };
 
 function getimages() {
@@ -273,7 +275,7 @@ function getimages() {
     let counts = [];
     while ((frames_ready < frames_count) 
         && ((frames_ready - last_frame_visible) < 32)
-        && $('#endtrigger').isInViewport()
+        && isInViewport('endtrigger')
         && do_run) {
       let frame_processing = frames_ready; 
       frames_ready += 1;
@@ -281,81 +283,82 @@ function getimages() {
       idxs.push(frames[frame_processing].id);
       counts.push(frame_processing);
     };  
-    SchoolDButilSocket.sendandwait({
-      'command' : 'getpredictions',
-      'idxs' :  idxs,
-      'school' : {{ schoolnr }},
-      'is_school' : false,
-    })
-    .then((predictions) => {
-      if (do_run) {
-        numbers.forEach((nr) => {
-          newaddition = '<div id="col' + frames[counts[nr]].id;
-          newaddition += '" class="col-sm-auto m-0 p-0">';
-          newaddition += '<div class="card m-1 p-0"';
-          newaddition += 'style="border: 1; width: 212px; height: auto;" done=0>';
-          newaddition += frames[counts[nr]].made;
-          newaddition += '<a href="/schools/getbigbmp/1/' + frames[counts[nr]].id;
-          newaddition += '/" target="_blank">';
-          newaddition += '<img idx=' + frames[counts[nr]].id;
-          newaddition += ' style="width: 210px;';
-          newaddition += ' height: 210px; object-fit: contain"';
-          newaddition += ' src="/schools/getbmp/1/' + frames[counts[nr]].id;
-          newaddition += '/3/1/210/210/"></a><br><div class="checklist h4">';
-          for (let i=0; i<taglines.length; i++) {
+    if (idxs.length) {
+      SchoolDButilSocket.sendandwait({
+        'command' : 'getpredictions',
+        'idxs' :  idxs,
+        'school' : {{ schoolnr }},
+        'is_school' : false,
+      })
+      .then((predictions) => {
+        if (do_run) {
+          numbers.forEach((nr) => {
+            newaddition = '<div id="col' + frames[counts[nr]].id;
+            newaddition += '" class="col-sm-auto m-0 p-0">';
+            newaddition += '<div class="card m-1 p-0"';
+            newaddition += 'style="border: 1; width: 212px; height: auto;" done=0>';
+            newaddition += frames[counts[nr]].made;
+            newaddition += '<a href="/schools/getbigbmp/1/' + frames[counts[nr]].id;
+            newaddition += '/" target="_blank">';
+            newaddition += '<img idx=' + frames[counts[nr]].id;
+            newaddition += ' style="width: 210px;';
+            newaddition += ' height: 210px; object-fit: contain"';
+            newaddition += ' src="/schools/getbmp/1/' + frames[counts[nr]].id;
+            newaddition += '/3/1/210/210/"></a><br><div class="checklist h4">';
+            for (let i=0; i<taglines.length; i++) {
+              {% if may_write %}
+                newaddition += '<input type="checkbox" class="tc';
+                newaddition += frames[counts[nr]].id+'"';
+                newaddition += ' img="'+frames[counts[nr]].id+'" cnt="'+i+'"';
+                if (frames[counts[nr]].cs[i] >= 0.5) {
+                  newaddition += ' checked>';
+                } else {
+                  newaddition += '>';
+                };
+              {% endif %}
+              if (predictions[nr][i] >= 0.5) {
+                if (frames[counts[nr]].cs[i] < 0.5) {
+                  newaddition += '<span class="bluegrey">';
+                } else {
+                  newaddition += '<span>';
+                };
+              } else {
+                if (frames[counts[nr]].cs[i] >= 0.5) {
+                  newaddition += '<span class="bluegrey">';
+                } else {
+                  newaddition += '<span>';
+                };
+              };
+              newaddition += taglines[i].substr(0,3)+': ';
+              newaddition += Math.round(predictions[nr][i]*10000)
+                  /10000+'</span><br>';
+              };
+            newaddition += '<h6>'+counts[nr]+': Tagged by ';
+            newaddition += frames[counts[nr]].made_by+'</h6>';
             {% if may_write %}
-              newaddition += '<input type="checkbox" class="tc';
-              newaddition += frames[counts[nr]].id+'"';
-              newaddition += ' img="'+frames[counts[nr]].id+'" cnt="'+i+'"';
-              if (frames[counts[nr]].cs[i] >= 0.5) {
-	              newaddition += ' checked>';
-              } else {
-	              newaddition += '>';
-              };
+              newaddition += '<button type="button" img="'+frames[counts[nr]].id
+              newaddition += '" class="btn btn-primary m-1" action="checkone"';
+              newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
+              newaddition += ' style="width: 80px;">Check</button>';
+              newaddition += '<button type="button" img="'+frames[counts[nr]].id;
+              newaddition += '" class="btn btn-primary m-1" action="delone"';
+              newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
+              newaddition += ' style="width: 80px;">Delete</button>';
             {% endif %}
-            if (predictions[nr][i] >= 0.5) {
-              if (frames[counts[nr]].cs[i] < 0.5) {
-                newaddition += '<span class="bluegrey">';
-              } else {
-                newaddition += '<span>';
-              };
-            } else {
-              if (frames[counts[nr]].cs[i] >= 0.5) {
-                newaddition += '<span class="bluegrey">';
-              } else {
-                newaddition += '<span>';
-              };
-            };
-            newaddition += taglines[i].substr(0,3)+': ';
-            newaddition += Math.round(predictions[nr][i]*10000)
-	              /10000+'</span><br>';
-            };
-          newaddition += '<h6>'+counts[nr]+': Tagged by ';
-          newaddition += frames[counts[nr]].made_by+'</h6>';
-          {% if may_write %}
-            newaddition += '<button type="button" img="'+frames[counts[nr]].id
-            newaddition += '" class="btn btn-primary m-1" action="checkone"';
-            newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
-            newaddition += ' style="width: 80px;">Check</button>';
-            newaddition += '<button type="button" img="'+frames[counts[nr]].id;
-            newaddition += '" class="btn btn-primary m-1" action="delone"';
-            newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
-            newaddition += ' style="width: 80px;">Delete</button>';
-          {% endif %}
-          newaddition += '</div>';
-          newaddition += '</div>';
-          newaddition += '</div>';
-          $('#lastcol').before(newaddition);
-          {% if may_write %}
-            $('.tc'+frames[counts[nr]].id).change(function(event) {
-              tagcheck_changed(event);
-            });
-          {% endif %}
-          last_frame_visible = counts[nr];
-        });
-      };
-    })
-    .catch(err => {console.log(err);});
+            newaddition += '</div>';
+            newaddition += '</div>';
+            newaddition += '</div>';
+            $('#lastcol').before(newaddition);
+            {% if may_write %}
+              $('.tc'+frames[counts[nr]].id).change(function(event) {
+                tagcheck_changed(event);
+              });
+            {% endif %}
+            last_frame_visible = counts[nr];
+          });
+        };
+      })
+    };  
     get_images_active = false;
   };  
 };
@@ -367,7 +370,8 @@ function tagcheck_changed(event) {
   let cnt = checkbox.attr('cnt');
   SchoolDButilSocket.sendandwait({
     'command' : 'setonetag',
-    'img' : img,
+    'school' : {{ schoolnr }},
+    'img' : parseInt(img),
     'cnt' : cnt,
     'value' : checkbox.prop('checked'),
   })
@@ -381,7 +385,6 @@ function tagcheck_changed(event) {
       };
     };
   })
-  .catch(err => {console.log(err);});
 }
 {% endif %}
 
@@ -439,7 +442,6 @@ $(document).ready(function() {
               draw_all_cards();
             };
           })
-          .catch(err => {console.log(err);});
         };
       };
       if (action == 'delall') {
@@ -461,7 +463,6 @@ $(document).ready(function() {
               draw_all_cards();
             };
           })
-          .catch(err => {console.log(err);});
         };
       };
 {% if user.is_superuser %}
@@ -482,7 +483,6 @@ $(document).ready(function() {
               $('#copyallbutton').removeClass('btn-warning');
             };
           })
-          .catch(err => {console.log(err);});
         };
       };
 {% endif %}
@@ -498,11 +498,11 @@ $(document).ready(function() {
             };
           };
         })
-        .catch(err => {console.log(err);});
       };
       if (action == 'delone') {
         SchoolDButilSocket.sendandwait({
           'command' : 'deltrainframe',
+          'school' : {{ schoolnr }},
           'img' : $(this).attr('img'),
         })
         .then((result) => {
@@ -510,13 +510,11 @@ $(document).ready(function() {
             $('#col'+$(this).attr('img')).remove();
           };
         })
-        .catch(err => {console.log(err);});
       };
     });
 {% endif %}
     draw_all_cards();
   })
-  .catch(err => {console.log(err);});
 });
 
 </script>
