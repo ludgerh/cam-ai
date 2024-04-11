@@ -18,6 +18,7 @@ import sys
 import cv2 as cv
 import numpy as np
 import json
+from select import select
 from psutil import Process
 from signal import SIGINT, SIGKILL, SIGTERM
 from os import remove, path, makedirs, mkfifo, kill as oskill
@@ -172,7 +173,11 @@ class c_cam(c_device):
       elif self.dbline.cam_feed_type in {2, 3}: 
         if self.ff_proc is None:
           return(None)
-        in_bytes = self.ff_proc.stdout.read(self.bytes_per_frame)
+        ready_to_read, _, _ = select([self.ff_proc.stdout], [], [], 5.0) 
+        if ready_to_read:
+          in_bytes = self.ff_proc.stdout.read(self.bytes_per_frame)
+        else:
+          in_bytes = None
         if in_bytes:
           self.framewait = 0.0
           nptemp = np.frombuffer(in_bytes, np.uint8)
@@ -465,7 +470,7 @@ class c_cam(c_device):
         source_string = ('c_client/fifo/rep_fifo_'
           + str(self.dbline.cam_repeater) + '_' + str(self.rep_cam_nr))
       else:
-        source_string = self.mycam.url
+        source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
       if self.redis.record_from_dev(self.type, self.dbline.id):
         self.vid_count = 0
         filepath = (self.recordingspath + 'C' 
@@ -522,7 +527,7 @@ class c_cam(c_device):
         outparams2 += ' ' + filepath
       cmd = ('/usr/bin/ffmpeg ' + generalparams + inparams + outparams1 
         + outparams2)
-      #print(cmd)
+      #self.logger.info('#####' + cmd)
       self.ff_proc = Popen(cmd, stdout=PIPE, shell=True)
       if self.dbline.cam_repeater > 0:
         self.repeater.rep_connect(self.mycam.url, self.rep_cam_nr)
