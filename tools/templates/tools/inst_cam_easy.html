@@ -87,9 +87,10 @@ let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 function install_cam(control_mode, cam_info, cam_address) {
   url_str =  cam_info.urlscheme.replace('{user}', $('#userinput').val());
   url_str = url_str.replace('{pass}', $('#passinput').val());
+  url_str_temp = url_str.replace('{address}', $('#camaddress').val());
   acaminstSocket.sendandwait({
     'command' : 'scanoneip',
-    'camurl' : url_str,
+    'camurl' : url_str_temp,
   })  
   .then((result) => {
     if(Object.keys(result).length === 0) {

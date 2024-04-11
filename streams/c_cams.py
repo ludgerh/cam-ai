@@ -230,7 +230,7 @@ class c_cam(c_device):
         control_port=self.dbline.cam_control_port, 
         control_user=self.dbline.cam_control_user, 
         control_pass=self.dbline.cam_control_passwd, 
-        url=self.dbline.cam_url,
+        url=self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
       )
       self.mp4timestamp = 0.0
       self.wd_ts = time()
@@ -547,6 +547,8 @@ class c_cam(c_device):
       + '_' + str(nr).zfill(8) + '.mp4')
 
   def reset_cam(self):
+    if not self.cam_active:
+      return()
     self.logger.info('Cam #'+str(self.dbline.id)+' is off')
     if self.ff_proc is not None:
       self.ff_proc.send_signal(SIGTERM)

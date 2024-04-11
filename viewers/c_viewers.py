@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import cv2 as cv
 import asyncio
+from statistics import mean
 from threading import Lock, Event
 from time import time
 from l_buffer.l_buffer import c_buffer
@@ -42,6 +43,7 @@ class c_viewer():
   async def onf(self, client_nr):  
     if not self.client_dict[client_nr]['busy'].is_set():
       self.client_dict[client_nr]['busy'].set()
+      self.client_dict[client_nr]['lat_ts'] = time()
       ts = time()
       frame = self.inqueue.get()[1]
       if self.parent.type == 'D':
@@ -91,6 +93,8 @@ class c_viewer():
         'busy' : Event(),
         'outx' : outx,
         'socket' : websocket,
+        'lat_ts' : 0.0,
+        'lat_arr' : [],
       }
       client_info['busy'].set()
       self.client_dict[count] = client_info
@@ -101,6 +105,11 @@ class c_viewer():
       del self.client_dict[client_nr]
       
   def clear_busy(self, client_nr):
+    if self.client_dict[client_nr]['lat_ts']:
+      self.client_dict[client_nr]['lat_arr'].append(time() - self.client_dict[client_nr]['lat_ts'])
+      if len(self.client_dict[client_nr]['lat_arr']) >= 10:
+        #print('Latency:', self.parent.type, self.parent.id, mean(self.client_dict[client_nr]['lat_arr']))
+        self.client_dict[client_nr]['lat_arr'] = []
     self.client_dict[client_nr]['busy'].clear()   
 
   def stop(self):

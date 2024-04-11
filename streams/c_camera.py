@@ -167,18 +167,14 @@ class search_executor(ThreadPoolExecutor):
             }
             params['ProfileToken'] = myprofile.token
             myresult['onvif']['urlstart'] = media_service.GetStreamUri(params)['Uri']
-            retrieved = media_service.GetStreamUri(params)['Uri']
-            scheme = retrieved.split("//")[0]
-            right = retrieved.split("//")[1]
+            scheme = myresult['onvif']['urlstart'].split("//")[0]
+            right = myresult['onvif']['urlstart'].split("//")[1]
             address = right.split("/")[0]
             ip_address = address.split(":")[0]
             port_address = address.split(":")[1]
-            if self.url != ip_address:
-                remaining = '/'.join(right.split('/')[1:])
-                new_address= scheme + '//' + self.url + ':' + port_address + '/' + remaining
-                myresult['onvif']['urlstart'] = new_address
-            else:    
-              myresult['onvif']['urlstart'] = media_service.GetStreamUri(params)['Uri']
+            remaining = '/'.join(right.split('/')[1:])
+            myresult['onvif']['urlstart'] = (scheme + '//{address}:' 
+              + port_address + '/' + remaining)
             myresult['onvif']['stream_port'] = port_address
             myresult['onvif']['urlscheme'] = myresult['onvif']['urlstart'].replace('://', '://{user}:{pass}@')
             myresult['onvif']['user'] = self.uname
@@ -210,7 +206,7 @@ class search_executor(ThreadPoolExecutor):
                 if (tempstring == 'true') or (tempstring == 'false'):
                   myresult['isapi']['user'] = self.uname
                   myresult['isapi']['pass'] = self.upass
-                  myresult['isapi']['urlstart'] = 'rtsp://'+myresult['address']['ip'] + ':554/ISAPI/streaming/channels/101'
+                  myresult['isapi']['urlstart'] = 'rtsp://{address}:554/ISAPI/streaming/channels/101'
                   netloc = urlparse(myresult['isapi']['urlstart']).netloc
                   myresult['isapi']['stream_port'] = netloc.split(':')[1]
                   myresult['isapi']['urlscheme'] = myresult['isapi']['urlstart'].replace('://', '://{user}:{pass}@')

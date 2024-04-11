@@ -66,7 +66,7 @@ class acaminst(AsyncWebsocketConsumer):
     await self.accept() 
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + text_data)
+    logger.info('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
     
@@ -155,7 +155,7 @@ class acaminst(AsyncWebsocketConsumer):
         await asyncio.sleep(0.1)
       e.stop()  
       outlist['data'] = e.all_results
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
       
     elif params['command'] == 'scanoneip':
@@ -168,7 +168,7 @@ class acaminst(AsyncWebsocketConsumer):
       p = await asyncio.create_subprocess_shell(cmds, stdout=asyncio.subprocess.PIPE)
       output, _ = await p.communicate()
       outlist['data'] = json.loads(output)
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'validate_domain':
