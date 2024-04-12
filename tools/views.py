@@ -87,7 +87,9 @@ class cam_inst_view(LoginRequiredMixin, TemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
+      'is_public' : djconf.getconfigbool('is_public_server', False),
       'debug' : settings.DEBUG,
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 

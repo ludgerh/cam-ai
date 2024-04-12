@@ -81,6 +81,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let ports = [80, 2020, 8000, 8080];
 
 let acaminstSocket;
+let mynetwork;
+let myip;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
@@ -148,6 +150,15 @@ $(document).ready(function() {
   )
   .then((result) => {
     acaminstSocket = result;
+{% if not is_public %}    
+    return(acaminstSocket.sendandwait({
+      'command' : 'getnetandip',
+    }));
+  })
+  .then((result) => {
+    mynetwork = result.mynet;
+    myip = result.myip;
+{% endif %}    
     $('#camaddress').keyup(function() {
       acaminstSocket.sendandwait({
         'command' : 'validate_domain',
@@ -161,6 +172,9 @@ $(document).ready(function() {
           $('#scan-button').attr('disabled','disabled');
         };  
       })
+    });
+    $('#camaddress').change(function() {
+      $('#camaddress').trigger('keyup');
     });
     $('#camaddress').trigger('change');
     $('#scan-button').click(function() {
@@ -178,6 +192,8 @@ $(document).ready(function() {
         'portaddr' : ports,
         'uname' : $('#userinput').val(),
         'upass' : $('#passinput').val(),
+        'network' : mynetwork,
+        'ipaddr' : myip,
       })  
       .then((result) => {
         console.log

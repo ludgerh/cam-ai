@@ -42,6 +42,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       Password:
       <input class="mb-3 m-2" type="password" id="passinput" size="30">
     </div>
+    <div class="h2 m-2">
+      Explanation: These are username and password from the camera configuration...
+    </div>
     <div>
       Select Port:
       <select class="mb-3 m-2" id="portselect">
@@ -50,8 +53,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       {% endfor %}  
       </select>
     </div>
+    <div class="h2 m-2">
+      Explanation: This is the port that we will contact the camera on.<br>
+      Standard-Settings are 443 for RTSP and 1935 for RTMP.<br>
+      If you have set up a different (non-standard) port on your camera, you have to set it here accordingly.
+    </div>
   </div>
-  <button class="btn btn-primary m-2 scan-button" type="button">Collect info from camera</button>
+  <button class="btn btn-primary m-2 scan-button" type="button">Collect info from camera (from ONVIF and/or ISAPI)</button>
 </div>
 <div class="h2 m-2 d-none" id="please_wait">
 Collecting Information. Please wait a while...
@@ -200,10 +208,10 @@ $(document).ready(function() {
         urlscheme = $('#urlselect').val();
       };
     };
-    urlstr =  urlscheme.replace('{user}', $('#userinput').val())
-    urlstr = urlstr.replace('{pass}', $('#passinput').val())
-    urlstr = urlstr.replace('{address}', $('#ipaddress').text())
-    urlstr = urlstr.replace('{port}', $('#portselect').val())
+    urlstr =  urlscheme.replace('{user}', $('#userinput').val());
+    urlstr = urlstr.replace('{pass}', $('#passinput').val());
+    //urlstr = urlstr.replace('{address}', $('#ipaddress').text());
+    urlstr = urlstr.replace('{port}', $('#portselect').val());
     $('#camurl').val(urlstr);
   });
   $('#urlselect').trigger("change");
@@ -240,13 +248,17 @@ $(document).ready(function() {
           $('#isapi-item').removeClass("d-none");
           $('#isapi_port').text(result[0].isapi.port);
           $('#isapi_activated').text(result[0].isapi.activated);
-          $('#isapi_devicename').text(result[0].isapi.info.deviceName);
-          $('#isapi_devicelocation').text(result[0].isapi.info.deviceLocation);
-          $('#isapi_model').text(result[0].isapi.info.model);
-          $('#isapi_hardware').text(result[0].isapi.info.hardwareVersion);
-          $('#isapi_firmware').text(result[0].isapi.info.firmwareVersion + result[0].isapi.info.firmwareReleasedDate);
-          $('#isapi_serial').text(result[0].isapi.info.serialNumber);
-          $('#isapi_url').text(result[0].isapi.urlscheme);
+          if ('info' in result[0].isapi) {
+            $('#isapi_devicename').text(result[0].isapi.info.deviceName);
+            $('#isapi_devicelocation').text(result[0].isapi.info.deviceLocation);
+            $('#isapi_model').text(result[0].isapi.info.model);
+            $('#isapi_hardware').text(result[0].isapi.info.hardwareVersion);
+            $('#isapi_firmware').text(result[0].isapi.info.firmwareVersion + result[0].isapi.info.firmwareReleasedDate);
+            $('#isapi_serial').text(result[0].isapi.info.serialNumber);
+            $('#isapi_url').text(result[0].isapi.urlscheme);
+          } else {
+            $('#isapi_devicename').text('Please enter correct username/password for more information');
+          };  
           if ('ptz' in result[0].isapi) {
             if ('pan' in result[0].isapi.ptz) {
               $('#isapi_ptz_pan').text(result[0].isapi.ptz.pan.min + ' - ' + result[0].isapi.ptz.pan.max);
@@ -265,12 +277,16 @@ $(document).ready(function() {
         if ('onvif' in result[0]) {
           $('#onvif-item').removeClass("d-none");
           $('#onvif_port').text(result[0].onvif.port);
-          $('#onvif_manufacturer').text(result[0].onvif.info.Manufacturer);
-          $('#onvif_model').text(result[0].onvif.info.Model);
-          $('#onvif_hardware').text(result[0].onvif.info.HardwareId);
-          $('#onvif_firmware').text(result[0].onvif.info.FirmwareVersion);
-          $('#onvif_serial').text(result[0].onvif.info.SerialNumber);
-          $('#onvif_url').text(result[0].onvif.urlscheme);
+          if ('Manufacturer' in result[0].onvif.info) {
+            $('#onvif_manufacturer').text(result[0].onvif.info.Manufacturer);
+            $('#onvif_model').text(result[0].onvif.info.Model);
+            $('#onvif_hardware').text(result[0].onvif.info.HardwareId);
+            $('#onvif_firmware').text(result[0].onvif.info.FirmwareVersion);
+            $('#onvif_serial').text(result[0].onvif.info.SerialNumber);
+            $('#onvif_url').text(result[0].onvif.urlscheme);
+          } else {
+            $('#onvif_manufacturer').text('Please enter correct username/password for more information');
+          };  
         };
         $(document).scrollTop($(document).height()); 
       })
@@ -294,9 +310,10 @@ $(document).ready(function() {
     $('.check-button').click(function() {
       $('#search_result').addClass("d-none");
       $('#codecdiv').addClass("d-none");
+      url_str_temp = $('#camurl').val().replace('{address}','{{ ipaddress }}');
       acaminstSocket.sendandwait({
         'command' : 'scanoneip',
-        'camurl' : $('#camurl').val(),
+        'camurl' : url_str_temp,
       })  
       .then((result) => {
         if(Object.keys(result).length === 0) {

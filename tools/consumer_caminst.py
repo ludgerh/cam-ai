@@ -63,6 +63,7 @@ class acaminst(AsyncWebsocketConsumer):
       return(streamcount < limit) 
 
   async def connect(self):
+    self.mynet = None
     await self.accept() 
 
   async def receive(self, text_data):
@@ -122,7 +123,7 @@ class acaminst(AsyncWebsocketConsumer):
         'mynet' : str(self.mynet),
         'myip' : str(self.myip),
       }
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'scanips':
@@ -177,12 +178,12 @@ class acaminst(AsyncWebsocketConsumer):
         mydomain = mydomain.split('//')[1]
       if '/' in mydomain:
         mydomain = mydomain.split('/')[0]  
-      if (mydomain == '') and self.scope['user'].is_superuser:
+      if (mydomain == '') and self.scope['user'].is_superuser and self.mynet:
         result = True #Admin may scan the network
       elif domain(mydomain) or ipv4(mydomain) or ipv6(mydomain): 
         result = True #Anyone may check an external domain or IP
       else:
         result = False #No correct IP nor domain
       outlist['data'] = {'result' : result, 'domain' : mydomain, } 
-      logger.debug('--> ' + str(outlist))
+      logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
