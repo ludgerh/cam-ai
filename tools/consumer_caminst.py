@@ -67,7 +67,7 @@ class acaminst(AsyncWebsocketConsumer):
     await self.accept() 
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']	
     outlist = {'tracker' : json.loads(text_data)['tracker']}	
     
@@ -123,14 +123,19 @@ class acaminst(AsyncWebsocketConsumer):
         'mynet' : str(self.mynet),
         'myip' : str(self.myip),
       }
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'get_client_ip':
+      headers_dict = dict(self.scope['headers'])
+      if b'x-real-ip' in headers_dict:
+        client_ip = headers_dict[b'x-real-ip'].decode()
+      else:
+        client_ip = self.scope['client'][0] 
       outlist['data'] = {
-        'client_ip' : self.scope['client'][0],
+        'client_ip' : client_ip,
       }
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'scanips':
@@ -163,7 +168,7 @@ class acaminst(AsyncWebsocketConsumer):
         await asyncio.sleep(0.1)
       e.stop()  
       outlist['data'] = e.all_results
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
       
     elif params['command'] == 'scanoneip':
@@ -176,7 +181,7 @@ class acaminst(AsyncWebsocketConsumer):
       p = await asyncio.create_subprocess_shell(cmds, stdout=asyncio.subprocess.PIPE)
       output, _ = await p.communicate()
       outlist['data'] = json.loads(output)
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
     elif params['command'] == 'validate_domain':
@@ -192,5 +197,5 @@ class acaminst(AsyncWebsocketConsumer):
       else:
         result = False #No correct IP nor domain
       outlist['data'] = {'result' : result, 'domain' : mydomain, } 
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	

@@ -27,37 +27,64 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="h2 m-2">
     Welcome! This is your camera installation assistant.
   </div>
-  <div>
+  {% if not is_public %}
     <div class="h2 m-2">
+      Please give us 2 to 4 minutes to collect information about the cameras in your network:
+    </div>
+    <div class="container-fluid float-left">
+      <div class="row" id="netlist">
+      </div>
+    </div>
+  {% endif %}
+  <div>
+    {% if is_public %}
+    <div class="h2 m-2">
+    {% else %}
+    <div class="h2 m-2 d-none" id="camaddress_hide">
+    {% endif %}
       Camera address:
       <input class="mb-3 m-2" type="text" id="camaddress" size="30">
     </div>
     <div class="h2 m-2">
-      Explanation: This is the place in the internet, where we can find your camera (IP or domain). 
-      Examples: '123.45.67.98', 'mydomain.com'...<br>
       {% if is_public %}
+        Explanation: This is the place in the internet, where we can find your camera (IP or domain). 
+        Examples: '123.45.67.98', 'mydomain.com'...<br>
         Your current IP address is <span id="client_ip">?</span>. 
         If your camera is connected via the same router, this will be the right IP to select.<br>
         If your IP address is dynamic, please configure a DynDNS service to ensure continuous connectivity.
         To learn how to do this, 
         <a href="https://cam-ai.de/other_routers_dyn_dns/" target="_blank"> click here</a>.
-      {% else %}
-        Leave empty to scan your network...
       {% endif %}
     </div>
+    {% if is_public %}
     <div class="h2 m-2">
+    {% else %}
+    <div class="h2 m-2 d-none" id="user_hide">
+    {% endif %}
       Camera Username:
       <input class="mb-3 m-2" type="text" id="userinput" size="30">
     </div>
+    {% if is_public %}
     <div class="h2 m-2">
+    {% else %}
+    <div class="h2 m-2 d-none" id="pass_hide">
+    {% endif %}
       Camera Password:
       <input class="mb-3 m-2" type="password" id="passinput" size="30">
     </div>
+    {% if is_public %}
     <div class="h2 m-2">
+    {% else %}
+    <div class="h2 m-2 d-none" id="explanation_hide">
+    {% endif %}
       Explanation: These are username and password from the camera configuration...
     </div>
   </div>
+  {% if is_public %}
   <div>
+  {% else %}
+  <div class="d-none">
+  {% endif %}
     <button class="btn btn-primary m-2" id="scan-button" type="button" disabled>Connectivity Check</button>
   </div>
   <div class="h2 m-2 d-none" id="info_text"></div>
@@ -96,6 +123,74 @@ let mynetwork;
 let myip;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+
+{% if not is_public %} 
+function collect_netlist() {
+  $('#netlist').empty();
+  $('#please_wait').removeClass("d-none");
+  portarray = ports;
+  if ($('#custom_port').val()) {
+    portarray = portarray.concat([parseInt($('#custom_port').val())]).sort(function(a, b){return a-b});
+  }  
+  $(document).scrollTop($(document).height()); 
+  acaminstSocket.sendandwait({
+    'command' : 'scanips',
+    'camaddress' : '',
+    'portaddr' : portarray,
+    'network' : mynetwork,
+    'ipaddr' : myip,
+  })  
+  .then((result) => {
+    $('#please_wait').addClass("d-none");
+    if ('address' in result[0]) {
+      for (item of result) {
+        if (!(('isapi' in item) || ('onvif' in item))){
+          continue;
+        };  
+        newcard  = '<div class="card m-1 p-0" style="border: 1; width: 212px; height: auto;">';
+          newcard += '<div class="card-body">';
+            newcard += '<h5 class="card-title">'+item.address.ip+'</h5>';
+            newcard += '<h6 class="card-subtitle mb-2">'+item.address.name+'</h6>';
+            newcard += '<h6 class="card-subtitle mb-2">Listening on ' + item.address.ports + '</h6>';
+            if (item.onvif) {
+              newcard += '<h6 class="card-subtitle mb-2">ONVIF on Port ' + (item.onvif.port) + '</h6>';
+            };  
+            if (item.isapi) {
+              newcard += '<h6 class="card-subtitle mb-2">ISAPI on Port ' + (item.isapi.port) + '</h6>';
+              if (item.isapi.activated) {
+                newcard += '<h6 class="card-subtitle mb-2">ISAPI is activated</h6>';
+              } else {
+                newcard += '<h6 class="card-subtitle mb-2">ISAPI is not activated</h6>';
+              };
+            };  
+            newcard += '<button class="btn btn-primary m-2 select-button"'
+              + ' ip="'+item.address.ip+'" ports="'+JSON.stringify(item.address.ports)+'"'
+              + ' type="button">Install this one</button>';
+          newcard += '</div>';
+        newcard += '</div>';
+        $('#netlist').append(newcard);
+      };
+      $('.select-button').click(function() {
+        $('#camaddress').val($(this).attr('ip'));
+        $('#scan-button').trigger('click');
+      });
+    } else {
+      newcard = '<div class="h2 m-2">';
+      newcard += 'We did not find any answering device according to your specs.<br>';
+      newcard += 'Try again with different address or port<br>';
+      newcard += 'Is the port correctly forwarded by the router?<br>';
+      newcard += 'Do you need DynDNS?';
+      newcard += '</div>';
+      $('#netlist').html(newcard);
+    };
+    $('#camaddress_hide').removeClass("d-none");
+    $('#user_hide').removeClass("d-none");
+    $('#pass_hide').removeClass("d-none");
+    $('#explanation_hide').removeClass("d-none");
+    $(document).scrollTop($(document).height()); 
+  })
+};
+{% endif %} 
 
 function install_cam(control_mode, cam_info, cam_address) {
   url_str =  cam_info.urlscheme.replace('{user}', $('#userinput').val());
@@ -198,7 +293,9 @@ $(document).ready(function() {
     });
     $('#camaddress').trigger('change');
     $('#scan-button').click(function() {
+{% if is_public %}    
       $('#netlist').empty();
+{% endif %}    
       $('#info_text').text('Testing connectivity. Please wait a while...');
       $('#info_text').removeClass("d-none");
       $(document).scrollTop($(document).height()); 
@@ -237,6 +334,10 @@ $(document).ready(function() {
               display = 'We found an ISAPI compatible camera, but your username and/or password seem to be wrong.<br>';
               display += 'Try again with the right credentials.<br>';
               $('#info_text').html(display);
+              {% if not is_public %}              
+              $('#explanation_hide').addClass("d-none");
+              {% endif %}          
+              
             }; 
           } else {
             if (result[0].onvif) {
@@ -256,6 +357,9 @@ $(document).ready(function() {
                 display = 'We found an ONVIF compatible camera, but your username and/or password seem to be wrong.<br>';
                 display += 'Try again with the right credentials.<br>';
                 $('#info_text').html(display);
+                {% if not is_public %}              
+                $('#explanation_hide').addClass("d-none");
+                {% endif %}          
               }; 
             } else {
               display = 'We found the system you addressed, but we got no proper answer for our ISAPI and/or ONVIF requests.<br>';
@@ -291,7 +395,9 @@ $(document).ready(function() {
         };
       });    
     });
-    
+{% if not is_public %}  
+    collect_netlist();
+{% endif %}    
   })  
 });
 </script>
