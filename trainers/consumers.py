@@ -354,7 +354,7 @@ class trainerutil(AsyncWebsocketConsumer):
     elif params['command'] == 'getparams':
       if self.trainerline.t_type in {2, 3}:
         await self.ws.send_str(text_data)
-        returned = await self.ws.recv()
+        returned = await self.ws.receive()
         outlist['data'] = json.loads(returned.data)['data']
       else:
         line = await fit.objects.aget(id=params['fitnr'])
