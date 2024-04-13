@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <main>
   <div class="h2 m-2">
     Welcome! This is your expert installation assistant.<br>
-    Uses this if you know what you are doing...
+    Use this if you know what you are doing...
   </div>
   {% if not is_public %}
     <div class="h2 m-2">
@@ -45,9 +45,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <input class="mb-3 m-2" type="text" id="camaddress" size="30">
     </div>
     <div class="h2 m-2">
-      Explanation: This is the place in the internet, where we can find your camera (IP or domain). Examples: '123.45.67.98', 'mydomain.com'...
+      Explanation: This is the place in the internet, where we can find your camera (IP or domain). 
+      Examples: '123.45.67.98', 'mydomain.com'...<br>
       {% if is_public %}
-        Lave empty to scan your network...
+        Your current IP address is <span id="client_ip">?</span>. 
+        If your camera is connected via the same router, this will be the right IP to select.<br>
+        If your IP address is dynamic, please configure a DynDNS service to ensure continuous connectivity.
+        To learn how to do this, 
+        <a href="https://cam-ai.de/other_routers_dyn_dns/" target="_blank"> click here</a>.
+      {% else %}
+        Leave empty to scan your network...
       {% endif %}
     </div>
   </div>
@@ -135,7 +142,15 @@ $(document).ready(function() {
   )
   .then((result) => {
     acaminstSocket = result;
-{% if not is_public %}    
+{% if is_public %}  
+    return(acaminstSocket.sendandwait({
+      'command' : 'get_client_ip',
+    }));
+  })
+  .then((result) => {
+    $('#camaddress').val(result.client_ip);
+    $('#client_ip').text(result.client_ip);
+{% else %}   
     return(acaminstSocket.sendandwait({
       'command' : 'getnetandip',
     }));
@@ -145,7 +160,7 @@ $(document).ready(function() {
     myip = result.myip;
     $('#network').text(result.mynet);
     $('#ipaddress').text(result.myip);
-{% endif %}    
+{% endif %}   
     $('.form-check-input').each(function( index ) {
       if (ports.includes(parseInt($(this).attr('port')))) {
         $(this).prop("checked",true);

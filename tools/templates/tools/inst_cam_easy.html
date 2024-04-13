@@ -33,7 +33,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <input class="mb-3 m-2" type="text" id="camaddress" size="30">
     </div>
     <div class="h2 m-2">
-      Explanation: This is the place in the internet, where we can find your camera (IP or domain). Examples: '123.45.67.98', 'mydomain.com'...
+      Explanation: This is the place in the internet, where we can find your camera (IP or domain). 
+      Examples: '123.45.67.98', 'mydomain.com'...<br>
+      {% if is_public %}
+        Your current IP address is <span id="client_ip">?</span>. 
+        If your camera is connected via the same router, this will be the right IP to select.<br>
+        If your IP address is dynamic, please configure a DynDNS service to ensure continuous connectivity.
+        To learn how to do this, 
+        <a href="https://cam-ai.de/other_routers_dyn_dns/" target="_blank"> click here</a>.
+      {% else %}
+        Leave empty to scan your network...
+      {% endif %}
     </div>
     <div class="h2 m-2">
       Camera Username:
@@ -81,6 +91,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let ports = [80, 2020, 8000, 8080];
 
 let acaminstSocket;
+let client_ip;
 let mynetwork;
 let myip;
 
@@ -150,7 +161,16 @@ $(document).ready(function() {
   )
   .then((result) => {
     acaminstSocket = result;
-{% if not is_public %}    
+{% if is_public %}  
+    return(acaminstSocket.sendandwait({
+      'command' : 'get_client_ip',
+    }));
+  })
+  .then((result) => {
+    client_ip = result.client_ip;
+    $('#camaddress').val(client_ip);
+    $('#client_ip').text(result.client_ip);
+{% else %}   
     return(acaminstSocket.sendandwait({
       'command' : 'getnetandip',
     }));
@@ -220,7 +240,7 @@ $(document).ready(function() {
             }; 
           } else {
             if (result[0].onvif) {
-              if (result[0].onvif.info) {
+              if ('Manufacturer' in result[0].onvif.info) {
                 $('#onvif_manufacturer').text(result[0].onvif.info.Manufacturer);
                 $('#onvif_model').text(result[0].onvif.info.Model);
                 $('#onvif_list').removeClass("d-none");

@@ -47,7 +47,7 @@ def update(request, new_ip, task_url):
             logger.info('DynDNS Update failed: User ' + name + ' used wrong password.')
             user = None
   if user:
-    tasklist = task_url.split('.')[0].split('_')
+    tasklist = task_url.split('.')[0].split('-')
     if tasklist[0].upper() == 'ALL':
       streamlines = access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', user, 'W'

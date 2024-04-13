@@ -126,6 +126,13 @@ class acaminst(AsyncWebsocketConsumer):
       logger.info('--> ' + str(outlist))
       await self.send(json.dumps(outlist))	
 
+    elif params['command'] == 'get_client_ip':
+      outlist['data'] = {
+        'client_ip' : self.scope['client'][0],
+      }
+      logger.info('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))	
+
     elif params['command'] == 'scanips':
       if 'network' in params:
         mynet = ip_network(params['network'])
