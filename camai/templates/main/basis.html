@@ -51,9 +51,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             <a href="/">
               {% if emulatestatic %}
               {% load static %}
-                <img src="{% static 'camai/git/img/5.png' %}" style="width:auto;height:auto;">
+                <img src="{% static 'camai/git/img/6.png' %}" style="width:170px;">
               {% else %}
-                <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:auto;height:auto;">
+                <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/6.png" style="width:170;">
               {% endif %}
             </a>
           </div>
@@ -186,11 +186,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           </div>
           <div class="col-sm-auto">
             <a class="btn btn-primary m-2 back back" href="/tools/logout/">Log Out &#8205; <i class="bi bi-box-arrow-left"></i></a>
-          </div>
-        </div>
-        <div class="row helprow" style="float: right;">
-          <div class="col-sm-auto" style="float: right;">
-              <a class="btn m-2" href="https://cam-ai.de/instructions/" style="color: #475B63;"><i class="bi bi-question-circle"></i></a>
+            <a class="btn m-2" href="https://cam-ai.de/instructions/" target="_blank" style="color: #475B63;"><i class="bi bi-question-circle"></i></a>
           </div>
         </div>
       </div>
@@ -208,7 +204,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             </a>
           </div>
           <div class="col-sm-auto">
-            <a class="btn btn-link m-2 " style="border: 0; background-color= #F0F4F7; color: #475B63;" href="https://cam-ai.de">
+            <a class="btn btn-link m-2 " style="border: 0; background-color= #F0F4F7; color: #475B63;" href="https://cam-ai.de" target="_blank">
              <h5>Visit our website to learn more</h5>
             </a>
           </div>
@@ -219,13 +215,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           </div>
           <div class="col-sm-auto">
             <a class="btn btn-primary m-2 back back" href="/accounts/register/">Register</a>
-          </div>
-          <div class="col-sm-auto">
             <a class="btn btn-primary m-2" href="/accounts/login/?next=/">Log in &#8205; <i class="bi bi-box-arrow-right"></i></a>
-          </div>
-        </div>
-        <div class="col-sm-auto" style="float: right;">
-              <a class="btn m-2" href="https://cam-ai.de/instructions/" style="color: #475B63;"><i class="bi bi-question-circle"></i></a>
+              <a class="btn m-2" href="https://cam-ai.de/instructions/" target="_blank" style="color: #475B63;"><i class="bi bi-question-circle"></i></a>
           </div>
       </div>
     {% endif %}

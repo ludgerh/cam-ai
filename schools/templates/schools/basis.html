@@ -47,11 +47,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="col-sm-auto">
           <a href="/">
             {% if emulatestatic %}
-            {% load static %}
-            <img src="{% static 'camai/git/img/5.png' %}" style="width:144;height:58;">
-            {% else %}
-            <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.png" style="width:144;height:58;">
-            {% endif %}
+              {% load static %}
+                <img src="{% static 'camai/git/img/6.png' %}" style="width:170px;">
+              {% else %}
+                <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/6.png" style="width:170;">
+              {% endif %}
           </a>
         </div>
         <div class="col-sm-auto">
@@ -71,17 +71,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             V{{ version }}
             (User: {{ user }}){# Kommt als dropdown mit logout #}
           </div>
-{% if user.is_superuser %}
         </div>
         <div class="col-sm-auto">
           <a class="btn btn-primary m-2 back back" href="/tools/logout/">Log Out &#8205; <i class="bi bi-box-arrow-left"></i></a>
-        </div>
-        <div class="col-sm-auto" style="float: right;">
-            <a class="btn m-2" href="https://cam-ai.de/instructions/" style="color: #475B63;"><i class="bi bi-question-circle"></i></a>
+            <a class="btn m-2" href="https://cam-ai.de/instructions/" target="_blank" style="color: #475B63;"><i class="bi bi-question-circle"></i></a>
         </div>
       </div>
     </div>
-{% endif %}
     {% block content %}No Content yet...{% endblock %}
 
   </body>

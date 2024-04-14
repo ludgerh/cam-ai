@@ -24,167 +24,171 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 {% endif %}
-<div>
-  <div class="h2 m-2">
-    Camera on IP:
-    <span id="ipaddress">{{ ipaddress }}</span>
-  </div>
-  <div class="h2 m-2">
-    Open ports:
-    <span>{{ ports }}</span>
-  </div>
-  <div class="h4 m-2">
-    <div>
-      Username:
-      <input class="mb-3 m-2" type="text" id="userinput" size="30">
-    </div>
-    <div>
-      Password:
-      <input class="mb-3 m-2" type="password" id="passinput" size="30">
+<main>
+  <div>
+    <div class="h2 m-2">
+      Camera on IP:
+      <span id="ipaddress">{{ ipaddress }}</span>
     </div>
     <div class="h2 m-2">
-      Explanation: These are username and password from the camera configuration...
+      Open ports:
+      <span>{{ ports }}</span>
     </div>
-    <div>
-      Select Port:
-      <select class="mb-3 m-2" id="portselect">
-      {% for item in ports %}
-        <option value="{{ item }}">{{ item }}</option>
-      {% endfor %}  
-      </select>
+    <div class="h4 m-2">
+      <div>
+        Username:
+        <input class="mb-3 m-2" type="text" id="userinput" size="30">
+      </div>
+      <div>
+        Password:
+        <input class="mb-3 m-2" type="password" id="passinput" size="30">
+      </div>
+      <div class="h2 m-2">
+        Explanation: These are username and password from the camera configuration...
+      </div>
+      <div>
+        Select Port:
+        <select class="mb-3 m-2" id="portselect">
+        {% for item in ports %}
+          <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}  
+        </select>
+      </div>
+      <div class="h2 m-2">
+        Explanation: This is the port that will be used to connect to the camera. <br>
+        Standard settings are 554 for RTSP and 1935 for RTMP.<br>
+        If you have configured a different (non-standard) port on your camera, you must set it accordingly here.
+      </div>
     </div>
-    <div class="h2 m-2">
-      Explanation: This is the port that will be used to connect to the camera. <br>
-      Standard settings are 554 for RTSP and 1935 for RTMP.<br>
-      If you have configured a different (non-standard) port on your camera, you must set it accordingly here.
-    </div>
+    <button class="btn btn-primary m-2 scan-button" type="button">Collect info from camera (from ONVIF and/or ISAPI)</button>
   </div>
-  <button class="btn btn-primary m-2 scan-button" type="button">Collect info from camera (from ONVIF and/or ISAPI)</button>
-</div>
-<div class="h2 m-2 d-none" id="please_wait">
-Collecting Information. Please wait a while...
-</div>
-<div class="accordion d-none" id="CamAccordion">
-  <div class="accordion-item">
-    <h2 class="accordion-header" id="panelsStayOpen-headingOne">
-      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne">
-        General Information
-      </button>
-    </h2>
-    <div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show" aria-labelledby="panelsStayOpen-headingOne">
-      <div class="accordion-body">
-        <strong>Network name: </strong><span id="netname">?</span>
+  <div class="h2 m-2 d-none" id="please_wait">
+  Collecting Information. Please wait a while...
+  </div>
+  <div class="accordion d-none" id="CamAccordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="panelsStayOpen-headingOne">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne">
+          General Information
+        </button>
+      </h2>
+      <div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show" aria-labelledby="panelsStayOpen-headingOne">
+        <div class="accordion-body">
+          <strong>Network name: </strong><span id="netname">?</span>
+        </div>
+      </div>
+    </div>
+    <div class="accordion-item d-none" id="isapi-item">
+      <h2 class="accordion-header" id="panelsStayOpen-headingTwo">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseTwo" aria-expanded="false" aria-controls="panelsStayOpen-collapseTwo">
+          ISAPI Information
+        </button>
+      </h2>
+      <div id="panelsStayOpen-collapseTwo" class="accordion-collapse collapse show" aria-labelledby="panelsStayOpen-headingTwo">
+        <div class="accordion-body">
+          <div>
+            <strong>Port: </strong><span id="isapi_port">?</span>
+          </div>  
+          <div>
+            <strong>Activated: </strong><span id="isapi_activated">?</span>
+          </div>  
+          <div>
+            <strong>Device Name: </strong><span id="isapi_devicename">?</span>
+          </div>  
+          <div>
+            <strong>Device Location: </strong><span id="isapi_devicelocation">?</span>
+          </div>  
+          <div>
+            <strong>Model: </strong><span id="isapi_model">?</span>
+          </div>  
+          <div>
+            <strong>Hardware ID: </strong><span id="isapi_hardware">?</span>
+          </div>  
+          <div>
+            <strong>Firmware Version: </strong><span id="isapi_firmware">?</span>
+          </div>  
+          <div>
+            <strong>Serial Number: </strong><span id="isapi_serial">?</span>
+          </div>  
+          <div class="d-none" id="isapi_pan">
+            <strong>PTZ Pan Range: </strong><span id="isapi_ptz_pan">?</span>
+          </div> 
+          <div class="d-none" id="isapi_tilt">
+            <strong>PTZ Tilt Range: </strong><span id="isapi_ptz_tilt">?</span>
+          </div>  
+          <div class="d-none" id="isapi_zoom">
+            <strong>PTZ Zoom Range: </strong><span id="isapi_ptz_zoom">?</span>
+          </div>  
+          <div>
+            <strong>URL: </strong><span id="isapi_url">?</span>
+          </div>  
+          <button class="btn btn-primary m-2" type="button" id="use_isapi">Use ISAPI</button>
+        </div>
+      </div>
+    </div>
+    <div class="accordion-item d-none" id="onvif-item">
+      <h2 class="accordion-header" id="panelsStayOpen-headingThree">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseThree" aria-expanded="false" aria-controls="panelsStayOpen-collapseThree">
+          ONVIF Information
+        </button>
+      </h2>
+      <div id="panelsStayOpen-collapseThree" class="accordion-collapse collapse show" aria-labelledby="panelsStayOpen-headingThree">
+        <div class="accordion-body">
+          <h3>
+            <div>
+              <strong>Port: </strong><span id="onvif_port">?</span>
+            </div>  
+            <div>
+              <strong>Manufacturer: </strong><span id="onvif_manufacturer">?</span>
+            </div>  
+            <div>
+              <strong>Model: </strong><span id="onvif_model">?</span>
+            </div>  
+            <div>
+              <strong>Hardware ID: </strong><span id="onvif_hardware">?</span>
+            </div>  
+            <div>
+              <strong>Firmware Version: </strong><span id="onvif_firmware">?</span>
+            </div>  
+            <div>
+              <strong>Serial Number: </strong><span id="onvif_serial">?</span>
+            </div>  
+            <div>
+              <strong>URL: </strong><span id="onvif_url">?</span>
+            </div>  
+          </h3>
+          <button class="btn btn-primary m-2" type="button" id="use_onvif">Use ONVIF</button>
+        </div>
       </div>
     </div>
   </div>
-  <div class="accordion-item d-none" id="isapi-item">
-    <h2 class="accordion-header" id="panelsStayOpen-headingTwo">
-      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseTwo" aria-expanded="false" aria-controls="panelsStayOpen-collapseTwo">
-        ISAPI Information
-      </button>
-    </h2>
-    <div id="panelsStayOpen-collapseTwo" class="accordion-collapse collapse show" aria-labelledby="panelsStayOpen-headingTwo">
-      <div class="accordion-body">
-        <div>
-          <strong>Port: </strong><span id="isapi_port">?</span>
-        </div>  
-        <div>
-          <strong>Activated: </strong><span id="isapi_activated">?</span>
-        </div>  
-        <div>
-          <strong>Device Name: </strong><span id="isapi_devicename">?</span>
-        </div>  
-        <div>
-          <strong>Device Location: </strong><span id="isapi_devicelocation">?</span>
-        </div>  
-        <div>
-          <strong>Model: </strong><span id="isapi_model">?</span>
-        </div>  
-        <div>
-          <strong>Hardware ID: </strong><span id="isapi_hardware">?</span>
-        </div>  
-        <div>
-          <strong>Firmware Version: </strong><span id="isapi_firmware">?</span>
-        </div>  
-        <div>
-          <strong>Serial Number: </strong><span id="isapi_serial">?</span>
-        </div>  
-        <div class="d-none" id="isapi_pan">
-          <strong>PTZ Pan Range: </strong><span id="isapi_ptz_pan">?</span>
-        </div> 
-        <div class="d-none" id="isapi_tilt">
-          <strong>PTZ Tilt Range: </strong><span id="isapi_ptz_tilt">?</span>
-        </div>  
-        <div class="d-none" id="isapi_zoom">
-          <strong>PTZ Zoom Range: </strong><span id="isapi_ptz_zoom">?</span>
-        </div>  
-        <div>
-          <strong>URL: </strong><span id="isapi_url">?</span>
-        </div>  
-        <button class="btn btn-primary m-2" type="button" id="use_isapi">Use ISAPI</button>
-      </div>
-    </div>
+  <div class="h5 m-2">
+    Type of your camera:
+    <select class="form-select m-2 w-50" id="urlselect">
+      <option value="[custom url]" selected>Other Type</option>
+  {% for item in camurls %}
+      <option value="{{ item.url }}">{{ item.type }}</option>
+  {% endfor %}
+    </select>
   </div>
-  <div class="accordion-item d-none" id="onvif-item">
-    <h2 class="accordion-header" id="panelsStayOpen-headingThree">
-      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseThree" aria-expanded="false" aria-controls="panelsStayOpen-collapseThree">
-        ONVIF Information
-      </button>
-    </h2>
-    <div id="panelsStayOpen-collapseThree" class="accordion-collapse collapse show" aria-labelledby="panelsStayOpen-headingThree">
-      <div class="accordion-body">
-        <div>
-          <strong>Port: </strong><span id="onvif_port">?</span>
-        </div>  
-        <div>
-          <strong>Manufacturer: </strong><span id="onvif_manufacturer">?</span>
-        </div>  
-        <div>
-          <strong>Model: </strong><span id="onvif_model">?</span>
-        </div>  
-        <div>
-          <strong>Hardware ID: </strong><span id="onvif_hardware">?</span>
-        </div>  
-        <div>
-          <strong>Firmware Version: </strong><span id="onvif_firmware">?</span>
-        </div>  
-        <div>
-          <strong>Serial Number: </strong><span id="onvif_serial">?</span>
-        </div>  
-        <div>
-          <strong>URL: </strong><span id="onvif_url">?</span>
-        </div>  
-        <button class="btn btn-primary m-2" type="button" id="use_onvif">Use ONVIF</button>
-      </div>
-    </div>
+  <div class="mb-3 m-2">
+    <label for="camurl" class="form-label h4">Url of your camera:</label>
+    <textarea class="form-control" id="camurl" rows="2"></textarea>
   </div>
-</div>
-<div class="h4 m-2">
-  Type of your camera:
-  <select class="form-select m-2 w-50" id="urlselect">
-    <option value="[custom url]" selected>Other Type</option>
-{% for item in camurls %}
-    <option value="{{ item.url }}">{{ item.type }}</option>
-{% endfor %}
-  </select>
-</div>
-<div class="mb-3 m-2">
-  <label for="camurl" class="form-label h4">Url of your camera:</label>
-  <textarea class="form-control" id="camurl" rows="2"></textarea>
-</div>
-<div>
-  <button class="btn btn-primary m-2 check-button" type="button">Check connection</button>
-</div>
-<h4 class="m-2 d-none" id="search_result"></h4>
-<div class="h4 m-2 d-none" id="codecdiv">
-  Available video codecs:
-  <select class="form-select m-2 w-50" id="videoselect">
-  </select>
-  Available audio codecs:
-  <select class="form-select m-2 w-50" id="audioselect">
-  </select>
-  <button class="btn btn-primary m-2 install-button" type="button">Install this camera</button>
-</div>
+  <div>
+    <button class="btn btn-primary m-2 check-button" type="button">Check connection</button>
+  </div>
+  <h4 class="m-2 d-none" id="search_result"></h4>
+  <div class="h5 m-2 d-none" id="codecdiv">
+    Available video codecs:
+    <select class="form-select m-2 w-50" id="videoselect">
+    </select>
+    Available audio codecs:
+    <select class="form-select m-2 w-50" id="audioselect">
+    </select>
+    <button class="btn btn-primary m-2 install-button" type="button">Install this camera</button>
+  </div>
+</main>
 
 <script>
 
