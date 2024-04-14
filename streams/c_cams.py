@@ -175,7 +175,10 @@ class c_cam(c_device):
           return(None)
         ready_to_read, _, _ = select([self.ff_proc.stdout], [], [], 5.0) 
         if ready_to_read:
-          in_bytes = self.ff_proc.stdout.read(self.bytes_per_frame)
+          try:
+            in_bytes = self.ff_proc.stdout.read(self.bytes_per_frame)
+          except  AttributeError: 
+            in_bytes = None
         else:
           in_bytes = None
         if in_bytes:

@@ -63,7 +63,11 @@ class c_viewer():
           else:
             frame = cv.addWeighted(frame, 1, 
               (255-self.drawpad.screen), -1.0, 0)
-      frame = c_convert(frame, typein=1, typeout=3, 
+      if self.client_dict[client_nr]['do_compress']:
+        to = 3
+      else:
+        to = 2         
+      frame = c_convert(frame, typein=1, typeout=to, 
         xout=self.client_dict[client_nr]['outx'])
       if (int(redis.get('CAM-AI:KBInt')) 
           or int(redis.get('CAM-AI:KillStream:' + str(self.parent.id)))):
@@ -82,7 +86,7 @@ class c_viewer():
         asyncio.run_coroutine_threadsafe(self.onf(item), self.event_loop)
         
 
-  def push_to_onf(self, outx, websocket):
+  def push_to_onf(self, outx, do_compress, websocket):
     self.parent.add_view_count()
     count = 0
     with self.client_dict_lock:
@@ -95,6 +99,7 @@ class c_viewer():
         'socket' : websocket,
         'lat_ts' : 0.0,
         'lat_arr' : [],
+        'do_compress' : do_compress,
       }
       client_info['busy'].set()
       self.client_dict[count] = client_info

@@ -79,6 +79,10 @@ class triggerConsumer(AsyncWebsocketConsumer):
     outlist = {'tracker' : json.loads(text_data)['tracker']}
 
     if params['command'] == 'starttrigger':
+      if 'do_compress' in params:
+        do_compress = params['do_compress']
+      else:
+        do_compress = True  
       mystream = streams[params['idx']]
       show_cam = not(self.scope['user'].is_superuser 
         and is_public_server and mystream.dbline.encrypted)
@@ -90,11 +94,13 @@ class triggerConsumer(AsyncWebsocketConsumer):
             outx = max(mystream.dbline.cam_min_x_view, outx)
             if mystream.dbline.cam_max_x_view:
               outx = min(mystream.dbline.cam_max_x_view, outx)
+          while not hasattr(mystream, 'mycam'):
+            await asyncio.sleep(longbreak)
           myviewer = mystream.mycam.viewer
         elif params['mode'] == 'D':
           mydetector = mystream.mydetector
           while mydetector.scaledown is None:
-            sleep(longbreak)
+            await asyncio.sleep(longbreak)
           if outx > mystream.dbline.det_min_x_view:
             outx *= mystream.dbline.det_scale_x_view
             outx = max(mystream.dbline.det_min_x_view, outx)
@@ -116,7 +122,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
         myviewer.event_loop = asyncio.get_event_loop()
         outx = round(min(mystream.dbline.cam_xres, outx))
         if show_cam:
-          onf_index = myviewer.push_to_onf(outx, self)
+          onf_index = myviewer.push_to_onf(outx, do_compress, self)
         else:
           onf_index = None  
         if params['mode'] not in self.viewer_dict:
