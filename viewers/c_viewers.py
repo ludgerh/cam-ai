@@ -108,6 +108,7 @@ class c_viewer():
   def pop_from_onf(self, client_nr):
     with self.client_dict_lock:
       del self.client_dict[client_nr]
+    self.parent.take_view_count()
       
   def clear_busy(self, client_nr):
     if self.client_dict[client_nr]['lat_ts']:

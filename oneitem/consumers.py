@@ -16,13 +16,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 from logging import getLogger
-from traceback import format_exc
 from django.forms.models import model_to_dict
-from django.db import transaction
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from access.c_access import access
-from tools.djangodbasync import getoneline, savedbline, deletefilter, updatefilter
+#from tools.djangodbasync import deletefilter
 from tools.c_logger import log_ini
 from tools.c_redis import myredis
 from tf_workers.models import school
@@ -162,7 +160,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.myitem.inqueue.put(('set_event_time_gap', value))
         elif params['pname'] == 'eve_school':
           value = int(params['value'])
-          myschool = await getoneline(school, {'id' : value, })
+          myschool = await school.objects.aget(id = value)
           self.myitem.dbline.eve_school = myschool 
           self.myitem.inqueue.put(('set_school', value))
         elif params['pname'] == 'eve_alarm_email':
@@ -180,7 +178,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         if 'ch_edit' in params:
           self.myitem.viewer.drawpad.edit_active = params['ch_edit']
         if 'ch_apply' in params:
-          myline = await getoneline(stream, {'id' : self.myitem.dbline.id, })
+          myline = await stream.objects.aget(id = self.myitem.dbline.id)
           if self.mode == 'C':
             if self.mydrawpad.mtype == 'C':
               self.myitem.inqueue.put(('set_apply_mask', params['ch_apply']))
@@ -215,10 +213,14 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.mydrawpad.new_ring()
           self.mydrawpad.make_screen()
           self.mydrawpad.mask_from_polygons()
-          await deletefilter(mask, {
-            'stream_id' : self.idx,
-            'mtype' : self.mydrawpad.mtype,
-          })
+          await mask.objects.filter(
+            stream_id=self.idx, 
+            mtype=self.mydrawpad.mtype
+          ).adelete()
+          #await deletefilter(mask, {
+          #  'stream_id' : self.idx,
+          #  'mtype' : self.mydrawpad.mtype,
+          #})
           for ring in self.mydrawpad.ringlist:
             m = mask(
               name='New Ring',
@@ -226,7 +228,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               stream_id=self.idx,
               mtype=self.mydrawpad.mtype,
             )
-            await savedbline(m)
+            await m.asave()
           if self.mydrawpad.mtype == 'X':
             self.detectormask_changed = True
       outlist['data'] = 'OK'

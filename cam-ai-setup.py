@@ -249,8 +249,6 @@ for line in sourcefile:
   if line.startswith('env_type = '):
       line = 'env_type = "' + env_type + '"\n'
   targetfile.write(line)
-if not os.path.exists('eventers/c_alarm.py'):
-  copy('eventers/c_alarm.py.example','eventers/c_alarm.py')
 targetfile = open('camai/passwords.py-new', 'w')
 sourcefile.close()
 targetfile.close()

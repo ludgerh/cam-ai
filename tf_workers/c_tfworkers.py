@@ -89,22 +89,25 @@ class model_buffer(deque):
     if self.pause:
       ('short_brake', 0.01)
     else:  
-      with self.bufferlock:
-        for frame in initem[0]:
-          if self.websocket:
-            if ((frame.shape[1] * frame.shape[0]) > (self.xdim * self.ydim)):
-              frame = cv.resize(frame, (self.xdim, self.ydim))
-          else:
+      for frame in initem[0]:
+        if self.websocket:
+          if ((frame.shape[1] * frame.shape[0]) > (self.xdim * self.ydim)):
             frame = cv.resize(frame, (self.xdim, self.ydim))
+        else:
+          frame = cv.resize(frame, (self.xdim, self.ydim))
+        with self.bufferlock:
           super().append((frame, initem[1]))
 
   def get(self, maxcount):
     result = []
     while True:
-      with self.bufferlock:
-        if not len(self):
-          break
+      self.bufferlock.acquire()
+      if not len(self):
+        self.bufferlock.release()
+        break
+      else:  
         initem = self.popleft()
+        self.bufferlock.release()
       result.append(initem)
       if len(result) >= maxcount:
         break 
@@ -169,6 +172,7 @@ class tf_worker():
     self.myschool_cache = {}
     self.allmodels = {}
     self.activemodels = {}
+    #self.new_model_lock = Lock()
 
     #*** Client Var
     self.run_out_procs = {}
@@ -294,16 +298,17 @@ class tf_worker():
           self.my_output.put(received[2], ('put_xy', (xdim, ydim)))
         elif (received[0] == 'imglist'):
           schoolnr = received[1]
+          self.check_allmodels(schoolnr, self.logger)
+          self.check_activemodels(schoolnr, self.logger)
+          while not 'xdim' in self.allmodels[schoolnr]:
+            sleep(djconf.getconfigfloat('long_brake', 1.0))
           if schoolnr not in self.model_buffers:
-            self.check_allmodels(schoolnr, self.logger)
-            while not 'xdim' in self.allmodels[schoolnr]:
-              sleep(djconf.getconfigfloat('long_brake', 1.0))
             self.model_buffers[schoolnr] = model_buffer(schoolnr, 
               self.allmodels[schoolnr]['xdim'], 
               self.allmodels[schoolnr]['ydim'],
               self.dbline.use_websocket,
             )
-            self.model_buffers[schoolnr].pause = False
+          self.model_buffers[schoolnr].pause = False
           self.model_buffers[schoolnr].append(received[2:])
         elif (received[0] == 'register'):
           myuser = tf_user()
@@ -386,8 +391,6 @@ class tf_worker():
                 and (len(self.model_buffers[schoolnr]) >= self.dbline.maxblock
                 or new_time > self.model_buffers[schoolnr].ts + self.dbline.timeout)):
               self.model_buffers[schoolnr].ts = new_time  
-              while not schoolnr in self.model_buffers:
-                sleep(djconf.getconfigfloat('long_brake', 1.0)) 
               while self.do_run and len(self.model_buffers[schoolnr]):
                 self.process_buffer(schoolnr, self.logger)
             else:
@@ -426,8 +429,6 @@ class tf_worker():
             del self.allmodels[schoolnr]
             if schoolnr in self.activemodels:
               del self.activemodels[schoolnr]
-            if schoolnr in self.model_buffers:
-              del self.model_buffers[schoolnr]
         model_path = myschool.dir+'model/'+myschool.model_type+'.h5'
       if not (schoolnr in self.allmodels):
         self.allmodels[schoolnr] = {}
@@ -480,7 +481,9 @@ class tf_worker():
 
   def check_activemodels(self, schoolnr, logger, test_pred = False):
     with self.model_check_lock:
-      if not (schoolnr in self.activemodels) and (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket):
+      if (not (schoolnr in self.activemodels) 
+          and (self.dbline.gpu_sim < 0) 
+          and (not self.dbline.use_websocket)):
         logger.info('***** Loading model buffer #'+str(schoolnr)+', file: '
           + self.allmodels[schoolnr]['path'])
         if len(self.activemodels) < self.dbline.max_nr_models:
@@ -501,14 +504,18 @@ class tf_worker():
           self.activemodels[schoolnr]['xdim'] = self.allmodels[schoolnr]['xdim']
           self.activemodels[schoolnr]['ydim'] = self.allmodels[schoolnr]['ydim']
           self.activemodels[schoolnr]['time'] = time()
-          self.activemodels[schoolnr]['model'].get_layer(name=self.activemodels[schoolnr]['type']).set_weights(
-            self.allmodels[schoolnr]['weights'][0])
-          self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense1').set_weights(
-            self.allmodels[schoolnr]['weights'][1])
-          self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense2').set_weights(
-            self.allmodels[schoolnr]['weights'][2])
-          self.activemodels[schoolnr]['model'].get_layer(name='CAM-AI_Dense3').set_weights(
-            self.allmodels[schoolnr]['weights'][3])
+          self.activemodels[schoolnr]['model'].get_layer(
+            name=self.activemodels[schoolnr]['type']).set_weights(
+              self.allmodels[schoolnr]['weights'][0])
+          self.activemodels[schoolnr]['model'].get_layer(
+            name='CAM-AI_Dense1').set_weights(
+              self.allmodels[schoolnr]['weights'][1])
+          self.activemodels[schoolnr]['model'].get_layer(
+            name='CAM-AI_Dense2').set_weights(
+              self.allmodels[schoolnr]['weights'][2])
+          self.activemodels[schoolnr]['model'].get_layer(
+            name='CAM-AI_Dense3').set_weights(
+              self.allmodels[schoolnr]['weights'][3])
           del self.activemodels[nr_to_replace]
         logger.info('***** Got model buffer #'+str(schoolnr)+', file: '
           + self.allmodels[schoolnr]['path'])
@@ -534,6 +541,7 @@ class tf_worker():
       framesinfo = [item[1] for item in slice_to_process]
       self.check_allmodels(schoolnr, logger)
       self.check_activemodels(schoolnr, logger)
+      self.model_buffers[schoolnr].pause = False
       if self.dbline.gpu_sim >= 0: #GPU Simulation with random
         if self.dbline.gpu_sim > 0:
           sleep(self.dbline.gpu_sim)
@@ -654,7 +662,7 @@ class tf_worker():
             self.pred_out_lock.release()
             break
           else: 
-            self.pred_out_lock.release() 
+            self.pred_out_lock.release()
             sleep(djconf.getconfigfloat('very_short_brake', 0.001))
       else:
         raise QueueUnknownKeyword(received[0])

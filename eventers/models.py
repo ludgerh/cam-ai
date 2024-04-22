@@ -86,17 +86,27 @@ class evt_condition(models.Model):
 
   def __str__(self):
     return('evt_conditions model (TBD ...)')
+  
+class alarm_device_type(models.Model):
+  name = models.CharField(max_length=50, default="New device type")
+  mendef = models.CharField(max_length=255, default="[]")
+  
+  def __str__(self):
+    return('Model: alarm_device_type:' + self.name)
+  
+class alarm_device(models.Model):
+  name = models.CharField(max_length=50, default="New device")
+  device_type = models.ForeignKey(alarm_device_type, on_delete=models.CASCADE)
+  
+  def __str__(self):
+    return('Model: alarm_device:' + self.name)
     
 class alarm(models.Model):
+  name = models.CharField(max_length=50, default="New alarm")
+  active = models.BooleanField(default=True)
   mystream = models.ForeignKey(stream, on_delete=models.CASCADE)
+  mydevice = models.ForeignKey(alarm_device, on_delete=models.CASCADE, null=True)
   mendef = models.CharField(max_length=255, default="[]")
   
   def __str__(self):
-    return(self.name)
-  
-class alarmdevice(models.Model):
-  name = models.CharField(max_length=50, default="New device")
-  mendef = models.CharField(max_length=255, default="[]")
-  
-  def __str__(self):
-    return(self.name)
+    return('Model: alarm:' + self.name)

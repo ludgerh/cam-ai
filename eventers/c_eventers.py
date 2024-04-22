@@ -46,7 +46,7 @@ from schools.c_schools import get_taglist
 from .models import evt_condition
 from .models import event
 from .c_event import c_event, resolve_rules
-from .c_alarm import alarm
+from .c_alarm import alarm, alarm_init
 
 #from threading import enumerate
 
@@ -77,6 +77,7 @@ class c_eventer(c_device):
     self.logname = 'eventer #'+str(self.dbline.id)
     self.logger = getLogger(self.logname)
     log_ini(self.logger, self.logname)
+    alarm_init(self.logger, self.dbline.id)
     setproctitle('CAM-AI-Eventer #'+str(self.dbline.id))
     if self.dbline.eve_gpu_nr_cv:
       environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -413,8 +414,7 @@ class c_eventer(c_device):
       else:
         predictions = None   
       if resolve_rules(self.cond_dict[5], predictions):
-        alarm(self.dbline.id, self.dbline.name, predictions, 
-          self.dbline.eve_school.id, self.logger) 
+        alarm(self.dbline.id, predictions) 
       if item.check_out_ts:
         if predictions is None and self.cond_dict[2]:
           predictions = item.pred_read(max=1.0)

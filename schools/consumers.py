@@ -20,16 +20,10 @@ import cv2 as cv
 import aiofiles
 import aiofiles.os
 import aioshutil
-from os import path, makedirs, remove
-from shutil import copy
-#from PIL import Image
+from os import path
 from random import randint
 from logging import getLogger
 from datetime import datetime
-from django.db import transaction
-from django.utils import timezone
-from django.core import serializers
-from django.db.models import Q
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
 from asgiref.sync import sync_to_async
@@ -311,7 +305,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           for item in list_for_copy:
             if not (await check_extratags_async(params['school'], item)):
               destfilename = uniquename(destpath, path.splitext(item['name'])[0], 'bmp')  
-              copy(sourcepath + 'frames/' + item['name'], destpath + 'frames/' + destfilename)
+              await aioshutil.copy(sourcepath + 'frames/' + item['name'], destpath + 'frames/' + destfilename)
               newitem = trainframe(made = item['made'],
                 school = 1,
                 name = destfilename,

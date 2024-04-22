@@ -56,7 +56,6 @@ class triggerConsumer(AsyncWebsocketConsumer):
     for mode in self.viewer_dict:
       for idx in self.viewer_dict[mode]:
         dict_item = self.viewer_dict[mode][idx]
-        dict_item['viewer'].parent.take_view_count()
         if dict_item['show_cam']:
           dict_item['viewer'].pop_from_onf(dict_item['onf'])
         dict_item['log'].stop = timezone.now()

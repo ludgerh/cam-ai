@@ -28,7 +28,6 @@ if validate $1; then
   mv cam-ai backup
   git clone https://github.com/ludgerh/cam-ai
   mv backup/camai/passwords.py cam-ai/camai/
-  mv backup/eventers/c_alarm.py cam-ai/eventers/
   mv backup/plugins/ cam-ai/plugins
   mv backup/data/ cam-ai/data
   cd cam-ai

@@ -15,7 +15,6 @@ __pycache__/
 *.txt~
 .gitignore~
 /camai/passwords.py
-/eventers/c_alarm.py
 /camai/systemlist.ods
 /env/
 

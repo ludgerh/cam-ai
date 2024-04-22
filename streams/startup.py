@@ -1,16 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import sys
 import os
@@ -39,6 +41,7 @@ from tf_workers.c_tfworkers import tf_workers, tf_worker
 from trainers.models import model_type, trainer as trainerdb
 from trainers.c_trainers import trainers, trainer
 from tools.models import camurl
+from eventers.models import alarm_device_type, alarm_device
 from tools.health import stop as stophealth
 from .models import stream
 from .c_streams import streams, c_stream
@@ -91,6 +94,22 @@ if not  camurl.objects.filter(type='TP-Link Tapo C200'):
   newcam = camurl(type='TP-Link Tapo C200', 
     url='rtsp://{user}:{pass}@{address}:{port}/stream1')
   newcam.save()
+  
+if alarm_device_type.objects.filter(name='console'):
+  new_type = alarm_device_type.objects.get(name='console')
+else:  
+  new_type = alarm_device_type(
+    name='console', 
+    mendef='[["s", "Output", "We had an alarm..."]]', 
+  )
+  new_type.save()
+  
+if not alarm_device.objects.filter(name='console'):
+  new_device = alarm_device(
+    name='console', 
+    device_type=new_type, 
+  )
+  new_device.save()
 
 restart_mode = 0
 do_run = True
