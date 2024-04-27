@@ -14,14 +14,18 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-#from PIL import Image
+import os
+from shutil import rmtree
+from glob import glob
 from ua_parser import user_agent_parser
+from zipfile import ZipFile
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
+from django.core.files.storage import FileSystemStorage
 try:  
   from camai.passwords import emulatestatic
 except  ImportError: # can be removed when everybody is up to date
@@ -43,6 +47,8 @@ schoolframespath = djconf.getconfig('schoolframespath', datapath + 'schoolframes
 archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
 is_public_server = djconf.getconfigbool('is_public_server', False)
 crypter_dict = {}
+os.makedirs('temp/upload', exist_ok=True)
+os.makedirs('temp/unpack', exist_ok=True)
 
 @login_required
 def images(request, schoolnr):
@@ -83,6 +89,36 @@ def classroom(request, streamnr):
     return(HttpResponse(template.render(context)))
   else:
     return(HttpResponse('No Access'))
+
+@login_required
+def upload_file(request, schoolnr):
+  context = {
+    'version' : djconf.getconfig('version', 'X.Y.Z'),
+    'emulatestatic' : emulatestatic,
+    'school' : schoolnr,
+  }
+  if request.method == 'POST' and request.FILES['file']:
+    
+    uploaded_file = request.FILES['file']
+    fs = FileSystemStorage(location='temp/upload')
+    filename = fs.save(uploaded_file.name, uploaded_file)
+    file_path = fs.path(filename)
+    print('*****', file_path)
+    if os.path.exists('temp/unpack/' + filename):
+      rmtree('temp/unpack/' + filename)
+    os.makedirs('temp/unpack/' + filename)
+    with ZipFile(file_path, 'r') as zip_ref:
+      zip_ref.extractall('temp/unpack/' + filename) 
+    zipresult = glob('temp/unpack/' + filename + '/*')
+    os.remove(file_path)
+    context['file_number'] = len(zipresult)
+    
+    
+    # Do something with the uploaded file
+    context['file_name'] = uploaded_file.name
+    return render(request, 'schools/upload_success.html', context)
+  else:
+    return render(request, 'schools/upload_file.html', context)
 
 #mode == 0: Classroom Dir, mode == 1: Model Dir
 #mode == 2: Archive Image, mode == 3: Archive video 

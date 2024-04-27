@@ -20,10 +20,12 @@ import cv2 as cv
 import aiofiles
 import aiofiles.os
 import aioshutil
+from glob import glob
 from os import path
 from random import randint
 from logging import getLogger
 from datetime import datetime
+from django.utils import timezone
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
 from asgiref.sync import sync_to_async
@@ -87,7 +89,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       self.tf_worker.unregister(self.tf_w_index) 
 
   async def receive(self, text_data):
-    logger.debug('<-- ' + text_data)
+    logger.info('<-- ' + text_data)
     params = json.loads(text_data)['data']
 
     if ((params['command'] == 'gettags') 
@@ -517,6 +519,43 @@ class schooldbutil(AsyncWebsocketConsumer):
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))		
+
+    elif params['command'] == 'importimages':
+      schoolline = await school.objects.aget(id=params['school'])
+      modelpath = schoolline.dir
+      if await access.check_async('S', params['school'], self.scope['user'], 'W'):
+        for item in glob('temp/unpack/' + params['filesdir'] + '/*'):
+          pathadd = str(randint(0,99))+'/'
+          await aiofiles.os.makedirs(modelpath + 'frames/' + pathadd, exist_ok=True)
+          filename = item.split('/')[-1]
+          newname = await uniquename_async(modelpath + 'frames/', 
+              pathadd + filename, 'bmp')
+          await reduce_image_async(
+            item, 
+            modelpath + 'frames/' + newname, 
+            school_x_max, 
+            school_y_max, 
+          )
+          t = trainframe(
+            made=timezone.make_aware(datetime.now()),
+            school=params['school'],
+            name=newname,
+            code='NE',
+            checked=0,
+            made_by_id=self.user.id,
+          )
+          t.encrypted = False
+          for i in range(10):
+            tagname = 'c'+str(i)
+            if params['tag'] == i:
+              setattr(t, tagname, 1)
+            else:
+              setattr(t, tagname, 0)  
+          await t.asave()
+
+      outlist['data'] = 'OK'
+      logger.info('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))		
 
 #*****************************************************************************
 # SchoolUtil

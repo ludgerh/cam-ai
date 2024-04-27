@@ -1,6 +1,7 @@
 /data/
 /plugins/
 /camai/static/camai/nogit/
+/temp/
 /accounts/templates/django_registration/terms.html
 /accounts/templates/django_registration/privacy.html
 __pycache__/
