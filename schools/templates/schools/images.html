@@ -56,6 +56,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           style="width: 120px;">Delete all!
         </button>
       </span>
+      <span style="white-space:nowrap;">
+         <button 
+          type="button" id="delschoolbutton" class="btn btn-primary m-2" action="delschool" 
+          data-bs-toggle="modal" data-bs-target="#shureModal" 
+          style="width: 120px;">Delete school
+        </button>
+      </span>
       {% comment %}
       {% if user.is_superuser %}
         <span style="white-space:nowrap;">
@@ -71,6 +78,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </span> #}
       {% endcomment %}
     {% endif %}
+  </h3>
+  <h3 class="text-danger d-none" id="error_message">
+    Error-Message
   </h3>
   <h4>
     <span style="white-space:nowrap; display: inline-block;">
@@ -132,6 +142,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 {% if may_write %}
 $('#shureModal').on('shown.bs.modal', function (event) {
+  $('#error_message').addClass("d-none");
   let button = event.relatedTarget;
   let action = button.getAttribute('action');
   if (action == 'checkall') {
@@ -139,6 +150,9 @@ $('#shureModal').on('shown.bs.modal', function (event) {
   }
   if (action == 'delall') {
     $('.modal-title').text('Deleting all visible images...');
+  }
+  if (action == 'delschool') {
+    $('.modal-title').text('Deleting this complete school...');
   }
 {% if user.is_superuser %}
   if (action == 'copyall') {
@@ -207,6 +221,7 @@ $('#pagesizeselect').change(function() {
 });
 
 function draw_all_cards() {
+  $('#error_message').addClass("d-none");
   do_run = 0;
   $('#gallery').children().slice(0,-1).remove();
 
@@ -462,8 +477,30 @@ $(document).ready(function() {
               page_nr = 1;
               draw_all_cards();
             };
-          })
+          });
         };
+      };
+      if (action == 'delschool') {
+        $('#delschoolbutton').addClass('btn-warning');
+        if (get_imagegetimages, 100);
+        SchoolDButilSocket.sendandwait({
+          'command' : 'delschool',
+          'school' : {{ schoolnr }},
+        })
+        .then((result) => {
+          if (result.status == 'OK') {
+            window.location.href = window.location.protocol + '//' + window.location.host;
+          } else {
+            if (result.status == 'streams_linked') {
+              if (result.count == 1) {
+                $('#error_message').text("There is one stream linked to this school, cannot delete.");
+              } else {  
+                $('#error_message').text("There are "+result.count+" streams linked to this school, cannot delete.");
+              };  
+            };  
+            $('#error_message').removeClass("d-none");
+          };
+        });
       };
 {% if user.is_superuser %}
       if (action == 'copyall') {

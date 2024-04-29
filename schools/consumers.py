@@ -89,7 +89,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       self.tf_worker.unregister(self.tf_w_index) 
 
   async def receive(self, text_data):
-    logger.info('<-- ' + text_data)
+    logger.debug('<-- ' + text_data)
     params = json.loads(text_data)['data']
 
     if ((params['command'] == 'gettags') 
@@ -552,9 +552,31 @@ class schooldbutil(AsyncWebsocketConsumer):
             else:
               setattr(t, tagname, 0)  
           await t.asave()
-
+        await aioshutil.rmtree('temp/unpack/' + params['filesdir'])
       outlist['data'] = 'OK'
-      logger.info('--> ' + str(outlist))
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))			
+
+    elif params['command'] == 'delschool':
+      if await access.check_async('S', params['school'], self.scope['user'], 'W'):
+        schoolline = await school.objects.aget(id=params['school'])
+        modelpath = schoolline.dir
+        if (count := await stream.objects.filter(
+            active=True, 
+            eve_school=schoolline).acount()
+          ):
+          outlist['data'] = {
+            'status' : 'streams_linked', 
+            'count' : count, 
+          }
+        else:  
+          await aioshutil.rmtree(modelpath)
+          schoolline.active = False
+          await schoolline.asave(update_fields=('active', ))
+          outlist['data'] = {'status' : 'OK', }
+      else:  
+        outlist['data'] = {'status' : 'no_priv', }
+      logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))		
 
 #*****************************************************************************

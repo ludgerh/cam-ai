@@ -591,7 +591,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           myaccess.vid = myschool.id
           myaccess.u_g_nr = self.scope['user'].id
           myaccess.r_w = 'W'
-          await myaccess.save()
+          await myaccess.asave()
           await access.read_list_async()
       else:
         myschool.active = False

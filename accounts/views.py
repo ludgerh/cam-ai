@@ -16,6 +16,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.conf import settings
 from django_registration.backends.activation.views import ActivationView, RegistrationView
+from django.contrib.auth.views import (
+  PasswordResetView, 
+  PasswordResetDoneView, 
+  PasswordResetConfirmView, 
+  PasswordResetCompleteView,
+)
 from django.views.generic.base import TemplateView
 from django.contrib.auth.models import User
 try:  
@@ -55,3 +61,49 @@ class TermsView(TemplateView):
     
 class PrivacyView(TemplateView):
   template_name = 'django_registration/privacy.html'
+  
+class MyPasswordResetView(PasswordResetView): 
+  template_name = "registration/c_password_reset_form.html"
+  success_url = "/accounts/pass_reset/done/"
+  
+  def get_context_data(self, *args, **kwargs):
+    context = super().get_context_data(*args, **kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'), 
+      'emulatestatic' : emulatestPasswordResetConfirmViewatic,
+    })
+    return context
+  
+class MyPasswordResetDoneView(PasswordResetDoneView): 
+  template_name = "registration/c_password_reset_done.html"
+  
+  def get_context_data(self, *args, **kwargs):
+    context = super().get_context_data(*args, **kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'), 
+      'emulatestatic' : emulatestatic,
+    })
+    return context
+  
+class MyPasswordResetConfirmView(PasswordResetConfirmView): 
+  template_name = "registration/c_password_reset_confirm.html"
+  success_url = "/accounts/reset_complete/"
+  
+  def get_context_data(self, *args, **kwargs):
+    context = super().get_context_data(*args, **kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'), 
+      'emulatestatic' : emulatestatic,
+    })
+    return context
+  
+class MyPasswordResetCompleteView(PasswordResetCompleteView): 
+  template_name = "registration/c_password_reset_complete.html"
+  
+  def get_context_data(self, *args, **kwargs):
+    context = super().get_context_data(*args, **kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'), 
+      'emulatestatic' : emulatestatic,
+    })
+    return context
