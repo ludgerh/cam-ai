@@ -58,8 +58,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       </span>
       <span style="white-space:nowrap;">
          <button 
-          type="button" id="delschoolbutton" class="btn btn-primary m-2" action="delschool" 
-          data-bs-toggle="modal" data-bs-target="#shureModal" 
+          type="button" id="delschoolbutton" class="btn btn-primary m-2" 
+          action="delschool" data-bs-toggle="modal" data-bs-target="#shureModal" 
           style="width: 120px;">Delete school
         </button>
       </span>
@@ -235,7 +235,7 @@ function draw_all_cards() {
   })
   .then(() => {
     return(SchoolDButilSocket.sendandwait({
-      'command' : 'getshortlist',
+      'command' : 'gettrainshortlist',
       'page_nr' : page_nr,
     }));
   })
@@ -482,7 +482,6 @@ $(document).ready(function() {
       };
       if (action == 'delschool') {
         $('#delschoolbutton').addClass('btn-warning');
-        if (get_imagegetimages, 100);
         SchoolDButilSocket.sendandwait({
           'command' : 'delschool',
           'school' : {{ schoolnr }},
@@ -493,9 +492,12 @@ $(document).ready(function() {
           } else {
             if (result.status == 'streams_linked') {
               if (result.count == 1) {
-                $('#error_message').text("There is one stream linked to this school, cannot delete.");
+                $('#error_message').text(
+                  "There is one stream linked to this school, cannot delete."
+                );
               } else {  
-                $('#error_message').text("There are "+result.count+" streams linked to this school, cannot delete.");
+                $('#error_message').text("There are "+result.count
+                  + " streams linked to this school, cannot delete.");
               };  
             };  
             $('#error_message').removeClass("d-none");

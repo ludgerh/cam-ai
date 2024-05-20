@@ -131,7 +131,12 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
     if (crypt := frameline.encrypted):
       if not streamline.id in crypter_dict:
         crypter_dict[streamline.id] = l_crypt(key=streamline.crypt_key)
-    if is_public_server and request.user.is_superuser and crypt:   
+    if (
+        is_public_server 
+        and request.user.is_superuser 
+        and request.user.id != streamline.creator.id
+        and crypt
+    ):   
       filepath = 'camai/static/camai/git/img/privacy.jpg'
     else:
       filepath = schoolframespath + frameline.name
@@ -169,7 +174,10 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
     return(HttpResponse('No Access'))
   with open(filepath, "rb") as f:
     if crypt: 
-      if is_public_server and request.user.is_superuser:
+      if (is_public_server 
+        and request.user.is_superuser
+        and request.user.id != streamline.creator.id
+      ):
         myframe = c_convert(f.read(), typein=3, typeout=outtype, xycontained=xycontained, 
           xout=x, yout=y)
       else:  

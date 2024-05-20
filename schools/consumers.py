@@ -71,8 +71,12 @@ class schooldbutil(AsyncWebsocketConsumer):
     return([line.description for line in get_taglist(myschool)])
 
   @database_sync_to_async
-  def getshortlist(self, page_nr):
+  def gettrainshortlist(self, page_nr):
     return(list(self.trainpage.get_elided_page_range(page_nr)))
+
+  @database_sync_to_async
+  def geteventshortlist(self, page_nr):
+    return(list(self.eventpage.get_elided_page_range(page_nr)))
 
   async def connect(self):
     self.user = self.scope['user']
@@ -122,6 +126,13 @@ class schooldbutil(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
+    if params['command'] == 'seteventpage' :
+      eventlines = event.objects.filter(camera=params['streamnr'])
+      self.eventpage = Paginator(eventlines, params['pagesize'])
+      outlist['data'] = 'OK'
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))
+
     if params['command'] == 'gettrainimages' :
       lines = []
       async for line in self.trainpage.page(params['page_nr']).object_list:
@@ -131,19 +142,43 @@ class schooldbutil(AsyncWebsocketConsumer):
         else:
           made_by = made_by_nr.username
         lines.append({
-        'id' : line.id, 
-        'name' : line.name, 
-        'made_by' : made_by,
-        'cs' : [line.c0,line.c1,line.c2,line.c3,line.c4,line.c5,line.c6,
-          line.c7,line.c8,line.c9,],
-        'made' : line.made.strftime("%d.%m.%Y %H:%M:%S %Z"),
+          'id' : line.id, 
+          'name' : line.name, 
+          'made_by' : made_by,
+          'cs' : [line.c0,line.c1,line.c2,line.c3,line.c4,line.c5,line.c6,
+            line.c7,line.c8,line.c9,],
+          'made' : line.made.strftime("%d.%m.%Y %H:%M:%S %Z"),
         })
       outlist['data'] = lines
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
-    if params['command'] == 'getshortlist' :
-      result = list(await self.getshortlist(params['page_nr']))
+    if params['command'] == 'getevents' :
+      lines = []
+      async for line in self.eventpage.page(params['page_nr']).object_list:
+        lines.append({
+          'id' : line.id, 
+          'p_string' : line.p_string, 
+          'done' : line.done,
+          'start' : line.start.strftime("%d.%m.%Y %H:%M:%S %Z"),
+          'numframes' : line.numframes,
+          'videoclip' : line.videoclip,
+        })
+      outlist['data'] = lines
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))
+
+    if params['command'] == 'gettrainshortlist' :
+      result = list(await self.gettrainshortlist(params['page_nr']))
+      for i in range(len(result)):
+        if not isinstance(result[i], int):
+          result[i] = 0
+      outlist['data'] = result
+      logger.debug('--> ' + str(outlist))
+      await self.send(json.dumps(outlist))
+
+    if params['command'] == 'geteventshortlist' :
+      result = list(await self.geteventshortlist(params['page_nr']))
       for i in range(len(result)):
         if not isinstance(result[i], int):
           result[i] = 0
@@ -337,7 +372,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
 
-    elif params['command'] == 'getschoolframes':
+    elif params['command'] == 'geteventframes':
       framelines = event_frame.objects.filter(event__id=params['event'])
       result = []
       async for item in framelines:
@@ -409,7 +444,7 @@ class schooldbutil(AsyncWebsocketConsumer):
             t.c9=params['cblist'][i][9]
             await t.asave()
             item.trainframe = t.id
-            item.asave(update_fields=('trainframe', ))
+            await item.asave(update_fields=('trainframe', ))
           i += 1 
         eventline.done = True  
         await eventline.asave(update_fields=('done', ))

@@ -68,7 +68,8 @@ class c_eventer(c_device):
     self.display_ts = 0
     self.nr_of_cond_ed = 0
     self.read_conditions()
-    self.tag_list = get_taglist(self.dbline.eve_school.id)
+    self.tag_list_active = self.dbline.eve_school.id
+    self.tag_list = get_taglist(self.tag_list_active)
     datapath = djconf.getconfig('datapath', 'data/')
     self.recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
 
@@ -239,6 +240,9 @@ class c_eventer(c_device):
       if (time() - self.run_one_ts) > 1.0:
         self.run_one_ts = time()
         for i, item in list(self.eventdict.items()): 
+          if self.tag_list_active != self.dbline.eve_school.id:
+            self.tag_list_active = self.dbline.eve_school.id
+            self.tag_list = get_taglist(self.tag_list_active)
           self.check_events(i, item) 
       while self.motion_frame[2] <= frame[2] + self.dbline.eve_sync_factor:
         #print(self.motion_frame[2], frame[2], self.motion_frame[2] - frame[2], self.active_pred_count)
@@ -336,19 +340,19 @@ class c_eventer(c_device):
                 if predictions[j] >= 0.5]
               displaylist.sort(key=lambda x: -x[1])
               displaylist = displaylist[:3]
-              cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
               if displaylist:
+                cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
                 if item[2] < (self.dbline.cam_yres - item[3]):
                   y0 = item[3] + 30 * self.textheight
                 else:
                   y0 = item[2] - (10 + (len(displaylist) - 1) * 30) * self.textheight
-              for j in range(len(displaylist)):
-                cv.putText(newimage, 
-                  self.tag_list[displaylist[j][0]].name[:3]
-                  +' - '+str(round(displaylist[j][1],2)), 
-                  (item[0]+2, y0 + j * 30 * self.textheight), 
-                  cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
-                  self.textthickness, cv.LINE_AA)
+                for j in range(len(displaylist)):
+                  cv.putText(newimage, 
+                    self.tag_list[displaylist[j][0]].name[:3]
+                    +' - '+str(round(displaylist[j][1],2)), 
+                    (item[0]+2, y0 + j * 30 * self.textheight), 
+                    cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
+                    self.textthickness, cv.LINE_AA)
             else:
               imax = -1
               pmax = -1

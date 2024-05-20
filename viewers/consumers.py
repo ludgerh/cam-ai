@@ -25,6 +25,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
 from access.c_access import access
+from asgiref.sync import sync_to_async
 from streams.startup import streams
 from tools.c_redis import myredis
 from tools.c_logger import log_ini
@@ -66,6 +67,15 @@ class triggerConsumer(AsyncWebsocketConsumer):
             break
           except OperationalError:
             connection.close()
+            
+  @staticmethod
+  def check_conditions(user, mystream):
+    return not (
+      user.is_superuser 
+      and is_public_server
+      and mystream.dbline.encrypted
+      and mystream.dbline.creator.id != user.id
+    )
 
   async def receive(self, text_data):
     logger.debug('<-- ' + str(text_data))
@@ -83,8 +93,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
       else:
         do_compress = True  
       mystream = streams[params['idx']]
-      show_cam = not(self.scope['user'].is_superuser 
-        and is_public_server and mystream.dbline.encrypted)
+      show_cam = await sync_to_async(self.check_conditions)(self.scope['user'], mystream)
       if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
         outx = params['width']
         if params['mode'] == 'C':

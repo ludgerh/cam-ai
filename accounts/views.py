@@ -70,7 +70,7 @@ class MyPasswordResetView(PasswordResetView):
     context = super().get_context_data(*args, **kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'), 
-      'emulatestatic' : emulatestPasswordResetConfirmViewatic,
+      'emulatestatic' : emulatestatic,
     })
     return context
   
@@ -87,7 +87,7 @@ class MyPasswordResetDoneView(PasswordResetDoneView):
   
 class MyPasswordResetConfirmView(PasswordResetConfirmView): 
   template_name = "registration/c_password_reset_confirm.html"
-  success_url = "/accounts/reset_complete/"
+  success_url = "/accounts/reset/complete/"
   
   def get_context_data(self, *args, **kwargs):
     context = super().get_context_data(*args, **kwargs)

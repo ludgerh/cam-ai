@@ -66,42 +66,29 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     </button>
   {% endif %}
   </h2>
+  <h4>
+    <span style="white-space:nowrap; display: inline-block;">
+      <nav aria-label="Page navigation" style="display: inline-block;">
+        <ul id="pageselect" class="pagination m-2">
+        </ul>
+      </nav>
+      Page Size:
+      <select class=" m-2" id="pagesizeselect">
+        <option value='10'>10</option>
+        <option value='100' selected>100</option>
+        <option value='1000'>1000</option>
+        <option value='10000'>10000</option>
+        <option value='100000'>100000</option>
+      </select>
+    </span>
+  </h4>
   <div class="container-fluid float-left">
-    <div class="row">
-  {% for item in events %}
-      <div id="col{{ item.id }}" class="col-sm-auto colall {% if item.done %} colisdone{% endif %}">
-        <div class="card m-2" style="width: 375px; height: 585px;">
-          <div done=0 id="{{ item.id }}" class="carousel slide card-img-top" 
-              data-bs-ride="carousel" style="width: 375px; height: 375px">
-            <div class="carousel-inner">
-            </div>
-          </div>
-          <div class="card-body">
-            <h6 class="card-title">{{ item.start|date:'d.m.Y H:i:s' }}
-  {% if item.done %}
-              &#10004;
-  {% endif %}
-            </h6>
-            <h6 class="card-subtitle mb-2 text-muted">
-  {% if item.videoclip %}
-              {{ item.numframes }} Image(s), 1 Video</h6>
-  {% else %}
-              {{ item.numframes }} Image(s)</h6>
-  {% endif %}
-            <p class="card-text">{{ item.p_string }}</p>
-            <a href="/eventers/oneevent/{{ stream.id }}/{{ item.id }}" 
-              class="btn btn-primary position-absolute bottom-0 start-0 m-3" 
-              style="width: 120px;">See details</a>
-  {% if may_write_stream %}
-            <button type="button"  id="{{ item.id }}" 
-              class="btn btn-primary position-absolute bottom-0 end-0 m-3" 
-              data-bs-toggle="modal" data-bs-target="#deleteModal" 
-              style="width: 120px;">Delete</button>
-  {% endif %}
-          </div>
+    <div class="row" id="gallery">
+      <div id="lastcol" class="col-sm-auto">
+        <div class="card m-1 p-0" style="width: 375px; height: auto;">
+          <div id="endtrigger">...</div>
         </div>
       </div>
-  {% endfor %}
     </div>
   </div>
 </main>
@@ -124,28 +111,156 @@ $('#deleteModal').on('shown.bs.modal', function (event) {
 })
 {% endif %}
 
-let SchoolDBUtilSocket;
+let SchoolDBUtilSocket = 'TestString';
 const ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let do_run;
+let page_nr = 1;
+let events;
+let events_ready;
+let events_count;
+let last_event_visible;
+let get_cards_active = false;
 
-$.fn.isInViewport = function() {
-  const elementTop = $(this).offset().top;
-  const elementBottom = elementTop + $(this).outerHeight();
-  const viewportTop = $(window).scrollTop();
-  const viewportBottom = viewportTop + $(window).height();
-  return elementBottom > viewportTop && elementTop < viewportBottom;
+function isInViewport(elementid) {
+  element = document.getElementById(elementid)
+  let rect = element.getBoundingClientRect();
+  return (
+    rect.top >= 0 &&
+    rect.left >= 0 &&
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+  );
+};
+
+function draw_all_cards() {
+  do_run = 0;
+  $('#gallery').children().slice(0,-1).remove();
+
+  SchoolDBUtilSocket.sendandwait({
+    'command' : 'seteventpage',
+    'streamnr' : {{ stream.id }},
+    'pagesize' : parseInt($('#pagesizeselect').val()),
+  })
+  .then(() => {
+    return(SchoolDBUtilSocket.sendandwait({
+      'command' : 'geteventshortlist',
+      'page_nr' : page_nr,
+    }));
+  })
+  .then((result) => {
+    $('#pageselect').empty();
+    result.forEach(function(item, index) {
+      if (item) {
+        if (parseInt(item) == page_nr) {
+          $('#pageselect').append('<li class="page-item m-2">'+item);
+        } else {
+          $('#pageselect').append('<li page="' + item 
+            + '" class="page-item"><a class="page-link">'+item+'</a></li>');
+        };
+      } else {
+        $('#pageselect').append('<li class="page-item">...</li>');
+      };
+    });
+    $('#pageselect').children().click(function() {
+      mypage = parseInt($(this).attr('page'));
+      if (mypage && (mypage != page_nr)) {
+        page_nr = mypage;
+        draw_all_cards();
+      };
+    });
+    return(SchoolDBUtilSocket.sendandwait({
+      'command' : 'getevents',
+      'page_nr' : page_nr,
+    }));
+  })
+  .then((result) => {
+    events = result;
+    if (events.length) {
+      min_id = events[0].id;
+      max_id = events[events.length-1].id;
+    };
+    events_count = events.length;
+    events_ready = 0;
+    last_event_visible = 0;
+    do_run = 1;
+    getcards();
+  })
+};
+
+function getcards() {
+  if (get_cards_active) {
+    setTimeout(getcards, 100);
+  } else {  
+    get_cards_active = true;
+    let numbers = [];
+    let idxs = [];
+    let counts = [];
+    while ((events_ready < events_count) 
+        && ((events_ready - last_event_visible) < 32)
+        && isInViewport('endtrigger')
+        && do_run) {
+      let event_processing = events_ready; 
+      events_ready += 1;
+      numbers.push(idxs.length);
+      idxs.push(events[event_processing].id);
+      counts.push(event_processing);
+    };  
+    numbers.forEach((nr) => {
+      newaddition = '<div id="col' + events[counts[nr]].id + '" class="col-sm-auto colall';
+      if (events[counts[nr]].done) {
+        newaddition += ' colisdone">';
+      } else {  
+        newaddition += '">';
+      };  
+      newaddition += '<div class="card m-1 p-0" style="width: 375px; height: 585px;">';
+      newaddition += '<div done=0 id="' + events[counts[nr]].id + '" class="carousel slide card-img-top" ';
+      newaddition += 'data-bs-ride="carousel" style="width: 375px; height: 375px">';
+      newaddition += '<div class="carousel-inner">';
+      newaddition += '</div>';
+      newaddition += '</div>';
+      newaddition += '<div class="card-body">';
+      newaddition += '<h6 class="card-title">' + events[counts[nr]].start;
+      if (events[counts[nr]].done) {
+        newaddition += ' &#10004';
+      };  
+      newaddition += '</h6>';
+      newaddition += '<h6 class="card-subtitle mb-2 text-muted">';
+      if (events[counts[nr]].videoclip) {
+        newaddition += events[counts[nr]].numframes + ' Image(s), 1 Video</h6>';
+      } else {  
+        newaddition += events[counts[nr]].numframes + ' Image(s)</h6>';
+      };  
+      newaddition += '<p class="card-text">' + events[counts[nr]].p_string + '</p>';
+      newaddition += '<a href="/eventers/oneevent/{{ stream.id }}/' + events[counts[nr]].id + '" ';
+      newaddition += 'class="btn btn-primary position-absolute bottom-0 start-0 m-3" ';
+      newaddition += 'style="width: 120px;">See details</a>';
+{% if may_write_stream %}
+      newaddition += '<button type="button"  id="' + events[counts[nr]].id + '" ';
+      newaddition += 'class="btn btn-primary position-absolute bottom-0 end-0 m-3" ';
+      newaddition += 'data-bs-toggle="modal" data-bs-target="#deleteModal" ';
+      newaddition += 'style="width: 120px;">Delete</button>';
+{% endif %}
+      newaddition += '</div>';
+      newaddition += '</div>';
+      newaddition += '</div>';
+      $('#lastcol').before(newaddition);
+      last_event_visible = counts[nr];
+    });
+    get_cards_active = false;
+    getimages();
+  };  
 };
 
 getimages = function() {
   $('.carousel').each(function() {
-    if ($(this).attr('done') == 0) {
-      if ($(this).isInViewport()) {
-        $(this).attr('done', 1);
+    if ($(this).attr('done') == '0') {
+      if (isInViewport($(this).attr('id'))) {
+        $(this).attr('done', '1');
 	      SchoolDBUtilSocket.sendandwait({
-		      'command' : 'getschoolframes',
+		      'command' : 'geteventframes',
 		      'event' : $(this).attr('id'),
 	      })
 	      .then((framelines) => {
-	        console.log(framelines);
 		      for (let j=0; j<framelines.length; j++) {
             let imgElement;
             if (j == 0) {
@@ -172,6 +287,10 @@ getimages = function() {
 };
 
 $(document).ready(function() {
+  $('#pagesizeselect').change(function() {
+    page_nr = 1;
+    draw_all_cards();
+  });
 	WSAsync(
 		  ws_scheme + '//'
 		  + window.location.host
@@ -180,7 +299,7 @@ $(document).ready(function() {
 	.then((result) => {
 		SchoolDBUtilSocket = result;
     $(window).on('resize scroll', function() {
-      getimages();
+      getcards();
     });
 {% if may_write_stream %}
     $('.delbutton').click(function() {
@@ -202,7 +321,7 @@ $(document).ready(function() {
             if (event_nr == -1) {
               $('.colall').remove();
             };  
-            getimages();
+            getcards();
           } else {
             console.log('Error while deleting multiple events');
           };
@@ -218,7 +337,7 @@ $(document).ready(function() {
 		    .then((result) => {
 			    if (result === 'OK') {
             $('#col'+event_nr).remove(); 
-            getimages();
+            getcards();
           } else {
             console.log('Error while deleting event Nr. '+event_nr);
           };
@@ -226,7 +345,7 @@ $(document).ready(function() {
       };
     });
 {% endif %}
-    getimages();
+    draw_all_cards();
   })
 });
 </script>
