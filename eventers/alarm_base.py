@@ -26,5 +26,5 @@ class alarm_base():
     
   def action(self, pred):
     mylist = list(pred)[1:]
-    self.maxpos = mylist.index(max(mylist))  
+    self.maxpos = mylist.index(max(mylist))
 
