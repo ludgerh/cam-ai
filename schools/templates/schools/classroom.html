@@ -102,7 +102,7 @@ getimages = function() {
         $(this).attr('done', 1);
         indices[$(this).attr('id')] = [];
 	      SchoolDBUtilSocket.sendandwait({
-		      'command' : 'getschoolframes',
+		      'command' : 'geteventframes',
 		      'event' : $(this).attr('id'),
 	      })
 	      .then((result) => {
