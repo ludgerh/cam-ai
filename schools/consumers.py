@@ -127,7 +127,10 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.send(json.dumps(outlist))
 
     if params['command'] == 'seteventpage' :
-      eventlines = event.objects.filter(camera=params['streamnr'])
+      if params['showdone']:
+        eventlines = event.objects.filter(camera=params['streamnr'], xmax__gt=-1).order_by('-id')
+      else:  
+        eventlines = event.objects.filter(camera=params['streamnr'], done=False, xmax__gt=-1).order_by('-id')
       self.eventpage = Paginator(eventlines, params['pagesize'])
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
@@ -160,9 +163,14 @@ class schooldbutil(AsyncWebsocketConsumer):
           'id' : line.id, 
           'p_string' : line.p_string, 
           'done' : line.done,
-          'start' : line.start.strftime("%d.%m.%Y %H:%M:%S %Z"),
+          'start' : line.start.strftime("%d.%m.%Y %H:%M:%S"),
+          'end' : line.end.strftime("%d.%m.%Y %H:%M:%S"),
           'numframes' : line.numframes,
           'videoclip' : line.videoclip,
+          'xmin' : line.xmin,
+          'xmax' : line.xmax,
+          'ymin' : line.ymin,
+          'ymax' : line.ymax,
         })
       outlist['data'] = lines
       logger.debug('--> ' + str(outlist))

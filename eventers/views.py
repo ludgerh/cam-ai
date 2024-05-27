@@ -46,7 +46,6 @@ def events(request, camnr):
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
-      #'events' : event.objects.filter(camera_id=camnr, xmax__gt=-1).order_by('-id')[:100],
       'debug' : settings.DEBUG,
       'may_write_stream' : access.check('C', camnr, request.user, 'W'),
       'may_write_school' : access.check('S', mystream.eve_school.id, request.user, 'W'),

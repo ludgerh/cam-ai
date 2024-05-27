@@ -58,10 +58,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <h2 class="m-2">New events: {{ stream.name }}
     <br>
   {% if may_write_stream %}
-    <button type="button" class="btn btn-primary m-2" id="-1" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 240px;">
+    <button type="button" class="btn btn-primary m-2" id="-1" data-bs-toggle="modal" 
+        data-bs-target="#deleteModal" style="width: 240px;">
       Purge schooled events
     </button>
-    <button type="button" class="btn btn-primary m-2" id="-1" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 240px;">
+    <button type="button" class="btn btn-primary m-2" id="-1" data-bs-toggle="modal" 
+        data-bs-target="#deleteModal" style="width: 240px;">
       Purge all events
     </button>
   {% endif %}
@@ -111,7 +113,7 @@ $('#deleteModal').on('shown.bs.modal', function (event) {
 })
 {% endif %}
 
-let SchoolDBUtilSocket = 'TestString';
+let SchoolDBUtilSocket;
 const ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let do_run;
 let page_nr = 1;
@@ -140,6 +142,7 @@ function draw_all_cards() {
     'command' : 'seteventpage',
     'streamnr' : {{ stream.id }},
     'pagesize' : parseInt($('#pagesizeselect').val()),
+    'showdone' : true,
   })
   .then(() => {
     return(SchoolDBUtilSocket.sendandwait({
@@ -175,10 +178,6 @@ function draw_all_cards() {
   })
   .then((result) => {
     events = result;
-    if (events.length) {
-      min_id = events[0].id;
-      max_id = events[events.length-1].id;
-    };
     events_count = events.length;
     events_ready = 0;
     last_event_visible = 0;
@@ -206,14 +205,16 @@ function getcards() {
       counts.push(event_processing);
     };  
     numbers.forEach((nr) => {
-      newaddition = '<div id="col' + events[counts[nr]].id + '" class="col-sm-auto colall';
+      newaddition = '<div id="col' + events[counts[nr]].id 
+        + '" class="col-sm-auto colall';
       if (events[counts[nr]].done) {
         newaddition += ' colisdone">';
       } else {  
         newaddition += '">';
       };  
       newaddition += '<div class="card m-2" style="width: 375px; height: 585px;">';
-      newaddition += '<div done=0 id="' + events[counts[nr]].id + '" class="carousel slide card-img-top" ';
+      newaddition += '<div done=0 id="' + events[counts[nr]].id 
+        + '" class="carousel slide card-img-top" ';
       newaddition += 'data-bs-ride="carousel" style="width: 375px; height: 375px">';
       newaddition += '<div class="carousel-inner">';
       newaddition += '</div>';
@@ -231,7 +232,8 @@ function getcards() {
         newaddition += events[counts[nr]].numframes + ' Image(s)</h6>';
       };  
       newaddition += '<p class="card-text">' + events[counts[nr]].p_string + '</p>';
-      newaddition += '<a href="/eventers/oneevent/{{ stream.id }}/' + events[counts[nr]].id + '" ';
+      newaddition += '<a href="/eventers/oneevent/{{ stream.id }}/' 
+        + events[counts[nr]].id + '" ';
       newaddition += 'class="btn btn-primary position-absolute bottom-0 start-0 m-3" ';
       newaddition += 'style="width: 120px;">See details</a>';
 {% if may_write_stream %}
@@ -280,7 +282,8 @@ getimages = function() {
             imgElement += '</div>';
             $(this).children().append(imgElement);
           };
-        })
+          $(this).carousel();
+        });
       };
     };
   });
