@@ -21,6 +21,7 @@ from django.contrib.auth.views import (
   PasswordResetDoneView, 
   PasswordResetConfirmView, 
   PasswordResetCompleteView,
+  LoginView,
 )
 from django.views.generic.base import TemplateView
 from django.contrib.auth.models import User
@@ -30,6 +31,15 @@ except  ImportError: # can be removed when everybody is up to date
   emulatestatic = False
 from tools.l_tools import djconf
 from users.models import userinfo
+
+class MyLoginView(LoginView):
+  def get_context_data(self, *args, **kwargs):
+    context = super().get_context_data(*args, **kwargs)
+    context.update({
+      'version' : djconf.getconfig('version', 'X.Y.Z'), 
+      'emulatestatic' : emulatestatic,
+    })
+    return context
 
 class MyActivationView(ActivationView):
   def activate(self, *args, **kwargs):

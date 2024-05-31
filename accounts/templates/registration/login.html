@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   {% load static %}
   <img src="{% static 'camai/git/img/5.svg' %}" style="width:auto;height:auto;">
   {% else %}
-  <img src="https://static.cam-ai.de/const/camai/git/img/5.svg" style="width:auto;height:auto;">
+  <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.svg" style="width:auto;height:auto;">
   {% endif %}
   <h2>Login {{ version }}</h2>
   <form method="post">

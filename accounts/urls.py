@@ -24,6 +24,7 @@ from .forms import MyRegistrationFormUniqueEmail
 app_name = 'accounts'
 
 urlpatterns = [
+  path("login/", views.MyLoginView.as_view(), name="login"),
   path("register/", 
     views.MyRegistrationView.as_view(form_class=MyRegistrationFormUniqueEmail),
     name="django_registration_register",
