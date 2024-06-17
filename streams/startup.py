@@ -23,6 +23,7 @@ from threading import Thread
 from tools.l_tools import djconf
 from tools.c_redis import myredis
 from camai.version import version as software_version
+print('Hallo Arm!')
 print('***** Software-Version: ', software_version, '*****')
 djconf.setconfig('version', software_version)
 try:
