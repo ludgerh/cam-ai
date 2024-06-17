@@ -242,6 +242,7 @@ function install_cam(control_mode, cam_info, cam_address) {
         'control_ip' : cam_address.ip,
         'control_port' : cam_info.port,
         'cam_name' : model_string,
+        'red_lat' :  false,
       })  
       .then((result) => {
         window.location.href = window.location.protocol + '//' + window.location.host;

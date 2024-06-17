@@ -63,9 +63,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="col-sm-auto">
           <a href="/trainers/trainer/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Statistics</a>
         </div>
-        <div class="col-sm-auto">
-          <a href="/schools/upload/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Upload</a>
-        </div>
+        {% if user.is_superuser %}
+          <div class="col-sm-auto">
+            <a href="/schools/upload/{{ schoolnr }}/" class="btn btn-primary m-2" style="width: 120px;">Upload</a>
+          </div>
+        {% endif %}
         <div class="col-sm-auto">
           <a class="btn btn-primary m-2 back back" href="/">Back to main</a>
         </div>

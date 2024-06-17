@@ -493,8 +493,9 @@ class c_cam(c_device):
       generalparams = ' -v fatal'
       if source_string[:4].upper() == 'RTSP':
         generalparams += ' -rtsp_transport tcp'
-      generalparams += ' -fflags nobuffer'
-      generalparams += ' -flags low_delay'
+      if self.dbline.cam_red_lat:
+        generalparams += ' -fflags nobuffer'
+        generalparams += ' -flags low_delay'
       if self.video_codec_name not in {'h264', 'hevc'}:
         generalparams += ' -use_wallclock_as_timestamps 1'
       outparams2 = ''

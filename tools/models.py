@@ -25,6 +25,7 @@ class setting(models.Model):
 class camurl(models.Model):
   type = models.CharField(max_length=100)
   url =  models.CharField(max_length=255)
+  reduce_latence = models.BooleanField(default=True)
 
   def __str__(self):
     return('CamUrl model: ' + self.type+' - ' + self.url)

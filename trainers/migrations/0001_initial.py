@@ -51,7 +51,7 @@ class Migration(migrations.Migration):
         ('active', models.BooleanField(default=True)),
         ('name', models.CharField(default='New Trainer', max_length=256)),
         ('t_type', models.IntegerField(choices=[(1, 'GPU'), (2, 'CPU'), (3, 'Remote'), (4, 'other')], default=3, verbose_name='trainer type')),
-        ('gpu_nr', models.IntegerField(default=1, verbose_name='gpu number')),
+        ('gpu_nr', models.IntegerField(default=0, verbose_name='gpu number')),
         ('gpu_mem_limit', models.IntegerField(default=0, verbose_name='gpu mem limit')),
         ('startworking', models.CharField(default='00:00:00', max_length=8)),
         ('stopworking', models.CharField(default='24:00:00', max_length=8)),

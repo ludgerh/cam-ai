@@ -105,7 +105,8 @@ while not root_db_pass:
 print()
 
 while not cam_ai_db_pass:
-  dbpass1 = (getpass(prompt='Please choose a database password for the user CAM-AI (required): '))
+  dbpass1 = (getpass(
+    prompt='Please choose a database password for the user CAM-AI (required): '))
   dbpass2 = (getpass(prompt='Please repeat: '))
   if dbpass1 and dbpass1 == dbpass2:
     cam_ai_db_pass = dbpass1
@@ -133,7 +134,8 @@ sql_query("drop user if exists ''@'%';")
 sql_query("drop user if exists 'root'@'%';")
 sql_query("drop database if exists test;")
 sql_query("drop database if exists `CAM-AI`;")
-sql_query("grant all on *.* to 'CAM-AI'@'localhost' identified by '" + cam_ai_db_pass + "' with grant option;")
+sql_query("grant all on *.* to 'CAM-AI'@'localhost' identified by '" + cam_ai_db_pass 
+  + "' with grant option;")
 sql_query("flush privileges;")
 sql_query("create database `CAM-AI`;")
 print() 
@@ -179,20 +181,26 @@ if True:
   print()
     
   print('>>>>> Modifying system config...')
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', '/etc/dhcp/dhclient.conf']) 
+  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+    '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^timeout/d', '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , '/etc/dhcp/dhclient.conf']) 
+  subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , 
+    '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$atimeout 180;' , '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', '/etc/sysctl.conf']) 
+  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+    '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^vm.overcommit_memory/d', '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^net.core.somaxconn/d', '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$avm.overcommit_memory = 1' , '/etc/sysctl.conf']) 
+  subprocess.call(['sudo', 'sed', '-i', '$avm.overcommit_memory = 1' , 
+    '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$anet.core.somaxconn=1024' , '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI disabled saving/d', '/etc/redis/redis.conf']) 
+  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI disabled saving/d', 
+    '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^save/d', '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^#save/d', '/etc/redis/redis.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI disabled saving' , '/etc/redis/redis.conf']) 
+  subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI disabled saving' , 
+    '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 900 1' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 300 10' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 60 10000' , '/etc/redis/redis.conf']) 

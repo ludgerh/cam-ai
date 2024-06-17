@@ -21,6 +21,8 @@ from asyncio import sleep as asleep
 from logging import getLogger
 from traceback import format_exc
 from django.contrib.auth.models import User
+from django.db import connection
+from django.db.utils import OperationalError
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.l_tools import djconf
@@ -67,7 +69,12 @@ class predictionsConsumer(AsyncWebsocketConsumer):
         if 'tf_w_index' in self.mydatacache:
           return(xytemp)
     self.mydatacache['schooldata'][myschool] = {}
-    tf_worker_object = await worker.objects.aget(school__id=myschool)  
+    while True:
+      try:
+        tf_worker_object = await worker.objects.aget(school__id=myschool) 
+        break
+      except OperationalError:
+        connection.close() 
     self.mydatacache['workernr'] = tf_worker_object.id
     self.mydatacache['tf_w_index'] = (
       tf_workers[self.mydatacache['workernr']].register())

@@ -165,9 +165,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="h5 m-2">
     Type of your camera:
     <select class="form-select m-2 w-50" id="urlselect">
-      <option value="[custom url]" selected>Other Type</option>
+      <option red_lat="True" value="[custom url]" selected>Other Type</option>
   {% for item in camurls %}
-      <option value="{{ item.url }}">{{ item.type }}</option>
+      <option red_lat="{{ item.reduce_latence }}" value="{{ item.url }}">
+        {{ item.type }}</option>
   {% endfor %}
     </select>
   </div>
@@ -175,6 +176,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <label for="camurl" class="form-label h4">Url of your camera:</label>
     <textarea class="form-control" id="camurl" rows="2"></textarea>
   </div>
+  <input class="mb-3 m-2 form-check-input me-3 bool" type="checkbox" value="" id="red_lat_check" checked>
+  <label class="mb-3 m-2 form-check-label h4" for="red_lat_check">
+    Reduce latence?
+  </label>
+  
   <div>
     <button class="btn btn-primary m-2 check-button" type="button">Check connection</button>
   </div>
@@ -217,6 +223,8 @@ $(document).ready(function() {
     //urlstr = urlstr.replace('{address}', $('#ipaddress').text());
     urlstr = urlstr.replace('{port}', $('#portselect').val());
     $('#camurl').val(urlstr);
+    let boolbuf = ($(this).find(":selected").attr('red_lat') === 'True');
+    $('#red_lat_check').prop('checked', boolbuf);
   });
   $('#urlselect').trigger("change");
   $('#userinput').change(function() {
@@ -392,6 +400,7 @@ $(document).ready(function() {
         'control_ip' : '{{ ipaddress }}',
         'control_port' : parseInt(control_port),
         'cam_name' : cam_name,
+        'red_lat' :  $('#red_lat_check').prop('checked'),
       })  
       .then((result) => {
         window.location.href = window.location.protocol + '//' + window.location.host;

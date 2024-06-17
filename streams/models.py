@@ -56,6 +56,7 @@ class stream(models.Model):
   cam_control_port = models.IntegerField(default=0)
   cam_control_user = models.CharField(max_length=256, default='')
   cam_control_passwd = models.CharField(max_length=256, default='')
+  cam_red_lat = models.BooleanField("Red. latence", default=True)
  
   det_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  

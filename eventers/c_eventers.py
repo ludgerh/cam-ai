@@ -80,10 +80,13 @@ class c_eventer(c_device):
     log_ini(self.logger, self.logname)
     alarm_init(self.logger, self.dbline.id)
     setproctitle('CAM-AI-Eventer #'+str(self.dbline.id))
-    if self.dbline.eve_gpu_nr_cv:
-      environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    if self.dbline.eve_gpu_nr_cv== -1:
+      environ["CUDA_VISIBLE_DEVICES"] = ''
+    else:  
       environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.eve_gpu_nr_cv)
-      self.logger.info('**** Eventer running GPU #' + str(self.dbline.eve_gpu_nr_cv))
+    self.logger.info('**** Eventer #' + str(self.dbline.id)+' running GPU #' 
+      + str(self.dbline.eve_gpu_nr_cv))
     self.eventdict = {}
     self.eventdict_lock = t_lock()
     self.display_lock = t_lock()

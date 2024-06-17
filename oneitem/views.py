@@ -54,12 +54,14 @@ def onecam(request, camnr, tokennr=0, token=None):
       dbline.cam_url = form.cleaned_data['cam_url']
       dbline.cam_fpslimit = form.cleaned_data['cam_fpslimit']
       dbline.cam_feed_type = form.cleaned_data['cam_feed_type']
+      dbline.cam_red_lat = form.cleaned_data['cam_red_lat']
       dbline.save(update_fields=[
         'name',
         'cam_pause',
         'cam_fpslimit', 
         'cam_feed_type',
         'cam_url',
+        'cam_red_lat',
       ])
       mycam.inqueue.put(('reset_cam',))
       return HttpResponseRedirect(myurl+str(camnr)+'/')
@@ -70,6 +72,7 @@ def onecam(request, camnr, tokennr=0, token=None):
       'cam_fpslimit' : dbline.cam_fpslimit,
       'cam_feed_type' : dbline.cam_feed_type,
       'cam_url' : dbline.cam_url,
+      'cam_red_lat' : dbline.cam_red_lat,
     })
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),

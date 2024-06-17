@@ -99,11 +99,14 @@ class c_detector(c_device):
       self.logname = 'detector #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
-      setproctitle('CAM-AI-Detector #'+str(self.dbline.id))
-      if self.dbline.det_gpu_nr_cv:
-        environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+      setproctitle('CAM-AI-Detector #' + str(self.dbline.id))
+      environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+      if self.dbline.det_gpu_nr_cv == -1:
+        environ["CUDA_VISIBLE_DEVICES"] = ''
+      else:  
         environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.det_gpu_nr_cv)
-        self.logger.info('**** Detector running GPU #' + str(self.dbline.det_gpu_nr_cv))
+      self.logger.info('**** Detector #' + str(self.dbline.id)+' running GPU #' 
+        + str(self.dbline.det_gpu_nr_cv))
       self.do_run = True
       self.warning_done = False
       while self.do_run:

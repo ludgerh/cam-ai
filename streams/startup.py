@@ -82,6 +82,12 @@ if not  camurl.objects.filter(type='levelone FCS-5201'):
   newcam = camurl(type='levelone FCS-5201', 
     url='rtsp://{user}:{pass}@{address}:{port}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1')
   newcam.save()
+if not  camurl.objects.filter(type='Novus NVIP-4VE-6501'):
+  newcam = camurl(type='Novus NVIP-4VE-6501', 
+    url='rtsp://{user}:{pass}@{address}:{port}/profile1',
+    reduce_latence = False,
+  )
+  newcam.save()
 if not  camurl.objects.filter(type='Reolink RLC-410W'):
   newcam = camurl(type='Reolink RLC-410W', 
     url='rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')

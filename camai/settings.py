@@ -137,7 +137,7 @@ if debug_daphne or debug_channels:
     'disable_existing_loggers': False,
     'handlers': {
       'console': {
-        'level': 'DEBUG', 
+        'level': 'ERROR', 
         'class': 'logging.StreamHandler',
       },
       # You can add more handlers if needed, such as file handlers
@@ -148,14 +148,14 @@ if debug_daphne or debug_channels:
 if debug_daphne:
   LOGGING['loggers']['daphne'] =  {
     'handlers': ['console'],
-    'level': 'DEBUG',
+    'level': 'ERROR',
     'propagate': False,
   }
   
 if debug_channels:
   LOGGING['loggers']['channels'] =  {
     'handlers': ['console'],
-    'level': 'DEBUG',
+    'level': 'ERROR',
     'propagate': False,
   }
 

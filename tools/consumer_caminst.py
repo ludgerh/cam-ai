@@ -97,6 +97,7 @@ class acaminst(AsyncWebsocketConsumer):
       newstream.eve_gpu_nr_cv = cv_gpu_nr
       newstream.eve_school = myschool
       newstream.creator = self.scope['user']
+      newstream.cam_red_lat = params['red_lat']
       await newstream.asave()
       newlineid = newstream.id
       if not self.scope['user'].is_superuser:
