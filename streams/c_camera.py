@@ -138,8 +138,7 @@ class search_executor(ThreadPoolExecutor):
     myresult = f.result()
     if myresult and 'address' in myresult:
       for port in myresult['address']['ports']:
-        #if port in {80, 2020, 8000, 8080}:
-        if port in {80}:
+        if port in {80, 2020, 8000, 8080}:
           try:
             myonvif = ONVIFCamera(
               myresult['address']['ip'], 
