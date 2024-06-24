@@ -533,6 +533,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
       await aiofiles.os.makedirs(schooldir+'model', exist_ok=True)
       if using_websocket or remote_trainer:
         async with ClientSession() as session:
+          print('*****', myworker.wsserver + 'ws/schoolutil/')
           async with session.ws_connect(myworker.wsserver + 'ws/schoolutil/') as ws:
             outdict = {
               'code' : 'makeschool',

@@ -40,7 +40,7 @@ class c_detector(c_device):
       self.type = 'D'
       super().__init__(*args, **kwargs)
       self.mode_flag = self.dbline.det_mode_flag
-      self.dataqueue = c_buffer(block=True)
+      self.dataqueue = c_buffer(block=True, timeout=5.0)
       self.firstdetect = True
       self.ts_background = time()
       self.finished = True

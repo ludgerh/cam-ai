@@ -33,7 +33,7 @@ class c_viewer():
   def __init__(self, parent, logger):
     self.logger = logger
     self.parent = parent
-    self.inqueue = c_buffer(call=self.callback)
+    self.inqueue = c_buffer(call=self.callback, timeout=5.0)
     self.client_dict_lock = Lock()
     self.client_dict = {}
     self.event_loop = None #see consumers

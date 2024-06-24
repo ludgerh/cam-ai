@@ -40,10 +40,11 @@ from traceback import format_exc
 class l_buffer():
   redis_list = []
 
-  def __init__(self, block=False, call=None, queue=None):
+  def __init__(self, block=False, call=None, queue=None, timeout=None):
     self.block = block
     self.call = call
     self.queue = queue
+    self.timeout = timeout
     self.redis = saferedis() 
     self.blockdelay = 0.01  
     i = 0
@@ -86,16 +87,20 @@ class l_buffer():
           if self.blockdelay < 1.0:
             self.blockdelay += 0.01  
       self.blockdelay = 0.01  
-    with self.my_lock:
+    #with self.my_lock:
+    if self.my_lock.acquire(timeout = self.timeout):
       if self.queue:
         bytedata = self.redis.rpop(self.storage[0])
         objdata = self.redis.rpop(self.storage[1])
       else:
         bytedata = self.redis.get(self.storage[0])
         objdata = self.redis.get(self.storage[1])
-    if objdata:
-      objdata = pickle.loads(objdata)
-    result = (bytedata, objdata)
+      if objdata:
+        objdata = pickle.loads(objdata)
+      result = (bytedata, objdata)
+      self.my_lock.release()
+    else:
+      result = None  
     if self.block:
       if not self.queue:
         self.redis.delete(self.storage[0])
@@ -106,15 +111,17 @@ class l_buffer():
       objdata = pickle.dumps(objdata)
     else:
       objdata = b''  
-    with self.my_lock:
+    #with self.my_lock:
+    if self.my_lock.acquire(timeout = self.timeout):
       if self.queue:
         self.redis.lpush(self.storage[0], bytedata)
         self.redis.lpush(self.storage[1], objdata)
       else:  
         self.redis.set(self.storage[0], bytedata)
         self.redis.set(self.storage[1], objdata)
-    if self.call: 
-      self.redis.publish(self.storage[0], 'T') #Trigger
+      if self.call: 
+        self.redis.publish(self.storage[0], 'T') #Trigger
+      self.my_lock.release()
       
   def send_death_pill(self):  
     if self.call: 

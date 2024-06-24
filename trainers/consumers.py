@@ -153,7 +153,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       
     elif indict['code'] == 'delete':
       frameline = await trainframe.objects.aget(name=indict['name'])
-      bmppath = self.myschoollinedir + 'frames/' + indict['name']
+      bmppath = self.myschoolline.dir + 'frames/' + indict['name']
       await frameline.adelete()
       if await aiofiles.os.path.exists(bmppath):
         await aiofiles.os.remove(bmppath)

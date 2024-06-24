@@ -63,7 +63,7 @@ class c_eventer(c_device):
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
     self.dataqueue = c_buffer(block=True)
-    self.detectorqueue = l_buffer(queue=True)
+    self.detectorqueue = l_buffer(queue=True, timeout=5.0)
     self.buffer_ts = time()
     self.display_ts = 0
     self.nr_of_cond_ed = 0
@@ -119,8 +119,10 @@ class c_eventer(c_device):
         if self.redis.view_from_dev('E', self.dbline.id): 
           frameline = self.dataqueue.get()
         else:
+          frameline = None
+        if frameline is None:  
           frameline = [None, 0, time()]  
-        if (self.do_run and (frameline is not None) 
+        if (self.do_run and (frameline[0] is not None) 
             and self.sl.greenlight(self.period, frameline[2])):
           self.run_one(frameline) 
         else:
@@ -136,9 +138,9 @@ class c_eventer(c_device):
               connection.close()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-      self.logger.handlers.clear()
       self.tf_worker.stop_out(self.tf_w_index)
       self.tf_worker.unregister(self.tf_w_index)
+      self.logger.handlers.clear()
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()
@@ -246,7 +248,7 @@ class c_eventer(c_device):
           if self.tag_list_active != self.dbline.eve_school.id:
             self.tag_list_active = self.dbline.eve_school.id
             self.tag_list = get_taglist(self.tag_list_active)
-          self.check_events(i, item) 
+          self.check_events(i, item)
       while self.motion_frame[2] <= frame[2] + self.dbline.eve_sync_factor:
         #print(self.motion_frame[2], frame[2], self.motion_frame[2] - frame[2], self.active_pred_count)
         if self.active_pred_count:

@@ -106,13 +106,8 @@ class train_once_remote():
       count = len(remoteset & localset)
       for item in (remoteset & localset):
         if remotedict[item] != localdict[item][10]:
-          outdict = {
-            'code' : 'delete',
-            'name' : item,
-          }
-          self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
           self.logger.info('(' + str(count) + ') Changed, deleting: ' + item)
-          remoteset.remove(item)
+          localset.remove(item)
         count -= 1  
       count = len(remoteset - localset)
       for item in (remoteset - localset):
@@ -154,7 +149,9 @@ class train_once_remote():
           'school' : self.myschool.e_school,
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        model_type = json.loads(self.ws.recv())
+        temp = self.ws.recv()
+        print('*****', temp)
+        model_type = json.loads(temp)
       outdict = {
         'code' : 'trainnow',
       } 

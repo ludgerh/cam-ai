@@ -33,7 +33,8 @@ from tf_workers.models import school
 from users.models import userinfo
 from .models import trainer as dbtrainer, trainframe, fit, epoch
 if djconf.getconfigbool('local_trainer', False):
-  from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
+  if djconf.getconfigbool('local_gpu', False):
+    from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
 from .train_worker_remote import train_once_remote
 
 #from threading import enumerate
