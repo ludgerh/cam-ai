@@ -130,26 +130,47 @@ class tf_user(object):
       self.clientset.discard(self.id)
       
 class output_dist():   
-  def __init__(self, worker_nr):
-    self.nametag = 'out_dist:' + str(worker_nr) + ':'
+  def __init__(self, tf_w_index):
+    self.nametag = 'out_dist:' + str(tf_w_index) + ':'
     self.used_adresses = set()
+    self.tsp_dict={}
+    self.tsg_dict={}
     
-  def put(self, address, data):
-    while redis.exists(self.nametag + str(address)):      
+  def put(self, tf_w_index, data, timeout = None):
+    #if tf_w_index in self.tsp_dict:
+      #print('###', tf_w_index, 'putting started', time() - self.tsp_dict[tf_w_index])
+    #else:  
+      #print('###', tf_w_index, 'putting started')
+    self.tsp_dict[tf_w_index] = time()
+    while redis.exists(self.nametag + str(tf_w_index)): 
       sleep(djconf.getconfigfloat('short_brake', 0.01))
-    self.used_adresses.add(address) 
-    redis.set(self.nametag + str(address), pickle.dumps(data))   
+    #print('###', tf_w_index, 'putting waited', time() - self.tsp_dict[tf_w_index])
+    self.used_adresses.add(tf_w_index) 
+    redis.set(self.nametag + str(tf_w_index), pickle.dumps(data)) 
+    #print('###', tf_w_index, 'putting done', time() - self.tsp_dict[tf_w_index])
+    self.tsp_dict[tf_w_index] = time()
     
-  def get(self, address):
-    while (result := redis.get(self.nametag + str(address))) is None: 
+  def get(self, tf_w_index):
+    #if tf_w_index in self.tsg_dict:
+      #print('###', tf_w_index, 'getting started', time() - self.tsg_dict[tf_w_index])
+    #else:  
+      #print('###', tf_w_index, 'getting started')
+    self.tsg_dict[tf_w_index] = time()
+    while (result := redis.get(self.nametag + str(tf_w_index))) is None: 
       sleep(djconf.getconfigfloat('short_brake', 0.01))
-    redis.delete(self.nametag + str(address))
+    #print('###', tf_w_index, 'getting waited', time() - self.tsg_dict[tf_w_index])
+    redis.delete(self.nametag + str(tf_w_index))
+    #print('###', tf_w_index, 'getting done', time() - self.tsg_dict[tf_w_index])
+    self.tsg_dict[tf_w_index] = time()
     return(pickle.loads(result))
     
+  def clean_one(self, tf_w_index):
+    if redis.exists(self.nametag + str(tf_w_index)):
+      redis.delete(self.nametag + str(tf_w_index)) 
+    
   def clean(self):
-    for address in self.used_adresses:
-      if redis.exists(self.nametag + str(address)):
-        redis.delete(self.nametag + str(address))  
+    for tf_w_index in self.used_adresses:
+      self.clean_one(tf_w_index)
 
 #***************************************************************************
 #
@@ -390,8 +411,8 @@ class tf_worker():
             if (schoolnr in self.model_buffers
                 and (len(self.model_buffers[schoolnr]) >= self.dbline.maxblock
                 or new_time > self.model_buffers[schoolnr].ts + self.dbline.timeout)):
-              self.model_buffers[schoolnr].ts = new_time  
-              while self.do_run and len(self.model_buffers[schoolnr]):
+              self.model_buffers[schoolnr].ts = new_time 
+              if self.do_run and len(self.model_buffers[schoolnr]):
                 self.process_buffer(schoolnr, self.logger)
             else:
               sleep(djconf.getconfigfloat('short_brake', 0.01))
@@ -527,115 +548,111 @@ class tf_worker():
             + self.allmodels[schoolnr]['type'])
 
   def process_buffer(self, schoolnr, logger, had_timeout=False):
-    try:
-      mybuffer = self.model_buffers[schoolnr]
-      if schoolnr in self.myschool_cache:
-        myschool= self.myschool_cache[schoolnr][0]
-      else:
-        myschool = school.objects.get(id=schoolnr)
-        self.myschool_cache[schoolnr] = (myschool, time())
+    mybuffer = self.model_buffers[schoolnr]
+    if schoolnr in self.myschool_cache:
+      myschool= self.myschool_cache[schoolnr][0]
+    else:
+      myschool = school.objects.get(id=schoolnr)
+      self.myschool_cache[schoolnr] = (myschool, time())
 
-      ts_one = time()
-      slice_to_process = mybuffer.get(self.dbline.maxblock)
-      framelist = [item[0] for item in slice_to_process]
-      framesinfo = [item[1] for item in slice_to_process]
-      self.check_allmodels(schoolnr, logger)
-      self.check_activemodels(schoolnr, logger)
-      self.model_buffers[schoolnr].pause = False
-      if self.dbline.gpu_sim >= 0: #GPU Simulation with random
-        if self.dbline.gpu_sim > 0:
-          sleep(self.dbline.gpu_sim)
-        predictions = np.empty((0, len(taglist)), np.float32)
-        for i in framelist:
-          myindex = round(np.sum(i).item())
-          if myindex in self.cachedict:
-            line = self.cachedict[myindex]
-          else:
-            line = []
-            for j in range(len(taglist)):
-              line.append(random())
-            line = np.array([np.float32(line)])
-            self.cachedict[myindex] = line
-          predictions = np.vstack((predictions, line))
-      elif self.dbline.use_websocket: #Predictions from Server
-        self.ws_ts = time()
-        outdict = {
-          'code' : 'imgl',
-          'scho' : myschool.e_school,
-        }
-        self.continue_sending(json.dumps(outdict), opcode=1, logger=logger)
-        while True:
-          try:
-            for item in framelist:
-              jpgdata = cv.imencode('.jpg', item)[1].tobytes()
-              schoolbytes = myschool.e_school.to_bytes(8, 'big')
-              self.continue_sending(schoolbytes+jpgdata, opcode=0, 
-                logger=logger, get_answer=False)
-            outdict = {
-              'code' : 'done',
-              'scho' : myschool.e_school,
-            }
-            predictions = self.continue_sending(json.dumps(outdict), opcode=1, 
-              logger=logger, get_answer=True)
-            predictions = json.loads(predictions) 
-            if predictions is None:
-              predictions = np.zeros((len(framelist), len(taglist)), np.float32)
-            else:
-              predictions = np.array(predictions, dtype=np.float32)
-            break
-          except (ConnectionResetError, OSError):
-            sleep(djconf.getconfigfloat('long_brake', 1.0))
-            self.reset_websocket()
-      else: #local GPU
-        frames_ok = True
-        try:
-          npframelist = []
-          for item in framelist:
-            if item is not None and len(item.shape) == 3:
-              npframelist.append(np.expand_dims(item, axis=0))
-            else:
-              frames_ok = False  
-              break
-        except:
-          frame_ok = False
-          logger.error(format_exc())
-          logger.handlers.clear()      
-        if frames_ok:    
-          npframelist = np.vstack(npframelist)
-          self.check_activemodels(schoolnr, logger)
-          self.activemodels[schoolnr]['model'].summary
-          predictions = (
-            self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
+    ts_one = time()
+    slice_to_process = mybuffer.get(self.dbline.maxblock)
+    framelist = [item[0] for item in slice_to_process]
+    framesinfo = [item[1] for item in slice_to_process]
+    self.check_allmodels(schoolnr, logger)
+    self.check_activemodels(schoolnr, logger)
+    self.model_buffers[schoolnr].pause = False
+    if self.dbline.gpu_sim >= 0: #GPU Simulation with random
+      if self.dbline.gpu_sim > 0:
+        sleep(self.dbline.gpu_sim)
+      predictions = np.empty((0, len(taglist)), np.float32)
+      for i in framelist:
+        myindex = round(np.sum(i).item())
+        if myindex in self.cachedict:
+          line = self.cachedict[myindex]
         else:
-          logger.warning('Defective image in c_tfworkers / processbuffer') 
-          predictions = None    
-      if predictions is not None:
-        starting = 0
-        for i in range(len(framelist)):
-          if ((i == len(framelist) - 1) 
-              or (framesinfo[i] != framesinfo[i+1])):
-            if (framesinfo[starting] in self.users):
-              self.my_output.put(framesinfo[starting], (
-                'pred_to_send', 
-                predictions[starting:i+1], 
-                framesinfo[starting],
-              ))
-            starting = i + 1
-        if self.dbline.savestats > 0: #Later to be written in DB
-          newtime = time()
-          logtext = 'School: ' + str(schoolnr).zfill(3)
-          logtext += ('  Buffer Size: ' 
-            + str(len(mybuffer)).zfill(5))
-          logtext += ('  Block Size: ' 
-            + str(len(framelist)).zfill(5))
-          logtext += ('  Proc Time: ' 
-            + str(round(newtime - ts_one, 3)).ljust(5, '0'))
-          if had_timeout:
-            logtext += ' T'
-          logger.info(logtext)
-    except:
-      self.logger.error(format_exc())
-      self.logger.handlers.clear()
+          line = []
+          for j in range(len(taglist)):
+            line.append(random())
+          line = np.array([np.float32(line)])
+          self.cachedict[myindex] = line
+        predictions = np.vstack((predictions, line))
+    elif self.dbline.use_websocket: #Predictions from Server
+      self.ws_ts = time()
+      outdict = {
+        'code' : 'imgl',
+        'scho' : myschool.e_school,
+      }
+      self.continue_sending(json.dumps(outdict), opcode=1, logger=logger)
+      while True:
+        try:
+          for item in framelist:
+            jpgdata = cv.imencode('.jpg', item)[1].tobytes()
+            schoolbytes = myschool.e_school.to_bytes(8, 'big')
+            self.continue_sending(schoolbytes+jpgdata, opcode=0, 
+              logger=logger, get_answer=False)
+          outdict = {
+            'code' : 'done',
+            'scho' : myschool.e_school,
+          }
+          predictions = self.continue_sending(json.dumps(outdict), opcode=1, 
+            logger=logger, get_answer=True)
+          predictions = json.loads(predictions) 
+          if predictions is None:
+            predictions = np.zeros((len(framelist), len(taglist)), np.float32)
+          else:
+            predictions = np.array(predictions, dtype=np.float32)
+          break
+        except (ConnectionResetError, OSError):
+          sleep(djconf.getconfigfloat('long_brake', 1.0))
+          self.reset_websocket()
+    else: #local GPU
+      frames_ok = True
+      try:
+        npframelist = []
+        for item in framelist:
+          if item is not None and len(item.shape) == 3:
+            npframelist.append(np.expand_dims(item, axis=0))
+          else:
+            frames_ok = False  
+            break
+      except:
+        frame_ok = False
+        logger.error(format_exc())
+        logger.handlers.clear()      
+      if frames_ok:    
+        npframelist = np.vstack(npframelist)
+        self.check_activemodels(schoolnr, logger)
+        self.activemodels[schoolnr]['model'].summary
+        predictions = (
+          self.activemodels[schoolnr]['model'].predict_on_batch(npframelist))
+      else:
+        logger.warning('Defective image in c_tfworkers / processbuffer') 
+        predictions = None  
+    if predictions is not None:
+      starting = 0
+      for i in range(len(framelist)):
+        if ((i == len(framelist) - 1) 
+            or (framesinfo[i] != framesinfo[i+1])):
+          if (framesinfo[starting] in self.users):
+            self.my_output.put(framesinfo[starting], (
+              'pred_to_send', 
+              predictions[starting:i+1], 
+              framesinfo[starting],
+            ), timeout=5.0)
+          starting = i + 1
+      if self.dbline.savestats > 0: #Later to be written in DB
+        newtime = time()
+        logtext = 'School: ' + str(schoolnr).zfill(3)
+        logtext += ('  Buffer Size: ' 
+          + str(len(mybuffer)).zfill(5))
+        logtext += ('  Block Size: ' 
+          + str(len(framelist)).zfill(5))
+        logtext += ('  Proc Time: ' 
+          + str(round(newtime - ts_one, 3)).ljust(5, '0'))
+        if had_timeout:
+          logtext += ' T'
+        logger.info(logtext) 
 
 
 #***************************************************************************
@@ -646,13 +663,11 @@ class tf_worker():
 
   def out_reader_proc(self, index): #called by client (c_eventer)
     while (received := self.my_output.get(index))[0] != 'stop':
-      #print('Out to queue', index, ':', received)
       if (received[0] == 'put_is_ready'):
         self.is_ready = received[1]
       elif (received[0] == 'put_xy'):
         self.xy = received[1]
       elif (received[0] == 'pred_to_send'):
-        #print('Out to queue', index, ':', received)
         while True:
           self.pred_out_lock.acquire()
           if  received[2] not in self.pred_out_dict:
@@ -664,13 +679,15 @@ class tf_worker():
           else: 
             self.pred_out_lock.release()
             sleep(djconf.getconfigfloat('very_short_brake', 0.001))
+            break
       else:
         raise QueueUnknownKeyword(received[0])
-    #print('Finished:', received)
 
   def register(self):
     self.inqueue.put(('register', ))
     self.tf_w_index = self.registerqueue.get()
+    self.my_output.clean_one(self.tf_w_index)
+    #print('*** Register', self.tf_w_index)
     return(self.tf_w_index)
 
   def run_out(self, index):
@@ -682,6 +699,7 @@ class tf_worker():
     return(self.tf_w_index)
 
   def unregister(self, index):
+    #print('*** Unregister', index)
     self.inqueue.put(('unregister', index))
 
   def check_ready(self, index):
@@ -701,7 +719,6 @@ class tf_worker():
 
   def ask_pred(self, school, img_list, userindex):
     with  self.pred_out_lock:
-      #self.pred_out_dict[userindex] = None
       self.inqueue.put((
         'imglist', 
         school, 

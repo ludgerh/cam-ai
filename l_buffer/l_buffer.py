@@ -160,10 +160,12 @@ class c_buffer(l_buffer):
     
   def get(self):
     frame = super().get()
-    if frame:
+    if frame and frame[0]:
       np_image = np.frombuffer(frame[0], dtype=np.uint8)
       np_image = np_image.reshape(frame[1][1], frame[1][2], 3)
       frame = [frame[1][0], np_image] + frame[1][3:]
+    else:
+      frame = None  
     return(frame)
 
         
