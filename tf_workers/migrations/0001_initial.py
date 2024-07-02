@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
           ('l_rate_min', models.CharField(default='1e-6', max_length=20)),
           ('l_rate_max', models.CharField(default='1e-6', max_length=20)),
           ('e_school', models.IntegerField(default=1)),
-          ('model_type', models.CharField(default='efficientnetv2b0', max_length=50)),
+          ('model_type', models.CharField(default='efficientnetv2-b0', max_length=50)),
           ('ignore_checked', models.BooleanField(default=True)),
           ('extra_runs', models.IntegerField(default=0)),
           ('donate_pics', models.BooleanField(default=False)),

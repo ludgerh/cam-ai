@@ -20,7 +20,7 @@ import numpy as np
 import json
 from select import select
 from psutil import Process
-from signal import SIGINT, SIGKILL, SIGTERM
+from signal import SIGKILL, SIGTERM
 from os import remove, path, makedirs, mkfifo, kill as oskill
 from shutil import move
 from time import sleep, time
@@ -62,6 +62,7 @@ class c_cam(c_device):
     self.video_codec = -1
     self.video_codec_name = '?'
     self.audio_codec = -1
+    self.vid_count = None
     
     if not path.exists(self.recordingspath):
       makedirs(self.recordingspath)
@@ -132,16 +133,18 @@ class c_cam(c_device):
           sleep(djconf.getconfigfloat('short_brake', 0.01))
       else:
         if self.cam_active:
-          if ((not self.redis.record_from_dev('C', self.dbline.id)) 
+          if (not self.redis.record_from_dev('C', self.dbline.id)
               and self.cam_recording):
-            self.stopprocess()
-            self.newprocess() 
+            if self.ffmpeg_recording:
+              self.stopprocess()
+              self.newprocess() 
             self.cam_recording = False
             self.logger.info('Cam #'+str(self.dbline.id)+' stopped recording')
           if (self.redis.record_from_dev('C', self.dbline.id) 
-              and (not self.cam_recording)):
-            self.stopprocess()
-            self.newprocess() 
+              and not self.cam_recording):
+            if not self.ffmpeg_recording:
+              self.stopprocess()
+              self.newprocess() 
             self.cam_recording = True
             self.logger.info('Cam #'+str(self.dbline.id)+' started recording')
         else:
@@ -151,54 +154,34 @@ class c_cam(c_device):
         self.cam_ts = None
         break
     while True:
-      if self.dbline.cam_feed_type == 1:
-        frame = None
-        oldtime = thistime
-        thistime = time()
+      if self.ff_proc is None:
+        return(None)
+      ready_to_read, _, _ = select([self.ff_proc.stdout], [], [], 5.0) 
+      if ready_to_read:
         try:
-          frame = requests.get(self.dbline.url_img, timeout=60).content
-          frame = c_convert(frame, typein=3, typeout=1)
-        except requests.exceptions.ReadTimeout:
-          self.logger.warning('Cam #' + str(self.id)
-            + ' had timeout while getting JPG')
-        except requests.exceptions.ConnectTimeout:
-          self.logger.warning('Cam #' + str(self.id)
-            + ' had timeout while connecting for JPG')
-        except requests.exceptions.ConnectionError:
-          self.logger.warning('Cam #' + str(self.id)
-            + ' could not connect for getting JPG')
-          sleep(60)
-        if frame is not None:
-          break
-      elif self.dbline.cam_feed_type in {2, 3}: 
-        if self.ff_proc is None:
-          return(None)
-        ready_to_read, _, _ = select([self.ff_proc.stdout], [], [], 5.0) 
-        if ready_to_read:
-          try:
-            in_bytes = self.ff_proc.stdout.read(self.bytes_per_frame)
-          except  AttributeError: 
-            in_bytes = None
-        else:
+          in_bytes = self.ff_proc.stdout.read(self.bytes_per_frame)
+        except  AttributeError: 
           in_bytes = None
-        if in_bytes:
-          self.framewait = 0.0
-          nptemp = np.frombuffer(in_bytes, np.uint8)
-          try:
-            frame = nptemp.reshape(self.dbline.cam_yres,
-              self.dbline.cam_xres, 3)
-          except ValueError:
-            self.logger.warning('ValueError: cannot reshape array of size ' 
-              + str(nptemp.size) + ' into shape ' 
-              + str((self.dbline.cam_yres, self.dbline.cam_xres, 3)))
-            return(None)
-          self.getting_newprozess = False
-        else:
-          if self.framewait < 10.0:
-            self.framewait += 0.1
-          sleep(self.framewait)
-          frame = None
-        break
+      else:
+        in_bytes = None
+      if in_bytes:
+        self.framewait = 0.0
+        nptemp = np.frombuffer(in_bytes, np.uint8)
+        try:
+          frame = nptemp.reshape(self.dbline.cam_yres,
+            self.dbline.cam_xres, 3)
+        except ValueError:
+          self.logger.warning('ValueError: cannot reshape array of size ' 
+            + str(nptemp.size) + ' into shape ' 
+            + str((self.dbline.cam_yres, self.dbline.cam_xres, 3)))
+          return(None)
+        self.getting_newprozess = False
+      else:
+        if self.framewait < 10.0:
+          self.framewait += 0.1
+        sleep(self.framewait)
+        frame = None
+      break
     if self.dbline.cam_checkdoubles:
       imagesum = np.sum(frame)
       if self.imagecheck == imagesum:
@@ -295,50 +278,10 @@ class c_cam(c_device):
       return()
     self.logger.info('[' + str(maxcounter) + '] Probing camera #' 
       + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
-    if self.dbline.cam_feed_type == 1:
-      self.online = False
-      try:
-        frame = Image.open(requests.get(self.mycam.url, 
-          stream=True).raw).convert('RGB') 
-        frame = cv.cvtColor(np.array(frame), cv.COLOR_RGB2BGR)
-        self.redis.x_y_res_to_cam(self.dbline.id, frame.shape[1], 
-          frame.shape[0])
-        self.dbline.xres = frame.shape[1]
-        self.dbline.yres = frame.shape[0]
-        self.dbline.save(update_fields=['xres', 'yres'])
-        self.online = True
-      except requests.exceptions.ReadTimeout:
-        mylogger.warning('Cam #' + str(self.dbline.id)
-          + ' had timeout while getting JPG')
-      except requests.exceptions.ConnectTimeout:
-        mylogger.warning('Cam #' + str(self.dbline.id)
-          + ' had timeout while connecting for JPG')
-      except requests.exceptions.ConnectionError:
-        mylogger.warning('Cam #' + str(self.dbline.id)
-          + ' could not connect for getting JPG')
-    elif self.dbline.cam_feed_type in {2, 3}:
-      if self.dbline.cam_repeater > 0:
-        while not (self.dbline.cam_repeater in repeaterConsumer.register):
-          self.logger.info('Waiting for repeater '
-            + str(self.dbline.cam_repeater) + ' to register...')
-          sleep(10)
-        self.repeater = (
-          repeaterConsumer.register[self.dbline.cam_repeater]['myself'])
-        while not (self.repeater.host_register_complete):
-          self.logger.info('Waiting for repeater '
-            + str(self.dbline.cam_repeater) + ' to collect host list...')
-          sleep(10)
-        self.repeater_running = True
-        try:
-          probe = loads(self.repeater.probe(self.params['url_vid']))
-          self.online = True
-        except json.decoder.JSONDecodeError:
-          self.online = False
-      else:
-        self.mycam.ffprobe()
-        probe = self.mycam.probe
-        #print('***', probe, '***')
-        self.online = self.mycam.online
+    self.mycam.ffprobe()
+    probe = self.mycam.probe
+    #print('***', probe, '***')
+    self.online = self.mycam.online
     if self.online:
       if self.dbline.cam_video_codec == -1:
         self.video_codec = 0
@@ -400,6 +343,9 @@ class c_cam(c_device):
     try:
       self.checkmp4busy = True
       if self.cam_recording:
+        if self.vid_count is None:
+          self.checkmp4busy = False
+          return()
         if path.exists(self.vid_file_path(self.vid_count + 2)):
           try:
             timestamp = path.getmtime(self.vid_file_path(self.vid_count))
@@ -440,15 +386,6 @@ class c_cam(c_device):
       if not (self.redis.view_from_dev('C', self.dbline.id)
           or self.redis.data_from_dev('C', self.dbline.id)):
         return()
-      if (self.dbline.cam_repeater > 0):
-        if not self.repeater_running:
-          return()
-        if not self.repeater.host_register_complete:
-          self.online = False
-          while not self.online:
-            self.set_x_y(self.logger)
-            if not self.online:
-              sleep(60)
       self.wd_ts = time()
       self.logger.info('*** Wakeup for Camera #'
         + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
@@ -460,90 +397,84 @@ class c_cam(c_device):
       self.logger.handlers.clear()
 
   def newprocess(self):
-    
     if self.dbline.cam_fpslimit and self.dbline.cam_fpslimit < self.cam_fps:
       det_frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
     else:
       det_frame_rate = 0.0
     self.wd_ts = time()
     self.mydetector.myeventer.inqueue.put(('purge_videos', ))
-    if self.dbline.cam_feed_type in {2, 3}:
-      if self.dbline.cam_repeater > 0:
-        self.rep_cam_nr = self.repeater.get_rep_cam_nr()
-        source_string = ('c_client/fifo/rep_fifo_'
-          + str(self.dbline.cam_repeater) + '_' + str(self.rep_cam_nr))
+    source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
+    if self.redis.record_from_dev(self.type, self.dbline.id):
+      self.vid_count = 0
+      filepath = (self.recordingspath + 'C' 
+        + str(self.dbline.id).zfill(4) + '_%08d.mp4')
+    else:
+      filepath = None
+    outparams1 = ' -map 0:'+str(self.video_codec) + ' -map -0:a -f rawvideo'
+    outparams1 += ' -pix_fmt bgr24'
+    if det_frame_rate:
+      outparams1 += ' -r ' + str(det_frame_rate)
+    if os_type == 'raspi11':
+      outparams1 += ' -vsync cfr'
+    else:
+      outparams1 += ' -fps_mode cfr'
+    outparams1 += ' pipe:1'
+    inparams = ' -i "' + source_string + '"'
+    generalparams = ' -v fatal'
+    if source_string[:4].upper() == 'RTSP':
+      generalparams += ' -rtsp_transport tcp'
+    if self.dbline.cam_red_lat:
+      generalparams += ' -fflags nobuffer'
+      generalparams += ' -flags low_delay'
+    if self.video_codec_name not in {'h264', 'hevc'}:
+      generalparams += ' -use_wallclock_as_timestamps 1'
+    outparams2 = ''
+    if filepath:
+      self.ffmpeg_recording = True
+      if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
+        video_framerate = self.dbline.cam_ffmpeg_fps
       else:
-        source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
-      if self.redis.record_from_dev(self.type, self.dbline.id):
-        self.vid_count = 0
-        filepath = (self.recordingspath + 'C' 
-          + str(self.dbline.id).zfill(4) + '_%08d.mp4')
-      else:
-        filepath = None
-      outparams1 = ' -map 0:'+str(self.video_codec) + ' -map -0:a -f rawvideo'
-      outparams1 += ' -pix_fmt bgr24'
-      if det_frame_rate:
-        outparams1 += ' -r ' + str(det_frame_rate)
-      if os_type == 'raspi11':
-        outparams1 += ' -vsync cfr'
-      else:
-        outparams1 += ' -fps_mode cfr'
-      outparams1 += ' pipe:1'
-      inparams = ' -i "' + source_string + '"'
-      generalparams = ' -v fatal'
-      if source_string[:4].upper() == 'RTSP':
-        generalparams += ' -rtsp_transport tcp'
-      if self.dbline.cam_red_lat:
-        generalparams += ' -fflags nobuffer'
-        generalparams += ' -flags low_delay'
-      if self.video_codec_name not in {'h264', 'hevc'}:
-        generalparams += ' -use_wallclock_as_timestamps 1'
-      outparams2 = ''
-      if filepath:
-        if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
-          video_framerate = self.dbline.cam_ffmpeg_fps
+        video_framerate = None
+      outparams2 += ' -map 0:'+str(self.video_codec)
+      if self.audio_codec > -1:
+        outparams2 += ' -map 0:'+str(self.audio_codec)
+      if self.video_codec_name in {'h264', 'hevc'}:
+        if video_framerate:
+          outparams2 += ' -c:v libx264'
         else:
-          video_framerate = 0.0 
-        outparams2 += ' -map 0:'+str(self.video_codec)
-        if self.audio_codec > -1:
-          outparams2 += ' -map 0:'+str(self.audio_codec)
-        if self.video_codec_name in {'h264', 'hevc'}:
-          if video_framerate:
-            outparams2 += ' -c libx264'
-          else:
-            outparams2 += ' -c:v copy'
-          if self.audio_codec_name == 'pcm_alaw':
-            outparams2 += ' -c:a aac'
-          else:
-            outparams2 += ' -c:a copy'
-        else:    
-          outparams2 = ' -c libx264'
-        if video_framerate:
-          outparams2 += ' -r ' + str(video_framerate)
-          outparams2 += ' -g ' + str(round(video_framerate * self.dbline.cam_ffmpeg_segment))
-        outparams2 += ' -f segment'
-        outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
-        if video_framerate:
-          outparams2 += ' -segment_time_delta '+str(0.5 / (video_framerate))
-        outparams2 += ' -reset_timestamps 1'
-        if self.dbline.cam_ffmpeg_crf:
-          outparams2 += ' -crf ' + str(self.dbline.cam_ffmpeg_crf)
-        outparams2 += ' ' + filepath
-      cmd = ('/usr/bin/ffmpeg ' + generalparams + inparams + outparams1 
-        + outparams2)
-      #self.logger.info('#####' + cmd)
-      self.ff_proc = Popen(cmd, stdout=PIPE, shell=True)
-      if self.dbline.cam_repeater > 0:
-        self.repeater.rep_connect(self.mycam.url, self.rep_cam_nr)
+          outparams2 += ' -c:v copy'
+        if self.audio_codec_name == 'pcm_alaw':
+          outparams2 += ' -c:a aac'
+        else:
+          outparams2 += ' -c:a copy'
+      else:    
+        outparams2 = ' -c libx264'
+      if video_framerate:
+        outparams2 += ' -r ' + str(video_framerate)
+        outparams2 += ' -g ' + str(round(video_framerate * self.dbline.cam_ffmpeg_segment))
+      outparams2 += ' -f segment'
+      outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
+      if video_framerate:
+        outparams2 += ' -segment_time_delta '+str(0.5 / (video_framerate))
+      outparams2 += ' -reset_timestamps 1'
+      if self.dbline.cam_ffmpeg_crf:
+        outparams2 += ' -crf ' + str(self.dbline.cam_ffmpeg_crf)
+      outparams2 += ' ' + filepath
+    else:
+      self.ffmpeg_recording = True  
+    cmd = ('/usr/bin/ffmpeg ' + generalparams + inparams + outparams1 
+      + outparams2)
+    #self.logger.info('#####' + cmd)
+    self.ff_proc = Popen(cmd, stdout=PIPE, shell=True)
 
   def stopprocess(self):
     if self.ff_proc is not None:
-      #self.ff_proc.send_signal(signal.SIGINT)
       p = Process(self.ff_proc.pid)
       child_pid = p.children(recursive=True)
       for pid in child_pid:
-        oskill(pid.pid, SIGKILL)
-      oskill(self.ff_proc.pid, SIGKILL)
+        pid.send_signal(SIGKILL)
+        pid.wait()
+      self.ff_proc.send_signal(SIGKILL)
       self.ff_proc.wait()
       self.ff_proc = None
 

@@ -265,6 +265,7 @@ class tf_worker():
               WebSocketConnectionClosedException,
               WebSocketAddressException,
               OSError,
+              #AttributeError,
             ):
           if logger:
             frameinfo = getframeinfo(currentframe())

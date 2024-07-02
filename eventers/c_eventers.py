@@ -488,7 +488,8 @@ class c_eventer(c_device):
         if is_ready:
           with self.eventdict_lock:
             with self.display_lock:
-              del self.eventdict[i]
+              if i in self.eventdict:
+                del self.eventdict[i]
     except:
       self.logger.error(format_exc())
       self.logger.handlers.clear()

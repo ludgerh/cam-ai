@@ -25,16 +25,19 @@ class CamForm(forms.ModelForm):
       'name',
       'cam_pause', 
       'cam_fpslimit', 
-      'cam_feed_type', 
+      'cam_ffmpeg_fps',
       'cam_url', 
       'cam_red_lat', 
+      'cam_checkdoubles', 
     )
     widgets = { 
       'cam_pause' : forms.CheckboxInput(),
       'cam_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
+      'cam_ffmpeg_fps' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
       'cam_url' : forms.TextInput(attrs={'size': 70}),
       'cam_pause' : forms.CheckboxInput(),
       'cam_red_lat' : forms.CheckboxInput(),
+      'cam_checkdoubles' : forms.CheckboxInput(),
     }
 
 class DetectorForm(forms.ModelForm):
