@@ -36,6 +36,7 @@ from tf_workers.models import school, worker
 from tools.l_tools import djconf
 from .models import camurl
 from .forms import UploadFileForm
+from camai.passwords import os_type
 
 class health(LoginRequiredMixin, TemplateView):
   template_name = 'tools/health.html'
@@ -69,7 +70,8 @@ class health(LoginRequiredMixin, TemplateView):
       ),
       'recordingspath' : djconf.getconfig('recordingspath', datapath + 'recordings/'),
       'schoolframespath' : djconf.getconfig('schoolframespath', 
-        datapath + 'schoolframes/')
+        datapath + 'schoolframes/'),
+      'os_type' : os_type[:3],
     })
     return context
 
@@ -86,7 +88,6 @@ class cam_inst_view(LoginRequiredMixin, TemplateView):
     streamcount = stream.objects.filter(creator = self.request.user.id, active = True, ).count()
     context = super().get_context_data(**kwargs)
     context.update({
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'is_public' : djconf.getconfigbool('is_public_server', False),
@@ -114,6 +115,7 @@ class cam_inst_view(LoginRequiredMixin, TemplateView):
       'streamlimit' : streamlimit,
       'streamcount' : streamcount,
       'mayadd' : (streamlimit > streamcount),
+      'os_type' : os_type[:3],
     })
     return context
 
@@ -169,6 +171,7 @@ class addschool(LoginRequiredMixin, TemplateView):
       'schoollimit' : schoollimit,
       'schoolcount' : schoolcount,
       'mayadd' : (schoollimit > schoolcount),
+      'os_type' : os_type[:3],
     })
     return context
 
@@ -201,6 +204,7 @@ class linkworkers(LoginRequiredMixin, TemplateView):
         self.request.user, 'W'
       ),
       'workerlist' : worker.objects.all(),
+      'os_type' : os_type[:3],
     })
     return context
 

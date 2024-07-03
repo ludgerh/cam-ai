@@ -27,6 +27,7 @@ from access.c_access import access
 from streams.models import stream
 from tf_workers.models import school, worker
 from tools.l_tools import djconf
+from camai.passwords import os_type
 
 @login_required
 def index(request, mode='C'):
@@ -57,6 +58,7 @@ def index(request, mode='C'):
       request.user, 'W'
     ),
     'user' : request.user,
+    'os_type' : os_type[:3],
   }
   return(HttpResponse(template.render(context)))
 
@@ -87,5 +89,6 @@ def landing(request):
       request.user, 'W'
     ),
     'user' : request.user,
+    'os_type' : os_type[:3],
   }
   return(HttpResponse(template.render(context)))

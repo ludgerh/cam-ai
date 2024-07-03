@@ -29,6 +29,7 @@ from tools.l_tools import djconf
 from tools.tokens import checktoken
 from tf_workers.models import school, worker
 from .forms import CamForm , DetectorForm, EventerForm
+from camai.passwords import os_type
 
 @login_required
 def onecam(request, camnr, tokennr=0, token=None):
@@ -108,6 +109,7 @@ def onecam(request, camnr, tokennr=0, token=None):
       ),
       'myurl' : myurl,
       'form' : form,
+      'os_type' : os_type[:3],
     }
   return(render(request, 'oneitem/onecam.html', context))
 
@@ -192,6 +194,7 @@ def onedetector(request, detectornr, tokennr=0, token=None):
       ),
       'myurl' : myurl,
       'form' : form,
+      'os_type' : os_type[:3],
     }
   return(render(request, 'oneitem/onedetector.html', context))
 
@@ -273,5 +276,6 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       ),
       'myurl' : myurl,
       'form' : form,
+      'os_type' : os_type[:3],
     }
   return(render(request, 'oneitem/oneeventer.html', context))
