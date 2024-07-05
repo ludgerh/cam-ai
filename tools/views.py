@@ -242,7 +242,7 @@ class upgrade(TemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'emulatestatic' : emulatestatic,
-      'version' : 'v' + djconf.getconfig('version', 'X.Y.Z'),
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
       'new_version' : response['tag_name'],
       'zip_url' : response['zipball_url']
     })
