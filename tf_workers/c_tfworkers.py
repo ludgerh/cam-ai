@@ -41,7 +41,7 @@ from django.db.utils import OperationalError
 from django.db import connections, connection
 from tools.l_tools import QueueUnknownKeyword, djconf, get_proc_name
 if djconf.getconfigbool('local_trainer', False):
-  from plugins.train_worker_gpu.train_gpu_tools import cmetrics, hit100
+  from trainers.train_gpu_tools import cmetrics, hit100
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from .models import school, worker

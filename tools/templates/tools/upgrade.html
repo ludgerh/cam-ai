@@ -43,18 +43,26 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <main>  
   <div class="h2">
-    Your present version is: v{{ version }}
+    Your present version is: {{ version }}
   </div> 
   <div class="h2">
     The latest available version is: {{ new_version }}
   </div> 
   <div class="h2">
+    {% if version == new_version %}
+      We have no new version available.
+    {% else %}
+      There is a new version.
+    {% endif %}
     Are you sure you want to upgrade the CAM-AI-Server?
     <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
   </div> 
   <div class="h2 d-none" id="line2">
     Downloading the new software. Please wait...
   </div>  
+  <div class="spinner-border" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
 </main>
   
 <script>
