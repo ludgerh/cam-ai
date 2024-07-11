@@ -261,7 +261,12 @@ class c_event(list):
         self.dbline.ymax=self[3]
         self.dbline.numframes=len(frames_to_save)
         self.dbline.done = not self.goes_to_school
-        self.dbline.save()
+        while True:
+          try:
+            self.dbline.save()
+            break
+          except OperationalError:
+            connection.close()
         self.mailimages = []
         for item in frames_to_save:
           pathadd = str(self.dbline.camera.id)+'/'+str(randint(0,99))

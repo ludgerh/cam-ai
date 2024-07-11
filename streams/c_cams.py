@@ -256,8 +256,11 @@ class c_cam(c_device):
               and (self.redis.view_from_dev('D', self.dbline.id) 
               or self.redis.data_from_dev('D', self.dbline.id))):
             self.mydetector.dataqueue.put(frameline)
+          #if self.dbline.id == 1:
+          #  print(self.dbline.eve_mode_flag 
+          #      and (not self.redis.check_if_counts_zero('E', self.dbline.id)))
           if (self.dbline.eve_mode_flag 
-              and self.redis.view_from_dev('E', self.dbline.id)): 
+              and (not self.redis.check_if_counts_zero('E', self.dbline.id))): 
             self.mydetector.myeventer.dataqueue.put(frameline)
       self.finished = True
     except:

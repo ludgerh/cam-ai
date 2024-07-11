@@ -157,23 +157,25 @@ $.fn.isInViewport = function() {
 
 
 vid = document.getElementById("video");
-video.addEventListener( "loadedmetadata", function () {
-  console.log(this.duration)
-  $('#duration').text(Math.round(this.duration) + ' Sec');
-  xscale = ($(window).width() - 20) / this.videoWidth;
-  yscale = ($(window).height() - 300) / this.videoHeight;
-  let displaywidth;
-  let displayheight;
-  if (xscale > yscale) {
-    displaywidth = Math.round(vid.videoWidth * yscale);
-    displayheight = Math.round(vid.videoHeight * yscale);
-  } else {
-    displaywidth = Math.round(vid.videoWidth * xscale);
-    displayheight = Math.round(vid.videoHeight* xscale);
-  };
-  $('#video').attr('width', displaywidth);
-  $('#video').attr('height', displayheight);
-}, false);
+if (vid) {
+  vid.addEventListener( "loadedmetadata", function () {
+    console.log(this.duration)
+    $('#duration').text(Math.round(this.duration) + ' Sec');
+    xscale = ($(window).width() - 20) / this.videoWidth;
+    yscale = ($(window).height() - 300) / this.videoHeight;
+    let displaywidth;
+    let displayheight;
+    if (xscale > yscale) {
+      displaywidth = Math.round(vid.videoWidth * yscale);
+      displayheight = Math.round(vid.videoHeight * yscale);
+    } else {
+      displaywidth = Math.round(vid.videoWidth * xscale);
+      displayheight = Math.round(vid.videoHeight* xscale);
+    };
+    $('#video').attr('width', displaywidth);
+    $('#video').attr('height', displayheight);
+  }, false);
+};  
 
 
 $(document).ready(function() {

@@ -243,7 +243,7 @@ class upgrade(TemplateView):
     context.update({
       'emulatestatic' : emulatestatic,
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'new_version' : response['tag_name'],
+      'new_version' : response['tag_name'][1:],
       'zip_url' : response['zipball_url']
     })
     return context

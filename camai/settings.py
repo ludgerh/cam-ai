@@ -86,8 +86,8 @@ if localaccess:
   ALLOWED_HOSTS =  ['127.0.0.1', 'localhost', '192.168.126.25']
   CLIENT_URL = 'http://localhost:8000/'
 if myip:
-  ALLOWED_HOSTS.append(myip)
-  CLIENT_URL = 'http://' + myip + ':8000/'
+  ALLOWED_HOSTS += myip
+  CLIENT_URL = 'http://' + myip[0] + ':8000/'
 if mydomain:
   ALLOWED_HOSTS.append(mydomain.split(':')[0])
   trustedorigin = 'https://'+mydomain

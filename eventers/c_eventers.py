@@ -114,7 +114,9 @@ class c_eventer(c_device):
     self.redis.set('webm_queue:' + str(self.id) + ':end', 0)
     self.webm_proc = Process(target=self.make_webm).start()
     while self.do_run:
-      if self.redis.view_from_dev('E', self.dbline.id): 
+      #if self.dbline.id == 1:
+      #  print('*****', self.redis.view_from_dev('E', self.dbline.id), self.redis.record_from_dev('E', self.dbline.id), self.redis.data_from_dev('E', self.dbline.id))
+      if not self.redis.check_if_counts_zero('E', self.dbline.id):
         frameline = self.dataqueue.get()
       else:
         frameline = None
@@ -226,17 +228,18 @@ class c_eventer(c_device):
     if self.redis.check_if_counts_zero('E', self.dbline.id):
       sleep(djconf.getconfigfloat('long_brake', 1.0))
       return()
-    if self.do_run and frame[0]:
-      if self.scaling is None:
-        if frame[1].shape[1] > self.scrwidth:
-          self.scaling = self.scrwidth / frame[1].shape[1]
-        else:
-          self.scaling = 1.0  
-        self.linewidth = round(4.0 / self.scaling)
-        self.textheight = round(0.51 / self.scaling)
-        self.textthickness = round(2.0 / self.scaling)
-    else:
-      sleep(djconf.getconfigfloat('short_brake', 0.01))
+    if self.redis.view_from_dev('E', self.dbline.id):
+      if self.do_run and frame[0]:
+        if self.scaling is None:
+          if frame[1].shape[1] > self.scrwidth:
+            self.scaling = self.scrwidth / frame[1].shape[1]
+          else:
+            self.scaling = 1.0  
+          self.linewidth = round(4.0 / self.scaling)
+          self.textheight = round(0.51 / self.scaling)
+          self.textthickness = round(2.0 / self.scaling)
+      else:
+        sleep(djconf.getconfigfloat('short_brake', 0.01))
     if self.do_run and (time() - self.run_one_ts) > 1.0: # once per second
       self.run_one_ts = time()
       if self.tag_list_active != self.dbline.eve_school.id:
@@ -244,10 +247,18 @@ class c_eventer(c_device):
         self.tag_list = get_taglist(self.tag_list_active)
       for i, item in list(self.eventdict.items()): 
         self.check_events(i, item) 
-    while self.do_run and frame[2] + self.dbline.eve_sync_factor > self.last_insert_ts:
+         
+    while (
+      self.do_run 
+      and (clean_item_count := [i for i in self.eventdict if self.eventdict[i].check_out_ts is None])
+      and frame[2] + self.dbline.eve_sync_factor > self.last_insert_ts
+      and not self.detectorqueue.empty()
+    ):
       sleep(djconf.getconfigfloat('medium_brake', 0.1))
-    if self.do_run and frame[0]:
-      self.display_events(frame)
+    
+    if self.redis.view_from_dev('E', self.dbline.id):
+      if self.do_run and frame[0]:
+        self.display_events(frame)
     if self.do_run and self.dbline.eve_view:
       fps = self.som.gettime()
       if fps:
@@ -311,6 +322,7 @@ class c_eventer(c_device):
                 colorcode= (0, 255, 0)
               displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list)) 
                 if predictions[j] >= 0.5]
+              #displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list))]
               displaylist.sort(key=lambda x: -x[1])
               displaylist = displaylist[:3]
               if displaylist:
@@ -532,7 +544,7 @@ class c_eventer(c_device):
             school_id, 
             imglist, 
             self.tf_w_index,
-          )
+          )  
           predictions = np.empty((0, len(self.tag_list)), np.float32)
           while predictions.shape[0] < len(detector_buffer):
             predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))

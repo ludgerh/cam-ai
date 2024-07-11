@@ -22,5 +22,6 @@ app_name = 'dyndns'
 urlpatterns = [
 	path('dyndns', views.dyndns1.as_view(), name='dyndns1'),
 	path('update', views.dyndns2.as_view(), name='dyndns2'),
+	path('checkip', views.checkip.as_view(), name='checkip'),
 ]
 

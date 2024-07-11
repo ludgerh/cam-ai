@@ -15,6 +15,8 @@
 from os import path, makedirs, remove
 from shutil import copy
 from tools.l_tools import djconf, uniquename
+from tools.l_crypt import l_crypt
+from tools.c_tools import reduce_image
 from eventers.models import event, event_frame
 from users.models import archive as dbarchive
 from access.c_access import access
@@ -40,7 +42,14 @@ class archive():
           targetdir = self.archivepath + 'frames/'
           targetname = frameline.name.split('/')[-1]
           targetname = uniquename(targetdir, targetname.split('.')[0], targetname.split('.')[1])
-          copy(sourcedir+frameline.name, targetdir+targetname)
+          if frameline.encrypted:
+            streamline = frameline.event.camera
+            crypt =  l_crypt(key=streamline.crypt_key)
+          
+          
+            reduce_image(sourcedir+frameline.name, targetdir+targetname, 0, 0, crypt)
+          else:
+            copy(sourcedir+frameline.name, targetdir+targetname)
           archiveline = dbarchive(
             typecode=0, 
             number=frameline.id, 

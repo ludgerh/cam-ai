@@ -31,7 +31,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import WebsocketConsumer, AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from tools.l_tools import djconf, seq_to_int, version_flat
+from tools.l_tools import djconf, seq_to_int
 from tools.c_logger import log_ini
 from tools.djangodbasync import (getonelinedict, updatefilter, getoneline, 
   filterlinesdict, savedbline, deletefilter)
@@ -55,7 +55,6 @@ class remotetrainer(AsyncWebsocketConsumer):
 
   async def connect(self):
     self.frameinfo = {}
-    self.client_soft_version = None
     await self.accept()
 
   async def receive(self, text_data =None, bytes_data=None):
@@ -142,7 +141,6 @@ class remotetrainer(AsyncWebsocketConsumer):
       
     elif indict['code'] == 'setversion':
       self.myschoolline = await school.objects.aget(id=indict['school'])
-      self.client_soft_version = version_flat(indict['version'])
       result = (self.myschoolline.model_xin, self.myschoolline.model_yin)
       await self.send(json.dumps(result))
       

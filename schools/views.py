@@ -102,7 +102,6 @@ def upload_file(request, schoolnr):
     fs = FileSystemStorage(location='temp/upload')
     filename = fs.save(uploaded_file.name, uploaded_file)
     file_path = fs.path(filename)
-    print('*****', file_path)
     if os.path.exists('temp/unpack/' + filename):
       rmtree('temp/unpack/' + filename)
     os.makedirs('temp/unpack/' + filename)

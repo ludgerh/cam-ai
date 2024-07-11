@@ -249,7 +249,10 @@ for line in sourcefile:
   if line.startswith('mydomain = '):
       line = 'mydomain = "' + mydomain + '"\n'
   if line.startswith('myip = '):
-      line = 'myip = "' + myip + '"\n'
+      if myip: 
+        line = 'myip = ["' + myip + '"]\n'
+      else:
+        line = 'myip = []\n'
   if line.startswith('db_password = '):
       line = 'db_password = "' + cam_ai_db_pass + '"\n'
   if line.startswith('os_type = '):

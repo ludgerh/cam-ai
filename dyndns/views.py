@@ -96,3 +96,13 @@ class dyndns2(View):
     returncode = update(request, new_ip, task_url)
     return HttpResponse(returncode + ' ' + new_ip, content_type='text/plain')
 
+class checkip(View):
+  def get(self, request, *args, **kwargs):
+    headers_dict = dict(request.scope['headers'])
+    if b'x-real-ip' in headers_dict:
+      client_ip = headers_dict[b'x-real-ip'].decode()
+    else:
+      client_ip = 'Server is not configured for CHECKIP' 
+    #logger.info(str(request.scope['headers']))
+    return HttpResponse(client_ip, content_type='text/plain')
+

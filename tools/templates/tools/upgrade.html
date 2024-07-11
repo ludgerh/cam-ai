@@ -46,7 +46,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     Your present version is: v{{ version }}
   </div> 
   <div class="h2">
-    The latest available version is: {{ new_version }}
+    The latest available version is: v{{ new_version }}
   </div> 
   <div class="h2">
     {% if version == new_version %}
@@ -60,7 +60,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="h2 d-none" id="line2">
     Downloading the new software. Please wait...
   </div>  
-  <div class="spinner-border" role="status">
+  <div class="spinner-border d-none" role="status" id="spinner1">
     <span class="visually-hidden">Loading...</span>
   </div>
 </main>
@@ -81,6 +81,7 @@ $(document).ready(function() {
     $('#continue-button').click(function() {
       $('#continue-button').prop('disabled', true);
       $('#line2').removeClass("d-none");
+      $('#spinner1').removeClass("d-none");
       admintoolsSocket.socket.onclose = function(e) {
         setTimeout(function () {
           window.location.href = window.location.protocol + '//' + window.location.host;
