@@ -82,13 +82,7 @@ while not selected:
   if not myip:
     print('We WILL NOT use internal IP,')
   print()
-  print('What is the external domain to access the server? (leave empty if none)')
-  print('(example: mydomain.org)')
-  mydomain = input(": ")
-  if not mydomain:
-    print('We WILL NOT use external domain,')
-  print()
-  if uselocal or myip or mydomain:
+  if uselocal or myip:
     selected = True
   else:  
     print('You need to choose at least one item, try again.')  
@@ -173,11 +167,9 @@ if True:
   subprocess.call(['sudo', 'apt', '-y', 'install', 'ffmpeg']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'libgeos-dev']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'redis']) 
-  subprocess.call(['sudo', 'apt', '-y', 'install', 'sudo nano pkg-config']) 
+  subprocess.call(['sudo', 'apt', '-y', 'install', 'pkg-config']) 
   if env_type == 'venv':
     subprocess.call(['sudo', 'apt', '-y', 'install', 'python3-venv']) 
-  else:
-    pass #Conda  
   print()
     
   print('>>>>> Modifying system config...')
@@ -246,8 +238,6 @@ for line in sourcefile:
       line = 'security_key = "' + djangocode + '"\n'
   if line.startswith('localaccess = '):
       line = 'localaccess = ' + str(uselocal) + '\n'
-  if line.startswith('mydomain = '):
-      line = 'mydomain = "' + mydomain + '"\n'
   if line.startswith('myip = '):
       if myip: 
         line = 'myip = ["' + myip + '"]\n'
@@ -289,10 +279,15 @@ print('*                                               *')
 print('*************************************************')
 print()
 print('You can now start the server by entering this:')
-print('./runserver.sh')
+print('./runserver.sh '+env_type)
 print()
 print('And then surf to your new server in the browser using:')
-print('http://cam-ai-raspi:8000/index/C/')
+if uselocal:
+  print('http://localhost:8000/')
+if myip:  
+  if uselocal:
+    print('or')
+  print('http://' + myip + ':8000/')
 print()
 print('Have a nice day...')
 

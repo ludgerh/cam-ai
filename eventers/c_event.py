@@ -122,6 +122,7 @@ class c_event(list):
     self.savename = ''
     self.schoolnr = eventer_dbl.eve_school.id
     self.dbline = event()
+    self.dbline.camera = eventer_dbl
     self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
     while True:
       try:
