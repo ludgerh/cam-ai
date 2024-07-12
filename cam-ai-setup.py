@@ -173,13 +173,13 @@ if True:
   print()
     
   print('>>>>> Modifying system config...')
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+  subprocess.call(['sudo', 'sed', '-i', '/^#***** CAM-AI setting/d', 
     '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^timeout/d', '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , 
     '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$atimeout 180;' , '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+  subprocess.call(['sudo', 'sed', '-i', '/^#***** CAM-AI setting/d', 
     '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^vm.overcommit_memory/d', '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^net.core.somaxconn/d', '/etc/sysctl.conf']) 
@@ -187,7 +187,7 @@ if True:
   subprocess.call(['sudo', 'sed', '-i', '$avm.overcommit_memory = 1' , 
     '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$anet.core.somaxconn=1024' , '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI disabled saving/d', 
+  subprocess.call(['sudo', 'sed', '-i', '/^#***** CAM-AI disabled saving/d', 
     '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^save/d', '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^#save/d', '/etc/redis/redis.conf']) 
