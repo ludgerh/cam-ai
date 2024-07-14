@@ -116,10 +116,10 @@ class remotetrainer(AsyncWebsocketConsumer):
     if indict['code'] == 'auth':
       self.user = await User.objects.aget(username=indict['name'])
       if self.user.check_password(indict['pass']):
-        logger.debug('Success!')
+        logger.info('Successfull login:' + indict['name'])
         self.authed = True
       if not self.authed:
-        logger.debug('Failure!')
+        logger.info('Login failure: ' + indict['name'])
         await self.close() 
         
     elif indict['code'] == 'namecheck':

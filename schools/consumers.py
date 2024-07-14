@@ -128,9 +128,18 @@ class schooldbutil(AsyncWebsocketConsumer):
 
     if params['command'] == 'seteventpage' :
       if params['showdone']:
-        eventlines = event.objects.filter(camera=params['streamnr'], xmax__gt=-1).order_by('-id')
+        eventlines = event.objects.filter(
+          camera=params['streamnr'], 
+          xmax__gt=-1, 
+          deleted=False,
+        ).order_by('-id')
       else:  
-        eventlines = event.objects.filter(camera=params['streamnr'], done=False, xmax__gt=-1).order_by('-id')
+        eventlines = event.objects.filter(
+          camera=params['streamnr'], 
+          done=False, 
+          xmax__gt=-1,
+          deleted=False,
+        ).order_by('-id')
       self.eventpage = Paginator(eventlines, params['pagesize'])
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
@@ -474,30 +483,8 @@ class schooldbutil(AsyncWebsocketConsumer):
           streamnr =  params['streamnr']
         if await access.check_async('C', streamnr, self.scope['user'], 'W'):
           async for eventline in eventlines:
-            framelines = event_frame.objects.filter(event__id=eventline.id)
-            async for frameline in framelines:
-              framefile = schoolframespath + frameline.name
-              if await aiofiles.os.path.exists(framefile):
-                await aiofiles.os.remove(framefile)
-              else:
-                logger.warning('delevent - Delete did not find: ' + framefile)
-              await frameline.adelete()
-            if eventline.videoclip:
-              if await event.objects.filter(videoclip=eventline.videoclip).acount() <= 1:
-                videofile = recordingspath + eventline.videoclip
-                if await aiofiles.os.path.exists(videofile + '.mp4'):
-                  await aiofiles.os.remove(videofile + '.mp4')
-                else:
-                  logger.warning('delevent - Delete did not find: ' + videofile + '.mp4')
-                if await aiofiles.os.path.exists(videofile + '.webm'):
-                  await aiofiles.os.remove(videofile + '.webm')
-                else:
-                  logger.warning('delevent - Delete did not find: ' + videofile + '.webm')
-                if await aiofiles.os.path.exists(videofile + '.jpg'):
-                  await aiofiles.os.remove(videofile + '.jpg')
-                else:
-                  logger.warning('delevent - Delete did not find: ' + videofile + '.jpg')
-            await eventline.adelete()
+            eventline.deleted = True
+            await eventline.asave(update_fields = ['deleted'])
       except event.DoesNotExist:
         logger.warning('delevent - Did not find DB line: ' + str(params['eventnr']))
       outlist['data'] = 'OK'
@@ -510,14 +497,8 @@ class schooldbutil(AsyncWebsocketConsumer):
         eventline = await event.objects.aget(id=params['event_nr'])
         streamline = await stream.objects.aget(event__id=eventline.id)
         if await access.check_async('C', streamline.id, self.scope['user'], 'W'):
-          framefile = schoolframespath + frameline.name
-          if await aiofiles.os.path.exists(framefile):
-            await aiofiles.os.remove(framefile)
-          else:
-            logger.warning('delitem - Delete did not find: ' + framefile)
-          await frameline.adelete()
-          eventline.numframes -= 1
-          await eventline.asave(update_fields=('numframes', ))
+          frameline.deleted = True
+          await frameline.asave(update_fields=('deleted', ))
       elif params['dtype'] == 1:
         eventline = await event.objects.aget(id=params['nr_todel'])
         streamline = await stream.objects.aget(event__id=eventline.id)

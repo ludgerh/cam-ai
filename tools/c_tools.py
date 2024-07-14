@@ -154,7 +154,7 @@ def image_size(infile):
 def do_reduction(image, x, y):
   xin = image.shape[1]
   yin = image.shape[0]
-  print('In:', image.shape, x, y, xin, yin) 
+  #print('In:', image.shape, x, y, xin, yin) 
   if (xin > x or yin > y) and (x > 0 and y > 0):
     if (x / xin) > (y / yin):
       scale = x / xin
@@ -176,7 +176,7 @@ def reduce_image(infile, outfile, x=0, y=0, crypt=None):
     myimage = cv.imread(infile)
   myimage = do_reduction(myimage, x, y) 
   cv.imwrite(outfile, myimage)
-  print('Out:', outfile, myimage.shape, crypt) 
+  #print('Out:', outfile, myimage.shape, crypt) 
   
 async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
   if outfile is None:

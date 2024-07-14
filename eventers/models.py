@@ -22,6 +22,7 @@ from tf_workers.models import school
 from streams.models import stream
 
 class event(models.Model):
+  deleted = models.BooleanField(default=False)
   p_string = models.CharField(max_length=255, default='[]')
   start = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
   end = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
@@ -42,6 +43,7 @@ class event(models.Model):
     return('event model, id = '+str(self.id))
 		
 class event_frame(models.Model):
+  deleted = models.BooleanField(default=False)
   time = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
   status = models.SmallIntegerField(default=0)
   name = models.CharField(max_length=100)

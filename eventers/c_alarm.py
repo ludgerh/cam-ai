@@ -18,10 +18,13 @@ import os
 from .models import alarm as dbalarm
 from .alarm_base import alarm_base
 
-#check what plugins are present:
+#check which plugins are present:
 plugin_shelly_ok = os.path.exists('plugins/cam_ai_shelly')
 if plugin_shelly_ok:
   from plugins.cam_ai_shelly.shelly import shelly123_alarm
+plugin_hue_ok = os.path.exists('plugins/cam_ai_hue')
+if plugin_hue_ok:
+  from plugins.cam_ai_hue.hue import hue_alarm
   
 mylogger = None 
 alarm_list = None
@@ -40,6 +43,12 @@ def alarm_init(logger, idx):
       else:
         mylogger.warning('***** For alarm device shelly123 we need the shelly-plugin, '
           + 'ignoring this alarm.')   
+    elif item.mydevice.device_type.name == 'hue':
+      if plugin_hue_ok:  
+        alarm_list.append(hue_alarm(item, mylogger))
+      else:
+        mylogger.warning('***** For alarm device phillips hue we need the hue-plugin, '
+          + 'ignoring this alarm.') 
 
 class console_alarm(alarm_base):
 

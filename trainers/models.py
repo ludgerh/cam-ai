@@ -42,6 +42,7 @@ class img_size(models.Model):
     return('img_size, '+self.x+'x'+self.y)
 
 class trainframe(models.Model):
+  deleted = models.BooleanField(default=False)
   made = models.DateTimeField()
   school = models.SmallIntegerField()
   encrypted = models.BooleanField(default=True)

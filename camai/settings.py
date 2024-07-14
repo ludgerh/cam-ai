@@ -133,6 +133,7 @@ INSTALLED_APPS = [
     'users',
     'ws_predictions',
     'onvif',
+    'cleanup',
 ]
 
 if debug_daphne or debug_channels:

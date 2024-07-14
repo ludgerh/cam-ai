@@ -46,6 +46,7 @@ from eventers.models import alarm_device_type, alarm_device
 from tools.health import stop as stophealth
 from .models import stream
 from .c_streams import streams, c_stream
+from cleanup.c_cleanup import my_cleanup
 
 #from threading import enumerate
     
@@ -111,6 +112,20 @@ else:
   )
   new_type.save()
   
+if not alarm_device_type.objects.filter(name='shelly123'):
+  new_type = alarm_device_type(
+    name='shelly123', 
+    mendef='[["s", "IP", "1.2.3.4"]]', 
+  )
+  new_type.save()
+  
+if not alarm_device_type.objects.filter(name='hue'):
+  new_type = alarm_device_type(
+    name='hue', 
+    mendef='[["s", "IP", "1.2.3.4"], ["s", "User", "user"]]', 
+  )
+  new_type.save()
+  
 if not alarm_device.objects.filter(name='console'):
   new_device = alarm_device(
     name='console', 
@@ -121,6 +136,7 @@ if not alarm_device.objects.filter(name='console'):
 restart_mode = 0
 do_run = True
 redis = myredis()
+cleanup = None
 redis.set_start_trainer_busy(0)
 redis.set_start_worker_busy(0)
 redis.set_start_stream_busy(0)
@@ -167,6 +183,7 @@ def newexit(*args):
   do_run = False
   sleep(5.0)
   stophealth()
+  my_cleanup.stop()
   for i in streams:
     print('Closing stream #', i)
     streams[i].stop()
@@ -203,6 +220,8 @@ def run():
   for dbline in stream.objects.filter(active=True):
     streams[dbline.id] = c_stream(dbline)
     streams[dbline.id].start()
+    
+  my_cleanup.run()  
     
   check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
 
