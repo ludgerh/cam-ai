@@ -90,7 +90,10 @@ class train_once_remote():
         function=self.send_ping, 
         runonstart=False)
       pingproc.start()
-      filterdict = {'school' : self.myschool.id, }
+      filterdict = {
+        'school' : self.myschool.id, 
+        'deleted' : False,
+      }
       if not self.myschool.ignore_checked:
         filterdict['checked'] = True
       localsearch = trainframe.objects.filter(**filterdict)

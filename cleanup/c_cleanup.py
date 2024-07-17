@@ -16,21 +16,28 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from os import nice
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 from multiprocessing import Process, Queue
 from threading import Thread
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
 from logging import getLogger
-from django.db import connections
+from django.db import connection, connections
+from django.db.utils import OperationalError
 from tools.l_tools import djconf
 from tools.c_logger import log_ini
 from eventers.models import event, event_frame
+from trainers.models import trainframe
 from tf_workers.models import school
+from .models import status_line, events_frames_missingframe, events_frames_missingdbline
 
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
+schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
+
+cleanup_interval = 5
+health_check_interval = 10 # later 3600
 
 def sigint_handler(signal, frame):
   #print ('Devices: Interrupt is caught')
@@ -57,7 +64,11 @@ class c_cleanup():
     signal(SIGHUP, sigint_handler)
     self.do_run = True
     nice(19)
+    ts = 0.0
     while self.do_run:
+      #if self.do_run and time() - ts >= health_check_interval:
+      #  self.health_check()
+      #  ts =  time() 
       # ***** cleaning up eventframes
       if self.do_run:
         for frameline in event_frame.objects.filter(deleted = True):
@@ -85,7 +96,17 @@ class c_cleanup():
               if delpath.exists():
                 delpath.unlink() 
           eventline.delete()  
-      for i in range(5): #later range(3600)
+      # ***** cleaning up trainframes
+      if self.do_run:
+        for frameline in trainframe.objects.filter(deleted = True):
+          self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
+          myschooldir = Path(school.objects.get(id = frameline.school).dir)
+          del_path = myschooldir / 'frames' / frameline.name
+          if del_path.exists():
+            print(del_path)
+            del_path.unlink()
+          frameline.delete()
+      for i in range(cleanup_interval):
         if not self.do_run:
           break
         sleep(1.0)
@@ -98,6 +119,26 @@ class c_cleanup():
       if (received[0] == 'stop'):
         self.do_run = False
         break
+        
+  def health_check(self): 
+    self.logger.info('Cleanup: Starting health check')
+    # ***** checking eventframes vs events
+    eventframequery = event_frame.objects.filter(deleted = False)
+    while True:
+      try:
+        eventframeset = {item.event.id for item in eventframequery}
+        break
+      except OperationalError:
+        connection.close()
+    print(eventframeset)   
+    eventquery = event.objects.filter(deleted = False, )
+    eventset = {item.id for item in eventquery}
+    result = {
+      'correct' : len(eventset & eventframeset),
+      #'missingevents' : (eventframeset - eventset),
+      'missingframes' : (eventset - eventframeset),
+    } 
+    self.logger.info('Cleanup: Finished health check')     
 
   def stop(self):
     self.inqueue.put(('stop',))

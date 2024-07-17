@@ -91,6 +91,7 @@ class c_eventer(c_device):
     self.eventdict_lock = t_lock()
     self.display_lock = t_lock()
     self.vid_deque = deque()
+    self.vid_deque_lock = t_lock()
     self.vid_str_dict = {}
     self.set_cam_counts()
 
@@ -150,25 +151,27 @@ class c_eventer(c_device):
         return(True)
       else:
         if (received[0] == 'new_video'):
-          self.vid_deque.append(received[1:])
-          while True:
-            if self.vid_deque and (time() - self.vid_deque[0][2]) > 300:
-              listitem = self.vid_deque.popleft()
-              try:
-                remove(self.recordingspath + listitem[1])
-              except FileNotFoundError:
-                self.logger.warning('c_eventers.py:new_video - Delete did not find: '
-                  + self.recordingspath + listitem[1])
-            else:
-              break
+          with self.vid_deque_lock:
+            self.vid_deque.append(received[1:])
+            while True:
+              if self.vid_deque and (time() - self.vid_deque[0][2]) > 300:
+                listitem = self.vid_deque.popleft()
+                try:
+                  remove(self.recordingspath + listitem[1])
+                except FileNotFoundError:
+                  self.logger.warning('c_eventers.py:new_video - Delete did not find: '
+                    + self.recordingspath + listitem[1])
+              else:
+                break
         elif (received[0] == 'purge_videos'):
-          for item in self.vid_deque.copy():
-            try:
-              remove(self.recordingspath + item[1])
-            except FileNotFoundError:
-              self.logger.warning('c_eventers.py:purge_videos - Delete did not find: '
-                + self.recordingspath + item[1])
-          self.vid_deque.clear()
+          with self.vid_deque_lock:
+            for item in self.vid_deque.copy():
+              try:
+                remove(self.recordingspath + item[1])
+              except FileNotFoundError:
+                self.logger.warning('c_eventers.py:purge_videos - Delete did not find: '
+                  + self.recordingspath + item[1])
+            self.vid_deque.clear()
         elif (received[0] == 'set_fpslimit'):
           self.dbline.eve_fpslimit = received[1]
           if received[1] == 0:
@@ -394,117 +397,114 @@ class c_eventer(c_device):
     
 
   def check_events(self, i, item):
-    try:
-      if (item.end < time() - self.dbline.eve_event_time_gap 
-          or item.end > item.start + 120.0):
-        item.check_out_ts = item.end
-      if self.cond_dict[5]:
+    if (item.end < time() - self.dbline.eve_event_time_gap 
+        or item.end > item.start + 120.0):
+      item.check_out_ts = item.end
+    if self.cond_dict[5]:
+      predictions = item.pred_read(max=1.0)
+    else:
+      predictions = None   
+    if resolve_rules(self.cond_dict[5], predictions):
+      alarm(self.dbline.id, predictions) 
+    if item.check_out_ts:
+      if predictions is None and self.cond_dict[2]:
         predictions = item.pred_read(max=1.0)
+      item.goes_to_school = resolve_rules(self.cond_dict[2], predictions)
+      if predictions is None and self.cond_dict[3]:
+        predictions = item.pred_read(max=1.0)
+      item.isrecording = resolve_rules(self.cond_dict[3], predictions)
+      if predictions is None and self.cond_dict[4]:
+        predictions = item.pred_read(max=1.0)
+      if resolve_rules(self.cond_dict[4], predictions):
+        item.to_email = self.dbline.eve_alarm_email
       else:
-        predictions = None   
-      if resolve_rules(self.cond_dict[5], predictions):
-        alarm(self.dbline.id, predictions) 
-      if item.check_out_ts:
-        if predictions is None and self.cond_dict[2]:
-          predictions = item.pred_read(max=1.0)
-        item.goes_to_school = resolve_rules(self.cond_dict[2], predictions)
-        if predictions is None and self.cond_dict[3]:
-          predictions = item.pred_read(max=1.0)
-        item.isrecording = resolve_rules(self.cond_dict[3], predictions)
-        if predictions is None and self.cond_dict[4]:
-          predictions = item.pred_read(max=1.0)
-        if resolve_rules(self.cond_dict[4], predictions):
-          item.to_email = self.dbline.eve_alarm_email
-        else:
-          item.to_email = ''
-        is_ready = True
-        if item.goes_to_school or item.isrecording or item.to_email:
-          if item.isrecording:
-            if (self.vid_deque and 
-                (item.check_out_ts <= (self.vid_deque[-1][2]))):
-              my_vid_list = []
-              my_vid_str = ''
-              my_vid_start = None
-              for v_item in self.vid_deque:
-                if (item.start <= v_item[2]):
-                  if not my_vid_start:
-                    #10 seconds video length plus average trigger delay from checkmp4
-                    my_vid_start = (v_item[2] - 10.5)
-                  my_vid_end = v_item[2]
-                  my_vid_list.append(v_item[1])
-                  my_vid_str += str(v_item[0])
-              vid_offset = item.focus_time - my_vid_start
-              vid_offset = max(vid_offset, 0.0)
-              if my_vid_str in self.vid_str_dict:
-                item.savename=self.vid_str_dict[my_vid_str]
-                isdouble = True
+        item.to_email = ''
+      is_ready = True
+      if item.goes_to_school or item.isrecording or item.to_email:
+        if item.isrecording:
+          with self.vid_deque_lock:
+            checkbool = self.vid_deque and item.check_out_ts <= self.vid_deque[-1][2]
+          if checkbool:
+            my_vid_list = []
+            my_vid_str = ''
+            my_vid_start = None
+            for v_item in self.vid_deque:
+              if (item.start <= v_item[2]):
+                if not my_vid_start:
+                  #10 seconds video length plus average trigger delay from checkmp4
+                  my_vid_start = (v_item[2] - 10.5)
+                my_vid_end = v_item[2]
+                my_vid_list.append(v_item[1])
+                my_vid_str += str(v_item[0])
+            vid_offset = item.focus_time - my_vid_start
+            vid_offset = max(vid_offset, 0.0)
+            if my_vid_str in self.vid_str_dict:
+              item.savename=self.vid_str_dict[my_vid_str]
+              isdouble = True
+            else:
+              item.savename = ('E_'
+                +str(item.dbline.id).zfill(12)+'.mp4')
+              savepath = (self.recordingspath + item.savename)
+              if len(my_vid_list) == 1: 
+                copyfile(self.recordingspath + my_vid_list[0], savepath)
               else:
-                item.savename = ('E_'
-                  +str(item.dbline.id).zfill(12)+'.mp4')
-                savepath = (self.recordingspath + item.savename)
-                if len(my_vid_list) == 1: 
-                  copyfile(self.recordingspath + my_vid_list[0], savepath)
-                else:
-                  tempfilename = (self.recordingspath + 'T_'
-                    + str(item.dbline.id).zfill(12)+'.temp')
-                  with open(tempfilename, 'a') as f1:
-                    for line in my_vid_list:
-                      f1.write('file ' + path.abspath(self.recordingspath + line) + '\n')
-                  run(['ffmpeg', 
-                    '-f', 'concat', 
-                    '-safe', '0', 
-                    '-v', 'fatal', 
-                    '-i', tempfilename, 
-                    '-codec', 'copy', 
-                    savepath])
-                  remove(tempfilename)
-                self.vid_str_dict[my_vid_str] = item.savename
-                isdouble = False
-              item.dbline.videoclip = item.savename[:-4]
-              item.dbline.double = isdouble
-              item.dbline.save()
-              if not isdouble:
-                run([
-                  'ffmpeg', 
-                  '-ss', str(vid_offset), 
+                tempfilename = (self.recordingspath + 'T_'
+                  + str(item.dbline.id).zfill(12)+'.temp')
+                with open(tempfilename, 'a') as f1:
+                  for line in my_vid_list:
+                    f1.write('file ' + path.abspath(self.recordingspath + line) + '\n')
+                run(['ffmpeg', 
+                  '-f', 'concat', 
+                  '-safe', '0', 
                   '-v', 'fatal', 
-                  '-i', savepath, 
-                  '-vframes', '1', 
-                  '-q:v', '2', 
-                  savepath[:-4]+'.jpg'
-                ])
-                with self.webm_lock:
-                  the_end = int(self.redis.get('webm_queue:' + str(self.id) + ':end'))
-                  the_end += 1
-                  self.redis.set('webm_queue:' + str(self.id) + ':item:' + str(the_end), 
-                    savepath)
-                  self.redis.set('webm_queue:' + str(self.id) + ':end', 
-                    str(the_end))
-            else:  
-              is_ready = False
-          if is_ready:
-            if not item.save(self.cond_dict):
-              while True:
-                try:
-                  item.dbline.delete()
-                  break  
-                except OperationalError:
-                  connection.close()  
-        else:
-          while True:
-            try:
-              item.dbline.delete()
-              break  
-            except OperationalError:
-              connection.close()  
+                  '-i', tempfilename, 
+                  '-codec', 'copy', 
+                  savepath])
+                remove(tempfilename)
+              self.vid_str_dict[my_vid_str] = item.savename
+              isdouble = False
+            item.dbline.videoclip = item.savename[:-4]
+            item.dbline.double = isdouble
+            item.dbline.save()
+            if not isdouble:
+              run([
+                'ffmpeg', 
+                '-ss', str(vid_offset), 
+                '-v', 'fatal', 
+                '-i', savepath, 
+                '-vframes', '1', 
+                '-q:v', '2', 
+                savepath[:-4]+'.jpg'
+              ])
+              with self.webm_lock:
+                the_end = int(self.redis.get('webm_queue:' + str(self.id) + ':end'))
+                the_end += 1
+                self.redis.set('webm_queue:' + str(self.id) + ':item:' + str(the_end), 
+                  savepath)
+                self.redis.set('webm_queue:' + str(self.id) + ':end', 
+                  str(the_end))
+          else:  
+            is_ready = False
         if is_ready:
-          with self.eventdict_lock:
-            with self.display_lock:
-              if i in self.eventdict:
-                del self.eventdict[i]
-    except:
-      self.logger.error(format_exc())
-      self.logger.handlers.clear()
+          if not item.save(self.cond_dict):
+            while True:
+              try:
+                item.dbline.delete()
+                break  
+              except OperationalError:
+                connection.close()  
+      else:
+        while True:
+          try:
+            item.dbline.delete()
+            break  
+          except OperationalError:
+            connection.close()  
+      if is_ready:
+        with self.eventdict_lock:
+          with self.display_lock:
+            if i in self.eventdict:
+              del self.eventdict[i]
 
   def inserter(self):
     detector_buffer = deque()

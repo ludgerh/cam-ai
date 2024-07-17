@@ -103,7 +103,10 @@ class schooldbutil(AsyncWebsocketConsumer):
       await self.close()
 
     if params['command'] == 'settrainpage' :
-      filterdict = {'school' : params['model']}
+      filterdict = {
+        'school' : params['model'],
+        'deleted' : False,
+      }
       if params['cbnot']:
         if not params['cbchecked']:
           filterdict['checked'] = 0
@@ -260,13 +263,8 @@ class schooldbutil(AsyncWebsocketConsumer):
     elif params['command'] == 'deltrainframe':
       frameline = await trainframe.objects.aget(id=params['img'],)
       if await access.check_async('S', params['school'], self.user, 'W'):
-        schoolline = await school.objects.aget(id=params['school'])
-        await frameline.adelete()
-        framefile = schoolline.dir + 'frames/' + frameline.name
-        if await aiofiles.os.path.exists(framefile):
-          aiofiles.os.remove(framefile)
-        else:
-          logger.warning('deltrainframe - Delete did not find: ' + framefile)
+        frameline.deleted = True
+        await frameline.asave(update_fields=('deleted', ))
       outlist['data'] = 'OK'
       logger.debug('--> ' + str(outlist))
       await self.send(json.dumps(outlist))
@@ -313,16 +311,10 @@ class schooldbutil(AsyncWebsocketConsumer):
           else:
             filterdict = None
         if filterdict is not None:
-          schoolline = await school.objects.aget(id=params['school'])
-          filepath = schoolline.dir
           framelines = trainframe.objects.filter(**filterdict)
-          async for item in framelines:
-            await item.adelete()
-            framefile = filepath + 'frames/' + item.name
-            if await aiofiles.os.path.exists(framefile):
-              aiofiles.os.remove(framefile)
-            else:
-              logger.warning('deleteall - Delete did not find: ' + framefile)
+          async for frameline in framelines:
+            frameline.deleted = True
+            await frameline.asave(update_fields=('deleted', ))
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
