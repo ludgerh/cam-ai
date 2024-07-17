@@ -236,7 +236,6 @@ class trainerutil(AsyncWebsocketConsumer):
       if self.didrunout:
         trainers[self.trainernr].stop_out(self.schoolnr)
       if self.trainerline.t_type in {2, 3}:
-        self.ws.close()
         self.ws_session.close()
     logger.debug('Disconnected, Code:'+ str(code))
 
@@ -401,7 +400,7 @@ class trainerutil(AsyncWebsocketConsumer):
           temp['data']['pass']=tf_workerline.wspass
           temp['data']['dorunout']=params['dorunout']
           await self.ws.send_str(json.dumps(temp))
-          returned = await self.ws.receive()
+          returned = await self.ws.receive()    
           if json.loads(returned.data)['data'] != 'OK':
             await self.close()	
       else:

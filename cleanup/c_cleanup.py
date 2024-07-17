@@ -103,7 +103,6 @@ class c_cleanup():
           myschooldir = Path(school.objects.get(id = frameline.school).dir)
           del_path = myschooldir / 'frames' / frameline.name
           if del_path.exists():
-            print(del_path)
             del_path.unlink()
           frameline.delete()
       for i in range(cleanup_interval):
