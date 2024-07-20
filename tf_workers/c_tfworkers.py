@@ -410,13 +410,14 @@ class tf_worker():
             if self.model_buffers[schoolnr].pause:
               sleep(djconf.getconfigfloat('long_brake', 1.0)) 
             else:   
-              new_time = time()
+              #timeout = time() > self.model_buffers[schoolnr].ts + self.dbline.timeout
+              timeout = time() > self.model_buffers[schoolnr].ts + 1.0
               if (schoolnr in self.model_buffers
                   and (len(self.model_buffers[schoolnr]) >= self.dbline.maxblock
-                  or new_time > self.model_buffers[schoolnr].ts + self.dbline.timeout)):
-                self.model_buffers[schoolnr].ts = new_time 
+                  or timeout)):
                 if self.do_run and len(self.model_buffers[schoolnr]):
-                  self.process_buffer(schoolnr, self.logger)
+                  self.process_buffer(schoolnr, self.logger, timeout)
+                self.model_buffers[schoolnr].ts = time() 
               else:
                 sleep(djconf.getconfigfloat('short_brake', 0.01))
       self.finished = True

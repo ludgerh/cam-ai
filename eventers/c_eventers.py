@@ -235,6 +235,8 @@ class c_eventer(c_device):
       self.logger.handlers.clear()
 
   def run_one(self, frame):
+    if self.id == 6:
+      tst = time()
     if self.redis.check_if_counts_zero('E', self.dbline.id):
       sleep(djconf.getconfigfloat('long_brake', 1.0))
       return()
@@ -247,12 +249,11 @@ class c_eventer(c_device):
         self.check_events(i, item) 
     while (
       self.do_run 
-      and (clean_item_count := [i for i in self.eventdict if self.eventdict[i].check_out_ts is None])
-      and frame[2] + self.dbline.eve_sync_factor > self.last_insert_ts
+      and [i for i in self.eventdict if self.eventdict[i].check_out_ts is None]
+      and frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts
       and not self.detectorqueue.empty()
     ):
       sleep(djconf.getconfigfloat('medium_brake', 0.1))
-    
     if self.redis.view_from_dev('E', self.dbline.id):
       while self.scrwidth is None:
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
@@ -516,7 +517,7 @@ class c_eventer(c_device):
         if detector_to is None:
           detector_to = frame[2]
         detector_buffer.append(frame)
-        if len(detector_buffer) < 16 and (new_time := frame[2]) - detector_to < 0.1:
+        if len(detector_buffer) < 16 and (new_time := frame[2]) - detector_to < 1.0:
           detector_to = new_time
           continue
         detector_to = new_time
