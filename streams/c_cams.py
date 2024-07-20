@@ -75,38 +75,41 @@ class c_cam(c_device):
       try:
         remove(f)
       except:
-        self.logger.error(format_exc())
-        self.logger.handlers.clear()
-        #self.logger.warning('Cam-Task failed to delete: '+f)
+        self.logger.warning('Cam-Task failed to delete: '+f)
 
   def in_queue_handler(self, received):
-    if super().in_queue_handler(received):
-      return(True)
-    else:
-      #print(received)
-      if (received[0] == 'reset_cam'):
-        self.reset_cam()
-      elif (received[0] == 'pause'):
-        self.dbline.cam_pause = received[1]
-      elif (received[0] == 'ptz_mdown'):
-        self.mousex = received[1]
-        self.mousey = received[2]
-      elif (received[0] == 'ptz_mup'):
-        ptz_pos = self.mycam.myptz.abs_pos
-        xdiff = 0 - round((received[1] - self.mousex) / 3.0)
-        ydiff = 0 - round((received[2] - self.mousey) / 3.0)
-        self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
-      elif (received[0] == 'ptz_zoom'):
-        self.mycam.myptz.goto_rel(zin= 0-received[1])
-      elif (received[0] == 'zoom_abs'):
-        self.mycam.myptz.goto_abs(z = received[1])
-      elif (received[0] == 'pos_rel'):
-        xdiff = 0 - received[1]
-        ydiff = 0 - received[2]
-        self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
+    try:
+      if super().in_queue_handler(received):
+        return(True)
       else:
-        return(False)
-      return(True)
+        #print(received)
+        if (received[0] == 'reset_cam'):
+          self.reset_cam()
+        elif (received[0] == 'pause'):
+          self.dbline.cam_pause = received[1]
+        elif (received[0] == 'ptz_mdown'):
+          self.mousex = received[1]
+          self.mousey = received[2]
+        elif (received[0] == 'ptz_mup'):
+          ptz_pos = self.mycam.myptz.abs_pos
+          xdiff = 0 - round((received[1] - self.mousex) / 3.0)
+          ydiff = 0 - round((received[2] - self.mousey) / 3.0)
+          self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
+        elif (received[0] == 'ptz_zoom'):
+          self.mycam.myptz.goto_rel(zin= 0-received[1])
+        elif (received[0] == 'zoom_abs'):
+          self.mycam.myptz.goto_abs(z = received[1])
+        elif (received[0] == 'pos_rel'):
+          xdiff = 0 - received[1]
+          ydiff = 0 - received[2]
+          self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
+        else:
+          return(False)
+        return(True)
+    except:
+      self.logger.error('Error in process: ' + self.logname + ' (in_queue_handler)')
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def run_one(self):
     if not self.do_run:
@@ -263,18 +266,19 @@ class c_cam(c_device):
               and (not self.redis.check_if_counts_zero('E', self.dbline.id))): 
             self.mydetector.myeventer.dataqueue.put(frameline)
       self.finished = True
+      self.logger.info('Finished Process '+self.logname+'...')
+      self.logger.handlers.clear()
+      self.stopprocess()
+      if self.wd_proc is not None:
+        self.wd_proc.stop()
+        self.wd_proc.join()
+      if self.mp4_proc is not None:
+        self.mp4_proc.stop()
+        self.mp4_proc.join()
     except:
+      self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
       self.logger.handlers.clear()
-    self.logger.info('Finished Process '+self.logname+'...')
-    self.logger.handlers.clear()
-    self.stopprocess()
-    if self.wd_proc is not None:
-      self.wd_proc.stop()
-      self.wd_proc.join()
-    if self.mp4_proc is not None:
-      self.mp4_proc.stop()
-      self.mp4_proc.join()
 
   def try_connect(self, maxcounter):
     if self.dbline.cam_pause:
@@ -341,9 +345,9 @@ class c_cam(c_device):
       self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
 
   def checkmp4(self):
-    if self.checkmp4busy:
-      return()
     try:
+      if self.checkmp4busy:
+        return()
       self.checkmp4busy = True
       if self.cam_recording:
         if self.vid_count is None:
@@ -374,6 +378,7 @@ class c_cam(c_device):
       self.checkmp4busy = False
     except:
       self.checkmp4busy = False
+      self.logger.error('Error in process: ' + self.logname + ' (checkmp4)')
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
@@ -396,6 +401,7 @@ class c_cam(c_device):
       self.newprocess() 
       self.getting_newprozess = True
     except:
+      self.logger.error('Error in process: ' + self.logname + ' (watchdog)')
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 

@@ -19,20 +19,23 @@ from django.db import models
 class status_line(models.Model):
   made = models.DateTimeField()
   events_frames_correct = models.BigIntegerField(default=0) 
-  events_frames_missingframes = models.BigIntegerField(default=0) 
-  events_frames_missingevents = models.BigIntegerField(default=0) 
+  events_frames_missingframes = models.BigIntegerField(default=0)
+  eframes_correct = models.BigIntegerField(default=0)
+  eframes_missingdb = models.BigIntegerField(default=0)
+  eframes_missingfiles = models.BigIntegerField(default=0)
+  video_correct = models.BigIntegerField(default=0)
+  video_temp = models.BigIntegerField(default=0)
+  video_missingdb = models.BigIntegerField(default=0)
+  video_missingfiles = models.BigIntegerField(default=0)
+  trainer_correct = models.BigIntegerField(default=0)
+  trainer_missingdb = models.BigIntegerField(default=0)
+  trainer_missingfiles = models.BigIntegerField(default=0)
 
   def __str__(self):
     return('Cleanup model line: status')
 
-class events_frames_missingframe(models.Model):
-  idx =  models.BigIntegerField()
+class files_to_delete(models.Model):
+  name = models.CharField(max_length=256)
 
   def __str__(self):
-    return('Cleanup model line: events_frames_missingframe')
-
-class events_frames_missingdbline(models.Model):
-  idx =  models.BigIntegerField()
-
-  def __str__(self):
-    return('Cleanup model line: events_frames_missingdbline')
+    return('Cleanup model line: files_to_delete')

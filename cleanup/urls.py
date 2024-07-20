@@ -14,11 +14,12 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from django.urls import re_path
+from django.urls import path
+from . import views
 
-from . import consumers
+app_name = 'cleanup'
 
-websocket_urlpatterns = [
-  re_path(r'ws/trainerutil/$', consumers.trainerutil.as_asgi()),
-  re_path(r'ws/remotetrainer/$', consumers.remotetrainer.as_asgi()),
+urlpatterns = [
+	path('health/', views.health.as_view(), name='health'),
 ]
+

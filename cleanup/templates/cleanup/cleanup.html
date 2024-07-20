@@ -31,11 +31,69 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             data-bs-target="#panels-collapseOne" 
             aria-expanded="false" 
             aria-controls="panels-collapseOne">
-          <h4>Checking trainers</h4>
+          <h4>Checking streams</h4>
         </button>
       </h2>
       <div id="panels-collapseOne" class="accordion-collapse collapse" 
           aria-labelledby="panels-headingOne">
+        <div class="accordion-body">
+  {% for item in schoollist_write %}
+        <table class="table h4">
+          <thead>
+            <tr>
+              <th>{{ item.name }}</th>
+            </tr>
+          </thead>
+          <tbody>
+              <td>Correct: Events with frames</td>
+              <td id="correct_events">?</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Frames in DB without event</td>
+              <td id="missing_events">?</td>
+              <td> <button class="btn btn-primary m-2 fixmissing_events" 
+                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+            </tr>
+            <tr>
+              <td>Events without frames</td>
+              <td id="missing_frames">?</td>
+              <td> <button class="btn btn-primary m-2 fixmissing_frames"  
+                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+            </tr>
+            <tr>
+              <td>Correct: Event frames with files</td>
+              <td id="correct_events">?</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Files without event</td>
+              <td id="missing_events">?</td>
+              <td> <button class="btn btn-primary m-2 fixmissing_events" 
+                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+            </tr>
+            <tr>
+              <td>Event frames without file</td>
+              <td id="missing_frames">?</td>
+              <td> <button class="btn btn-primary m-2 fixmissing_frames"  
+                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+            </tr>
+          </tbody>
+        </table>
+  {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="accordion-item" id="accordionitem2">
+      <h2 class="accordion-header" id="panels-headingTwo">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+            data-bs-target="#panels-collapseTwo" aria-expanded="false" 
+            aria-controls="panels-collapseTwo">
+          <h4>Checking schools</h4>
+        </button>
+      </h2>
+      <div id="panels-collapseTwo" class="accordion-collapse collapse" 
+          aria-labelledby="panels-headingTwo">
         <div class="accordion-body">
   {% for item in schoollist_write %}
         <table class="table h4">
@@ -67,16 +125,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
       </div>
     </div>
-    <div class="accordion-item" id="accordionitem2">
-      <h2 class="accordion-header" id="panels-headingTwo">
+    <div class="accordion-item" id="accordionitem3">
+      <h2 class="accordion-header" id="panels-headingThree">
         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-            data-bs-target="#panels-collapseTwo" aria-expanded="false" 
-            aria-controls="panels-collapseTwo">
-          <h4>Checking video files</h4>
+            data-bs-target="#panels-collapseThree" aria-expanded="false" 
+            aria-controls="panels-collapseThree">
+          <h4>Checking videos</h4>
         </button>
       </h2>
-      <div id="panels-collapseTwo" class="accordion-collapse collapse" 
-          aria-labelledby="panels-headingTwo">
+      <div id="panels-collapseThree" class="accordion-collapse collapse" 
+          aria-labelledby="panels-headingThree">
         <div class="accordion-body">
         <table class="table h4">
           <thead>
@@ -128,94 +186,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
       </div>
     </div>
-    <div class="accordion-item" id="accordionitem3">
-      <h2 class="accordion-header" id="panels-headingThree">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-            data-bs-target="#panels-collapseThree" aria-expanded="false" 
-            aria-controls="panels-collapseThree">
-          <h4>Checking event frames against events</h4>
-        </button>
-      </h2>
-      <div id="panels-collapseThree" class="accordion-collapse collapse" 
-          aria-labelledby="panels-headingThree">
-        <div class="accordion-body">
-        <table class="table h4">
-          <thead>
-            <tr>
-              <th><h5>Database tables event and event_frame</h5></th>
-            </tr>
-          </thead>
-          <tbody>
-              <td>Correct events</td>
-              <td id="correct_events">?</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>Missing events</td>
-              <td id="missing_events">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_events" 
-                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
-            </tr>
-            <tr>
-              <td>Missing frames</td>
-              <td id="missing_frames">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_frames"  
-                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
-            </tr>
-          </tbody>
-        </table>
-        </div>
-      </div>
-    </div>
-    <div class="accordion-item" id="accordionitem4">
-      <h2 class="accordion-header" id="panels-headingFour">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-            data-bs-target="#panels-collapseFour" aria-expanded="false" 
-            aria-controls="panels-collapseFour">
-          <h4>Checking event frames against files</h4>
-        </button>
-      </h2>
-      <div id="panels-collapseFour" class="accordion-collapse collapse" 
-          aria-labelledby="panels-headingFour">
-        <div class="accordion-body">
-        <table class="table h4">
-          <thead>
-            <tr>
-              <th><h5>{{ schoolframespath }}</h5></th>
-            </tr>
-          </thead>
-          <tbody>
-              <td>Correct frames</td>
-              <td id="correct_frames">?</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>Missing db lines</td>
-              <td id="missing_frames_db">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_frames_db" 
-                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
-            </tr>
-            <tr>
-              <td>Missing files</td>
-              <td id="missing_frames_files">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_frames_files"  
-                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
-            </tr>
-          </tbody>
-        </table>
-        </div>
-      </div>
-    </div>
   </div>
 </main>
 <script>
 
-let healthSocket;
+let cleanupSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 function updateschool(schoolnr) {
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'checkschool',
     'school' : schoolnr,
   })
@@ -240,7 +220,7 @@ function updateschool(schoolnr) {
 };
 
 function updaterecfiles() {
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'checkrecfiles',
   })
   .then((result) => {
@@ -270,9 +250,10 @@ function updaterecfiles() {
   .catch(err => {console.log(err);});
 };
 
-function updateevents() {
-  healthSocket.sendandwait({
+function updateevents(streamnr) {
+  cleanupSocket.sendandwait({
     'command' : 'checkevents',
+    'stream' : streamnr,
   })
   .then((result) => {
     if (result.missingevents) {
@@ -293,7 +274,7 @@ function updateevents() {
 };
 
 function updateframes() {
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'checkframes',
   })
   .then((result) => {
@@ -318,7 +299,7 @@ $('.fixmissingdb').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingdb',
     'school' : parseInt(btn.attr('idx')),
   })
@@ -335,7 +316,7 @@ $('.fixmissingfiles').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingfiles',
     'school' : parseInt(btn.attr('idx')),
   })
@@ -352,7 +333,7 @@ $('.fixtemp_rec').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixtemp_rec',
   })
   .then((result) => {
@@ -368,7 +349,7 @@ $('.fixmissingdb_rec').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingdb_rec',
   })
   .then((result) => {
@@ -384,7 +365,7 @@ $('.fixmissingfiles_rec').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingfiles_rec',
   })
   .then((result) => {
@@ -400,7 +381,7 @@ $('.fixmissing_events').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingevents',
   })
   .then((result) => {
@@ -416,7 +397,7 @@ $('.fixmissing_frames').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingframes',
   })
   .then((result) => {
@@ -432,7 +413,7 @@ $('.fixmissing_frames_db').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingframesdb',
   })
   .then((result) => {
@@ -448,7 +429,7 @@ $('.fixmissing_frames_files').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
-  healthSocket.sendandwait({
+  cleanupSocket.sendandwait({
     'command' : 'fixmissingframesfiles',
   })
   .then((result) => {
@@ -464,23 +445,23 @@ $(document).ready(function() {
   WSAsync(
     ws_scheme + '//'
     + window.location.host
-    + '/ws/health/'
+    + '/ws/cleanup/'
   )
   .then((result) => {
-    healthSocket = result;
+    cleanupSocket = result;
     $('#accordionitem1').on('show.bs.collapse', function () {
-{% for item in schoollist %}
-     updateschool({{ item.id }});
+{% for item in streamlist_write %}
+      updateevents({{ item.id }});
 {% endfor %}
     });
     $('#accordionitem2').on('show.bs.collapse', function () {
       updaterecfiles();
+{% for item in schoollist_write %}
+     updateschool({{ item.id }});
+{% endfor %}
     });
     $('#accordionitem3').on('show.bs.collapse', function () {
       updateevents();
-    });
-    $('#accordionitem4').on('show.bs.collapse', function () {
-      updateframes();
     });
   })
   .catch(err => {console.log(err);});

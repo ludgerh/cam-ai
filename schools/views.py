@@ -252,5 +252,6 @@ def getbigmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
     'linenr' : linenr,
     'tokennr' : tokennr,
     'token' : token,
+    'do_webm' : djconf.getconfigbool('do_webm', False),
   }
   return(HttpResponse(template.render(context)))

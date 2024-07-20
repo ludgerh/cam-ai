@@ -15,24 +15,41 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import json
+from logging import getLogger
+from traceback import format_exc
 from channels.generic.websocket import AsyncWebsocketConsumer
+from tools.c_logger import log_ini
 from .models import alarm as dbalarm
+
+logname = 'ws_eventers'
+logger = getLogger(logname)
+log_ini(logger, logname)
 
 class alarm(AsyncWebsocketConsumer):
 
   async def connect(self):
-    if self.scope['user'].is_superuser:
-      self.accept()
+    try:
+      if self.scope['user'].is_superuser:
+        self.accept()
+    except:
+      logger.error('Error in consumer: ' + logname + ' (alarm)')
+      logger.error(format_exc())
+      logger.handlers.clear()
 
   async def receive(self, text_data):
-    params = json.loads(text_data)['data']	
-    outlist = {'tracker' : json.loads(text_data)['tracker']}	
-    print(text_data)
+    try:
+      params = json.loads(text_data)['data']	
+      outlist = {'tracker' : json.loads(text_data)['tracker']}	
+      print(text_data)
 
-    if params['command'] == 'write_db':
-      alarmline = dbalarm(name='test', mendef='text',action_type=1,action_param1='t',
-        action_param2='t')
-      await alarmline.asave()
-      outlist['data'] = 'OK'
-      print('--> ' + str(outlist))
-      await self.send(json.dumps(outlist))
+      if params['command'] == 'write_db':
+        alarmline = dbalarm(name='test', mendef='text',action_type=1,action_param1='t',
+          action_param2='t')
+        await alarmline.asave()
+        outlist['data'] = 'OK'
+        print('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))
+    except:
+      logger.error('Error in consumer: ' + logname + ' (alarm)')
+      logger.error(format_exc())
+      logger.handlers.clear()

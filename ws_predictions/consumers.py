@@ -31,7 +31,7 @@ from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import worker
 from schools.c_schools import get_taglist
 
-logname = 'ws_predictionsconsumers'
+logname = 'ws_predictions'
 logger = getLogger(logname)
 log_ini(logger, logname)
 taglist = get_taglist(1)
@@ -45,18 +45,28 @@ class predictionsConsumer(AsyncWebsocketConsumer):
   datacache = {}
 
   async def connect(self):
-    self.authed = False
-    self.permitted_schools = set()
-    self.user = None
-    self.ws_id = 0
-    self.worker_nr = 0
-    self.ws_name = 'undefined'
-    await self.accept()
+    try:
+      self.authed = False
+      self.permitted_schools = set()
+      self.user = None
+      self.ws_id = 0
+      self.worker_nr = 0
+      self.ws_name = 'undefined'
+      await self.accept()
+    except:
+      logger.error('Error in consumer: ' + logname + ' (predictions)')
+      logger.error(format_exc())
+      logger.handlers.clear()
 
   async def disconnect(self, close_code):
-    logger.info('Websocket-logout: WS-ID: ' + str(self.ws_id) 
-      + ' - WS-Name: '  + str(self.ws_name) 
-      + ' - Worker-Number: ' + str(self.worker_nr))
+    try:
+      logger.info('Websocket-logout: WS-ID: ' + str(self.ws_id) 
+        + ' - WS-Name: '  + str(self.ws_name) 
+        + ' - Worker-Number: ' + str(self.worker_nr))
+    except:
+      logger.error('Error in consumer: ' + logname + ' (predictions)')
+      logger.error(format_exc())
+      logger.handlers.clear()
 
   async def checkschooldata(self, myschool):
     if not('schooldata' in self.mydatacache):
@@ -206,7 +216,8 @@ class predictionsConsumer(AsyncWebsocketConsumer):
             except KeyError:
               logger.warning('KeyError while adding image data')
           else:
-            self.mydatacache['schooldata'][myschool]['imglist'] = None    
+            self.mydatacache['schooldata'][myschool]['imglist'] = None 
     except:
+      logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())
       logger.handlers.clear()

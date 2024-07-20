@@ -19,6 +19,5 @@ from django.urls import re_path
 from . import consumers
 
 websocket_urlpatterns = [
-  re_path(r'ws/trainerutil/$', consumers.trainerutil.as_asgi()),
-  re_path(r'ws/remotetrainer/$', consumers.remotetrainer.as_asgi()),
+  re_path(r'ws/cleanup/$', consumers.cleanup.as_asgi()),
 ]

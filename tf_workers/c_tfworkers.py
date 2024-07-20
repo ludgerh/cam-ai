@@ -341,85 +341,91 @@ class tf_worker():
         else:
           raise QueueUnknownKeyword(received[0])
     except:
+      self.logger.error('Error in process: ' + self.logname + ' (in_queue_handler)')
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
   def runner(self):
-    self.dbline = worker.objects.get(id=self.id)
-    self.users = {}
-    Thread(target=self.in_queue_thread, name='TFW_InQueueThread').start()
-    signal(SIGINT, sigint_handler)
-    signal(SIGTERM, sigint_handler)
-    signal(SIGHUP, sigint_handler)
-    self.logname = 'tf_worker #'+str(self.dbline.id)
-    self.logger = getLogger(self.logname)
-    log_ini(self.logger, self.logname)
-    setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
-    if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local CPU or GPU
-      environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-      if self.dbline.gpu_nr == -1:
-        environ["CUDA_VISIBLE_DEVICES"] = ''
-      else:  
-        environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
-      import tensorflow as tf 
-      self.logger.info("TensorFlow version: "+tf.__version__)
-      cpus = tf.config.list_physical_devices('CPU')
-      self.logger.info('+++++ tf_worker CPUs: '+str(cpus))
-      gpus = tf.config.list_physical_devices('GPU')
-      self.logger.info('+++++ tf_worker GPUs: '+str(gpus))
-      if self.dbline.gpu_nr == -1:
-        self.cuda_select = '/CPU:0'
-      else:  
-        self.cuda_select = '/GPU:'+str(self.dbline.gpu_nr)
-        for gpu in gpus:
-          tf.config.experimental.set_memory_growth(gpu, True)
-      self.logger.info('+++++ tf_worker Selected: '+self.cuda_select)
-      from tensorflow.keras.models import load_model
-      self.tf = tf
-      self.load_model = load_model
-    self.model_buffers = {}
-    if self.dbline.gpu_sim >= 0:
-      self.cachedict = {}
-    elif self.dbline.use_websocket:
-      if self.dbline.wsname:
-        self.reset_websocket()
-    self.is_ready = True
-    schoolnr = -1
-    while (len(self.model_buffers) == 0) and self.do_run:
-      if self.dbline.use_websocket:
-        self.send_ping()
-      sleep(djconf.getconfigfloat('long_brake', 1.0))
-    self.finished = False
-    while self.do_run:
-      if self.dbline.use_websocket:
-        self.send_ping()
+    try:
+      self.dbline = worker.objects.get(id=self.id)
+      self.users = {}
+      Thread(target=self.in_queue_thread, name='TFW_InQueueThread').start()
+      signal(SIGINT, sigint_handler)
+      signal(SIGTERM, sigint_handler)
+      signal(SIGHUP, sigint_handler)
+      self.logname = 'tf_worker #'+str(self.dbline.id)
+      self.logger = getLogger(self.logname)
+      log_ini(self.logger, self.logname)
+      setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
+      if (self.dbline.gpu_sim < 0) and (not self.dbline.use_websocket): #Local CPU or GPU
+        environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        if self.dbline.gpu_nr == -1:
+          environ["CUDA_VISIBLE_DEVICES"] = ''
+        else:  
+          environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
+        import tensorflow as tf 
+        self.logger.info("TensorFlow version: "+tf.__version__)
+        cpus = tf.config.list_physical_devices('CPU')
+        self.logger.info('+++++ tf_worker CPUs: '+str(cpus))
+        gpus = tf.config.list_physical_devices('GPU')
+        self.logger.info('+++++ tf_worker GPUs: '+str(gpus))
+        if self.dbline.gpu_nr == -1:
+          self.cuda_select = '/CPU:0'
+        else:  
+          self.cuda_select = '/GPU:'+str(self.dbline.gpu_nr)
+          for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        self.logger.info('+++++ tf_worker Selected: '+self.cuda_select)
+        from tensorflow.keras.models import load_model
+        self.tf = tf
+        self.load_model = load_model
+      self.model_buffers = {}
+      if self.dbline.gpu_sim >= 0:
+        self.cachedict = {}
+      elif self.dbline.use_websocket:
+        if self.dbline.wsname:
+          self.reset_websocket()
+      self.is_ready = True
+      schoolnr = -1
+      while (len(self.model_buffers) == 0) and self.do_run:
+        if self.dbline.use_websocket:
+          self.send_ping()
+        sleep(djconf.getconfigfloat('long_brake', 1.0))
+      self.finished = False
       while self.do_run:
-        if self.model_buffers:
-          schoolnr += 1
-          if schoolnr > max(self.model_buffers):
-            schoolnr = 0
-          if schoolnr in self.model_buffers:
-            break
-        else:
-          schoolnr = -1 
-          break  
-      if self.do_run:
-        if schoolnr > -1:
-          if self.model_buffers[schoolnr].pause:
-            sleep(djconf.getconfigfloat('long_brake', 1.0)) 
-          else:   
-            new_time = time()
-            if (schoolnr in self.model_buffers
-                and (len(self.model_buffers[schoolnr]) >= self.dbline.maxblock
-                or new_time > self.model_buffers[schoolnr].ts + self.dbline.timeout)):
-              self.model_buffers[schoolnr].ts = new_time 
-              if self.do_run and len(self.model_buffers[schoolnr]):
-                self.process_buffer(schoolnr, self.logger)
-            else:
-              sleep(djconf.getconfigfloat('short_brake', 0.01))
-    self.finished = True
-    self.logger.info('Finished Process '+self.logname+'...')
-    self.logger.handlers.clear()
+        if self.dbline.use_websocket:
+          self.send_ping()
+        while self.do_run:
+          if self.model_buffers:
+            schoolnr += 1
+            if schoolnr > max(self.model_buffers):
+              schoolnr = 0
+            if schoolnr in self.model_buffers:
+              break
+          else:
+            schoolnr = -1 
+            break  
+        if self.do_run:
+          if schoolnr > -1:
+            if self.model_buffers[schoolnr].pause:
+              sleep(djconf.getconfigfloat('long_brake', 1.0)) 
+            else:   
+              new_time = time()
+              if (schoolnr in self.model_buffers
+                  and (len(self.model_buffers[schoolnr]) >= self.dbline.maxblock
+                  or new_time > self.model_buffers[schoolnr].ts + self.dbline.timeout)):
+                self.model_buffers[schoolnr].ts = new_time 
+                if self.do_run and len(self.model_buffers[schoolnr]):
+                  self.process_buffer(schoolnr, self.logger)
+              else:
+                sleep(djconf.getconfigfloat('short_brake', 0.01))
+      self.finished = True
+      self.logger.info('Finished Process '+self.logname+'...')
+      self.logger.handlers.clear()
+    except:
+      self.logger.error('Error in process: ' + self.logname)
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def run(self):
     self.do_run = True
@@ -476,30 +482,26 @@ class tf_worker():
           self.allmodels[schoolnr]['ydim'] = xytemp[1]
           sleep(self.dbline.gpu_sim_loading) 
         else: #lokal GPU
-          try:
-            logger.info('***** Loading model file #'+str(schoolnr)
-              + ', file: '+model_path)
-            tempmodel = self.load_model(
-              model_path, 
-              custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
-            self.allmodels[schoolnr]['path'] = model_path  
-            self.allmodels[schoolnr]['type'] = myschool.model_type
-            self.allmodels[schoolnr]['weights'] = []
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name=myschool.model_type).get_weights())
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name='CAM-AI_Dense1').get_weights())
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
-            self.allmodels[schoolnr]['weights'].append(
-              tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
-            self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
-            self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
-            logger.info('***** Got model file #'+str(schoolnr) 
-              + ', file: '+model_path)
-          except:
-            self.logger.error(format_exc())
-            self.logger.handlers.clear()
+          logger.info('***** Loading model file #'+str(schoolnr)
+            + ', file: '+model_path)
+          tempmodel = self.load_model(
+            model_path, 
+            custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+          self.allmodels[schoolnr]['path'] = model_path  
+          self.allmodels[schoolnr]['type'] = myschool.model_type
+          self.allmodels[schoolnr]['weights'] = []
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name=myschool.model_type).get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense1').get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense2').get_weights())
+          self.allmodels[schoolnr]['weights'].append(
+            tempmodel.get_layer(name='CAM-AI_Dense3').get_weights())
+          self.allmodels[schoolnr]['ydim'] = tempmodel.layers[0].input_shape[2]
+          self.allmodels[schoolnr]['xdim'] = tempmodel.layers[0].input_shape[1]
+          logger.info('***** Got model file #'+str(schoolnr) 
+            + ', file: '+model_path)
 
   def check_activemodels(self, schoolnr, logger, test_pred = False):
     with self.model_check_lock:
@@ -663,26 +665,31 @@ class tf_worker():
 #***************************************************************************
 
   def out_reader_proc(self, index): #called by client (c_eventer)
-    while (received := self.my_output.get(index))[0] != 'stop':
-      if (received[0] == 'put_is_ready'):
-        self.is_ready = received[1]
-      elif (received[0] == 'put_xy'):
-        self.xy = received[1]
-      elif (received[0] == 'pred_to_send'):
-        while True:
-          self.pred_out_lock.acquire()
-          if  received[2] not in self.pred_out_dict:
-            self.pred_out_dict[received[2]] = None
-          if self.pred_out_dict[received[2]] is None:
-            self.pred_out_dict[received[2]] = received[1]
-            self.pred_out_lock.release()
-            break
-          else: 
-            self.pred_out_lock.release()
-            sleep(djconf.getconfigfloat('very_short_brake', 0.001))
-            break
-      else:
-        raise QueueUnknownKeyword(received[0])
+    try:
+      while (received := self.my_output.get(index))[0] != 'stop':
+        if (received[0] == 'put_is_ready'):
+          self.is_ready = received[1]
+        elif (received[0] == 'put_xy'):
+          self.xy = received[1]
+        elif (received[0] == 'pred_to_send'):
+          while True:
+            self.pred_out_lock.acquire()
+            if  received[2] not in self.pred_out_dict:
+              self.pred_out_dict[received[2]] = None
+            if self.pred_out_dict[received[2]] is None:
+              self.pred_out_dict[received[2]] = received[1]
+              self.pred_out_lock.release()
+              break
+            else: 
+              self.pred_out_lock.release()
+              sleep(djconf.getconfigfloat('very_short_brake', 0.001))
+              break
+        else:
+          raise QueueUnknownKeyword(received[0])
+    except:
+      self.logger.error('Error in process: ' + self.logname + ' (out_reader_proc)')
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def register(self):
     self.inqueue.put(('register', ))
