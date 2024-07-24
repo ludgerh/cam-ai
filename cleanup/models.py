@@ -15,24 +15,43 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from django.db import models
+from streams.models import stream
+from tf_workers.models import school
 
-class status_line(models.Model):
+class status_line_event(models.Model):
   made = models.DateTimeField()
+  stream = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)
   events_frames_correct = models.BigIntegerField(default=0) 
   events_frames_missingframes = models.BigIntegerField(default=0)
   eframes_correct = models.BigIntegerField(default=0)
   eframes_missingdb = models.BigIntegerField(default=0)
   eframes_missingfiles = models.BigIntegerField(default=0)
-  video_correct = models.BigIntegerField(default=0)
-  video_temp = models.BigIntegerField(default=0)
-  video_missingdb = models.BigIntegerField(default=0)
-  video_missingfiles = models.BigIntegerField(default=0)
-  trainer_correct = models.BigIntegerField(default=0)
-  trainer_missingdb = models.BigIntegerField(default=0)
-  trainer_missingfiles = models.BigIntegerField(default=0)
 
   def __str__(self):
-    return('Cleanup model line: status')
+    return('Cleanup model line: status_line_event')
+
+class status_line_video(models.Model):
+  made = models.DateTimeField()
+  videos_correct = models.BigIntegerField(default=0)
+  videos_temp = models.BigIntegerField(default=0)
+  videos_missingdb = models.BigIntegerField(default=0)
+  videos_missingfiles = models.BigIntegerField(default=0)
+  videos_mp4 = models.BigIntegerField(default=0)
+  videos_webm = models.BigIntegerField(default=0)
+  videos_jpg = models.BigIntegerField(default=0)
+
+  def __str__(self):
+    return('Cleanup model line: status_line_video')
+
+class status_line_school(models.Model):
+  made = models.DateTimeField()
+  school = models.ForeignKey(school, on_delete=models.CASCADE, default=1)
+  schools_correct = models.BigIntegerField(default=0)
+  schools_missingdb = models.BigIntegerField(default=0)
+  schools_missingfiles = models.BigIntegerField(default=0)
+
+  def __str__(self):
+    return('Cleanup model line: status_line_school')
 
 class files_to_delete(models.Model):
   name = models.CharField(max_length=256)

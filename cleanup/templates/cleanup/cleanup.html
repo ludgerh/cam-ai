@@ -37,7 +37,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <div id="panels-collapseOne" class="accordion-collapse collapse" 
           aria-labelledby="panels-headingOne">
         <div class="accordion-body">
-  {% for item in schoollist_write %}
+  {% for item in streamlist_write %}
         <table class="table h4">
           <thead>
             <tr>
@@ -45,37 +45,31 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             </tr>
           </thead>
           <tbody>
-              <td>Correct: Events with frames</td>
-              <td id="correct_events">?</td>
+              <td>Correct: Events with frames and/or video</td>
+              <td id="events_frames_correct{{ item.id }}">?</td>
               <td></td>
             </tr>
             <tr>
-              <td>Frames in DB without event</td>
-              <td id="missing_events">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_events" 
-                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
-            </tr>
-            <tr>
-              <td>Events without frames</td>
-              <td id="missing_frames">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_frames"  
+              <td>Events without frames and video</td>
+              <td id="events_frames_missingframes{{ item.id }}">?</td>
+              <td> <button class="btn btn-primary m-2 fix_events_frames_missingframes" idx="{{ item.id }}"
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
             <tr>
               <td>Correct: Event frames with files</td>
-              <td id="correct_events">?</td>
+              <td id="eframes_correct{{ item.id }}">?</td>
               <td></td>
             </tr>
             <tr>
-              <td>Files without event</td>
-              <td id="missing_events">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_events" 
+              <td>Files without event frame in DB</td>
+              <td id="eframes_missingdb{{ item.id }}">?</td>
+              <td> <button class="btn btn-primary m-2 fix_eframes_missingdb" idx="{{ item.id }}"
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
             <tr>
-              <td>Event frames without file</td>
-              <td id="missing_frames">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissing_frames"  
+              <td>Event frames in DB without file</td>
+              <td id="eframes_missingfiles{{ item.id }}">?</td>
+              <td> <button class="btn btn-primary m-2 fix_eframes_missingfiles" idx="{{ item.id }}"
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
           </tbody>
@@ -105,18 +99,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <tbody>
             <tr>
               <td>Correct lines</td>
-              <td id="correct{{ item.id }}">?</td>
+              <td id="schools_correct{{ item.id }}">?</td>
             </tr>
             <tr>
               <td>Missing db lines</td>
-              <td id="missingdblines{{ item.id }}">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissingdb" idx="{{ item.id }}" 
+              <td id="schools_missingdb{{ item.id }}">?</td>
+              <td> <button class="btn btn-primary m-2 fix_schools_missingdb" idx="{{ item.id }}" 
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
             <tr>
               <td>Missing files</td>
-              <td id="missingfiles{{ item.id }}">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissingfiles" idx="{{ item.id }}" 
+              <td id="schools_missingfiles{{ item.id }}">?</td>
+              <td> <button class="btn btn-primary m-2 fix_schools_missingfiles{" idx="{{ item.id }}" 
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
           </tbody>
@@ -144,41 +138,41 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           </thead>
           <tbody>
               <td>JPG files</td>
-              <td id="jpg_rec">?</td>
+              <td id="videos_jpg">?</td>
               <td></td>
             </tr>
             <tr>
               <td>MP4 files</td>
-              <td id="mp4_rec">?</td>
+              <td id="videos_mp4">?</td>
               <td></td>
             </tr>
             <tr>
               <td>WEBM files</td>
-              <td id="webm_rec">?</td>
+              <td id="videos_webm">?</td>
               <td></td>
             </tr>
             <tr>
               <td>Old temporary files</td>
-              <td id="temp_rec">?</td>
-              <td> <button class="btn btn-primary m-2 fixtemp_rec" 
+              <td id="videos_temp">?</td>
+              <td> <button class="btn btn-primary m-2 fix_videos_temp" 
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
             <tr>
               <td>Correct lines</td>
-              <td id="correct_rec">?</td>
+              <td id="videos_correct">?</td>
               <td></td>
             </tr>
             <tr>
             <tr>
               <td>Missing db lines</td>
-              <td id="missingdb_rec">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissingdb_rec" 
+              <td id="videos_missingdb">?</td>
+              <td> <button class="btn btn-primary m-2 fix_videos_missingdb" 
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
             <tr>
               <td>Missing files</td>
-              <td id="missingfiles_rec">?</td>
-              <td> <button class="btn btn-primary m-2 fixmissingfiles_rec"  
+              <td id="videos_missingfiles">?</td>
+              <td> <button class="btn btn-primary m-2 fix_videos_missingfiles"  
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
           </tbody>
@@ -194,29 +188,40 @@ let cleanupSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
+function updateevents(streamnr) {
+  cleanupSocket.sendandwait({
+    'command' : 'checkevents',
+    'stream' : streamnr,
+  })
+  .then((result) => {
+    $('.fix_events_frames_missingframes').filter('[idx='+streamnr+']').prop('disabled', 
+      !result.events_frames_missingframes);
+    $('.fix_eframes_missingdb').filter('[idx='+streamnr+']').prop('disabled', 
+      !result.eframes_missingdb);
+    $('.fix_eframes_missingfiles').filter('[idx='+streamnr+']').prop('disabled', 
+      !result.eframes_missingfiles);
+    $('#events_frames_correct'+streamnr).text(result.events_frames_correct);
+    $('#events_frames_missingframes'+streamnr).text(result.events_frames_missingframes);
+    $('#eframes_correct'+streamnr).text(result.eframes_correct);
+    $('#eframes_missingdb'+streamnr).text(result.eframes_missingdb);
+    $('#eframes_missingfiles'+streamnr).text(result.eframes_missingfiles);
+  });
+};
+
 function updateschool(schoolnr) {
   cleanupSocket.sendandwait({
     'command' : 'checkschool',
     'school' : schoolnr,
   })
   .then((result) => {
-    selector = $('.fixmissingdb').filter('[idx='+schoolnr+']');
-    if (result.missingdb) {
-      selector.prop('disabled', false);
-    } else {
-      selector.prop('disabled', true);
-    };
-    selector = $('.fixmissingfiles').filter('[idx='+schoolnr+']');
-    if (result.missingfiles) {
-      selector.prop('disabled', false);
-    } else {
-      selector.prop('disabled', true);
-    };
-    $('#correct'+schoolnr).text(result.correct);
-    $('#missingdblines'+schoolnr).text(result.missingdb);
-    $('#missingfiles'+schoolnr).text(result.missingfiles);
-  })
-  .catch(err => {console.log(err);});
+    $('.fix_schools_missingdb').filter('[idx='+schoolnr+']').prop('disabled', 
+      !result.schools_missingdb);
+    $('.fix_schools_missingfiles').filter('[idx='+schoolnr+']').prop('disabled', 
+      !result.schools_missingfiles);
+    $('#schools_correct'+schoolnr).text(result.schools_correct);
+    $('#schools_missingdb'+schoolnr).text(result.schools_missingdb);
+    $('#schools_missingfiles'+schoolnr).text(result.schools_missingfiles);
+  });
 };
 
 function updaterecfiles() {
@@ -224,83 +229,73 @@ function updaterecfiles() {
     'command' : 'checkrecfiles',
   })
   .then((result) => {
-    if (result.temp) {
-      $('.fixtemp_rec').prop('disabled', false);
-    } else {
-      $('.fixtemp_rec').prop('disabled', true);
-    };
-    if (result.missingdb) {
-      $('.fixmissingdb_rec').prop('disabled', false);
-    } else {
-      $('.fixmissingdb_rec').prop('disabled', true);
-    };
-    if (result.missingfiles) {
-      $('.fixmissingfiles_rec').prop('disabled', false);
-    } else {
-      $('.fixmissingfiles_rec').prop('disabled', true);
-    };
-    $('#jpg_rec').text(result.jpg);
-    $('#mp4_rec').text(result.mp4);
-    $('#webm_rec').text(result.webm);
-    $('#correct_rec').text(result.correct);
-    $('#temp_rec').text(result.temp);
-    $('#missingdb_rec').text(result.missingdb);
-    $('#missingfiles_rec').text(result.missingfiles);
-  })
-  .catch(err => {console.log(err);});
+    $('.fix_videos_temp').prop('disabled', !result.videos_temp);
+    $('.fix_videos_missingdb').prop('disabled', !result.videos_missingdb);
+    $('.fix_videos_missingfiles').prop('disabled', !result.videos_missingfiles);
+    $('#videos_jpg').text(result.videos_jpg);
+    $('#videos_mp4').text(result.videos_mp4);
+    $('#videos_webm').text(result.videos_webm);
+    $('#videos_correct').text(result.videos_correct);
+    $('#videos_temp').text(result.videos_temp);
+    $('#videos_missingdb').text(result.videos_missingdb);
+    $('#videos_missingfiles').text(result.videos_missingfiles);
+  });
 };
 
-function updateevents(streamnr) {
-  cleanupSocket.sendandwait({
-    'command' : 'checkevents',
-    'stream' : streamnr,
-  })
-  .then((result) => {
-    if (result.missingevents) {
-      $('.fixmissing_events').prop('disabled', false);
-    } else {
-      $('.fixmissing_events').prop('disabled', true);
-    };
-    if (result.missingframes) {
-      $('.fixmissing_frames').prop('disabled', false);
-    } else {
-      $('.fixmissing_frames').prop('disabled', true);
-    };
-    $('#correct_events').text(result.correct);
-    $('#missing_events').text(result.missingevents);
-    $('#missing_frames').text(result.missingframes);
-  })
-  .catch(err => {console.log(err);});
-};
-
-function updateframes() {
-  cleanupSocket.sendandwait({
-    'command' : 'checkframes',
-  })
-  .then((result) => {
-    if (result.missingdblines) {
-      $('.fixmissing_frames_db').prop('disabled', false);
-    } else {
-      $('.fixmissing_frames_db').prop('disabled', true);
-    };
-    if (result.missingfiles) {
-      $('.fixmissing_frames_files').prop('disabled', false);
-    } else {
-      $('.fixmissing_frames_files').prop('disabled', true);
-    };
-    $('#correct_frames').text(result.correct);
-    $('#missing_frames_db').text(result.missingdblines);
-    $('#missing_frames_files').text(result.missingfiles);
-  })
-  .catch(err => {console.log(err);});
-};
-
-$('.fixmissingdb').click(function(e) {
+$('.fix_events_frames_missingframes').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
   cleanupSocket.sendandwait({
-    'command' : 'fixmissingdb',
+    'command' : 'fix_events_frames_missingframes',
+    'stream' : parseInt(btn.attr('idx')),
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateevents(parseInt(btn.attr('idx')));
+      btn.removeClass('btn-warning');
+    };
+  });
+});
+
+$('.fix_eframes_missingdb').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  cleanupSocket.sendandwait({
+    'command' : 'fix_eframes_missingdb',
+    'stream' : parseInt(btn.attr('idx')),
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateframes(parseInt(btn.attr('idx')));
+      btn.removeClass('btn-warning');
+    };
+  });
+});
+
+$('.fix_eframes_missingfiles').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  cleanupSocket.sendandwait({
+    'command' : 'fix_eframes_missingfiles',
+    'stream' : parseInt(btn.attr('idx')),
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateframes(parseInt(btn.attr('idx')));
+      btn.removeClass('btn-warning');
+    };
+  });
+});
+
+$('.fix_schools_missingdb').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  cleanupSocket.sendandwait({
+    'command' : 'fix_schools_missingdb',
     'school' : parseInt(btn.attr('idx')),
   })
   .then((result) => {
@@ -308,16 +303,15 @@ $('.fixmissingdb').click(function(e) {
       updateschool(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
     };
-  })
-  .catch(err => {console.log(err);});
+  });
 });
 
-$('.fixmissingfiles').click(function(e) {
+$('.fix_schools_missingfiles').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
   cleanupSocket.sendandwait({
-    'command' : 'fixmissingfiles',
+    'command' : 'fix_schools_missingfiles',
     'school' : parseInt(btn.attr('idx')),
   })
   .then((result) => {
@@ -325,120 +319,52 @@ $('.fixmissingfiles').click(function(e) {
       updateschool(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
     };
-  })
-  .catch(err => {console.log(err);});
+  });
 });
 
-$('.fixtemp_rec').click(function(e) {
+$('.fix_videos_temp').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
   cleanupSocket.sendandwait({
-    'command' : 'fixtemp_rec',
+    'command' : 'fix_videos_temp',
   })
   .then((result) => {
     if (result == 'OK') {
       updaterecfiles();
       btn.removeClass('btn-warning');
     };
-  })
-  .catch(err => {console.log(err);});
+  });
 });
 
-$('.fixmissingdb_rec').click(function(e) {
+$('.fix_videos_missingdb').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
   cleanupSocket.sendandwait({
-    'command' : 'fixmissingdb_rec',
+    'command' : 'fix_videos_missingdb',
   })
   .then((result) => {
     if (result == 'OK') {
       updaterecfiles();
       btn.removeClass('btn-warning');
     };
-  })
-  .catch(err => {console.log(err);});
+  });
 });
 
-$('.fixmissingfiles_rec').click(function(e) {
+$('.fix_videos_missingfiles').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
   cleanupSocket.sendandwait({
-    'command' : 'fixmissingfiles_rec',
+    'command' : 'fix_videos_missingfiles',
   })
   .then((result) => {
     if (result == 'OK') {
       updaterecfiles();
       btn.removeClass('btn-warning');
     };
-  })
-  .catch(err => {console.log(err);});
-});
-
-$('.fixmissing_events').click(function(e) {
-  btn = $(e.target);
-  btn.prop('disabled', true);
-  btn.addClass('btn-warning');
-  cleanupSocket.sendandwait({
-    'command' : 'fixmissingevents',
-  })
-  .then((result) => {
-    if (result == 'OK') {
-      updateevents();
-      btn.removeClass('btn-warning');
-    };
-  })
-  .catch(err => {console.log(err);});
-});
-
-$('.fixmissing_frames').click(function(e) {
-  btn = $(e.target);
-  btn.prop('disabled', true);
-  btn.addClass('btn-warning');
-  cleanupSocket.sendandwait({
-    'command' : 'fixmissingframes',
-  })
-  .then((result) => {
-    if (result == 'OK') {
-      updateevents();
-      btn.removeClass('btn-warning');
-    };
-  })
-  .catch(err => {console.log(err);});
-});
-
-$('.fixmissing_frames_db').click(function(e) {
-  btn = $(e.target);
-  btn.prop('disabled', true);
-  btn.addClass('btn-warning');
-  cleanupSocket.sendandwait({
-    'command' : 'fixmissingframesdb',
-  })
-  .then((result) => {
-    if (result == 'OK') {
-      updateframes();
-      btn.removeClass('btn-warning');
-    };
-  })
-  .catch(err => {console.log(err);});
-});
-
-$('.fixmissing_frames_files').click(function(e) {
-  btn = $(e.target);
-  btn.prop('disabled', true);
-  btn.addClass('btn-warning');
-  cleanupSocket.sendandwait({
-    'command' : 'fixmissingframesfiles',
-  })
-  .then((result) => {
-    if (result == 'OK') {
-      updateframes();
-      btn.removeClass('btn-warning');
-    };
-  })
-  .catch(err => {console.log(err);});
+  });
 });
 
 $(document).ready(function() {
@@ -455,16 +381,14 @@ $(document).ready(function() {
 {% endfor %}
     });
     $('#accordionitem2').on('show.bs.collapse', function () {
-      updaterecfiles();
 {% for item in schoollist_write %}
      updateschool({{ item.id }});
 {% endfor %}
     });
     $('#accordionitem3').on('show.bs.collapse', function () {
-      updateevents();
+      updaterecfiles();
     });
-  })
-  .catch(err => {console.log(err);});
+  });
 });
 </script>
 

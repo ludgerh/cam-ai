@@ -601,7 +601,13 @@ class tf_worker():
           }
           predictions = self.continue_sending(json.dumps(outdict), opcode=1, 
             logger=logger, get_answer=True)
-          predictions = json.loads(predictions) 
+          try:  
+            predictions = json.loads(predictions) 
+          except json.decoder.JSONDecodeError:
+            self.logger.error('Error in process: ' + self.logname)
+            self.logger.error(format_exc())
+            self.logger.error('***** Received predictions: *' + predictions + '*')
+            predictions = None  
           if predictions is None:
             predictions = np.zeros((len(framelist), len(taglist)), np.float32)
           else:
