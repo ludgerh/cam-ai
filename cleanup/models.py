@@ -21,6 +21,7 @@ from tf_workers.models import school
 class status_line_event(models.Model):
   made = models.DateTimeField()
   stream = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)
+  events_temp = models.BigIntegerField(default=0) 
   events_frames_correct = models.BigIntegerField(default=0) 
   events_frames_missingframes = models.BigIntegerField(default=0)
   eframes_correct = models.BigIntegerField(default=0)

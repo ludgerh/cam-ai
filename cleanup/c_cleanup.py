@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 from os import nice
 from pathlib import Path
 from time import sleep, time
+from datetime import datetime
 from multiprocessing import Process, Queue
 from threading import Thread
 from signal import signal, SIGINT, SIGTERM, SIGHUP
@@ -204,6 +205,12 @@ class c_cleanup():
     timestamp = timezone.make_aware(datetime.now())
     for streamline in stream.objects.filter(active = True):
       my_status_events = status_line_event(made = timestamp, stream = streamline)
+# ***** checking temp events
+      eventquery = event.objects.filter(deleted = False, camera = streamline.id, xmax__lte=0)
+      events_temp = {item.id for item in eventquery if datetime.timestamp(item.start) < time() - 300.0}
+      my_status_events.events_temp = len(events_temp)
+      add_to_redis_queue('events_temp', streamline.id, events_temp)
+      print('***', len(events_temp))
 # ***** checking eventframes vs events
       eventframequery = event_frame.objects.filter(deleted = False, event__camera = streamline.id)
       while True:

@@ -45,6 +45,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td>Old temporary events</td>
+              <td id="events_temp{{ item.id }}">?</td>
+              <td> <button class="btn btn-primary m-2 fix_events_temp" idx="{{ item.id }}"
+                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+            </tr>
+            <tr>
               <td>Correct: Events with frames and/or video</td>
               <td id="events_frames_correct{{ item.id }}">?</td>
               <td></td>
@@ -194,12 +201,15 @@ function updateevents(streamnr) {
     'stream' : streamnr,
   })
   .then((result) => {
+    $('.fix_events_temp').filter('[idx='+streamnr+']').prop('disabled', 
+      !result.events_temp);
     $('.fix_events_frames_missingframes').filter('[idx='+streamnr+']').prop('disabled', 
       !result.events_frames_missingframes);
     $('.fix_eframes_missingdb').filter('[idx='+streamnr+']').prop('disabled', 
       !result.eframes_missingdb);
     $('.fix_eframes_missingfiles').filter('[idx='+streamnr+']').prop('disabled', 
       !result.eframes_missingfiles);
+    $('#events_temp'+streamnr).text(result.events_temp);
     $('#events_frames_correct'+streamnr).text(result.events_frames_correct);
     $('#events_frames_missingframes'+streamnr).text(result.events_frames_missingframes);
     $('#eframes_correct'+streamnr).text(result.eframes_correct);
@@ -242,6 +252,21 @@ function updaterecfiles() {
   });
 };
 
+$('.fix_events_temp').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  cleanupSocket.sendandwait({
+    'command' : 'fix_events_temp',
+    'stream' : parseInt(btn.attr('idx')),
+  })
+  .then((result) => {
+    if (result == 'OK') {
+      updateevents(parseInt(btn.attr('idx')));
+      btn.removeClass('btn-warning');
+    };
+  });
+});
 $('.fix_events_frames_missingframes').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);

@@ -101,12 +101,32 @@ class cleanup(AsyncWebsocketConsumer):
 
         if params['command'] == 'checkevents':
           outlist['data'] = {
+            'events_temp' : len_from_redis_queue('events_temp', params['stream']),
             'events_frames_correct' : get_from_redis('events_frames_correct', params['stream']),
             'events_frames_missingframes' : len_from_redis_queue('events_frames_missingframes', params['stream']),
             'eframes_correct' : get_from_redis('eframes_correct', params['stream']),
             'eframes_missingdb' : len_from_redis_queue('eframes_missingdb', params['stream']),
             'eframes_missingfiles' : len_from_redis_queue('eframes_missingfiles', params['stream']),
           }
+          logger.info('--> ' + str(outlist))
+          await self.send(json.dumps(outlist))	
+
+        elif params['command'] == 'fix_events_temp':		
+          list_to_delete = get_from_redis_queue('events_temp', params['stream'])
+          counter = len(list_to_delete)
+          for item in list_to_delete:
+            eventline = await event.objects.aget(id=int(item))
+            eventline.deleted = True
+            await eventline.asave(update_fields = ['deleted'])
+            with self.counter_lock:
+              counter -= 1
+          self.counter_lock.acquire()
+          while counter:
+            self.counter_lock.release()
+            sleep(1.0)   
+            self.counter_lock.acquire() 
+          self.counter_lock.release()
+          outlist['data'] = 'OK'
           logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
