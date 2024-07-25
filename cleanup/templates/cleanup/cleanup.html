@@ -110,7 +110,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             <tr>
               <td>Missing files</td>
               <td id="schools_missingfiles{{ item.id }}">?</td>
-              <td> <button class="btn btn-primary m-2 fix_schools_missingfiles{" idx="{{ item.id }}" 
+              <td> <button class="btn btn-primary m-2 fix_schools_missingfiles" idx="{{ item.id }}" 
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
           </tbody>
@@ -268,7 +268,7 @@ $('.fix_eframes_missingdb').click(function(e) {
   })
   .then((result) => {
     if (result == 'OK') {
-      updateframes(parseInt(btn.attr('idx')));
+      updateevents(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
     };
   });
@@ -284,7 +284,7 @@ $('.fix_eframes_missingfiles').click(function(e) {
   })
   .then((result) => {
     if (result == 'OK') {
-      updateframes(parseInt(btn.attr('idx')));
+      updateevents(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
     };
   });

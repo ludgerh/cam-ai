@@ -55,6 +55,7 @@ class status_line_school(models.Model):
 
 class files_to_delete(models.Model):
   name = models.CharField(max_length=256)
+  min_age = models.FloatField(default=0.0)
 
   def __str__(self):
     return('Cleanup model line: files_to_delete')

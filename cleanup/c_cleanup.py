@@ -43,7 +43,7 @@ schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolf
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
 
 cleanup_interval = 5
-health_check_interval = 10 # later 3600
+health_check_interval = 3600
 
 myredis = saferedis()
 
@@ -52,7 +52,8 @@ def sigint_handler(signal, frame):
   pass
  
 def clean_redis(name, idx=0): 
-   myredis.delete('cleanup:' + name + ':' + str(idx))
+  mytag = 'cleanup:' + name + ':' + str(idx)
+  myredis.delete(mytag)
    
 def add_to_redis(name, idx, myvalue):
   myredis.set('cleanup:' + name + ':' + str(idx), myvalue)
@@ -68,16 +69,19 @@ def add_to_redis_queue(name, idx, myset):
   myredis.delete(mytag)
   for item in myset:
     myredis.lpush(mytag, item)
-  myredis.lpush(mytag, 'end')
   
 def get_from_redis_queue(name, idx):
   mytag = 'cleanup:' + name + ':' + str(idx)
-  while not myredis.llen(mytag):
-    sleep(djconf.getconfigfloat('short_brake', 0.1))
+  print(mytag)
   result = []  
-  while (rline := myredis.rpop(mytag)) != b'end':
+  while (rline := myredis.rpop(mytag)):
+    print(rline)
     result.append(rline) 
   return(result)  
+  
+def len_from_redis_queue(name, idx):
+  mytag = 'cleanup:' + name + ':' + str(idx)  
+  return(myredis.llen(mytag))  
   
 class c_cleanup():
   def __init__(self, *args, **kwargs):
@@ -106,7 +110,7 @@ class c_cleanup():
       clean_redis('videos_missingdb')
       clean_redis('videos_missingfiles')
       clean_redis('videos_mp4')
-      clean_redis('videos_mp4')
+      clean_redis('videos_webm')
       clean_redis('videos_jpg')
       for streamline in stream.objects.filter(active = True):
         clean_redis('events_frames_correct', streamline.id)
@@ -162,9 +166,12 @@ class c_cleanup():
         if self.do_run:
           for fileline in files_to_delete.objects.all():
             delpath = Path(fileline.name)
-            self.logger.info('Cleanup: Deleting file: ' + str(delpath))
+            print('*****', delpath)
             if delpath.exists():
-              delpath.unlink() 
+              print('exists')
+              if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
+                self.logger.info('Cleanup: Deleting file: ' + str(delpath))
+                delpath.unlink() 
             fileline.delete()
 # *****
         for i in range(cleanup_interval):
@@ -218,7 +225,8 @@ class c_cleanup():
       print('***', len(events_frames_correct), len(events_frames_missingframes))
 # ***** checking eventframes vs files
       framefileset = {item.relative_to(schoolframespath).as_posix() 
-        for item in (schoolframespath / str(streamline.id)).rglob('*.bmp')}
+        for item in (schoolframespath / str(streamline.id)).rglob('*.bmp')
+        if  not files_to_delete.objects.filter(name = schoolframespath / item).count()}
       framedbquery = event_frame.objects.filter(deleted = False, event__camera = streamline.id)
       while True:
         try:
@@ -246,19 +254,26 @@ class c_cleanup():
       and item.suffix == '.mp4'
       and item.exists()
       and item.stat().st_mtime < (time() - 1800)
+      and not files_to_delete.objects.filter(name = recordingspath / item).count()
     )]
     my_status_videos.videos_temp = len(videos_temp)
     add_to_redis_queue('videos_temp', 0, videos_temp)
     videos_jpg = {item.stem for item in filelist if (item.name[:2] == 'E_') 
-      and (item.suffix == '.jpg')}
+      and (item.suffix == '.jpg')
+      and not files_to_delete.objects.filter(name = recordingspath / item).count()
+    }
     my_status_videos.videos_jpg = len(videos_jpg)
     add_to_redis('videos_jpg', 0, len(videos_jpg))
     videos_mp4 = {item.stem for item in filelist if (item.name[:2] == 'E_') 
-      and (item.suffix == '.mp4')}
+      and (item.suffix == '.mp4')
+      and not files_to_delete.objects.filter(name = recordingspath / item).count()
+    }
     my_status_videos.videos_mp4 = len(videos_mp4)
     add_to_redis('videos_mp4', 0, len(videos_mp4))
     videos_webm = {item.stem for item in filelist if (item.name[:2] == 'E_') 
-      and (item.suffix == '.webm')}
+      and (item.suffix == '.webm')
+      and not files_to_delete.objects.filter(name = recordingspath / item).count()
+    }
     my_status_videos.videos_webm = len(videos_webm)
     add_to_redis('videos_webm', 0, len(videos_webm))
     fileset = videos_jpg & videos_mp4
@@ -299,11 +314,13 @@ class c_cleanup():
       fileset = set()
       for item in (Path(myschooldir) / 'frames').iterdir():
         if item.is_file():
-          fileset.add(item.name)
+          if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / item).count():
+            fileset.add(item.name)
         elif item.is_dir():
           subdir = item.name
           for item in (Path(myschooldir) / 'frames' / subdir).iterdir():
-            fileset.add(subdir+'/'+item.name)
+            if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / subdir / item).count():
+              fileset.add(subdir+'/'+item.name)
       dbsetquery = trainframe.objects.filter(deleted = False, school=schoolline.id)
       dbset = {item.name for item in dbsetquery}
       schools_correct = fileset & dbset

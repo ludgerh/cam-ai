@@ -606,7 +606,7 @@ class tf_worker():
           except json.decoder.JSONDecodeError:
             self.logger.error('Error in process: ' + self.logname)
             self.logger.error(format_exc())
-            self.logger.error('***** Received predictions: *' + predictions + '*')
+            self.logger.error('***** Received predictions: *' + str(predictions) + '*')
             predictions = None  
           if predictions is None:
             predictions = np.zeros((len(framelist), len(taglist)), np.float32)
