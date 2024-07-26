@@ -35,6 +35,7 @@ from eventers.models import event, event_frame
 from trainers.models import trainframe
 from tf_workers.models import school
 from streams.models import stream
+from trainers.models import model_type
 from .models import (status_line_event, status_line_video, status_line_school,
  files_to_delete)
 
@@ -87,6 +88,16 @@ def len_from_redis_queue(name, idx):
 class c_cleanup():
   def __init__(self, *args, **kwargs):
     self.inqueue = Queue()
+    self.model_dims = {}
+    for schoolline in school.objects.filter(active = True):
+      myschooldir = schoolline.dir
+      self.model_dims[schoolline.id] = []
+      for item in model_type.objects.all():
+        dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
+        if ((Path(myschooldir) / 'coded' / dim_code).exists()
+            and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
+          self.model_dims[schoolline.id].append(dim_code)
+    print(self.model_dims)      
 
   def run(self):
     self.run_process = Process(target=self.runner)
@@ -167,7 +178,6 @@ class c_cleanup():
         if self.do_run:
           for fileline in files_to_delete.objects.all():
             delpath = Path(fileline.name)
-            print('*****', delpath)
             if delpath.exists():
               print('exists')
               if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
@@ -320,16 +330,29 @@ class c_cleanup():
           connection.close()
       fileset = set()
       for item in (Path(myschooldir) / 'frames').iterdir():
-        if item.is_file():
+        if item.is_file() and item.suffix == '.bmp':
           if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / item).count():
-            fileset.add(item.name)
+            fileset.add(item.stem)
         elif item.is_dir():
           subdir = item.name
           for item in (Path(myschooldir) / 'frames' / subdir).iterdir():
-            if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / subdir / item).count():
-              fileset.add(subdir+'/'+item.name)
+            if item.is_file() and item.suffix == '.bmp':
+              if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / subdir / item).count():
+                fileset.add(subdir+'/'+item.stem)
+      for dim in self.model_dims[schoolline.id]:
+        print('*****', dim, '*****')   
+        for item in (Path(myschooldir) / 'coded' / dim).iterdir():
+          if item.is_file() and item.suffix == '.cod':
+            if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / dim / item).count():
+              fileset.add(item.stem)
+          elif item.is_dir():
+            subdir = item.name
+            for item in (Path(myschooldir) / 'coded' / dim / subdir).iterdir():
+              if item.is_file() and item.suffix == '.cod':
+                if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / dim /subdir / item).count():
+                  fileset.add(subdir+'/'+item.stem)    
       dbsetquery = trainframe.objects.filter(deleted = False, school=schoolline.id)
-      dbset = {item.name for item in dbsetquery}
+      dbset = {'.'.join(item.name.split('.')[:-1]) for item in dbsetquery}
       schools_correct = fileset & dbset
       my_status_schools.schools_correct = len(schools_correct)
       schools_missingdb = fileset - dbset

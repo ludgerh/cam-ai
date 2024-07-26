@@ -45,7 +45,7 @@ from eventers.models import event, event_frame
 #from users.models import userinfo
 #from access.models import access_control
 #from access.c_access import access
-from cleanup.c_cleanup import get_from_redis, get_from_redis_queue, len_from_redis_queue
+from cleanup.c_cleanup import my_cleanup, get_from_redis, get_from_redis_queue, len_from_redis_queue
 from cleanup.models import files_to_delete
 
 #OUT = 0
@@ -203,8 +203,12 @@ class cleanup(AsyncWebsocketConsumer):
           list_to_delete = get_from_redis_queue('schools_missingdb', params['school'])
           counter = len(list_to_delete)
           for item in list_to_delete:
-            del_line = files_to_delete(name = school_line.dir + '/frames/' + item.decode(), min_age = 300)
+            del_line = files_to_delete(name = school_line.dir + '/frames/' + item.decode() + '.bmp', min_age = 300)
             await del_line.asave()
+            for dim in my_cleanup.model_dims[params['school']]:
+              print('+++++', school_line.dir + '/coded/' + dim + '/' + item.decode() + '.cod')
+              del_line = files_to_delete(name = school_line.dir + '/coded/' + dim + '/' + item.decode() + '.cod', min_age = 300)
+              await del_line.asave()
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -221,7 +225,7 @@ class cleanup(AsyncWebsocketConsumer):
           list_to_delete = get_from_redis_queue('schools_missingfiles', params['school'])
           counter = len(list_to_delete)
           for item in list_to_delete:
-            frame_line = await trainframe.objects.aget(name = item.decode())
+            frame_line = await trainframe.objects.aget(name = item.decode() + '.bmp')
             frame_line.deleted = True
             await frame_line.asave(update_fields = ['deleted'])
             with self.counter_lock:
