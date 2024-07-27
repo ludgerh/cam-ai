@@ -74,16 +74,18 @@ def add_to_redis_queue(name, idx, myset):
   
 def get_from_redis_queue(name, idx):
   mytag = 'cleanup:' + name + ':' + str(idx)
-  print(mytag)
   result = []  
-  while (rline := myredis.rpop(mytag)):
-    print(rline)
-    result.append(rline) 
+  if myredis.exists(mytag):
+    while (rline := myredis.rpop(mytag)):
+      result.append(rline) 
   return(result)  
   
 def len_from_redis_queue(name, idx):
   mytag = 'cleanup:' + name + ':' + str(idx)  
-  return(myredis.llen(mytag))  
+  if myredis.exists(mytag):
+    return(myredis.llen(mytag))  
+  else:
+    return(0)  
   
 class c_cleanup():
   def __init__(self, *args, **kwargs):
@@ -97,7 +99,6 @@ class c_cleanup():
         if ((Path(myschooldir) / 'coded' / dim_code).exists()
             and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
           self.model_dims[schoolline.id].append(dim_code)
-    print(self.model_dims)      
 
   def run(self):
     self.run_process = Process(target=self.runner)
@@ -141,7 +142,7 @@ class c_cleanup():
 # ***** cleaning up eventframes
         if self.do_run:
           for frameline in event_frame.objects.filter(deleted = True):
-            self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
+            #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
             del_path = schoolframespath / frameline.name
             if del_path.exists():
               del_path.unlink()
@@ -152,7 +153,7 @@ class c_cleanup():
 # ***** cleaning up events
         if self.do_run:
           for eventline in event.objects.filter(deleted = True):
-            self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
+            #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
             framelines = event_frame.objects.filter(event__id = eventline.id)
             for frameline in framelines:
               del_path = schoolframespath / frameline.name
@@ -168,7 +169,7 @@ class c_cleanup():
 # ***** cleaning up trainframes
         if self.do_run:
           for frameline in trainframe.objects.filter(deleted = True):
-            self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
+            #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
             myschooldir = Path(school.objects.get(id = frameline.school).dir)
             del_path = myschooldir / 'frames' / frameline.name
             if del_path.exists():
@@ -179,9 +180,8 @@ class c_cleanup():
           for fileline in files_to_delete.objects.all():
             delpath = Path(fileline.name)
             if delpath.exists():
-              print('exists')
               if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
-                self.logger.info('Cleanup: Deleting file: ' + str(delpath))
+                #self.logger.info('Cleanup: Deleting file: ' + str(delpath))
                 delpath.unlink() 
             fileline.delete()
 # *****
@@ -189,7 +189,7 @@ class c_cleanup():
           if not self.do_run:
             break
           sleep(1.0)
-      self.logger.info('Finished Process '+self.logname+'...')
+      #self.logger.info('Finished Process '+self.logname+'...')
       self.logger.handlers.clear()
     except:
       self.logger.error('Error in process: ' + self.logname)
@@ -211,7 +211,7 @@ class c_cleanup():
 
         
   def health_check(self): 
-    self.logger.info('Cleanup: Starting health check')
+    #self.logger.info('Cleanup: Starting health check')
     timestamp = timezone.make_aware(datetime.now())
     for streamline in stream.objects.filter(active = True):
       my_status_events = status_line_event(made = timestamp, stream = streamline)
@@ -220,7 +220,6 @@ class c_cleanup():
       events_temp = {item.id for item in eventquery if datetime.timestamp(item.start) < time() - 300.0}
       my_status_events.events_temp = len(events_temp)
       add_to_redis_queue('events_temp', streamline.id, events_temp)
-      print('***', len(events_temp))
 # ***** checking eventframes vs events
       eventframequery = event_frame.objects.filter(deleted = False, event__camera = streamline.id)
       while True:
@@ -239,7 +238,6 @@ class c_cleanup():
       events_frames_missingframes = eventset - (eventframeset | eventvideoset)
       my_status_events.events_frames_missingframes = len(events_frames_missingframes)
       add_to_redis_queue('events_frames_missingframes', streamline.id, events_frames_missingframes)
-      print('***', len(events_frames_correct), len(events_frames_missingframes))
 # ***** checking eventframes vs files
       framefileset = {item.relative_to(schoolframespath).as_posix() 
         for item in (schoolframespath / str(streamline.id)).rglob('*.bmp')
@@ -261,7 +259,6 @@ class c_cleanup():
       eframes_missingfiles = framedbset - framefileset
       my_status_events.eframes_missingfiles = len(eframes_missingfiles)
       add_to_redis_queue('eframes_missingfiles', streamline.id, eframes_missingfiles)
-      print('***', len(eframes_correct), len(eframes_missingdb), len(eframes_missingfiles))
       my_status_events.save()
 # ***** checking videos vs files
     my_status_videos = status_line_video(made = timestamp)
@@ -315,9 +312,6 @@ class c_cleanup():
     add_to_redis_queue('videos_temp', 0, videos_temp)
     add_to_redis_queue('videos_missingdb', 0, videos_missingdb)
     add_to_redis_queue('videos_missingfiles', 0, videos_missingfiles)
-    print('***', len(videos_correct), len(videos_temp), len(videos_missingdb), 
-      len(videos_missingfiles), len(videos_jpg), len(videos_mp4), 
-      len(videos_webm), )
     my_status_videos.save()
 # ***** checking trainframesdb vs files
     for schoolline in school.objects.filter(active = True):
@@ -340,7 +334,6 @@ class c_cleanup():
               if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / subdir / item).count():
                 fileset.add(subdir+'/'+item.stem)
       for dim in self.model_dims[schoolline.id]:
-        print('*****', dim, '*****')   
         for item in (Path(myschooldir) / 'coded' / dim).iterdir():
           if item.is_file() and item.suffix == '.cod':
             if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / dim / item).count():
@@ -362,9 +355,8 @@ class c_cleanup():
       add_to_redis('schools_correct', schoolline.id, len(schools_correct))
       add_to_redis_queue('schools_missingdb', schoolline.id, schools_missingdb)
       add_to_redis_queue('schools_missingfiles', schoolline.id, schools_missingfiles)
-      print('***', len(schools_correct), len(schools_missingdb), len(schools_missingfiles))
       my_status_schools.save()
-    self.logger.info('Cleanup: Finished health check')     
+    #self.logger.info('Cleanup: Finished health check')     
 
   def stop(self):
     self.inqueue.put(('stop',))

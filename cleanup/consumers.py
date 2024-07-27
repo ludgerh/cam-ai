@@ -16,47 +16,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 from pathlib import Path
-#from glob import glob
-#from shutil import copyfile, move, rmtree, copytree
 from time import sleep
-#from random import randint
-#from setproctitle import setproctitle
-#from multiprocessing import Process, Pipe, Lock
 from threading import Lock as t_lock
 from logging import getLogger
 from traceback import format_exc
-#from ipaddress import ip_network, ip_address
-#from requests import get as rget
-#from zipfile import ZipFile, ZIP_DEFLATED
-#from django.contrib.auth.models import User
-#from django.db import connection
-#from django.db.utils import OperationalError
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
-#from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
-#  updatefilter, savedbline, countfilter)
-#from camai.passwords import db_password 
-#from camai.passwords import os_type, env_type 
 from tools.l_tools import djconf
 from tf_workers.models import school
 from trainers.models import trainframe
 from eventers.models import event, event_frame
-#from streams.models import stream as dbstream
-#from users.models import userinfo
-#from access.models import access_control
-#from access.c_access import access
 from cleanup.c_cleanup import my_cleanup, get_from_redis, get_from_redis_queue, len_from_redis_queue
 from cleanup.models import files_to_delete
-
-#OUT = 0
-#IN = 1
-
-#using_websocket = worker.objects.get(id = 1).use_websocket
-#remote_trainer = worker.objects.get(id=1).remote_trainer
-#if school.objects.count():
-#  model_type = school.objects.first().model_type
-#else:
-#  model_type = 'NotDefined'
 
 logname = 'ws_cleanup'
 logger = getLogger(logname)
@@ -64,14 +35,6 @@ log_ini(logger, logname)
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
-
-#long_brake = djconf.getconfigfloat('long_brake', 1.0)
-#school_x_max = djconf.getconfigint('school_x_max', 500)
-#school_y_max = djconf.getconfigint('school_y_max', 500)
-  
-#lock_dict = {}
-#countdict = {}
-#check_rec_lock = Lock()
 
 #*****************************************************************************
 # cleanup
@@ -93,7 +56,7 @@ class cleanup(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.info('<-- ' + text_data)
+      logger.debug('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -108,16 +71,21 @@ class cleanup(AsyncWebsocketConsumer):
             'eframes_missingdb' : len_from_redis_queue('eframes_missingdb', params['stream']),
             'eframes_missingfiles' : len_from_redis_queue('eframes_missingfiles', params['stream']),
           }
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_events_temp':		
           list_to_delete = get_from_redis_queue('events_temp', params['stream'])
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             eventline = await event.objects.aget(id=int(item))
             eventline.deleted = True
             await eventline.asave(update_fields = ['deleted'])
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -126,17 +94,23 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_events_frames_missingframes':		
           list_to_delete = get_from_redis_queue('events_frames_missingframes', params['stream'])
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             eventline = await event.objects.aget(id=int(item))
             eventline.deleted = True
             await eventline.asave(update_fields = ['deleted'])
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -145,18 +119,22 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_eframes_missingdb':	
-          print('*****')
           list_to_delete = get_from_redis_queue('eframes_missingdb', params['stream'])
-          print(list_to_delete)
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             del_line = files_to_delete(name = schoolframespath / item.decode(), min_age = 300)
             await del_line.asave()
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -165,17 +143,23 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_eframes_missingfiles':	
           list_to_delete = get_from_redis_queue('eframes_missingfiles', params['stream'])
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             eframe_line = await event_frame.objects.aget(name = item.decode())
             eframe_line.deleted = True
             await eframe_line.asave(update_fields = ['deleted'])
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -184,8 +168,9 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'checkschool':
@@ -194,7 +179,7 @@ class cleanup(AsyncWebsocketConsumer):
             'schools_missingdb' : len_from_redis_queue('schools_missingdb', params['school']),
             'schools_missingfiles' : len_from_redis_queue('schools_missingfiles', params['school']),
           }
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_schools_missingdb':	
@@ -202,13 +187,17 @@ class cleanup(AsyncWebsocketConsumer):
           myschooldir = school_line.dir
           list_to_delete = get_from_redis_queue('schools_missingdb', params['school'])
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             del_line = files_to_delete(name = school_line.dir + '/frames/' + item.decode() + '.bmp', min_age = 300)
             await del_line.asave()
             for dim in my_cleanup.model_dims[params['school']]:
-              print('+++++', school_line.dir + '/coded/' + dim + '/' + item.decode() + '.cod')
               del_line = files_to_delete(name = school_line.dir + '/coded/' + dim + '/' + item.decode() + '.cod', min_age = 300)
               await del_line.asave()
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -217,17 +206,23 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_schools_missingfiles':	
           list_to_delete = get_from_redis_queue('schools_missingfiles', params['school'])
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             frame_line = await trainframe.objects.aget(name = item.decode() + '.bmp')
             frame_line.deleted = True
             await frame_line.asave(update_fields = ['deleted'])
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -236,8 +231,9 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'checkrecfiles':
@@ -250,15 +246,20 @@ class cleanup(AsyncWebsocketConsumer):
             'videos_webm' : get_from_redis('videos_webm', 0),
             'videos_jpg' : get_from_redis('videos_jpg', 0),
           }
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_videos_temp':	
           list_to_delete = get_from_redis_queue('videos_temp', 0)
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             del_line = files_to_delete(name = recordingspath / item.decode())
             await del_line.asave()
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -267,18 +268,24 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_videos_missingdb':	
           list_to_delete = get_from_redis_queue('videos_missingdb', 0)
           counter = len(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             for ext in ['.jpg', '.mp4', '.webm']:
               delpath = recordingspath / (item.decode() + ext)
               del_line = files_to_delete(name = delpath, min_age = 300)
               await del_line.asave()
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -287,14 +294,15 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
-          logger.info('--> ' + str(outlist))
+          logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_videos_missingfiles':	
           list_to_delete = get_from_redis_queue('videos_missingfiles', 0)
           counter = len(list_to_delete)
-          print(list_to_delete)
+          counter_start = len(list_to_delete)
           for item in list_to_delete:
             eventlines = event.objects.filter(videoclip=item.decode())
             async for eventline in eventlines:
@@ -304,6 +312,10 @@ class cleanup(AsyncWebsocketConsumer):
               delpath = recordingspath / (item.decode() + ext)
               del_line = files_to_delete(name = delpath, min_age = 300)
               await del_line.asave()
+            outlist['callback'] = True
+            outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
+            logger.debug('--> ' + str(outlist))
+            await self.send(json.dumps(outlist))	
             with self.counter_lock:
               counter -= 1
           self.counter_lock.acquire()
@@ -312,6 +324,7 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
+          del outlist['callback']
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	

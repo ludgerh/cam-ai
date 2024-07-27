@@ -24,6 +24,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 {% endif %}
 <main>
+<!-- Modal -->
+  <div class="modal fade" id="statusModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="statusModalLabel">Checking & ceaning up your database</h5>
+        </div>
+        <div class="modal-body">
+          <p>This process may take some minutes...</p>
+        </div>
+        <div class="modal-footer">
+          Progress: <span id="progress">(?/?)</span>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="accordion">
     <div class="accordion-item" id="accordionitem1">
       <h2 class="accordion-header" id="panels-headingOne">
@@ -256,14 +272,25 @@ $('.fix_events_temp').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_events_temp',
     'stream' : parseInt(btn.attr('idx')),
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
       updateevents(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
     };
   });
 });
@@ -271,14 +298,25 @@ $('.fix_events_frames_missingframes').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_events_frames_missingframes',
     'stream' : parseInt(btn.attr('idx')),
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updateevents(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updateevents(parseInt(btn.attr('idx')));
     };
   });
 });
@@ -287,14 +325,25 @@ $('.fix_eframes_missingdb').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_eframes_missingdb',
     'stream' : parseInt(btn.attr('idx')),
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updateevents(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updateevents(parseInt(btn.attr('idx')));
     };
   });
 });
@@ -303,14 +352,25 @@ $('.fix_eframes_missingfiles').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_eframes_missingfiles',
     'stream' : parseInt(btn.attr('idx')),
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updateevents(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updateevents(parseInt(btn.attr('idx')));
     };
   });
 });
@@ -319,14 +379,25 @@ $('.fix_schools_missingdb').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_schools_missingdb',
     'school' : parseInt(btn.attr('idx')),
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updateschool(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updateschool(parseInt(btn.attr('idx')));
     };
   });
 });
@@ -335,14 +406,25 @@ $('.fix_schools_missingfiles').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_schools_missingfiles',
     'school' : parseInt(btn.attr('idx')),
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updateschool(parseInt(btn.attr('idx')));
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updateschool(parseInt(btn.attr('idx')));
     };
   });
 });
@@ -351,13 +433,24 @@ $('.fix_videos_temp').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_videos_temp',
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updaterecfiles();
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updaterecfiles();
     };
   });
 });
@@ -366,13 +459,24 @@ $('.fix_videos_missingdb').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_videos_missingdb',
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updaterecfiles();
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updaterecfiles();
     };
   });
 });
@@ -381,13 +485,24 @@ $('.fix_videos_missingfiles').click(function(e) {
   btn = $(e.target);
   btn.prop('disabled', true);
   btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
   cleanupSocket.sendandwait({
     'command' : 'fix_videos_missingfiles',
-  })
+  }, mycallback)
   .then((result) => {
     if (result == 'OK') {
-      updaterecfiles();
       btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updaterecfiles();
     };
   });
 });

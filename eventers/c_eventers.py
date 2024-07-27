@@ -131,14 +131,6 @@ class c_eventer(c_device):
         else:
           sleep(djconf.getconfigfloat('short_brake', 0.01))
       self.dataqueue.stop()
-      with self.eventdict_lock:
-        for item in self.eventdict.values():
-          while True:
-            try:
-              item.dbline.delete()
-              break
-            except OperationalError:
-              connection.close()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
       self.tf_worker.stop_out(self.tf_w_index)
@@ -235,16 +227,15 @@ class c_eventer(c_device):
       self.logger.handlers.clear()
 
   def run_one(self, frame):
-    if self.id == 6:
-      tst = time()
     if self.redis.check_if_counts_zero('E', self.dbline.id):
       sleep(djconf.getconfigfloat('long_brake', 1.0))
       return()
+      
     if self.do_run and (time() - self.run_one_ts) > 1.0: # once per second
       self.run_one_ts = time()
       if self.tag_list_active != self.dbline.eve_school.id:
         self.tag_list_active = self.dbline.eve_school.id
-        self.tag_list = get_taglist(self.tag_list_active)
+        self.tag_list = get_taglist(school_active)
       for i, item in list(self.eventdict.items()): 
         self.check_events(i, item) 
     while (
@@ -328,7 +319,7 @@ class c_eventer(c_device):
             else:
               colorcode= (0, 255, 0)
             displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list)) 
-              if predictions[j] >= 0.5]
+              if predictions[j] >= 0.0]
             #displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list))]
             displaylist.sort(key=lambda x: -x[1])
             displaylist = displaylist[:3]
@@ -439,6 +430,7 @@ class c_eventer(c_device):
               item.savename=self.vid_str_dict[my_vid_str]
               isdouble = True
             else:
+              item.dbline.save()
               item.savename = ('E_'
                 +str(item.dbline.id).zfill(12)+'.mp4')
               savepath = (self.recordingspath + item.savename)
@@ -478,20 +470,7 @@ class c_eventer(c_device):
           else:  
             is_ready = False
         if is_ready:
-          if not item.save(self.cond_dict):
-            while True:
-              try:
-                item.dbline.delete()
-                break  
-              except OperationalError:
-                connection.close()  
-      else:
-        while True:
-          try:
-            item.dbline.delete()
-            break  
-          except OperationalError:
-            connection.close()  
+          item.save(self.cond_dict)
       if is_ready:
         with self.eventdict_lock:
           with self.display_lock:
@@ -551,10 +530,13 @@ class c_eventer(c_device):
                 found = item
                 break
             if found is None or found.check_out_ts:
+              count = 0  
+              while count in self.eventdict:
+                count += 1  
               new_event = c_event(self.tf_worker, self.tf_w_index, detector_buffer[i], 
-                margin, self.dbline, self.logger)
+                margin, self.dbline, count, self.logger)
               with self.eventdict_lock:
-                self.eventdict[new_event.dbline.id] = new_event
+                self.eventdict[count] = new_event
             else: 
               found.add_frame(detector_buffer[i]) 
             self.merge_events()

@@ -211,6 +211,7 @@ DATABASES = {
         'USER': 'CAM-AI',
         'PASSWORD': db_password,
     		'CONN_MAX_AGE': 3600,
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
