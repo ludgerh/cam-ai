@@ -36,11 +36,15 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from django.contrib.auth.models import User
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
-from camai.passwords import db_password, os_type, env_type 
+from tools.djangodbasync import (getonelinedict, filterlinesdict, deletefilter, 
+  updatefilter, savedbline, countfilter)
+from camai.passwords import db_password 
+from camai.passwords import os_type, env_type 
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tf_workers.models import school, worker
-from trainers.models import trainer
+from trainers.models import trainframe, trainer
+from eventers.models import event, event_frame
 from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
@@ -64,6 +68,7 @@ logger = getLogger(logname)
 log_ini(logger, logname)
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
+schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
 textpath = djconf.getconfig('textpath', datapath + 'texts/')
 if not ospath.exists(textpath):
   makedirs(textpath)
@@ -75,42 +80,12 @@ if not ospath.exists('temp'):
 chdir(basepath)
 
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
-
-#*****************************************************************************
-# health
-#*****************************************************************************
-
-class health(AsyncWebsocketConsumer):
-
-  async def connect(self):
-    try:
-      await self.accept()
-    except:
-      logger.error('Error in consumer: ' + logname + ' (health)')
-      logger.error(format_exc())
-      logger.handlers.clear()
-
-  async def receive(self, text_data):
-    try:
-      logger.debug('<-- ' + text_data)
-      params = json.loads(text_data)['data']	
-      outlist = {'tracker' : json.loads(text_data)['tracker']}	
-
-      if params['command'] == 'getdiscinfo':
-        outlist['data'] = {
-          'total' : totaldiscspace,
-          'free' : freediscspace,
-          'totalstr' : displaybytes(totaldiscspace),
-          'freestr' : displaybytes(freediscspace),
-        }
-        logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-
-    except:
-      logger.error('Error in consumer: ' + logname + ' (health)')
-      logger.error(format_exc())
-      logger.handlers.clear()
-
+school_x_max = djconf.getconfigint('school_x_max', 500)
+school_y_max = djconf.getconfigint('school_y_max', 500)
+  
+lock_dict = {}
+countdict = {}
+check_rec_lock = Lock()
 
 #*****************************************************************************
 # tools_async

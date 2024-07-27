@@ -20,7 +20,6 @@ from . import views
 app_name = 'tools'
 
 urlpatterns = [
-	path('health/', views.health.as_view(), name='health'),
 	path('addschool/', views.addschool.as_view(), name='addschool'),
 	path('linkworkers/', views.linkworkers.as_view(), name='linkworkers'),
 	path('inst_cam_easy/', views.inst_cam_easy.as_view(), name='inst_cam_easy'),

@@ -24,7 +24,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
-from django.http import HttpResponse, FileResponse, HttpResponseRedirect
+from django.http import HttpResponse
 try:  
   from camai.passwords import emulatestatic
 except  ImportError: # can be removed when everybody is up to date
@@ -35,51 +35,8 @@ from access.c_access import access
 from tf_workers.models import school, worker
 from tools.l_tools import djconf
 from .models import camurl
-from .forms import UploadFileForm
+#from .forms import UploadFileForm
 from camai.passwords import os_type
-
-class health(LoginRequiredMixin, TemplateView):
-  template_name = 'tools/health.html'
-
-  def get_context_data(self, **kwargs):
-    context = super().get_context_data(**kwargs)
-    datapath = djconf.getconfig('datapath', 'data/')
-    context.update({
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
-      'debug' : settings.DEBUG,
-      'camlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        self.request.user, 'R'
-      ),
-      'detectorlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        self.request.user, 'R'
-      ),
-      'eventerlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        self.request.user, 'R'
-      ),
-      'schoollist' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'R'
-      ),
-      'schoollist_write' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'W'
-      ),
-      'recordingspath' : djconf.getconfig('recordingspath', datapath + 'recordings/'),
-      'schoolframespath' : djconf.getconfig('schoolframespath', 
-        datapath + 'schoolframes/'),
-      'os_type' : os_type[:3],
-    })
-    return context
-
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
       
 class cam_inst_view(LoginRequiredMixin, TemplateView):   
 
