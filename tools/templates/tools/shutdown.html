@@ -73,7 +73,7 @@ $(document).ready(function() {
       admintoolsSocket.socket.onclose = function(e) {
         setTimeout(function () {
           $('#line3').removeClass("d-none");
-        }, 300000);
+        }, 30000);
       };
       admintoolsSocket.sendandwait({
         'command' : 'shutdown',
