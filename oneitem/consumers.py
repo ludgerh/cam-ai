@@ -284,7 +284,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         if self.myitem.viewer.drawpad.edit_active:
           if self.may_write:
             self.myitem.viewer.drawpad.mousemovehandler(
-              params['x']/self.scaling, params['y'] / self.scaling)
+              params['x'] / self.scaling, params['y'] / self.scaling)
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
@@ -292,7 +292,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       elif params['command'] == 'dblclick':
         if self.may_write:
           await self.myitem.viewer.drawpad.dblclickhandler(
-            params['x']/self.scaling, params['y'] / self.scaling)
+            params['x'] / self.scaling, params['y'] / self.scaling)
           self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
           if self.mydrawpad.mtype == 'X':
             self.detectormask_changed = True

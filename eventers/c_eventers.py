@@ -28,7 +28,6 @@ from collections import deque
 from time import time, sleep
 from threading import Thread, Lock as t_lock
 from queue import SimpleQueue
-from multiprocessing import Process, Lock as p_lock
 from subprocess import run
 from django.forms.models import model_to_dict
 from django.db import connection
@@ -44,7 +43,6 @@ from streams.c_devices import c_device
 from streams.models import stream
 from schools.c_schools import get_taglist
 from .models import evt_condition
-from .models import event
 from .c_event import c_event, resolve_rules
 from .c_alarm import alarm, alarm_init
 
@@ -233,8 +231,15 @@ class c_eventer(c_device):
       
     if self.do_run and (time() - self.run_one_ts) > 1.0: # once per second
       self.run_one_ts = time()
-      if self.tag_list_active != self.dbline.eve_school.id:
-        self.tag_list_active = self.dbline.eve_school.id
+      while True:
+        try:
+          present_school_nr = self.dbline.eve_school.id
+          break
+        except OperationalError:
+          connection.close()
+         
+      if self.tag_list_active != present_school_nr:
+        self.tag_list_active = present_school_nr
         self.tag_list = get_taglist(school_active)
       for i, item in list(self.eventdict.items()): 
         self.check_events(i, item) 
@@ -319,8 +324,7 @@ class c_eventer(c_device):
             else:
               colorcode= (0, 255, 0)
             displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list)) 
-              if predictions[j] >= 0.0]
-            #displaylist = [(j, predictions[j]) for j in range(1, len(self.tag_list))]
+              if predictions[j] >= 0.5]
             displaylist.sort(key=lambda x: -x[1])
             displaylist = displaylist[:3]
             if displaylist:

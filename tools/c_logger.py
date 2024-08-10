@@ -14,7 +14,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from logging import getLogger, DEBUG, FileHandler as LogFileHandler, StreamHandler as LogStreamHandler, Formatter
+from logging import DEBUG, FileHandler as LogFileHandler, StreamHandler as LogStreamHandler, Formatter
 from tools.l_tools import djconf, logdict
 from os import path, makedirs
 

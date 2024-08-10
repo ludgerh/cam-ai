@@ -35,9 +35,7 @@ from channels.db import database_sync_to_async
 from django.contrib.auth.hashers import check_password
 from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
-from tools.djangodbasync import (filterlines, getoneline, savedbline, 
-  deldbline, updatefilter, deletefilter, getonelinedict, filterlinesdict,
-  countfilter)
+from tools.djangodbasync import savedbline, getonelinedict, filterlinesdict
 from tools.c_logger import log_ini
 from tools.l_crypt import l_crypt
 from access.c_access import access
@@ -46,7 +44,7 @@ from schools.c_schools import get_taglist, check_extratags_async
 from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school, worker
 from eventers.models import event, event_frame
-from trainers.models import trainframe, img_size
+from trainers.models import trainframe
 from users.models import userinfo
 from streams.models import stream
 

@@ -24,9 +24,8 @@ from logging import getLogger
 from time import sleep, time
 from setproctitle import setproctitle
 from django.utils import timezone
-from django.db.utils import DatabaseError, OperationalError
+from django.db.utils import OperationalError
 from django.db import connections, connection
-from django.db.models import Max
 from tools.c_logger import log_ini
 from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
 from tf_workers.models import school

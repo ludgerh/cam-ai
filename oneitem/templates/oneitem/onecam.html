@@ -570,7 +570,6 @@ $(document).ready(function() {
 			overimage = true;
 		});
 		$(document).mouseup((evt) => {
-			//if (overimage) {
       let x = evt.originalEvent.pageX - myimage.offset().left;
       let y = evt.originalEvent.pageY - myimage.offset().top;
       oneitemSocket.sendandwait({
@@ -578,12 +577,10 @@ $(document).ready(function() {
 	      'x' : x,
 	      'y' : y,
       })
-			//};
 			overimage = false;
 		});
 		$(document).mousemove((evt) => {
       if($('#ch_edit').prop('checked')) {
-        //if (overimage) {
         let x = evt.originalEvent.pageX - myimage.offset().left;
         let y = evt.originalEvent.pageY - myimage.offset().top;
         oneitemSocket.sendandwait({
@@ -591,7 +588,6 @@ $(document).ready(function() {
           'x' : x,
           'y' : y,
         })
-        //};
       };  
 		});
 		myimage.dblclick((evt) => {

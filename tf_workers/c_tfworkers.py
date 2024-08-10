@@ -17,21 +17,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import json
 import numpy as np
 import cv2 as cv
-import sys
-import gc
 import pickle
-from os import environ, path, makedirs
+from os import environ
 from multiprocessing import Process, Queue
 from collections import deque
 from time import sleep, time
-from threading import Thread, Lock, get_native_id
+from threading import Thread, Lock
 from random import random
-from multitimer import MultiTimer
 from traceback import format_exc
 from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
-from inspect import currentframe, getframeinfo, stack
+from inspect import currentframe, getframeinfo
 from websocket._exceptions import (WebSocketTimeoutException, 
   WebSocketConnectionClosedException,
   WebSocketBadStatusException, 
@@ -39,16 +36,13 @@ from websocket._exceptions import (WebSocketTimeoutException,
 )
 from django.db.utils import OperationalError
 from django.db import connections, connection
-from tools.l_tools import QueueUnknownKeyword, djconf, get_proc_name
+from tools.l_tools import QueueUnknownKeyword, djconf
 if djconf.getconfigbool('local_trainer', False):
   from trainers.train_gpu_tools import cmetrics, hit100
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from .models import school, worker
 from schools.c_schools import get_taglist
-
-from psutil import virtual_memory
-from tools.l_tools import displaybytes
 
 tf_workers = {}
 taglist = get_taglist(1)

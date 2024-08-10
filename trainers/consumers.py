@@ -20,21 +20,17 @@ import numpy as np
 import asyncio
 import aiofiles
 import aiofiles.os
-from os import remove, path, makedirs, rename
+from os import path, makedirs
 from time import time, sleep
 from datetime import datetime
 from logging import getLogger
 from traceback import format_exc
-from django.core import serializers
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
-from channels.generic.websocket import WebsocketConsumer, AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
+from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.l_tools import djconf, seq_to_int
 from tools.c_logger import log_ini
-from tools.djangodbasync import (getonelinedict, updatefilter, getoneline, 
-  filterlinesdict, savedbline, deletefilter)
 from access.c_access import access
 from tools.tokens import maketoken_async
 from tf_workers.models import school, worker

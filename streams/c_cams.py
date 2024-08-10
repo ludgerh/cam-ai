@@ -14,14 +14,12 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-import sys
 import cv2 as cv
 import numpy as np
-import json
 from select import select
 from psutil import Process
 from signal import SIGKILL, SIGTERM
-from os import remove, path, makedirs, mkfifo, kill as oskill
+from os import remove, path, makedirs
 from shutil import move
 from time import sleep, time
 from setproctitle import setproctitle
@@ -29,12 +27,12 @@ from logging import getLogger
 from multitimer import MultiTimer
 from traceback import format_exc
 from glob import glob
-from subprocess import Popen, PIPE, DEVNULL
+from subprocess import Popen, PIPE
 from django.db import connection
 from django.db.utils import OperationalError
 from camai.passwords import os_type
 from tools.c_logger import log_ini
-from tools.l_tools import djconf, ts2filename, NonBlockingStreamReader
+from tools.l_tools import djconf, ts2filename
 from viewers.c_viewers import c_viewer
 from .c_devices import c_device
 from .models import stream
@@ -311,8 +309,14 @@ class c_cam(c_device):
         self.real_fps = float(self.real_fps[0]) / float(self.real_fps[1])
       self.logger.info('+++++ CAM #' + str(self.dbline.id) + ': ' + self.dbline.name)
       self.logger.info('+++++ Video codec: ' + self.video_codec_name + ' / Cam: ' + str(self.cam_fps) + 'fps / Connect: ' + str(self.real_fps) + 'fps')
-      self.redis.x_y_res_to_cam(self.dbline.id, probe['streams'][self.video_codec]['width'], 
-        probe['streams'][self.video_codec]['height'])
+      try:
+        self.redis.x_y_res_to_cam(
+          self.dbline.id, probe['streams'][self.video_codec]['width'], 
+          probe['streams'][self.video_codec]['height'])
+      except KeyError:
+        self.logger.warning('Key Error in redis.x_y_res_to_cam')
+        self.online = False
+        return()    
       self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
       self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
       while True:

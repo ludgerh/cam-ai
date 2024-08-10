@@ -20,21 +20,21 @@ from django.db.utils import OperationalError
 from .models import tag
 
 def get_taglist(myschoolnr):
-  count = 0
   while True:
     try:
       taglist = list(tag.objects.filter(school = 1))
       break
     except OperationalError:
       connection.close()
+  count = 0
   for item in taglist:
     item.id = count
     count += 1
   if myschoolnr > 1:
     extralist = tag.objects.filter(school = myschoolnr)
     for item in extralist:
-      taglist[item.replaces].name = item.name 
-      taglist[item.replaces].description = item.description
+      taglist[item.replaces - 1].name = item.name 
+      taglist[item.replaces - 1].description = item.description
   return(taglist)
 
 def get_tagnamelist(myschoolnr):

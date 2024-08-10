@@ -16,7 +16,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 import asyncio
-from time import sleep
 from logging import getLogger
 from traceback import format_exc
 from django.utils import timezone

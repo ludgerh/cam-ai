@@ -15,20 +15,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import json
-from string import ascii_letters, punctuation
-from random import choice
 from logging import getLogger
 from traceback import format_exc
 from django.conf import settings
-from django.contrib.auth.models import User
-from django.contrib.auth.hashers import make_password,  check_password
 from channels.generic.websocket import WebsocketConsumer #, AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
 from tools.c_logger import log_ini
 from tools.tokens import maketoken
-from tools.djangodbasync import getonelinedict, savedbline, getoneline
-from users.archive import myarchive, uniquename
-from .models import userinfo, archive as dbarchive
+from users.archive import myarchive
+from .models import archive as dbarchive
 
 logname = 'ws_users'
 logger = getLogger(logname)

@@ -17,9 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import cv2 as cv
 import numpy as np
 import aiofiles
-from time import time, sleep
-from shutil import copy
-from tools.l_tools import djconf
+from time import time
 
 def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=None, 
   outcrypt=None):

@@ -24,10 +24,10 @@ from setproctitle import setproctitle
 from django.db import connection
 from django.db.utils import OperationalError
 from tools.l_tools import djconf
-from tools.c_tools import rect_atob, rect_btoa, hasoverlap, merge_rects
+from tools.c_tools import rect_atob, rect_btoa, merge_rects
 from tools.c_redis import myredis
 from tools.c_logger import log_ini
-from l_buffer.l_buffer import l_buffer, c_buffer
+from l_buffer.l_buffer import c_buffer
 from viewers.c_viewers import c_viewer
 from streams.c_devices import c_device
 from streams.models import stream

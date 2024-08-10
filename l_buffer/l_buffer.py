@@ -30,12 +30,10 @@ If None, the values are not buffered
 
 import pickle
 import numpy as np
-from os import getpid
 from time import sleep, time
 from multiprocessing import Lock
 from threading import Thread
 from tools.c_redis import saferedis
-from traceback import format_exc
 
 class l_buffer():
   redis_list = []

@@ -12,8 +12,6 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-c_event.py V2.1.0 03.03.2024
 """
 
 import numpy as np
@@ -21,21 +19,18 @@ import cv2 as cv
 from datetime import datetime
 from random import randint
 from os import path, makedirs
-from time import sleep, time
-from threading import Thread
+from time import time
 from collections import OrderedDict
-from traceback import format_exc
 from django.db import connection
 from django.conf import settings
 from django.utils import timezone
 from django.db.utils import OperationalError
-from .models import event, event_frame, school
+from .models import event, event_frame
 from tools.l_tools import ts2filename, uniquename, np_mov_avg, djconf
-from tools.l_smtp import l_smtp
+from tools.l_smtp import smtp_send_mail
 from tools.l_crypt import l_crypt
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
-from streams.models import stream
 
 datapath = djconf.getconfig('datapath', 'data/')
 schoolpath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
@@ -100,7 +95,6 @@ def resolve_rules(conditions, predictions):
     return(eval(cond_str))
   else:
     return(False)
-
 
 class c_event(list):
   crypt = None
@@ -272,34 +266,10 @@ class c_event(list):
     if len(self.to_email) > 0:
       self.send_emails()
 
-  def smtp_send_mail(self, mysmtp, receiver):
-    count = 0
-    while count < 5:
-      count += 1
-      try: 
-        mysmtp.login(
-          djconf.getconfig('smtp_account'), 
-          djconf.getconfig('smtp_password'),
-        )
-        mysmtp.sendmail(
-          djconf.getconfig('smtp_email'), 
-          receiver,
-        )
-        break
-      except:
-        self.logger.warning('*** ['+str(count)+'] Email sending to: '+receiver+' failed')
-        sleep(300)
-    mysmtp.logout()
-    self.logger.info('*** ['+str(count)+'] Sent email to: '+receiver)
-
   def send_emails(self):
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
       mytoken = maketoken('EVR', self.dbline.id, receiver)
-      mysmtp = l_smtp(
-        djconf.getconfig('smtp_mode', 'SSL'), 
-        djconf.getconfig('smtp_server', 'localhost'),
-      )
       subject = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
         + self.p_string())
       from_name = djconf.getconfig('smtp_name', 'CAM-AI Emailer')
@@ -337,13 +307,12 @@ class c_event(list):
         html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
         html_text += '" style="width: 200px; height: 200px; object-fit: contain"</a> \n'
       html_text += '<br> \n'
-      mysmtp.putcontent(
-        subject, 
-        djconf.getconfig('smtp_name', 'CAM-AI Emailer'),
-        djconf.getconfig('smtp_email'), 
-        receiver,
+      smtp_send_mail(
+        subject,
         plain_text,
-        html_text,)
-      Thread(target=self.smtp_send_mail, name='SMTPSendThread', 
-        args=(mysmtp, receiver,)).start()
+        from_name + '<' + from_email + '>',
+        receiver,
+        html_text,
+        self.logger,
+      )  
 

@@ -27,7 +27,7 @@ from streams.models import stream
 from streams.c_streams import streams
 from tools.l_tools import djconf
 from tools.tokens import checktoken
-from tf_workers.models import school, worker
+from tf_workers.models import school
 from .forms import CamForm , DetectorForm, EventerForm
 from camai.passwords import os_type
 

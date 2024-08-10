@@ -19,12 +19,11 @@ import json
 import asyncio
 from logging import getLogger
 from traceback import format_exc
-from ipaddress import ip_network, ip_address
-from time import sleep
+from ipaddress import ip_network
 from validators.domain import domain
 from validators.ip_address import ipv4, ipv6
 #from tools.djangodbasync import filterlinesdict, savedbline, getonelinedict, countfilter
-from channels.generic.websocket import WebsocketConsumer, AsyncWebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.c_redis import myredis
 from tools.l_tools import djconf

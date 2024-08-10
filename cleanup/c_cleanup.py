@@ -28,7 +28,7 @@ from datetime import datetime
 from django.utils import timezone
 from django.db import connection, connections
 from django.db.utils import OperationalError
-from tools.l_tools import djconf
+from tools.l_tools import djconf, get_dir_size
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from eventers.models import event, event_frame
@@ -36,12 +36,14 @@ from trainers.models import trainframe
 from tf_workers.models import school
 from streams.models import stream
 from trainers.models import model_type
+from users.models import archive, userinfo
 from .models import (status_line_event, status_line_video, status_line_school,
  files_to_delete)
 
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
 schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
+archivepath = Path(djconf.getconfig('archivepath', datapath + 'archive/'))
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
 
 cleanup_interval = 5
@@ -211,7 +213,7 @@ class c_cleanup():
 
         
   def health_check(self): 
-    #self.logger.info('Cleanup: Starting health check')
+    self.logger.info('Cleanup: Starting health check')
     timestamp = timezone.make_aware(datetime.now())
     for streamline in stream.objects.filter(active = True):
       my_status_events = status_line_event(made = timestamp, stream = streamline)
@@ -356,6 +358,41 @@ class c_cleanup():
       add_to_redis_queue('schools_missingdb', schoolline.id, schools_missingdb)
       add_to_redis_queue('schools_missingfiles', schoolline.id, schools_missingfiles)
       my_status_schools.save()
+    #self.logger.info('Cleanup: Getting stream file sizes') 
+    for streamline in stream.objects.all(): 
+      result = get_dir_size(schoolframespath / str(streamline.id))
+      for eventline in event.objects.filter(camera = streamline, double = False):
+        if eventline.videoclip:
+          for ext in ('.mp4', '.webm', '.jpg'):
+            if (recordingspath / eventline.videoclip).with_suffix(ext).exists():
+              result += (recordingspath / eventline.videoclip).with_suffix(ext).stat().st_size
+      for archiveline in archive.objects.filter(stream = streamline):
+        if archiveline.typecode == 0:
+          filepath = archivepath / 'frames' / archiveline.name
+          if filepath.exists():
+            result += filepath.stat().st_size
+        elif archiveline.typecode == 1:
+          for ext in ('.mp4', '.webm', '.jpg'):
+            filepath = (archivepath / 'videos' / archiveline.name).with_suffix(ext)
+            if filepath.exists():
+              result += filepath.stat().st_size
+      streamline.storage_quota = result
+      streamline.save(update_fields = ['storage_quota'])
+    #self.logger.info('Cleanup: Getting school file sizes') 
+    for schoolline in school.objects.all():
+      myschooldir = schoolline.dir
+      result = get_dir_size(Path(myschooldir))
+      schoolline.storage_quota = result
+      schoolline.save(update_fields = ['storage_quota'])
+    #self.logger.info('Cleanup: Getting users storage used') 
+    for userline in userinfo.objects.all():
+      result = 0
+      for streamline in stream.objects.filter(creator = userline.user):
+        result += streamline.storage_quota
+      for schoolline in school.objects.filter(creator = userline.user):
+        result += schoolline.storage_quota
+      userline.storage_used = result  
+      userline.save(update_fields = ['storage_used'])  
     #self.logger.info('Cleanup: Finished health check')     
 
   def stop(self):

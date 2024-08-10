@@ -26,10 +26,10 @@ from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
 from os import makedirs, path as ospath, system as ossystem, getcwd, chdir, remove, nice
-from shutil import move, rmtree
+from shutil import rmtree
 from time import sleep
 from setproctitle import setproctitle
-from multiprocessing import Process, Lock
+from multiprocessing import Process
 from logging import getLogger
 from traceback import format_exc
 from zipfile import ZipFile, ZIP_DEFLATED

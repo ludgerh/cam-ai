@@ -17,9 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import numpy as np
 import cv2 as cv
 from json import dumps, loads
-from time import time
 from shapely.geometry import Point, LinearRing
-from tools.djangodbasync import savedbline, deletefilter, filterlinesdict
 from .models import mask
 
 class drawpad():

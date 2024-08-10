@@ -37,7 +37,7 @@ from tools.tokens import checktoken
 from tools.l_crypt import l_crypt
 from streams.models import stream
 from tf_workers.models import school
-from users.models import userinfo, archive
+from users.models import archive
 from eventers.models import event, event_frame
 from trainers.models import trainframe
 
