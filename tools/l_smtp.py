@@ -15,6 +15,7 @@ from smtplib import SMTP, SMTP_SSL
 from ssl import create_default_context
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from time import sleep
 
 class l_smtp():
 
