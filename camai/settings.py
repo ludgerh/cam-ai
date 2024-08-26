@@ -81,13 +81,14 @@ if emulatestatic:
 else:  
   DEBUG = debugpw
 
-ALLOWED_HOSTS = []
 if localaccess:
-  ALLOWED_HOSTS =  ['127.0.0.1', 'localhost', '192.168.126.25']
+  ALLOWED_HOSTS =  ['127.0.0.1', 'localhost']
   CLIENT_URL = 'http://localhost:8000/'
+else:  
+  ALLOWED_HOSTS = []
 if myip:
   if isinstance(myip, str):
-    ALLOWED_HOSTS = [myip]
+    ALLOWED_HOSTS += [myip]
     CLIENT_URL = 'http://' + myip + ':8000/'
   else:
     ALLOWED_HOSTS += myip
@@ -210,6 +211,7 @@ DATABASES = {
         'USER': 'CAM-AI',
         'PASSWORD': db_password,
     		'CONN_MAX_AGE': 3600,
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 

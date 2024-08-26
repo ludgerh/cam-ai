@@ -37,7 +37,7 @@ from tools.tokens import checktoken
 from tools.l_crypt import l_crypt
 from streams.models import stream
 from tf_workers.models import school
-from users.models import userinfo, archive
+from users.models import archive
 from eventers.models import event, event_frame
 from trainers.models import trainframe
 
@@ -252,5 +252,6 @@ def getbigmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
     'linenr' : linenr,
     'tokennr' : tokennr,
     'token' : token,
+    'do_webm' : djconf.getconfigbool('do_webm', False),
   }
   return(HttpResponse(template.render(context)))

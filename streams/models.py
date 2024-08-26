@@ -26,6 +26,7 @@ class stream(models.Model):
   demo = models.BooleanField(default=False)
   lastused = models.DateTimeField(default=timezone.now)
   creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_DEFAULT, default=1)
+  storage_quota = models.BigIntegerField(default=0)
   encrypted = models.BooleanField(default=True)
   crypt_key = models.BinaryField(max_length=256, default=b'')
 

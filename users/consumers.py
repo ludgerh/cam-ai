@@ -15,21 +15,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import json
-from string import ascii_letters, punctuation
-from random import choice
 from logging import getLogger
+from traceback import format_exc
 from django.conf import settings
-from django.contrib.auth.models import User
-from django.contrib.auth.hashers import make_password,  check_password
 from channels.generic.websocket import WebsocketConsumer #, AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
 from tools.c_logger import log_ini
 from tools.tokens import maketoken
-from tools.djangodbasync import getonelinedict, savedbline, getoneline
-from users.archive import myarchive, uniquename
-from .models import userinfo, archive as dbarchive
+from users.archive import myarchive
+from .models import archive as dbarchive
 
-logname = 'ws_usersconsumers'
+logname = 'ws_users'
 logger = getLogger(logname)
 log_ini(logger, logname)
       
@@ -38,9 +33,15 @@ log_ini(logger, logname)
 #*****************************************************************************
 
 class archiveConsumer(WebsocketConsumer):
+
   def connect(self):
-    self.user = self.scope['user']
-    self.accept()
+    try:
+      self.user = self.scope['user']
+      self.accept()
+    except:
+      logger.error('Error in consumer: ' + logname + ' (archive)')
+      logger.error(format_exc())
+      logger.handlers.clear()
 
   #@database_sync_to_async
   def to_archive(self, mytype, mynumber):
@@ -68,25 +69,30 @@ class archiveConsumer(WebsocketConsumer):
     return(dlurl)
 
   def receive(self, text_data=None, bytes_data=None):
-    logger.debug('<-- ' + str(text_data))
-    inlist = json.loads(text_data)
-    params = inlist['data']
-    outlist = {'tracker' : inlist['tracker']}
-    if params['command'] == 'to_arch':
-      self.to_archive(params['type'], int(params['frame_nr']))
-      outlist['data'] = 'OK'
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))
-    elif params['command'] == 'check_arch':
-      outlist['data'] = self.check_archive(params['type'], int(params['frame_nr']))
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))
-    elif params['command'] == 'del_arch':
-      self.del_archive(params['line_nr'])
-      outlist['data'] = 'OK'
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))
-    elif params['command'] == 'get_dl_url':
-      outlist['data'] = self.get_dl_url(params['line_nr'])
-      logger.debug('--> ' + str(outlist))
-      self.send(json.dumps(outlist))
+    try:
+      logger.debug('<-- ' + str(text_data))
+      inlist = json.loads(text_data)
+      params = inlist['data']
+      outlist = {'tracker' : inlist['tracker']}
+      if params['command'] == 'to_arch':
+        self.to_archive(params['type'], int(params['frame_nr']))
+        outlist['data'] = 'OK'
+        logger.debug('--> ' + str(outlist))
+        self.send(json.dumps(outlist))
+      elif params['command'] == 'check_arch':
+        outlist['data'] = self.check_archive(params['type'], int(params['frame_nr']))
+        logger.debug('--> ' + str(outlist))
+        self.send(json.dumps(outlist))
+      elif params['command'] == 'del_arch':
+        self.del_archive(params['line_nr'])
+        outlist['data'] = 'OK'
+        logger.debug('--> ' + str(outlist))
+        self.send(json.dumps(outlist))
+      elif params['command'] == 'get_dl_url':
+        outlist['data'] = self.get_dl_url(params['line_nr'])
+        logger.debug('--> ' + str(outlist))
+        self.send(json.dumps(outlist))
+    except:
+      logger.error('Error in consumer: ' + logname + ' (archive)')
+      logger.error(format_exc())
+      logger.handlers.clear()

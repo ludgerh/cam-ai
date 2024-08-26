@@ -27,6 +27,8 @@ class userinfo(models.Model):
   allowed_streams = models.IntegerField(default=3)
   pay_tokens = models.IntegerField(default=5)
   deadline = models.DateTimeField(default=timezone.make_aware(datetime(2100, 1, 1)))
+  storage_quota = models.BigIntegerField(default=1000000000)
+  storage_used = models.BigIntegerField(default=0)
 
   def __str__(self):
     return('userinfo model (TBD ...)')

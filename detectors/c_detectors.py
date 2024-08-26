@@ -24,10 +24,10 @@ from setproctitle import setproctitle
 from django.db import connection
 from django.db.utils import OperationalError
 from tools.l_tools import djconf
-from tools.c_tools import rect_atob, rect_btoa, hasoverlap, merge_rects
+from tools.c_tools import rect_atob, rect_btoa, merge_rects
 from tools.c_redis import myredis
 from tools.c_logger import log_ini
-from l_buffer.l_buffer import l_buffer, c_buffer
+from l_buffer.l_buffer import c_buffer
 from viewers.c_viewers import c_viewer
 from streams.c_devices import c_device
 from streams.models import stream
@@ -57,38 +57,43 @@ class c_detector(c_device):
       self.logger.handlers.clear()
 
   def in_queue_handler(self, received):
-    if super().in_queue_handler(received):
-      return(True)
-    else:
-      if (received[0] == 'set_fpslimit'):
-        self.dbline.det_fpslimit = received[1]
-        if received[1] == 0:
-          self.period = 0.0
-        else:
-          self.period = 1.0 / received[1]
-      elif (received[0] == 'set_threshold'):
-        self.dbline.det_threshold = received[1]
-      elif (received[0] == 'set_backgr_delay'):
-        self.dbline.det_backgr_delay = received[1]
-      elif (received[0] == 'set_dilation'):
-        self.dbline.det_dilation = received[1]
-      elif (received[0] == 'set_erosion'):
-        self.dbline.det_erosion = received[1]
-      elif (received[0] == 'set_max_size'):
-        self.dbline.det_fmax_size = received[1]
-      elif (received[0] == 'set_max_rect'):
-        self.dbline.det_max_rect = received[1]
-      elif (received[0] == 'reset'):
-        while self.run_lock:
-          sleep(djconf.getconfigfloat('short_brake', 0.1))
-        self.run_lock = True  
-        self.dbline.refresh_from_db()
-        self.scaledown = self.get_scale_down()
-        self.firstdetect = True
-        self.run_lock = False
+    try:
+      if super().in_queue_handler(received):
+        return(True)
       else:
-        return(False)
-      return(True)
+        if (received[0] == 'set_fpslimit'):
+          self.dbline.det_fpslimit = received[1]
+          if received[1] == 0:
+            self.period = 0.0
+          else:
+            self.period = 1.0 / received[1]
+        elif (received[0] == 'set_threshold'):
+          self.dbline.det_threshold = received[1]
+        elif (received[0] == 'set_backgr_delay'):
+          self.dbline.det_backgr_delay = received[1]
+        elif (received[0] == 'set_dilation'):
+          self.dbline.det_dilation = received[1]
+        elif (received[0] == 'set_erosion'):
+          self.dbline.det_erosion = received[1]
+        elif (received[0] == 'set_max_size'):
+          self.dbline.det_fmax_size = received[1]
+        elif (received[0] == 'set_max_rect'):
+          self.dbline.det_max_rect = received[1]
+        elif (received[0] == 'reset'):
+          while self.run_lock:
+            sleep(djconf.getconfigfloat('short_brake', 0.1))
+          self.run_lock = True  
+          self.dbline.refresh_from_db()
+          self.scaledown = self.get_scale_down()
+          self.firstdetect = True
+          self.run_lock = False
+        else:
+          return(False)
+        return(True)
+    except:
+      self.logger.error('Error in process: ' + self.logname + ' (in_queue_handler)')
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def run(self):
     super().run()
@@ -118,11 +123,12 @@ class c_detector(c_device):
             self.viewer.inqueue.put(frameline)
       self.dataqueue.stop()
       self.finished = True
+      self.logger.info('Finished Process '+self.logname+'...')
+      self.logger.handlers.clear()
     except:
+      self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
       self.logger.handlers.clear()
-    self.logger.info('Finished Process '+self.logname+'...')
-    self.logger.handlers.clear()
 
   def run_one(self, input):
     try:

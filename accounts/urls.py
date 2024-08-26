@@ -17,8 +17,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 from django.urls import path
 from django.views.generic.base import TemplateView
 from . import views
-from .views import (MyActivationView, MyRegistrationView, TermsView, PrivacyView, 
-  MyPasswordResetView)
 from .forms import MyRegistrationFormUniqueEmail
 
 app_name = 'accounts'

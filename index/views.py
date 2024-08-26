@@ -14,7 +14,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from django.shortcuts import render
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
@@ -25,7 +24,7 @@ except  ImportError: # can be removed when everybody is up to date
   emulatestatic = False
 from access.c_access import access
 from streams.models import stream
-from tf_workers.models import school, worker
+from tf_workers.models import school
 from tools.l_tools import djconf
 from camai.passwords import os_type
 

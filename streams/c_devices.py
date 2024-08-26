@@ -14,15 +14,12 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-import sys
-from time import sleep, time
 from multiprocessing import Process, Queue
 from threading import Thread
 from signal import signal, SIGINT, SIGTERM, SIGHUP
-from setproctitle import setproctitle
 from traceback import format_exc
 from django.db import connections
-from tools.l_tools import QueueUnknownKeyword, djconf
+from tools.l_tools import QueueUnknownKeyword
 from tools.c_redis import myredis
 from tools.c_tools import speedlimit, speedometer
 from .models import stream

@@ -23,20 +23,28 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <body>
 <video autoplay width="50" height="auto" id="video" controls>
 {% if tokennr %}
-  {% if is_android %}
-    <source src="/eventers/eventwebm/{{ linenr }}/{{ tokennr }}/{{ token }}/video.webm" type="video/webm"/>
-    <source src="/eventers/eventmp4/{{ linenr }}/{{ tokennr }}/{{ token }}/video.mp4" type="video/mp4"/>
+  {% if do_webm %}
+    {% if is_android %}
+      <source src="/eventers/eventwebm/{{ linenr }}/{{ tokennr }}/{{ token }}/video.webm" type="video/webm"/>
+      <source src="/eventers/eventmp4/{{ linenr }}/{{ tokennr }}/{{ token }}/video.mp4" type="video/mp4"/>
+    {% else %}
+      <source src="/eventers/eventmp4/{{ linenr }}/{{ tokennr }}/{{ token }}/video.mp4" type="video/mp4"/>
+      <source src="/eventers/eventwebm/{{ linenr }}/{{ tokennr }}/{{ token }}/video.webm" type="video/webm"/>
+    {% endif %}
   {% else %}
     <source src="/eventers/eventmp4/{{ linenr }}/{{ tokennr }}/{{ token }}/video.mp4" type="video/mp4"/>
-    <source src="/eventers/eventwebm/{{ linenr }}/{{ tokennr }}/{{ token }}/video.webm" type="video/webm"/>
   {% endif %}
 {% else %}
-  {% if is_android %}
-    <source src="/eventers/eventwebm/{{ linenr }}/video.webm" type="video/webm"/>
-    <source src="/eventers/eventmp4/{{ linenr }}/video.mp4" type="video/mp4"/>
+  {% if do_webm %}
+    {% if is_android %}
+      <source src="/eventers/eventwebm/{{ linenr }}/video.webm" type="video/webm"/>
+      <source src="/eventers/eventmp4/{{ linenr }}/video.mp4" type="video/mp4"/>
+    {% else %}
+      <source src="/eventers/eventmp4/{{ linenr }}/video.mp4" type="video/mp4"/>
+      <source src="/eventers/eventwebm/{{ linenr }}/video.webm" type="video/webm"/>
+    {% endif %}
   {% else %}
     <source src="/eventers/eventmp4/{{ linenr }}/video.mp4" type="video/mp4"/>
-    <source src="/eventers/eventwebm/{{ linenr }}/video.webm" type="video/webm"/>
   {% endif %}
 {% endif %}
   Your browser does not support the video tag.

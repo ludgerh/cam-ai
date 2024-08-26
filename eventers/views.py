@@ -15,13 +15,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from ua_parser import user_agent_parser
-from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
-from django.views.generic import ListView
 try:  
   from camai.passwords import emulatestatic
 except  ImportError: # can be removed when everybody is up to date

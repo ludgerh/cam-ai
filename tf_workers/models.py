@@ -25,7 +25,7 @@ class worker(models.Model):
   active = models.BooleanField(default=True)
   name = models.CharField(max_length=100, default='New TF-Worker')
   maxblock = models.IntegerField(default=8)
-  timeout = models.FloatField(default=0.1)
+  timeout = models.FloatField(default=1.0)
   max_nr_models = models.IntegerField(default=64)
   gpu_sim_loading = models.FloatField(default=0.0)
   gpu_sim = models.FloatField(default=-1.0)
@@ -45,6 +45,7 @@ class school(models.Model):
   name =  models.CharField(max_length=100)
   creator = models.ForeignKey(settings.AUTH_USER_MODEL, 
     on_delete=models.SET_DEFAULT, default=1)
+  storage_quota = models.BigIntegerField(default=0)
   encrypted = models.BooleanField(default=True)
   dir = models.CharField(max_length=256, default='')
   trigger = models.IntegerField(default=500)

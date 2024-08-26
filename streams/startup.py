@@ -20,6 +20,9 @@ from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
 from time import sleep
 from threading import Thread
+from traceback import format_exc
+from logging import getLogger
+from tools.c_logger import log_ini
 from tools.l_tools import djconf
 from tools.c_redis import myredis
 from camai.version import version as software_version
@@ -207,21 +210,28 @@ def run():
   signal(SIGTERM, newexit)
   signal(SIGHUP, newexit)
 
+  logname = 'startup'
+  logger = getLogger(logname)
+  log_ini(logger, logname)
   setproctitle('CAM-AI-Startup')
+  try:
+    for dbline in trainerdb.objects.filter(active=True):
+      trainers[dbline.id] = trainer(dbline.id)
+      trainers[dbline.id].run()
 
-  for dbline in trainerdb.objects.filter(active=True):
-    trainers[dbline.id] = trainer(dbline.id)
-    trainers[dbline.id].run()
-
-  for dbline in worker.objects.filter(active=True):
-    tf_workers[dbline.id] = tf_worker(dbline.id)
-    tf_workers[dbline.id].run()
-  
-  for dbline in stream.objects.filter(active=True):
-    streams[dbline.id] = c_stream(dbline)
-    streams[dbline.id].start()
+    for dbline in worker.objects.filter(active=True):
+      tf_workers[dbline.id] = tf_worker(dbline.id)
+      tf_workers[dbline.id].run()
     
-  my_cleanup.run()  
-    
-  check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
+    for dbline in stream.objects.filter(active=True):
+      streams[dbline.id] = c_stream(dbline)
+      streams[dbline.id].start()
+      
+    my_cleanup.run()  
+      
+    check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
+  except:
+    logger.error('Error in process: ' + logname)
+    logger.error(format_exc())
+    logger.handlers.clear()
 

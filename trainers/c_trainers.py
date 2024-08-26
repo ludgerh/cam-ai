@@ -24,9 +24,8 @@ from logging import getLogger
 from time import sleep, time
 from setproctitle import setproctitle
 from django.utils import timezone
-from django.db.utils import DatabaseError, OperationalError
+from django.db.utils import OperationalError
 from django.db import connections, connection
-from django.db.models import Max
 from tools.c_logger import log_ini
 from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
 from tf_workers.models import school
@@ -80,6 +79,7 @@ class trainer():
         else:
           raise QueueUnknownKeyword(received[0])
     except:
+      self.logger.error('Error in process: ' + self.logname + ' (inqueue)')
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
@@ -139,6 +139,7 @@ class trainer():
             connection.close()
         sleep(10.0)
     except:
+      self.logger.error('Error in process: ' + self.logname + ' (job_queue_thread)')
       self.logger.error(format_exc())
       self.logger.handlers.clear()
 
@@ -149,15 +150,15 @@ class trainer():
     self.run_process.start()
 
   def runner(self):
-    self.dbline = dbtrainer.objects.get(id=self.id)
-    Thread(target=self.in_queue_thread, name='Trainer_InQueueThread').start()
-    signal(SIGINT, sigint_handler)
-    signal(SIGTERM, sigint_handler)
-    signal(SIGHUP, sigint_handler)
-    self.logname = 'trainer #'+str(self.dbline.id)
-    self.logger = getLogger(self.logname)
-    log_ini(self.logger, self.logname)
     try:
+      self.dbline = dbtrainer.objects.get(id=self.id)
+      Thread(target=self.in_queue_thread, name='Trainer_InQueueThread').start()
+      signal(SIGINT, sigint_handler)
+      signal(SIGTERM, sigint_handler)
+      signal(SIGHUP, sigint_handler)
+      self.logname = 'trainer #'+str(self.dbline.id)
+      self.logger = getLogger(self.logname)
+      log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Trainer #'+str(self.dbline.id))
       self.finished = False
       self.job_queue = threadqueue()
@@ -218,13 +219,14 @@ class trainer():
             pass
         sleep(10.0)
       self.finished = True
+#      for thread in enumerate(): 
+#        print(thread)
+      self.logger.info('Finished Process '+self.logname+'...')
+      self.logger.handlers.clear()
     except:
+      self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
       self.logger.handlers.clear()
-    #for thread in enumerate(): 
-    #  print(thread)
-    self.logger.info('Finished Process '+self.logname+'...')
-    self.logger.handlers.clear()
   
   def stop(self):
     if self.run_out_proc and self.run_out_proc.is_alive():
@@ -240,13 +242,18 @@ class trainer():
 #***************************************************************************
 
   def out_reader_proc(self):
-    while (received := self.outqueue.get())[0] != 'stop':
-      #print('Out:', received)
-      if (received[0] == 'getqueueinfo'):
-        self.queueinfobuffers[received[1]] = received[2]
-      else:
-        raise QueueUnknownKeyword(received[0])
-    #print('Finished:', received)
+    try:
+      while (received := self.outqueue.get())[0] != 'stop':
+        #print('Out:', received)
+        if (received[0] == 'getqueueinfo'):
+          self.queueinfobuffers[received[1]] = received[2]
+        else:
+          raise QueueUnknownKeyword(received[0])
+      #print('Finished:', received)
+    except:
+      self.logger.error('Error in process: ' + self.logname + ' (out_reader_proc)')
+      self.logger.error(format_exc())
+      self.logger.handlers.clear()
 
   def run_out(self, schoolnr):
     if schoolnr in self.active_schools:

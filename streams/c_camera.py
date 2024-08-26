@@ -16,8 +16,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 import xml.etree.ElementTree as ET
-from time import sleep
-from random import randint
 from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
   timeout, gaierror)
 from concurrent.futures import ThreadPoolExecutor
@@ -29,9 +27,6 @@ from psutil import net_if_addrs
 from onvif import ONVIFCamera, exceptions, init_log
 from subprocess import Popen, PIPE
 from tools.c_redis import myredis
-
-import sys
-import traceback
 
 # Constants:
 # stream type

@@ -17,7 +17,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import base64
 from logging import getLogger
 from urllib.parse import parse_qs
-from django.shortcuts import render
 from django.http import HttpResponse
 from django.views import View
 from django.contrib.auth.models import User

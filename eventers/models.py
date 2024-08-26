@@ -17,7 +17,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 from django.db import models
 from django.utils import timezone
 from datetime import datetime
-from django.conf import settings
 from tf_workers.models import school
 from streams.models import stream
 

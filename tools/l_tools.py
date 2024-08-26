@@ -17,7 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import asyncio
 import aiofiles.os
 import numpy as np
-from os import path, getpid
+from os import path, getpid, scandir
 from threading import Thread
 from queue import Queue, Empty
 from subprocess import Popen
@@ -307,3 +307,17 @@ def version_flat(string_in):
     result += int(item)
     result *= 1000
   return(result // 1000)
+  
+def get_dir_size(path='.'):
+  total = 0
+  try:
+    with scandir(path) as it:
+      for entry in it:
+        if entry.is_file():
+          total += entry.stat().st_size
+        elif entry.is_dir():
+          total += get_dir_size(entry.path)
+  except FileNotFoundError:
+    total = 0        
+  return total
+

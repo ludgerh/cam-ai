@@ -14,7 +14,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.template import loader
 from django.conf import settings
@@ -28,7 +27,7 @@ from tf_workers.models import school
 from schools.c_schools import get_taglist
 from tools.l_tools import djconf
 from tools.tokens import checktoken
-from .models import fit, model_type
+from .models import model_type
 
 @login_required
 def trainer(request, schoolnr):

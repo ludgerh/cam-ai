@@ -16,7 +16,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import cv2 as cv
 import asyncio
-from statistics import mean
 from threading import Lock, Event
 from time import time
 from l_buffer.l_buffer import c_buffer
@@ -39,6 +38,7 @@ class c_viewer():
     self.event_loop = None #see consumers
     if self.parent.type in {'C', 'D'}:
       self.drawpad = drawpad(self, self.logger)
+    self.framebuffer = None  
           
   async def onf(self, client_nr):  
     if not self.client_dict[client_nr]['busy'].is_set():
@@ -66,7 +66,7 @@ class c_viewer():
       if self.client_dict[client_nr]['do_compress']:
         to = 3
       else:
-        to = 2         
+        to = 2    
       frame = c_convert(frame, typein=1, typeout=to, 
         xout=self.client_dict[client_nr]['outx'])
       if (int(redis.get('CAM-AI:KBInt')) 
