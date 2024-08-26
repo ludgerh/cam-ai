@@ -14,17 +14,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-<<<<<<< HEAD
-from smtplib import SMTP, SMTP_SSL
-from ssl import create_default_context
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from time import sleep
-
-=======
 from django.core.mail import send_mail
 from threading import Thread
->>>>>>> 46f131003da8b1075d6e47cf0682e1b76f996567
+from time import sleep
 
 def smtp_send_try_mail(subject, plain_text, sender, receiver, html_text, logger):
   count = 0

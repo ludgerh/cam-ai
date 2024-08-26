@@ -29,6 +29,7 @@ from django.utils import timezone
 from django.db import connection, connections
 from django.db.utils import OperationalError
 from tools.l_tools import djconf, get_dir_size
+from tools.l_smtp import smtp_send_mail
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from eventers.models import event, event_frame
@@ -384,7 +385,7 @@ class c_cleanup():
       result = get_dir_size(Path(myschooldir))
       schoolline.storage_quota = result
       schoolline.save(update_fields = ['storage_quota'])
-    #self.logger.info('Cleanup: Getting users storage used') 
+    self.logger.info('Cleanup: Getting users storage used') 
     for userline in userinfo.objects.all():
       result = 0
       for streamline in stream.objects.filter(creator = userline.user):
@@ -392,8 +393,36 @@ class c_cleanup():
       for schoolline in school.objects.filter(creator = userline.user):
         result += schoolline.storage_quota
       userline.storage_used = result  
-      userline.save(update_fields = ['storage_used'])  
-    #self.logger.info('Cleanup: Finished health check')     
+      if result < userline.storage_quota:  
+        userline.mail_flag_quota100 = False
+        if result < userline.storage_quota * 0.75:
+          userline.mail_flag_quota75 = False
+      if result > userline.storage_quota * 0.75:
+        if not userline.mail_flag_quota75:
+          print('Schreiben 75')
+          smtp_send_mail(
+            'Your disc quota is almost used!',
+            'Plain: Schreiben 75',
+            'CAM-AI' + '<' + 'theo@booker-hellerhoff.de' + '>',
+            userline.user.email,
+            'HTML: Schreiben <B>75</B>',
+            self.logger,
+          )  
+          userline.mail_flag_quota75 = True
+        if result > userline.storage_quota:
+          if not userline.mail_flag_quota100:
+            print('Schreiben 100')
+            smtp_send_mail(
+              'Your disc quota is completely used!',
+              'Plain: Schreiben 100',
+              'Theo Tester' + '<' + 'theo@booker-hellerhoff.de' + '>',
+              userline.user.email,
+              'HTML: Schreiben <B>100</B>',
+              self.logger,
+            )  
+            userline.mail_flag_quota100 = True
+      userline.save(update_fields = ['storage_used', 'mail_flag_quota75', 'mail_flag_quota100',]) 
+    self.logger.info('Cleanup: Finished health check')     
 
   def stop(self):
     self.inqueue.put(('stop',))

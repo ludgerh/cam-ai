@@ -45,6 +45,7 @@ from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
 from access.c_access import access
+from users.models import userinfo
 from .health import totaldiscspace, freediscspace
 
 OUT = 0
@@ -97,11 +98,18 @@ class health(AsyncWebsocketConsumer):
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
       if params['command'] == 'getdiscinfo':
+        if self.scope['user'].is_superuser:
+          avaible = freediscspace
+          total = totaldiscspace
+        else:  
+          infoline = await userinfo.objects.aget(user = self.scope['user'])
+          avaible = max(0, infoline.storage_quota - infoline.storage_used)
+          total = infoline.storage_quota
         outlist['data'] = {
-          'total' : totaldiscspace,
-          'free' : freediscspace,
-          'totalstr' : displaybytes(totaldiscspace),
-          'freestr' : displaybytes(freediscspace),
+          'total' : total,
+          'free' : avaible,
+          'totalstr' : displaybytes(total),
+          'freestr' : displaybytes(avaible),
         }
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

@@ -29,6 +29,8 @@ class userinfo(models.Model):
   deadline = models.DateTimeField(default=timezone.make_aware(datetime(2100, 1, 1)))
   storage_quota = models.BigIntegerField(default=1000000000)
   storage_used = models.BigIntegerField(default=0)
+  mail_flag_quota75 = models.BooleanField(default=False)
+  mail_flag_quota100 = models.BooleanField(default=False)
 
   def __str__(self):
     return('userinfo model (TBD ...)')

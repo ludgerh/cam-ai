@@ -175,7 +175,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               V{{ version }}
               (User: {{ user }}){# Kommt als dropdown mit logout #}
             </div>
-            {% if user.is_superuser %}
+            {% if user.is_authenticated %}
               <div class="col-sm-auto row">
                 <div class="col-sm-auto">
                   <span id="freediscspace">?</span> of <span id="totaldiscspace">?</span> Free (<span id="freepercent">?</span>%)
@@ -227,7 +227,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
     {% block content %}No Content yet...{% endblock %}
 
-{% if user.is_superuser %}
+{% if user.is_authenticated %}
 <script>
 let active_bg = 'bg-success';
 let active_percentage = 1;
