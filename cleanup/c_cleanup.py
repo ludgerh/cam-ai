@@ -326,16 +326,18 @@ class c_cleanup():
         except OperationalError:
           connection.close()
       fileset = set()
-      for item in (Path(myschooldir) / 'frames').iterdir():
-        if item.is_file() and item.suffix == '.bmp':
-          if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / item).count():
-            fileset.add(item.stem)
-        elif item.is_dir():
-          subdir = item.name
-          for item in (Path(myschooldir) / 'frames' / subdir).iterdir():
-            if item.is_file() and item.suffix == '.bmp':
-              if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / subdir / item).count():
-                fileset.add(subdir+'/'+item.stem)
+      framespath = Path(myschooldir) / 'frames'
+      if framespath.exists():
+        for item in framespath.iterdir():
+          if item.is_file() and item.suffix == '.bmp':
+            if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / item).count():
+              fileset.add(item.stem)
+          elif item.is_dir():
+            subdir = item.name
+            for item in (Path(myschooldir) / 'frames' / subdir).iterdir():
+              if item.is_file() and item.suffix == '.bmp':
+                if  not files_to_delete.objects.filter(name = Path(myschooldir) / 'frames' / subdir / item).count():
+                  fileset.add(subdir+'/'+item.stem)
       for dim in self.model_dims[schoolline.id]:
         for item in (Path(myschooldir) / 'coded' / dim).iterdir():
           if item.is_file() and item.suffix == '.cod':
