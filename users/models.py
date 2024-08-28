@@ -31,6 +31,7 @@ class userinfo(models.Model):
   storage_used = models.BigIntegerField(default=0)
   mail_flag_quota75 = models.BooleanField(default=False)
   mail_flag_quota100 = models.BooleanField(default=False)
+  mail_flag_discspace95 = models.BooleanField(default=False)
 
   def __str__(self):
     return('userinfo model (TBD ...)')

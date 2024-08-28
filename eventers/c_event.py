@@ -25,12 +25,13 @@ from django.db import connection
 from django.conf import settings
 from django.utils import timezone
 from django.db.utils import OperationalError
-from .models import event, event_frame
 from tools.l_tools import ts2filename, uniquename, np_mov_avg, djconf
 from tools.l_smtp import smtp_send_mail
 from tools.l_crypt import l_crypt
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
+from .models import event, event_frame
+
 
 datapath = djconf.getconfig('datapath', 'data/')
 schoolpath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')

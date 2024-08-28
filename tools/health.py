@@ -19,8 +19,10 @@ from multitimer import MultiTimer
 from os import path, remove
 from logging import getLogger
 from eventers.models import event, event_frame
+from users.models import userinfo
 from .c_logger import log_ini
 from .l_tools import djconf
+from .l_smtp import smtp_send_mail
 
 logname = 'health'
 logger = getLogger(logname)
@@ -31,13 +33,32 @@ recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
 
 totaldiscspace = 1
 freediscspace = 1
+useddiscspace = 1
 
 def setdiscspace():
   global totaldiscspace
   global freediscspace
-  total, used, free = disk_usage("/")
-  totaldiscspace = total
-  freediscspace = free
+  global useddiscspace
+  totaldiscspace, useddiscspace, freediscspace = disk_usage("/")
+  if useddiscspace > totaldiscspace * 0.95:
+    for userline in userinfo.objects.filter(user__is_superuser = True):
+      if not userline.mail_flag_discspace95:
+        print('Schreiben 95')
+        smtp_send_mail(
+          'Your servers disc is almost full!',
+          'Plain: Schreiben 95',
+          'CAM-AI' + '<' + 'theo@booker-hellerhoff.de' + '>',
+          userline.user.email,
+          'HTML: Schreiben <B>95</B>',
+          logger,
+        )  
+        userline.mail_flag_discspace95 = True 
+        userline.save(update_fields = ['mail_flag_discspace95', ]) 
+  else:   
+    for userline in userinfo.objects.filter(user__is_superuser = True):  
+      if userline.mail_flag_discspace95:
+        userline.mail_flag_discspace95 = False 
+        userline.save(update_fields = ['mail_flag_discspace95', ]) 
 
 setdiscspace()
 

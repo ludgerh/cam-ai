@@ -42,6 +42,7 @@ from tf_workers.models import school
 from streams.c_devices import c_device
 from streams.models import stream
 from schools.c_schools import get_taglist
+from users.userinfo import free_quota
 from .models import evt_condition
 from .c_event import c_event, resolve_rules
 from .c_alarm import alarm, alarm_init
@@ -414,70 +415,71 @@ class c_eventer(c_device):
       is_ready = True
       if item.goes_to_school or item.isrecording or item.to_email:
         print('+++++', predictions[1])
-        if item.isrecording:
-          with self.vid_deque_lock:
-            checkbool = self.vid_deque and item.check_out_ts <= self.vid_deque[-1][2]
+        if free_quota(item.dbline.camera.creator):
+          if item.isrecording:
+            with self.vid_deque_lock:
+              checkbool = self.vid_deque and item.check_out_ts <= self.vid_deque[-1][2]
+              if checkbool:
+                print(self.vid_deque[-1][2] - item.check_out_ts, item.check_out_ts, self.vid_deque[-1][2])
             if checkbool:
-              print(self.vid_deque[-1][2] - item.check_out_ts, item.check_out_ts, self.vid_deque[-1][2])
-          if checkbool:
-            my_vid_list = []
-            my_vid_str = ''
-            my_vid_start = None
-            for v_item in self.vid_deque:
-              if (item.start <= v_item[2]):
-                if not my_vid_start:
-                  #10 seconds video length plus average trigger delay from checkmp4
-                  my_vid_start = (v_item[2] - 10.5)
-                my_vid_end = v_item[2]
-                my_vid_list.append(v_item[1])
-                my_vid_str += str(v_item[0])
-            vid_offset = item.focus_time - my_vid_start
-            vid_offset = max(vid_offset, 0.0)
-            if my_vid_str in self.vid_str_dict:
-              item.savename=self.vid_str_dict[my_vid_str]
-              isdouble = True
-            else:
-              item.dbline.save()
-              item.savename = ('E_'
-                +str(item.dbline.id).zfill(12)+'.mp4')
-              savepath = (self.recordingspath + item.savename)
-              if len(my_vid_list) == 1: 
-                copyfile(self.recordingspath + my_vid_list[0], savepath)
+              my_vid_list = []
+              my_vid_str = ''
+              my_vid_start = None
+              for v_item in self.vid_deque:
+                if (item.start <= v_item[2]):
+                  if not my_vid_start:
+                    #10 seconds video length plus average trigger delay from checkmp4
+                    my_vid_start = (v_item[2] - 10.5)
+                  my_vid_end = v_item[2]
+                  my_vid_list.append(v_item[1])
+                  my_vid_str += str(v_item[0])
+              vid_offset = item.focus_time - my_vid_start
+              vid_offset = max(vid_offset, 0.0)
+              if my_vid_str in self.vid_str_dict:
+                item.savename=self.vid_str_dict[my_vid_str]
+                isdouble = True
               else:
-                tempfilename = (self.recordingspath + 'T_'
-                  + str(item.dbline.id).zfill(12)+'.temp')
-                with open(tempfilename, 'a') as f1:
-                  for line in my_vid_list:
-                    f1.write('file ' + path.abspath(self.recordingspath + line) + '\n')
-                run(['ffmpeg', 
-                  '-f', 'concat', 
-                  '-safe', '0', 
+                item.dbline.save()
+                item.savename = ('E_'
+                  +str(item.dbline.id).zfill(12)+'.mp4')
+                savepath = (self.recordingspath + item.savename)
+                if len(my_vid_list) == 1: 
+                  copyfile(self.recordingspath + my_vid_list[0], savepath)
+                else:
+                  tempfilename = (self.recordingspath + 'T_'
+                    + str(item.dbline.id).zfill(12)+'.temp')
+                  with open(tempfilename, 'a') as f1:
+                    for line in my_vid_list:
+                      f1.write('file ' + path.abspath(self.recordingspath + line) + '\n')
+                  run(['ffmpeg', 
+                    '-f', 'concat', 
+                    '-safe', '0', 
+                    '-v', 'fatal', 
+                    '-i', tempfilename, 
+                    '-codec', 'copy', 
+                    savepath])
+                  remove(tempfilename)
+                self.vid_str_dict[my_vid_str] = item.savename
+                isdouble = False
+              item.dbline.videoclip = item.savename[:-4]
+              item.dbline.double = isdouble
+              item.dbline.save()
+              if not isdouble:
+                run([
+                  'ffmpeg', 
+                  '-ss', str(vid_offset), 
                   '-v', 'fatal', 
-                  '-i', tempfilename, 
-                  '-codec', 'copy', 
-                  savepath])
-                remove(tempfilename)
-              self.vid_str_dict[my_vid_str] = item.savename
-              isdouble = False
-            item.dbline.videoclip = item.savename[:-4]
-            item.dbline.double = isdouble
-            item.dbline.save()
-            if not isdouble:
-              run([
-                'ffmpeg', 
-                '-ss', str(vid_offset), 
-                '-v', 'fatal', 
-                '-i', savepath, 
-                '-vframes', '1', 
-                '-q:v', '2', 
-                savepath[:-4]+'.jpg'
-              ])
-              if self.do_webm:
-                self.redis.lpush('webm_queue:' + str(self.id), savepath)
-          else:  
-            is_ready = False
-        if is_ready:
-          item.save(self.cond_dict)
+                  '-i', savepath, 
+                  '-vframes', '1', 
+                  '-q:v', '2', 
+                  savepath[:-4]+'.jpg'
+                ])
+                if self.do_webm:
+                  self.redis.lpush('webm_queue:' + str(self.id), savepath)
+            else:  
+              is_ready = False
+          if is_ready:
+            item.save(self.cond_dict)
       if is_ready:
         with self.eventdict_lock:
           with self.display_lock:
