@@ -33,7 +33,7 @@ def smtp_send_try_mail(subject, plain_text, sender, receiver, html_text, logger)
       break
     else: 
       logger.warning('*** ['+str(count)+'] Email sending to: '+receiver+' failed')
-      sleep(300)
+      sleep(60)
   logger.info('*** ['+str(count)+'] Sent email to: '+receiver)
       
 def smtp_send_mail(subject, plain_text, sender, receiver, html_text, logger):

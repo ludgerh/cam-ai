@@ -432,7 +432,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
         with ZipFile(io.BytesIO(response)) as z:
           z.extractall("temp/expanded")
         zipresult = glob('temp/expanded/ludgerh-cam-ai-*')[0]
-        print(zipresult)
         if await aiofiles.os.path.exists('temp/backup'):
           await aioshutil.rmtree('temp/backup')
         await aioshutil.move(basepath, 'temp/backup') 

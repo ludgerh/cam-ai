@@ -21,14 +21,12 @@ def free_quota(myuser):
   if useddiscspace > totaldiscspace * 0.95:
     return(0)
   if myuser.is_superuser:
-    print('Sup', totaldiscspace, useddiscspace)
     if (diff := totaldiscspace - useddiscspace) > 0:
       return(diff)
     else:
       return(0)  
   else:
     userline = userinfo.objects.get(user = myuser)
-    print('Norm', userline.storage_quota, userline.storage_used)
     if (diff := userline.storage_quota - userline.storage_used) > 0:
       return(diff)
     else:

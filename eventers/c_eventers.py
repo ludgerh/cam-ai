@@ -415,13 +415,10 @@ class c_eventer(c_device):
         item.to_email = ''
       is_ready = True
       if item.goes_to_school or item.isrecording or item.to_email:
-        print('+++++', predictions[1])
         if free_quota(item.dbline.camera.creator):
           if item.isrecording:
             with self.vid_deque_lock:
               checkbool = self.vid_deque and item.check_out_ts <= self.vid_deque[-1][2]
-              if checkbool:
-                print(self.vid_deque[-1][2] - item.check_out_ts, item.check_out_ts, self.vid_deque[-1][2])
             if checkbool:
               my_vid_list = []
               my_vid_str = ''

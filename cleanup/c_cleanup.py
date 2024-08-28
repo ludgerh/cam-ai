@@ -387,7 +387,7 @@ class c_cleanup():
       result = get_dir_size(Path(myschooldir))
       schoolline.storage_quota = result
       schoolline.save(update_fields = ['storage_quota'])
-    self.logger.info('Cleanup: Getting users storage used') 
+    #self.logger.info('Cleanup: Getting users storage used') 
     for userline in userinfo.objects.all():
       result = 0
       for streamline in stream.objects.filter(creator = userline.user):
