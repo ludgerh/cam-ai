@@ -59,7 +59,7 @@ class console_alarm(alarm_base):
   def action(self, pred): 
     super().action(pred=pred)
     self.logger.info(self.notice_line + ' ' + self.stream.name + '(' + str(self.stream.id) 
-      + ') : ' + self.classes_list[self.maxpos+1].name)
+      + ') : ' + self.classes_list[self.maxpos+1].name +  ' Sebi testet die Konsole')
 
 def alarm(stream_id, pred):
   for item in alarm_list:

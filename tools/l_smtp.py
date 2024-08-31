@@ -20,6 +20,7 @@ from time import sleep
 
 def smtp_send_try_mail(subject, plain_text, sender, receiver, html_text, logger):
   count = 0
+  done = False
   while count < 5:
     count += 1
     if send_mail(
@@ -30,11 +31,14 @@ def smtp_send_try_mail(subject, plain_text, sender, receiver, html_text, logger)
       fail_silently=True,
       html_message=html_text,
     ):
+      done = True
       break
     else: 
       logger.warning('*** ['+str(count)+'] Email sending to: '+receiver+' failed')
       sleep(60)
-  logger.info('*** ['+str(count)+'] Sent email to: '+receiver)
+  
+  if done: 
+    logger.info('*** ['+str(count)+'] Sent email to: '+receiver)
       
 def smtp_send_mail(subject, plain_text, sender, receiver, html_text, logger):
   Thread(target=smtp_send_try_mail, name='SMTPSendThread', 
