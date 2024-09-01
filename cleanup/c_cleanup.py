@@ -40,6 +40,7 @@ from trainers.models import model_type
 from users.models import archive, userinfo
 from .models import (status_line_event, status_line_video, status_line_school,
  files_to_delete)
+from django.conf import settings
 
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
@@ -404,13 +405,26 @@ class c_cleanup():
           userline.mail_flag_quota75 = False
       if result > userline.storage_quota * 0.75:
         if not userline.mail_flag_quota75:
-          print('Schreiben 75')
+          print('Write 75')
           smtp_send_mail(
-            'Your disc quota is almost used!',
-            'Plain: Schreiben 75',
-            'CAM-AI' + '<' + 'theo@booker-hellerhoff.de' + '>',
+            'Notice: Your CAM-AI Storage is 75% Full',
+            'Dear CAM-AI User, \n'
+            'We want to inform you that your CAM-AI storage is now 75% full. \n'
+            'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events. \n'
+            'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
+            'Thank you for choosing CAM-AI. \n'
+            'Best regards, \n'
+            'The CAM-AI Team',
+            'CAM-AI<' + settings.EMAIL_FROM + '>',
             userline.user.email,
-            'HTML: Schreiben <B>75</B>',
+            '<br>Dear CAM-AI User,<br>\n'
+            '<br>We want to inform you that your CAM-AI storage is now 75% full.\n'
+            'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events.<br>\n'
+            '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
+            '<br>Thank you for choosing CAM-AI.<br>\n'
+            '<br>Best regards,<br>\n'
+            'The CAM-AI Team<br>\n'
+            '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>',
             self.logger,
           )  
           userline.mail_flag_quota75 = True
@@ -418,11 +432,24 @@ class c_cleanup():
           if not userline.mail_flag_quota100:
             print('Schreiben 100')
             smtp_send_mail(
-              'Your disc quota is completely used!',
-              'Plain: Schreiben 100',
-              'Theo Tester' + '<' + 'theo@booker-hellerhoff.de' + '>',
+              'Action Required: Your CAM-AI Storage is Full',
+              'Dear CAM-AI User, \n'
+              'We are reaching out to inform you that your CAM-AI storage is currently full. \n'
+              'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space. \n'
+              'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
+              'Thank you for choosing CAM-AI. \n'
+              'Best regards, \n'
+              'The CAM-AI Team',
+              'CAM-AI<' + settings.EMAIL_FROM + '>',
               userline.user.email,
-              'HTML: Schreiben <B>100</B>',
+              '<br>Dear CAM-AI User,<br>\n'
+              '<br>We are reaching out to inform you that your CAM-AI storage is currently full. \n'
+              'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space.<br>\n'
+              '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
+              '<br>Thank you for choosing CAM-AI.<br>\n'
+              '<br>Best regards,<br>\n'
+              'The CAM-AI Team<br>\n'
+              '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>',
               self.logger,
             )  
             userline.mail_flag_quota100 = True
