@@ -27,6 +27,7 @@ from logging import getLogger
 from datetime import datetime
 from django.utils import timezone
 from django.db import connections
+from django.conf import settings
 from tools.l_tools import djconf, get_dir_size
 from tools.l_smtp import smtp_send_mail
 from tools.c_tools import check_db_connect
@@ -40,7 +41,6 @@ from trainers.models import model_type
 from users.models import archive, userinfo
 from .models import (status_line_event, status_line_video, status_line_school,
  files_to_delete)
-from django.conf import settings
 
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
@@ -144,57 +144,56 @@ class c_cleanup():
         if self.do_run and time() - ts >= health_check_interval:
           self.health_check()
           ts =  time() 
-        if False:
-  # ***** cleaning up eventframes
-          if self.do_run:
-            check_db_connect()
-            for frameline in event_frame.objects.filter(deleted = True):
-              #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
+# ***** cleaning up eventframes
+        if self.do_run:
+          check_db_connect()
+          for frameline in event_frame.objects.filter(deleted = True):
+            #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
+            del_path = schoolframespath / frameline.name
+            if del_path.exists():
+              del_path.unlink()
+            frameline.delete()
+            eventline = frameline.event
+            eventline.numframes -= 1
+            eventline.save(update_fields = ['numframes'])
+# ***** cleaning up events
+        if self.do_run:
+          check_db_connect()
+          for eventline in event.objects.filter(deleted = True):
+            #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
+            framelines = event_frame.objects.filter(event__id = eventline.id)
+            for frameline in framelines:
               del_path = schoolframespath / frameline.name
               if del_path.exists():
                 del_path.unlink()
               frameline.delete()
-              eventline = frameline.event
-              eventline.numframes -= 1
-              eventline.save(update_fields = ['numframes'])
-  # ***** cleaning up events
-          if self.do_run:
-            check_db_connect()
-            for eventline in event.objects.filter(deleted = True):
-              #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
-              framelines = event_frame.objects.filter(event__id = eventline.id)
-              for frameline in framelines:
-                del_path = schoolframespath / frameline.name
-                if del_path.exists():
-                  del_path.unlink()
-                frameline.delete()
-              if (video_name := eventline.videoclip):
-                for ext in ['.jpg', '.mp4', '.webm']:
-                  delpath = recordingspath / (video_name + ext)
-                  if delpath.exists():
-                    delpath.unlink() 
-              eventline.delete()  
-  # ***** cleaning up trainframes
-          if self.do_run:
-            check_db_connect()
-            for frameline in trainframe.objects.filter(deleted = True):
-              #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
-              myschooldir = Path(school.objects.get(id = frameline.school).dir)
-              del_path = myschooldir / 'frames' / frameline.name
-              if del_path.exists():
-                del_path.unlink()
-              frameline.delete()
-  # ***** deleting files
-          if self.do_run:
-            check_db_connect()
-            for fileline in files_to_delete.objects.all():
-              delpath = Path(fileline.name)
-              if delpath.exists():
-                if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
-                  #self.logger.info('Cleanup: Deleting file: ' + str(delpath))
+            if (video_name := eventline.videoclip):
+              for ext in ['.jpg', '.mp4', '.webm']:
+                delpath = recordingspath / (video_name + ext)
+                if delpath.exists():
                   delpath.unlink() 
-              fileline.delete()
-  # *****
+            eventline.delete()  
+# ***** cleaning up trainframes
+        if self.do_run:
+          check_db_connect()
+          for frameline in trainframe.objects.filter(deleted = True):
+            #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
+            myschooldir = Path(school.objects.get(id = frameline.school).dir)
+            del_path = myschooldir / 'frames' / frameline.name
+            if del_path.exists():
+              del_path.unlink()
+            frameline.delete()
+# ***** deleting files
+        if self.do_run:
+          check_db_connect()
+          for fileline in files_to_delete.objects.all():
+            delpath = Path(fileline.name)
+            if delpath.exists():
+              if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
+                #self.logger.info('Cleanup: Deleting file: ' + str(delpath))
+                delpath.unlink() 
+            fileline.delete()
+# *****
         for i in range(cleanup_interval):
           if not self.do_run:
             break
@@ -225,7 +224,6 @@ class c_cleanup():
     timestamp = timezone.make_aware(datetime.now())
     check_db_connect()
     files_to_delete_list = [item.name for item in files_to_delete.objects.all()]
-    print('+++++', files_to_delete_list, '+++++')
     for streamline in stream.objects.filter(active = True):
       my_status_events = status_line_event(made = timestamp, stream = streamline)
 # ***** checking temp events
@@ -405,7 +403,6 @@ class c_cleanup():
           userline.mail_flag_quota75 = False
       if result > userline.storage_quota * 0.75:
         if not userline.mail_flag_quota75:
-          print('Write 75')
           smtp_send_mail(
             'Notice: Your CAM-AI Storage is 75% Full',
             'Dear CAM-AI User, \n'
@@ -430,7 +427,6 @@ class c_cleanup():
           userline.mail_flag_quota75 = True
         if result > userline.storage_quota:
           if not userline.mail_flag_quota100:
-            print('Schreiben 100')
             smtp_send_mail(
               'Action Required: Your CAM-AI Storage is Full',
               'Dear CAM-AI User, \n'
