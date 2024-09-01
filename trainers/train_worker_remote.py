@@ -151,7 +151,6 @@ class train_once_remote():
       }
       self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
       temp = self.ws.recv()
-      print('*****', temp)
       model_type = json.loads(temp)
     outdict = {
       'code' : 'trainnow',

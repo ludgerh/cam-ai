@@ -64,9 +64,9 @@ class c_viewer():
             frame = cv.addWeighted(frame, 1, 
               (255-self.drawpad.screen), -1.0, 0)
       if self.client_dict[client_nr]['do_compress']:
-        to = 3
+        to = 3 #jpg
       else:
-        to = 2    
+        to = 2 #bmp  
       frame = c_convert(frame, typein=1, typeout=to, 
         xout=self.client_dict[client_nr]['outx'])
       if (int(redis.get('CAM-AI:KBInt')) 

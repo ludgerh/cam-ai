@@ -273,8 +273,6 @@ class c_event(list):
       mytoken = maketoken('EVR', self.dbline.id, receiver)
       subject = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
         + self.p_string())
-      from_name = djconf.getconfig('smtp_name', 'CAM-AI Emailer')
-      from_email = djconf.getconfig('smtp_email')
       to_email = receiver
       plain_text = 'Hello CAM-AI user,\n' 
       plain_text += 'We had some movement.\n'  
@@ -311,7 +309,7 @@ class c_event(list):
       smtp_send_mail(
         subject,
         plain_text,
-        from_name + '<' + from_email + '>',
+        'CAM-AI Emailer<' + settings.EMAIL_FROM + '>',
         receiver,
         html_text,
         self.logger,

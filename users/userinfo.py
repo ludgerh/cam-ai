@@ -30,4 +30,4 @@ def free_quota(myuser):
     if (diff := userline.storage_quota - userline.storage_used) > 0:
       return(diff)
     else:
-      return(0)  
+      return(0)    

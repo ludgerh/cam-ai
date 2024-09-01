@@ -52,7 +52,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   </div>
   {% endif %}
 
-  <h2 class="m-2">Camera Stream: {{ stream.name }}</h2>
+  <h2 class="m-2">Camera Stream: {{ stream.name }}{{ has_quota }}</h2>
   <h4>
     <span style="white-space:nowrap; display: inline-block;">
       <nav aria-label="Page navigation" style="display: inline-block;">
@@ -277,7 +277,9 @@ getimages = function() {
 	            $('#n_button' + $(this).attr('id')).removeClass('disabled');
 	            $('#dc_button' + $(this).attr('id')).removeClass('disabled');
 	            $('#nc_button' + $(this).attr('id')).removeClass('disabled');
+{% if has_quota %}
 	            $('#s_button' + $(this).attr('id')).removeClass('disabled');
+{% endif %}
 	            $('#del_button' + $(this).attr('id')).removeClass('disabled');
             };
 {% endif %}

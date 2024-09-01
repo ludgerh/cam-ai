@@ -30,6 +30,7 @@ from tools.c_logger import log_ini
 from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
 from tf_workers.models import school
 from users.models import userinfo
+from users.userinfo import free_quota
 from .models import trainer as dbtrainer, trainframe, fit, epoch
 if djconf.getconfigbool('local_trainer', False):
   if djconf.getconfigbool('local_gpu', False):
@@ -126,6 +127,11 @@ class trainer():
                       school=item.id)
                     for fititem in fitstodelete:
                       epoch.objects.filter(fit=fititem).delete()
+                    fitstodelete = fit.objects.filter(
+                      status='Error', 
+                      school=item.id)
+                    for fititem in fitstodelete:
+                      epoch.objects.filter(fit=fititem).delete()
                     fitstodelete.delete()
                     myfit = fit(made=timezone.now(), 
 	                    school = item.id, 
@@ -178,7 +184,7 @@ class trainer():
             tempread = self.job_queue.get(timeout=1.0)
             myschool = tempread[0]
             myfit = tempread[1]
-            if (self.dbline.t_type == 1):
+            if self.dbline.t_type == 1:
               gpu_process = Process(target = train_once_gpu, args = (myschool, myfit, 
                 self.dbline.gpu_nr, self.dbline.gpu_mem_limit, ))
               gpu_process.start()
@@ -194,7 +200,7 @@ class trainer():
                 self.dbline.t_type,
                 self.logger,
               ).run()
-            if  not trainresult:
+            if not trainresult:
               filterdict = {
                 'school' : myschool.id,
                 'train_status' : 1,

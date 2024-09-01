@@ -18,6 +18,9 @@ import cv2 as cv
 import numpy as np
 import aiofiles
 from time import time
+from django.db import connection
+from django.db.utils import OperationalError
+from tools.models import setting as dbsetting
 
 def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=None, 
   outcrypt=None):
@@ -30,7 +33,7 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=N
   if typein != 1:
     if incrypt:
       frame = incrypt.decrypt(frame)
-    frame = cv.imdecode(np.frombuffer(frame, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+    frame = cv.imdecode(np.frombuffer(frame, dtype=np.uint8), cv.IMREAD_UNCHANGED) #convert to opencv
   xin = frame.shape[1]
   yin = frame.shape[0]
   forcescale = False
@@ -51,7 +54,7 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=N
     else:
       yout = round(yin / xin * xout)
   if (xout < xin) or (yout < yin) or forcescale:
-    frame = cv.resize(frame, (xout, yout))
+    frame = cv.resize(frame, (xout, yout)) #resize
   if typeout == 2:
     frame = cv.imencode('.bmp', frame)[1].tostring()
   elif typeout == 3:
@@ -189,3 +192,29 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
   myimage = cv.imencode('.bmp', myimage)[1].tobytes()
   async with aiofiles.open(outfile, mode="wb") as f:
     await f.write(myimage)
+    
+db_ts = time()
+    
+def check_db_connect():
+  global db_ts
+  if (new_time := time()) - db_ts > 3300.0: #55 Minutes 
+    while True:
+      try:
+        dummy = dbsetting.objects.get(setting = 'version')
+        print(dummy.value) 
+        break
+      except OperationalError:
+        connection.close()
+  db_ts = new_time     
+    
+async def acheck_db_connect():
+  global db_ts
+  if (new_time := time()) - db_ts > 3300.0: #55 Minutes 
+    while True:
+      try:
+        dummy = await dbsetting.objects.aget(setting = 'version')
+        print(dummy.value) 
+        break
+      except OperationalError:
+        connection.close()
+  db_ts = new_time     

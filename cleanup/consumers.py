@@ -94,7 +94,8 @@ class cleanup(AsyncWebsocketConsumer):
             sleep(1.0)   
             self.counter_lock.acquire() 
           self.counter_lock.release()
-          del outlist['callback']
+          if 'callback' in outlist:
+            del outlist['callback']
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	

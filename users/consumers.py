@@ -23,6 +23,7 @@ from tools.c_logger import log_ini
 from tools.tokens import maketoken
 from users.archive import myarchive
 from .models import archive as dbarchive
+from .userinfo import free_quota
 
 logname = 'ws_users'
 logger = getLogger(logname)
@@ -49,7 +50,10 @@ class archiveConsumer(WebsocketConsumer):
 
   #@database_sync_to_async
   def check_archive(self, mytype, mynumber):
-    return(myarchive.check_archive(mytype, mynumber, self.scope['user']))
+    if free_quota(self.scope['user']):
+      return(myarchive.check_archive(mytype, mynumber, self.scope['user']))
+    else:
+      return(True)  
 
   #@database_sync_to_async
   def del_archive(self, mynumber):

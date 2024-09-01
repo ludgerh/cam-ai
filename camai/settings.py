@@ -280,3 +280,4 @@ EMAIL_HOST_PASSWORD = smtp_password
 EMAIL_HOST_USER = smtp_account
 EMAIL_PORT = smtp_port
 EMAIL_USE_TLS = smtp_use_ssl
+EMAIL_FROM = smtp_email

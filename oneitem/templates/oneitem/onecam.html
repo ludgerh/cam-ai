@@ -239,6 +239,59 @@ let oneitemSocket;
 let wait = 0;
 let imageElement = document.getElementById("imagespace");
 
+function jpegToRawData(jpegBlob) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Set up the image onload event to process the image data once it's loaded
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Zeichne das Bild auf das Canvas
+      ctx.drawImage(img, 0, 0);
+
+      // Extrahiere die Pixel-Daten
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      resolve(imageData);
+    };
+
+    img.onerror = (err) => {
+      reject(new Error("Fehler beim Laden des JPEG-Bildes: " + err.message));
+    };
+
+    // Lade das Bild aus dem Blob
+    img.src = URL.createObjectURL(jpegBlob);
+  });
+}
+
+function rawDataToJpeg(rawData, width, height, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+
+    // ImageData aus den Rohdaten erstellen
+    const imageData = new ImageData(new Uint8ClampedArray(rawData), width, height);
+
+    // ImageData auf das Canvas zeichnen
+    ctx.putImageData(imageData, 0, 0);
+
+    // Canvas in JPEG exportieren
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("Fehler bei der JPEG-Komprimierung."));
+      }
+    }, 'image/jpeg', quality);
+  });
+}
+
 $(document).ready(function() {
 	$('#mask_select').val('C');
   $('#imagespace').attr('width', displaywidth+'px');
@@ -354,12 +407,41 @@ $(document).ready(function() {
         if (typeof(e.data) === 'object') {
 		      indicator = e.data.slice(0, 13);
 		      blob = e.data.slice(13, e.data.size, "image/jpeg")
-		      let url = URL.createObjectURL(blob);
+		      // New Output Start
+          jpegToRawData(blob).then((imageData) => {
+            // Hier ist imageData eine Instanz von ImageData, die die Roh-Pixeldaten enthält
+            console.log('Raw:', imageData.data); // Uint8ClampedArray mit den RGBA-Werten
+            console.log(imageData.width); // Bildbreite
+            console.log(imageData.height); // Bildhöhe
+            rawDataToJpeg(imageData.data, imageData.width, imageData.height, 0.8).then((jpegBlob) => {
+              // Hier ist jpegBlob das komprimierte JPEG-Bild als Blob
+              console.log('JPEG:', jpegBlob);
+
+              // Um das JPEG anzuzeigen oder zu speichern
+              //const jpegUrl = URL.createObjectURL(jpegBlob);
+              //console.log(jpegUrl);
+              // Du kannst das Bild jetzt in einem img-Tag verwenden oder herunterladen
+                let url = URL.createObjectURL(jpegBlob);
+                imageElement.src = url;
+                indicator.text()
+                .then((result) => {
+                  trigger_Socket.socket.send(result);
+                })
+            }).catch((error) => {
+                console.error("Fehler bei der JPEG-Komprimierung:", error);
+            });   
+          }).catch((error) => {
+              console.error("Fehler beim Dekomprimieren des JPEG:", error);
+          });
+		      // New Output End
+		      // Old Output Start
+		      /*let url = URL.createObjectURL(blob);
 		      imageElement.src = url;
 		      indicator.text()
           .then((result) => {
             trigger_Socket.socket.send(result);
-          })
+          })*/
+		      // Old Output End
         };
 		  };
     } else {
