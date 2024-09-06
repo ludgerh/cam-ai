@@ -34,7 +34,7 @@ class userinfo(models.Model):
   mail_flag_discspace95 = models.BooleanField(default=False)
 
   def __str__(self):
-    return('userinfo model (TBD ...)')
+    return(self.user.username + ' (userinfo model)')
 
 class archive(models.Model):
   typecode =  models.IntegerField(default=0) # 0 -->> Frame (BMP), 1 --> Video (MP4)
