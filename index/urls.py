@@ -16,11 +16,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.urls import path
 
-from .views import index, landing
+from .views import index, landing, indexgrid
 
 urlpatterns = [
 	path('<str:mode>/', index, name='index'),
 	path('landing/', landing, name='landing'),
 	path('', landing, name='landing'),
+	path('grid/<str:mode>/', indexgrid, name='indexgrid'),
 ]
 

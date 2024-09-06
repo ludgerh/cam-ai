@@ -60,6 +60,38 @@ def index(request, mode='C'):
     'os_type' : os_type[:3],
   }
   return(HttpResponse(template.render(context)))
+  
+def indexgrid(request, mode='C'):
+  template = loader.get_template('index/indexgrid.html')
+  context = {
+    'version' : djconf.getconfig('version', 'X.Y.Z'),
+    'emulatestatic' : emulatestatic,
+    'debug' : settings.DEBUG,
+    'mode' : mode,
+    'camlist' : access.filter_items(
+      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0, demo=0), 'C', 
+      request.user, 'R'
+    ),
+    'detectorlist' : access.filter_items(
+      stream.objects.filter(active=True).filter(det_mode_flag__gt=0, demo=0), 'D', 
+      request.user, 'R'
+    ),
+    'eventerlist' : access.filter_items(
+      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0, demo=0), 'E', 
+      request.user, 'R'
+    ),
+    'schoollist' : access.filter_items(
+      school.objects.filter(active=True), 'S', 
+      request.user, 'R'
+    ),
+    'schoollist_write' : access.filter_items(
+      school.objects.filter(active=True), 'S', 
+      request.user, 'W'
+    ),
+    'user' : request.user,
+    'os_type' : os_type[:3],
+  }
+  return(HttpResponse(template.render(context)))
 
 def landing(request):
   template = loader.get_template('index/landing.html')

@@ -1,0 +1,148 @@
+{% extends 'main/basis.html' %}
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+Printed: index.html v1.1.17 22.02.2024
+{% endcomment %}
+{% block content %}
+{% if emulatestatic %}
+{% load static %}
+  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
+  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+{% else %}
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
+    </script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
+    </script>
+{% endif %}
+<main style="margin:0px">
+    <div class="row">
+    {% spaceless %}
+    {% for item in camlist %}
+      {% if mode == 'C' %}
+        <div>
+          <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
+        </div>
+      {% endif %}
+      {% if mode == 'D' %}
+        <div>
+          <a href="/oneitem/detector/{{ item.id }}/">
+          <img id="imagespace{{ item.id }}" /></a>
+        </div>
+      {% endif %}
+      {% if mode == 'E' %}
+        <div>
+          <a href="/oneitem/eventer/{{ item.id }}/">
+          <img id="imagespace{{ item.id }}" /></a>
+        </div>
+      {% endif %}
+    {% endfor %}
+    {% endspaceless %}
+    </div>
+</main>
+<script >
+
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let c_view_Socket;
+let trigger_Socket;
+let displaywidth = 375 // Screen width IPhone 7
+
+let imageElements = [];
+{% for item in camlist %} 
+  let displayheight{{ item.id }} = 
+    Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
+  let xinput{{ item.id }}
+  let yinput{{ item.id }}
+  let wait{{ item.id }} = 0;
+  imageElements[{{ item.id }}] = document.getElementById("imagespace{{ item.id }}");
+{% endfor %}
+
+$(document).ready(function() {
+{% for item in camlist %} 
+    $('#imagespace{{ item.id }}').attr('width', displaywidth+'px');
+    $('#imagespace{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
+{% endfor %}
+  WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
+  .then((result) => {
+    c_view_Socket = result;
+    return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/trigger/'));
+  })
+  .then((result) => {
+    trigger_Socket = result;
+{% for item in camlist %} 
+    return(trigger_Socket.sendandwait({
+      'command' : 'starttrigger',
+      'mode' : '{{ mode }}',
+      'idx' : {{ item.id }},
+      'width' : displaywidth,
+    }));
+  })
+  .then((result) => {
+    show_cam{{ item.id }} = result.show_cam;
+    xinput{{ item.id }} = result.outx;
+    yinput{{ item.id }} = 
+      Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
+    onf_nr{{ item.id }} = result.on_frame_nr; 
+{% endfor %}
+{% for item in camlist %} 
+    if (show_cam{{ item.id }}) {
+      vnrcode = '{{ mode }}' + String({{ item.id }}).padStart(6,'0') + String(onf_nr{{ item.id }}).padStart(6,'0');
+      trigger_Socket.socket.send(vnrcode);
+    } else {
+      $('#imagespace{{ item.id }}').css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  imageElements[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+{% else %}
+      imageElements[{{ item.id }}].src 
+        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+{% endif %}
+    };
+{% endfor %}
+    trigger_Socket.socket.onclose = function(e) {
+      console.log('Trigger-Socket closed');
+    };
+    trigger_Socket.socket.onmessage = function(e) {
+      if (typeof(e.data) === 'object') {
+		    blob = e.data.slice(13, e.data.size, "image/jpeg");
+		    indicator = e.data.slice(0, 13);
+		    let url = URL.createObjectURL(blob);
+        indicator.text()
+        .then((result) => {
+          vnr = parseInt(result.slice(1,7));
+		      imageElements[vnr].src = url;
+          trigger_Socket.socket.send(result);
+        })
+      };
+    };
+{% for item in camlist %} 
+    setInterval(() => {
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'mode' : '{{ mode }}',
+        'idx' : {{ item.id }},
+      })
+      .then((result) => {
+        $('#fpstag{{ item.id }}').text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtag{{ item.id }}').text(result.viewers);
+        {% endif %}
+      })
+    }, 5000);
+{% endfor %}
+	})
+});
+	
+</script>
+{% endblock %}
+
