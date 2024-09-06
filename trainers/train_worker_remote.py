@@ -18,8 +18,8 @@ import cv2 as cv
 from time import sleep, time
 from multitimer import MultiTimer
 from django.utils import timezone
-from camai.version import version as software_version
 from tools.l_tools import djconf, seq_to_int
+from users.userinfo import afree_quota
 from .models import trainframe
 
 class train_once_remote():
@@ -67,12 +67,14 @@ class train_once_remote():
           + 'to training server')
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
     outdict = {
-      'code' : 'setversion',
+      'code' : 'init_trainer',
       'school' : self.myschool.e_school,
-      'version' : software_version,
     } 
     self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-    model_in_dims = json.loads(self.ws.recv())
+    result = json.loads(self.ws.recv())
+    if result['status'] != 'OK':
+      return(1)
+    model_in_dims = result['dims']
     outdict = {
       'code' : 'namecheck',
       'school' : self.myschool.e_school,

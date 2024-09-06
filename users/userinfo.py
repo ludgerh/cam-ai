@@ -31,3 +31,18 @@ def free_quota(myuser):
       return(diff)
     else:
       return(0)    
+
+async def afree_quota(myuser):
+  if useddiscspace > totaldiscspace * 0.95:
+    return(0)
+  if myuser.is_superuser:
+    if (diff := totaldiscspace - useddiscspace) > 0:
+      return(diff)
+    else:
+      return(0)  
+  else:
+    userline = await userinfo.objects.aget(user = myuser)
+    if (diff := userline.storage_quota - userline.storage_used) > 0:
+      return(diff)
+    else:
+      return(0)    

@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 class trainer(models.Model):
   active = models.BooleanField(default=True)
@@ -68,7 +69,7 @@ class trainframe(models.Model):
     return('Trainframe, Name = '+self.name)
 
 class fit(models.Model):
-  made = models.DateTimeField()
+  made = models.DateTimeField(default=timezone.now)
   minutes = models.FloatField(default=0)
   school = models.IntegerField()
   epochs = models.IntegerField(default=0)

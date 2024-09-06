@@ -271,10 +271,6 @@ function refresh_all() {
 {% if may_write %}
       trainnowstarted = false;
       $('#train_button').prop("disabled",true);
-      if (modal_visible) {
-        $('#mymodal').modal('hide');
-        modal_visible = false;
-      };  
 {% endif %}
       if (result.pos > 1) {
         $('#queue_status').text('Queuing');
@@ -296,20 +292,22 @@ function refresh_all() {
       'school' : {{ school.id }},
     }))
   })
-  .then((result) => {
-    added_one = result[1]
-    old_epoch = 0;
-    result = result[0];
-    if (added_one) {
+  .then((result_all) => {
+    result = result_all[0];
+    remove = result_all[1];
+    new_epoch = result_all[2];
+    unshow_modal = result_all[3];
+    if (remove) {
       $('#tablebody tr:last').remove();
     };
-    new_epoch = false;
+    if (unshow_modal) {
+      if (modal_visible) {
+        $('#mymodal').modal('hide');
+        modal_visible = false;
+      };  
+    };
     result.forEach(function(item, index) {
       datestring = item.made;
-      if (item.epochs > old_epoch) {
-        old_epoch = item.epochs;
-        new_epoch = true;
-      }
       newaddition = '<tr>';
       newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
       newaddition += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';

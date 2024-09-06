@@ -25,6 +25,7 @@ from time import time, sleep
 from datetime import datetime
 from logging import getLogger
 from traceback import format_exc
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -34,6 +35,8 @@ from tools.c_logger import log_ini
 from access.c_access import access
 from tools.tokens import maketoken_async
 from tf_workers.models import school, worker
+from users.userinfo import afree_quota
+from trainers.models import fit
 from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
 from .c_trainers import trainers
 
@@ -141,10 +144,25 @@ class remotetrainer(AsyncWebsocketConsumer):
           await self.send(json.dumps(result))
         await self.send(json.dumps(None))
         
-      elif indict['code'] == 'setversion':
+      elif indict['code'] == 'init_trainer':
         self.myschoolline = await school.objects.aget(id=indict['school'])
-        result = (self.myschoolline.model_xin, self.myschoolline.model_yin)
-        await self.send(json.dumps(result))
+        creator = await sync_to_async(lambda: self.myschoolline.creator)()
+        if await afree_quota(creator):
+          result = {
+            'status' : 'OK',
+            'dims' : (self.myschoolline.model_xin, self.myschoolline.model_yin),
+          }  
+          await self.send(json.dumps(result))
+        else: 
+          logger.warning('*** User ' + creator.username + ' has no quota for remote training.')
+          myfit = fit(school = indict['school'])
+          myfit.status = 'NoQuota'
+          await myfit.asave()
+          result = {
+            'status' : 'no_quota',
+          }  
+          await self.send(json.dumps(result))
+          await self.close() 
         
       elif indict['code'] == 'send':
         self.frameinfo['name'] = indict['name']
@@ -240,8 +258,8 @@ class trainerutil(AsyncWebsocketConsumer):
       self.ws_ts = None
       await self.accept()
       self.trainernr = None
-      self.fit_list_done = 0
-      self.one_more = False
+      self.query_count = 0
+      self.query_working = False
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())
@@ -309,23 +327,28 @@ class trainerutil(AsyncWebsocketConsumer):
           outlist['data'] = json.loads(returned.data)['data']
         else:
           all_fits = fit.objects.filter(school=params['school'])
+          last_fit = await all_fits.alast()
+          temp_count = await all_fits.acount()
           result = [] 
-          if await all_fits.acount():
-            returned = await all_fits.alast()
-            self.working = (returned.status != 'Done')
-            if (not self.working) and (not self.one_more):
-              query_set= all_fits[self.fit_list_done:]
-              added_one = False
+          if temp_count:
+            if self.query_working:
+              query_set = all_fits[self.query_count - 1:] 
+              new_epoch = False
+              remove = True
+            else:
+              query_set = all_fits[self.query_count:] 
+              new_epoch = self.query_count < temp_count
+              self.query_count = temp_count
+              remove = False
+            if last_fit.status in {'Working', 'Queuing'}:  
+              unshow_modal = not self.query_working
+              self.query_working = True
             else:  
-              if self.fit_list_done:
-                query_set = all_fits[self.fit_list_done - 1:]
-                added_one = True
-              else:
-                query_set = all_fits[self.fit_list_done:]
-                added_one = False
-              self.one_more = self.working
-            self.fit_list_done = await all_fits.acount()
+              unshow_modal = False
+              self.query_working = False
             async for item in query_set:
+              if item.status == 'NoQuota':
+                unshow_modal = True
               result.append({
                 'id':item.id, 'made':item.made.strftime("%Y-%m-%d"), 
                 'nr_tr':item.nr_tr, 'nr_va':item.nr_va, 'minutes':item.minutes, 
@@ -345,8 +368,10 @@ class trainerutil(AsyncWebsocketConsumer):
                 'early_stop_patience':item.early_stop_patience,
               })
           else:
-            added_one = False  
-          outlist['data'] = (result, added_one)
+            remove = 0
+            new_epoch = False
+            unshow_modal = False
+          outlist['data'] = (result, remove, new_epoch, unshow_modal)
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))			
 

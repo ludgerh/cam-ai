@@ -48,7 +48,7 @@ schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolf
 archivepath = Path(djconf.getconfig('archivepath', datapath + 'archive/'))
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
 
-cleanup_interval = 5
+check_interval = 5
 health_check_interval = 3600
 
 myredis = saferedis()
@@ -142,64 +142,66 @@ class c_cleanup():
         clean_redis('schools_missingfiles', schoolline.id)
       while self.do_run:
         if self.do_run and time() - ts >= health_check_interval:
-          self.health_check()
           ts =  time() 
+          self.health_check()
 # ***** cleaning up eventframes
-        if self.do_run:
-          check_db_connect()
-          for frameline in event_frame.objects.filter(deleted = True):
-            #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
-            del_path = schoolframespath / frameline.name
-            if del_path.exists():
-              del_path.unlink()
-            frameline.delete()
-            eventline = frameline.event
-            eventline.numframes -= 1
-            eventline.save(update_fields = ['numframes'])
-# ***** cleaning up events
-        if self.do_run:
-          check_db_connect()
-          for eventline in event.objects.filter(deleted = True):
-            #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
-            framelines = event_frame.objects.filter(event__id = eventline.id)
-            for frameline in framelines:
+          if self.do_run:
+            check_db_connect()
+            for frameline in event_frame.objects.filter(deleted = True):
+              #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
               del_path = schoolframespath / frameline.name
               if del_path.exists():
                 del_path.unlink()
               frameline.delete()
-            if (video_name := eventline.videoclip):
-              for ext in ['.jpg', '.mp4', '.webm']:
-                delpath = recordingspath / (video_name + ext)
-                if delpath.exists():
-                  delpath.unlink() 
-            eventline.delete()  
+              eventline = frameline.event
+              eventline.numframes -= 1
+              eventline.save(update_fields = ['numframes'])
+# ***** cleaning up events
+          if self.do_run:
+            check_db_connect()
+            for eventline in event.objects.filter(deleted = True):
+              #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
+              framelines = event_frame.objects.filter(event__id = eventline.id)
+              for frameline in framelines:
+                del_path = schoolframespath / frameline.name
+                if del_path.exists():
+                  del_path.unlink()
+                frameline.delete()
+              if (video_name := eventline.videoclip):
+                for ext in ['.jpg', '.mp4', '.webm']:
+                  delpath = recordingspath / (video_name + ext)
+                  if delpath.exists():
+                    delpath.unlink() 
+              eventline.delete()  
 # ***** cleaning up trainframes
-        if self.do_run:
-          check_db_connect()
-          for frameline in trainframe.objects.filter(deleted = True):
-            #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
-            myschooldir = Path(school.objects.get(id = frameline.school).dir)
-            del_path = myschooldir / 'frames' / frameline.name
-            if del_path.exists():
-              del_path.unlink()
-            frameline.delete()
+          if self.do_run:
+            check_db_connect()
+            for frameline in trainframe.objects.filter(deleted = True):
+              #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
+              myschooldir = Path(school.objects.get(id = frameline.school).dir)
+              del_path = myschooldir / 'frames' / frameline.name
+              if del_path.exists():
+                del_path.unlink()
+              frameline.delete()
 # ***** deleting files
-        if self.do_run:
-          check_db_connect()
-          for fileline in files_to_delete.objects.all():
-            delpath = Path(fileline.name)
-            if delpath.exists():
-              if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
-                #self.logger.info('Cleanup: Deleting file: ' + str(delpath))
-                delpath.unlink() 
-            fileline.delete()
+          if self.do_run:
+            check_db_connect()
+            for fileline in files_to_delete.objects.all():
+              delpath = Path(fileline.name)
+              if delpath.exists():
+                if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
+                  #self.logger.info('Cleanup: Deleting file: ' + str(delpath))
+                  delpath.unlink() 
+              fileline.delete()
 # *****
-        for i in range(cleanup_interval):
-          if not self.do_run:
-            break
+          for i in range(check_interval):
+            if not self.do_run:
+              break
+            sleep(1.0)
+        #self.logger.info('Finished Process '+self.logname+'...')
+        else:
           sleep(1.0)
-      #self.logger.info('Finished Process '+self.logname+'...')
-      self.logger.handlers.clear()
+        self.logger.handlers.clear()
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())

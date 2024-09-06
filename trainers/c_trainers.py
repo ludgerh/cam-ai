@@ -41,6 +41,15 @@ from .train_worker_remote import train_once_remote
 
 trainers = {}
 short_brake = djconf.getconfigfloat('short_brake', 0.01)
+      
+      
+fitstochange = fit.objects.filter(status='Queuing')
+fitstochange = fitstochange | fit.objects.filter(status='Working')
+for fititem in fitstochange:
+  fititem.status = 'Stopped'
+  fititem.save(update_fields=['status', ])
+                    
+                    
 
 def sigint_handler(signal, frame):
   #print ('TFWorkers: Interrupt is caught')
@@ -116,23 +125,6 @@ class trainer():
                       alllines = trainframe.objects.filter(school=item.id).count()
                     run_condition = (count >= item.trigger) and alllines
                   if run_condition:
-                    fitstodelete = fit.objects.filter(
-                      status='Queuing', 
-                      school=item.id)
-                    for fititem in fitstodelete:
-                      epoch.objects.filter(fit=fititem).delete()
-                    fitstodelete.delete()
-                    fitstodelete = fit.objects.filter(
-                      status='Working', 
-                      school=item.id)
-                    for fititem in fitstodelete:
-                      epoch.objects.filter(fit=fititem).delete()
-                    fitstodelete = fit.objects.filter(
-                      status='Error', 
-                      school=item.id)
-                    for fititem in fitstodelete:
-                      epoch.objects.filter(fit=fititem).delete()
-                    fitstodelete.delete()
                     myfit = fit(made=timezone.now(), 
 	                    school = item.id, 
                       status = 'Queuing',
