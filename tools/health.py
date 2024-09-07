@@ -23,6 +23,7 @@ from users.models import userinfo
 from .c_logger import log_ini
 from .l_tools import djconf
 from .l_smtp import smtp_send_mail
+from django.conf import settings
 
 logname = 'health'
 logger = getLogger(logname)
@@ -43,13 +44,28 @@ def setdiscspace():
   if useddiscspace > totaldiscspace * 0.95:
     for userline in userinfo.objects.filter(user__is_superuser = True):
       if not userline.mail_flag_discspace95:
-        print('Schreiben 95')
+        print('Server Capacity 95')
         smtp_send_mail(
-          'Your servers disc is almost full!',
-          'Plain: Schreiben 95',
-          'CAM-AI' + '<' + 'theo@booker-hellerhoff.de' + '>',
+          'Important: Your CAM-AI Server Storage is Nearly Full',
+          'Dear CAM-AI Server Administrator, \n'
+          'We would like to inform you that your server’s storage capacity has reached 95%. \n'
+          'To prevent any potential disruptions to your CAM-AI services, we recommend reviewing and managing your storage usage. \n'
+          'You may either delete unnecessary data or increase your server’s capacity as needed. \n'
+          'If you have any questions or need assistance, please don’t hesitate to contact us at info@cam-ai.de \n'
+          'Thank you for choosing CAM-AI. \n'
+          'Best regards, \n'
+          'The CAM-AI Team',
+          'CAM-AI<' + settings.EMAIL_FROM + '>',
           userline.user.email,
-          'HTML: Schreiben <B>95</B>',
+          '<br>Dear CAM-AI Server Administrator,<br>\n'
+          '<br>We would like to inform you that your server’s storage capacity has reached 95%.\n'
+          'To prevent any potential disruptions to your CAM-AI services, we recommend reviewing and managing your storage usage. \n'
+          'You may either delete unnecessary data or increase your server’s capacity as needed. <br>\n'
+          '<br>If you have any questions or need assistance, please don’t hesitate to contact us at info@cam-ai.de <br>\n'
+          '<br>Thank you for choosing CAM-AI.<br>\n'
+          '<br>Best regards,<br>\n'
+          'The CAM-AI Team<br>\n'
+          '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>',
           logger,
         )  
         userline.mail_flag_discspace95 = True 
