@@ -89,31 +89,30 @@ class remotetrainer(AsyncWebsocketConsumer):
               else:
                 async with aiofiles.open(codpath, mode="wb") as f:
                   await f.write(bytes_data)
-              #jsondata =     
+              jsondata = json.loads(myzip.read(item + '.json'))   
+              print(jsondata)
+              try:  
+                frameline = await trainframe.objects.aget(
+                  name=item, 
+                  school=self.myschoolline.id,
+                )
+              except trainframe.DoesNotExist:  
+                frameline = trainframe(
+                  made = timezone.make_aware(datetime.fromtimestamp(time())),
+                  school = self.myschoolline.id,
+                  name = item,
+                  code = jsondata[11],
+                  c0 = jsondata[0], c1 = jsondata[1], c2 = jsondata[2], c3 = jsondata[3],
+                  c4 = jsondata[4], c5 = jsondata[5], c6 = jsondata[6], c7 = jsondata[7],
+                  c8 = jsondata[8], c9 = jsondata[9],
+                  checked = 1,
+                  train_status = 1,
+                )
+                await frameline.asave()
         return(0)
         
         
         
-        try:  
-          frameline = await trainframe.objects.aget(
-            name=self.frameinfo['name'], 
-            school=self.myschoolline.id,
-          )
-        except trainframe.DoesNotExist:  
-          frameline = trainframe(
-            made = timezone.make_aware(datetime.fromtimestamp(time())),
-            school = self.myschoolline.id,
-            name = self.frameinfo['name'],
-            code = self.frameinfo['code'],
-            c0 = self.frameinfo['tags'][0], c1 = self.frameinfo['tags'][1],
-            c2 = self.frameinfo['tags'][2], c3 = self.frameinfo['tags'][3],
-            c4 = self.frameinfo['tags'][4], c5 = self.frameinfo['tags'][5],
-            c6 = self.frameinfo['tags'][6], c7 = self.frameinfo['tags'][7],
-            c8 = self.frameinfo['tags'][8], c9 = self.frameinfo['tags'][9],
-            checked = 1,
-            train_status = 1,
-          )
-          await frameline.asave()
         try:
           sizeline = await img_size.objects.aget(x=cod_x, y=cod_y)
         except img_size.DoesNotExist:
@@ -127,7 +126,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       if text_data == 'Ping':
         return()
         
-      logger.debug('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -138,6 +137,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         if not self.authed:
           logger.info('Login failure: ' + indict['name'])
           await self.close() 
+        await self.send(json.dumps('OK'))
           
       elif indict['code'] == 'namecheck':
         try:
@@ -469,10 +469,10 @@ class trainerutil(AsyncWebsocketConsumer):
             temp['data']['pass']=tf_workerline.wspass
             temp['data']['dorunout']=params['dorunout']
             await self.ws.send_str(json.dumps(temp))
-            returned = await self.ws.receive()    
+            returned = await self.ws.receive() 
             if json.loads(returned.data)['data'] != 'OK':
               await self.close()	
-        else:
+        else: #Proper error description to both consoles!!!
           await self.close()
         if params['dorunout']:
           outlist['data'] = trainers[self.trainernr].run_out(self.schoolnr)
@@ -482,7 +482,7 @@ class trainerutil(AsyncWebsocketConsumer):
           self.didrunout = False
         if outlist['data'] == 'Busy':
           self.trainernr = None
-        logger.debug('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))						
 
       elif params['command'] == 'getqueueinfo':

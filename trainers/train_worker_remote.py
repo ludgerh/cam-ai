@@ -69,7 +69,7 @@ class train_once_remote():
         self.logger.warning('Socket error while pushing initialization data '
           + 'to training server')
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
-    ws.recv()    
+    self.ws.recv()    
     outdict = {
       'code' : 'init_trainer',
       'school' : self.myschool.e_school,
@@ -136,6 +136,7 @@ class train_once_remote():
     # remoteset = set()
     # -----
     count = len(localset - remoteset)
+    print('#####', count)
     
     zip_buffer = io.BytesIO()   
     with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:

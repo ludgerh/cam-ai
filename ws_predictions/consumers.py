@@ -103,7 +103,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
           logger.debug('Received Ping')
           return()
         intext = text_data
-        logger.info('<-- ' + str(intext))
+        #logger.info('<-- ' + str(intext))
         indict=json.loads(intext)
         if indict['code'] == 'auth':
           try:
@@ -135,7 +135,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
             self.ws_name = indict['ws_name']
             self.worker_nr = indict['worker_nr']
             self.authed = True
-            logger.info('--> ' + 'OK')
+            #logger.info('--> ' + 'OK')
             await self.send(json.dumps('OK'))
           else:
             logger.warning('Failure of websocket-login:  WS-ID: ' 
@@ -143,13 +143,12 @@ class predictionsConsumer(AsyncWebsocketConsumer):
               + ' - WS-Name: ' + str(indict['ws_name']) 
               + ' - Worker-Number: ' + str(indict['worker_nr']) 
               + ' - Software-Version: ' + indict['soft_ver'])
-            print('Close #00000')
             await self.close() 
             return()
         elif indict['code'] == 'get_xy':
           myschool = indict['scho']
           xytemp = await self.checkschooldata(myschool)
-          logger.info('--> ' + str(xytemp))
+          #logger.info('--> ' + str(xytemp))
           await self.send(json.dumps(xytemp))
         elif indict['code'] == 'imgl':
           if not('schooldata' in self.mydatacache):
@@ -164,7 +163,6 @@ class predictionsConsumer(AsyncWebsocketConsumer):
           if not (myschool in self.mydatacache['schooldata']):
             self.mydatacache['schooldata'][myschool] = {}
           if not (myschool in self.permitted_schools):
-            print(myschool, self.user)
             if await access.check_async('S', myschool, self.user, 'R'):
               self.permitted_schools.add(myschool)
             else:
@@ -175,18 +173,13 @@ class predictionsConsumer(AsyncWebsocketConsumer):
               return()
           try:
             self.mydatacache['schooldata'][myschool]['imglist'] = []
-            print('0000000000', self.mydatacache['schooldata'][myschool])
           except KeyError:
             logger.warning('KeyError while initializing ImgList')
-          logger.info('imgl --> ' + 'OK')
+          #logger.info('--> ' + 'OK')
           await self.send(json.dumps('OK'))
         elif indict['code'] == 'done':
           myschool = indict['scho'] 
           await self.checkschooldata(myschool)
-          if ('imglist' in self.mydatacache['schooldata'][myschool]):
-            print('1111111111', len(self.mydatacache['schooldata'][myschool]['imglist']))
-          else:  
-            print('1111111111', self.mydatacache['schooldata'][myschool])
           if ('imglist' in self.mydatacache['schooldata'][myschool]):
             if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
               tf_workers[self.mydatacache['workernr']].ask_pred(
@@ -210,12 +203,11 @@ class predictionsConsumer(AsyncWebsocketConsumer):
           else:
             logger.warning('Incomplete image data in ws_predictions / consumers') 
             predictions = None   
-          logger.info('--> ' + str(predictions))
+          #logger.info('--> ' + str(predictions))
           await self.send(json.dumps(predictions))
         return()
       #bytes_data
       myschool = int.from_bytes(bytes_data[:8], 'big')
-      print('!!!!!!!!!!', len(self.mydatacache['schooldata'][myschool]['imglist']))
       if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
         frame_ok = True
         try:
