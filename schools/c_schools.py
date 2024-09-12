@@ -33,8 +33,11 @@ def get_taglist(myschoolnr):
   if myschoolnr > 1:
     extralist = tag.objects.filter(school = myschoolnr)
     for item in extralist:
-      taglist[item.replaces - 1].name = item.name 
-      taglist[item.replaces - 1].description = item.description
+      try:
+        taglist[item.replaces - 1].name = item.name 
+        taglist[item.replaces - 1].description = item.description
+      except IndexError:
+        pass 
   return(taglist)
 
 def get_tagnamelist(myschoolnr):

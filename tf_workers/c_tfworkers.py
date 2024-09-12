@@ -37,7 +37,7 @@ from websocket._exceptions import (WebSocketTimeoutException,
 from django.db.utils import OperationalError
 from django.db import connections, connection
 from tools.l_tools import QueueUnknownKeyword, djconf
-if djconf.getconfigbool('local_trainer', False):
+if djconf.getconfigbool('local_gpu', False):
   from trainers.train_gpu_tools import cmetrics, hit100
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
@@ -228,6 +228,7 @@ class tf_worker():
           'soft_ver' : djconf.getconfig('version', 'not set'),
         }
         self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+        self.ws.recv()    
         break
       except (BrokenPipeError, 
             TimeoutError,
@@ -581,7 +582,10 @@ class tf_worker():
         'code' : 'imgl',
         'scho' : myschool.e_school,
       }
-      self.continue_sending(json.dumps(outdict), opcode=1, logger=logger)
+      result = json.loads(self.continue_sending(json.dumps(outdict), opcode=1, logger=logger, get_answer=True))
+      if result != 'OK':
+        logger.error(result)
+        return()
       while True:
         try:
           for item in framelist:

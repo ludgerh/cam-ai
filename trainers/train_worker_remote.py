@@ -15,8 +15,11 @@
 import json
 import requests
 import cv2 as cv
+import os
+import io
 from time import sleep, time
 from multitimer import MultiTimer
+from zipfile import ZipFile, ZIP_DEFLATED
 from django.utils import timezone
 from tools.l_tools import djconf, seq_to_int
 from users.userinfo import afree_quota
@@ -66,6 +69,7 @@ class train_once_remote():
         self.logger.warning('Socket error while pushing initialization data '
           + 'to training server')
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
+    ws.recv()    
     outdict = {
       'code' : 'init_trainer',
       'school' : self.myschool.e_school,
@@ -128,23 +132,31 @@ class train_once_remote():
         except TimeoutError:
           i += 1
       count -= 1  
+    # Temporary testing
+    # remoteset = set()
+    # -----
     count = len(localset - remoteset)
-    for item in (localset - remoteset):
-      self.logger.info('(' + str(count) + ') Sending: ' + item)
-      outdict = {
-        'code' : 'send',
-        'name' : item,
-        'tags' : localdict[item][:10],
-        'framecode' : localdict[item][11],
-      }
-      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
-      if (imagedata.shape[1] > model_in_dims[0]) or (imagedata.shape[0] > model_in_dims[1]):
-        imagedata = cv.resize(imagedata, model_in_dims)
-      imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
-      self.ws.send_binary(imagedata)
-      self.ws.recv()
-      count -= 1  
+    
+    zip_buffer = io.BytesIO()   
+    with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
+      for item in (localset - remoteset):
+        print(item, count)
+        imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
+        if imagedata.shape[1] > model_in_dims[0] or imagedata.shape[0] > model_in_dims[1]:
+          imagedata = cv.resize(imagedata, model_in_dims)
+        imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
+        zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
+        jsondata = json.dumps(localdict[item]).encode()
+        zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
+        
+    zip_buffer.seek(0)
+    zip_content = zip_buffer.read()
+    self.ws.send_binary(zip_content)
+    self.ws.recv()
+    return(1)
+    
+    
+    
     if self.t_type == 2:
       outdict = {
         'code' : 'checkfitdone',

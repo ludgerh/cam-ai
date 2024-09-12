@@ -28,6 +28,7 @@ from tools.c_redis import myredis
 from camai.version import version as software_version
 print('Ich bin da!')
 print('***** Software-Version: ', software_version, '*****')
+old_version = djconf.getconfig('version', '0.0.0')
 djconf.setconfig('version', software_version)
 try:
   from camai.passwords import data_path
@@ -45,13 +46,16 @@ from tf_workers.c_tfworkers import tf_workers, tf_worker
 from trainers.models import model_type, trainer as trainerdb
 from trainers.c_trainers import trainers, trainer
 from tools.models import camurl
-from eventers.models import alarm_device_type, alarm_device
 from tools.health import stop as stophealth
+from tools.version_upgrade import version_upgrade
+from eventers.models import alarm_device_type, alarm_device
+from cleanup.c_cleanup import my_cleanup
 from .models import stream
 from .c_streams import streams, c_stream
-from cleanup.c_cleanup import my_cleanup
 
 #from threading import enumerate
+
+version_upgrade(old_version, software_version)
     
 if not model_type.objects.filter(name='efficientnetv2-b0'):
   newtype = model_type(name='efficientnetv2-b0', x_in_default=224, y_in_default=224)

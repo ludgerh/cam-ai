@@ -101,122 +101,145 @@ class predictionsConsumer(AsyncWebsocketConsumer):
       if text_data:
         if text_data == 'Ping':
           logger.debug('Received Ping')
-        else:
-          intext = text_data
-          logger.debug('<-- ' + str(intext))
-          indict=json.loads(intext)
-          if indict['code'] == 'auth':
-            try:
-              self.user = await User.objects.aget(username=indict['name'])
-            except User.DoesNotExist:
-              self.user = None  
-            if self.user and self.user.check_password(indict['pass']):
-              logger.debug('Success!')
-              if not (indict['ws_id'] in self.datacache):
-                self.datacache[indict['ws_id']] = {}
-              if not (indict['worker_nr'] 
-                  in self.datacache[indict['ws_id']]):
-                self.datacache[indict['ws_id']][indict['worker_nr']]=(
-                  {})
-              self.mydatacache = (
-                self.datacache[indict['ws_id']][indict['worker_nr']])
-              if 'tf_w_index' in self.mydatacache:
-                tf_workers[self.mydatacache['workernr']].stop_out(
-                  self.mydatacache['tf_w_index'])
-                tf_workers[self.mydatacache['workernr']].unregister(
-                  self.mydatacache['tf_w_index'])
-                del self.mydatacache['tf_w_index']
-              logger.info('Successful websocket-login: WS-ID: ' 
-                + str(indict['ws_id']) 
-                + ' - WS-Name: ' + str(indict['ws_name']) 
-                + ' - Worker-Number: ' + str(indict['worker_nr']) 
-                + ' - Software-Version: ' + indict['soft_ver'])
-              self.ws_id = indict['ws_id']
-              self.ws_name = indict['ws_name']
-              self.worker_nr = indict['worker_nr']
-              self.authed = True
-            else:
-              logger.warning('Failure of websocket-login:  WS-ID: ' 
-                + str(indict['ws_id']) 
-                + ' - WS-Name: ' + str(indict['ws_name']) 
-                + ' - Worker-Number: ' + str(indict['worker_nr']) 
-                + ' - Software-Version: ' + indict['soft_ver'])
-              await self.close() 
-          elif indict['code'] == 'get_xy':
-            myschool = indict['scho']
-            xytemp = await self.checkschooldata(myschool)
-            logger.debug('--> ' + str(xytemp))
-            await self.send(json.dumps(xytemp))
-          elif indict['code'] == 'imgl':
-            if not('schooldata' in self.mydatacache):
-              self.mydatacache['schooldata'] = {}
-            if not self.authed:
-              await self.close()
-            myschool = indict['scho']
-            if not (myschool in self.mydatacache['schooldata']):
-              self.mydatacache['schooldata'][myschool] = {}
-            if not (myschool in self.permitted_schools):
-              if await access.check_async('S', myschool, self.user, 'R'):
-                self.permitted_schools.add(myschool)
-              else:
-                await self.close()
-            try:
-              self.mydatacache['schooldata'][myschool]['imglist'] = []
-            except KeyError:
-              logger.warning('KeyError while initializing ImgList')
-          elif indict['code'] == 'done':
-            myschool = indict['scho'] 
-            await self.checkschooldata(myschool)
-            if ('imglist' in self.mydatacache['schooldata'][myschool]):
-              if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
-                tf_workers[self.mydatacache['workernr']].ask_pred(
-                  myschool, 
-                  self.mydatacache['schooldata'][myschool]['imglist'], 
-                  self.mydatacache['tf_w_index'],
-                )
-                my_worker = tf_workers[self.mydatacache['workernr']]
-                predictions = np.empty((0, len(taglist)), np.float32)
-                while (predictions.shape[0] 
-                    < len(self.mydatacache['schooldata'][myschool]['imglist'])):
-                  while 'tf_w_index' not in self.mydatacache or my_worker.outqueue_empty(self.mydatacache['tf_w_index']):
-                    await asleep(medium_brake)
-                  predictions = np.vstack((predictions, 
-                    my_worker.get_from_outqueue(self.mydatacache['tf_w_index'])))
-                predictions = predictions.tolist()
-              else:
-                logger.warning('Defective image in ws_predictions / consumers') 
-                predictions = None        
-            else:
-              logger.warning('Incomplete image data in ws_predictions / consumers') 
-              predictions = None   
-            logger.debug('--> ' + str(predictions))
-            await self.send(json.dumps(predictions))
-      else: #bytes_data
-        myschool = int.from_bytes(bytes_data[:8], 'big')
-        if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
-          frame_ok = True
+          return()
+        intext = text_data
+        logger.info('<-- ' + str(intext))
+        indict=json.loads(intext)
+        if indict['code'] == 'auth':
           try:
-            logger.debug('<-- Length = ' + str(len(bytes_data)))
-            frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
-              dtype=np.uint8), cv.IMREAD_UNCHANGED)
-            if len(frame.shape) != 3:
-              frame_ok = False 
-          except:
-            frame_ok = False  
-          if frame_ok:    
-            try:
-              if ((frame.shape[1] 
-                    != self.mydatacache['schooldata'][myschool]['xdim'])
-                  or (frame.shape[0] 
-                    != self.mydatacache['schooldata'][myschool]['ydim'])):
-                frame = cv.resize(frame, (
-                  self.mydatacache['schooldata'][myschool]['ydim'], 
-                  self.mydatacache['schooldata'][myschool]['xdim']))
-              self.mydatacache['schooldata'][myschool]['imglist'].append(frame)
-            except KeyError:
-              logger.warning('KeyError while adding image data')
+            self.user = await User.objects.aget(username=indict['name'])
+          except User.DoesNotExist:
+            self.user = None  
+          if self.user and self.user.check_password(indict['pass']):
+            logger.debug('Success!')
+            if not (indict['ws_id'] in self.datacache):
+              self.datacache[indict['ws_id']] = {}
+            if not (indict['worker_nr'] 
+                in self.datacache[indict['ws_id']]):
+              self.datacache[indict['ws_id']][indict['worker_nr']]=(
+                {})
+            self.mydatacache = (
+              self.datacache[indict['ws_id']][indict['worker_nr']])
+            if 'tf_w_index' in self.mydatacache:
+              tf_workers[self.mydatacache['workernr']].stop_out(
+                self.mydatacache['tf_w_index'])
+              tf_workers[self.mydatacache['workernr']].unregister(
+                self.mydatacache['tf_w_index'])
+              del self.mydatacache['tf_w_index']
+            logger.info('Successful websocket-login: WS-ID: ' 
+              + str(indict['ws_id']) 
+              + ' - WS-Name: ' + str(indict['ws_name']) 
+              + ' - Worker-Number: ' + str(indict['worker_nr']) 
+              + ' - Software-Version: ' + indict['soft_ver'])
+            self.ws_id = indict['ws_id']
+            self.ws_name = indict['ws_name']
+            self.worker_nr = indict['worker_nr']
+            self.authed = True
+            logger.info('--> ' + 'OK')
+            await self.send(json.dumps('OK'))
           else:
-            self.mydatacache['schooldata'][myschool]['imglist'] = None 
+            logger.warning('Failure of websocket-login:  WS-ID: ' 
+              + str(indict['ws_id']) 
+              + ' - WS-Name: ' + str(indict['ws_name']) 
+              + ' - Worker-Number: ' + str(indict['worker_nr']) 
+              + ' - Software-Version: ' + indict['soft_ver'])
+            print('Close #00000')
+            await self.close() 
+            return()
+        elif indict['code'] == 'get_xy':
+          myschool = indict['scho']
+          xytemp = await self.checkschooldata(myschool)
+          logger.info('--> ' + str(xytemp))
+          await self.send(json.dumps(xytemp))
+        elif indict['code'] == 'imgl':
+          if not('schooldata' in self.mydatacache):
+            self.mydatacache['schooldata'] = {}
+          if not self.authed:
+            result = 'Unauthed user tried inferencing.'
+            logger.error(result)
+            await self.send(json.dumps(result))
+            await self.close()
+            return()
+          myschool = indict['scho']
+          if not (myschool in self.mydatacache['schooldata']):
+            self.mydatacache['schooldata'][myschool] = {}
+          if not (myschool in self.permitted_schools):
+            print(myschool, self.user)
+            if await access.check_async('S', myschool, self.user, 'R'):
+              self.permitted_schools.add(myschool)
+            else:
+              result = 'User ' + str(self.user) + ' has no reading privilege for school #' + str(myschool)
+              logger.error(result)
+              await self.send(json.dumps(result))
+              await self.close()
+              return()
+          try:
+            self.mydatacache['schooldata'][myschool]['imglist'] = []
+            print('0000000000', self.mydatacache['schooldata'][myschool])
+          except KeyError:
+            logger.warning('KeyError while initializing ImgList')
+          logger.info('imgl --> ' + 'OK')
+          await self.send(json.dumps('OK'))
+        elif indict['code'] == 'done':
+          myschool = indict['scho'] 
+          await self.checkschooldata(myschool)
+          if ('imglist' in self.mydatacache['schooldata'][myschool]):
+            print('1111111111', len(self.mydatacache['schooldata'][myschool]['imglist']))
+          else:  
+            print('1111111111', self.mydatacache['schooldata'][myschool])
+          if ('imglist' in self.mydatacache['schooldata'][myschool]):
+            if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
+              tf_workers[self.mydatacache['workernr']].ask_pred(
+                myschool, 
+                self.mydatacache['schooldata'][myschool]['imglist'], 
+                self.mydatacache['tf_w_index'],
+              )
+              my_worker = tf_workers[self.mydatacache['workernr']]
+              predictions = np.empty((0, len(taglist)), np.float32)
+              while (predictions.shape[0] 
+                  < len(self.mydatacache['schooldata'][myschool]['imglist'])):
+                while ('tf_w_index' not in self.mydatacache 
+                    or my_worker.outqueue_empty(self.mydatacache['tf_w_index'])):
+                  await asleep(medium_brake)
+                predictions = np.vstack((predictions, 
+                  my_worker.get_from_outqueue(self.mydatacache['tf_w_index'])))
+              predictions = predictions.tolist()
+            else:
+              logger.warning('Defective image in ws_predictions / consumers') 
+              predictions = None        
+          else:
+            logger.warning('Incomplete image data in ws_predictions / consumers') 
+            predictions = None   
+          logger.info('--> ' + str(predictions))
+          await self.send(json.dumps(predictions))
+        return()
+      #bytes_data
+      myschool = int.from_bytes(bytes_data[:8], 'big')
+      print('!!!!!!!!!!', len(self.mydatacache['schooldata'][myschool]['imglist']))
+      if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
+        frame_ok = True
+        try:
+          logger.debug('<-- Length = ' + str(len(bytes_data)))
+          frame = cv.imdecode(np.frombuffer(bytes_data, offset=8,
+            dtype=np.uint8), cv.IMREAD_UNCHANGED)
+          if len(frame.shape) != 3:
+            frame_ok = False 
+        except:
+          frame_ok = False  
+        if frame_ok:    
+          try:
+            if ((frame.shape[1] 
+                  != self.mydatacache['schooldata'][myschool]['xdim'])
+                or (frame.shape[0] 
+                  != self.mydatacache['schooldata'][myschool]['ydim'])):
+              frame = cv.resize(frame, (
+                self.mydatacache['schooldata'][myschool]['ydim'], 
+                self.mydatacache['schooldata'][myschool]['xdim']))
+            self.mydatacache['schooldata'][myschool]['imglist'].append(frame)
+          except KeyError:
+            logger.warning('KeyError while adding image data')
+        else:
+          self.mydatacache['schooldata'][myschool]['imglist'] = None 
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())

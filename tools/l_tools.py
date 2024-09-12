@@ -304,9 +304,32 @@ class async_timer:
 def version_flat(string_in):
   result = 0
   for item in string_in.split('.'):
-    result += int(item)
-    result *= 1000
-  return(result // 1000)
+    if item[-1].isalpha():
+      result += int(item[:-1])
+      letter_nr = ord(item[-1].lower())
+    else:  
+      result += int(item)
+      letter_nr = 0
+    result *= 100000
+  result += letter_nr
+  return(result)
+  
+def version_full(int_in):
+  last = True
+  temp = int_in % 100000
+  if temp:
+    result = chr(temp)
+  else:
+    result = ''
+  int_in //= 100000  
+  while int_in:  
+    if last:
+      last = False
+    else:  
+      result = '.' + result
+    result = str(int_in % 100000) + result 
+    int_in //= 100000 
+  return(result)  
   
 def get_dir_size(path='.'):
   total = 0

@@ -408,7 +408,7 @@ $(document).ready(function() {
 		      indicator = e.data.slice(0, 13);
 		      blob = e.data.slice(13, e.data.size, "image/jpeg")
 		      // New Output Start
-          jpegToRawData(blob).then((imageData) => {
+          /* jpegToRawData(blob).then((imageData) => {
             // Hier ist imageData eine Instanz von ImageData, die die Roh-Pixeldaten enthält
             console.log('Raw:', imageData.data); // Uint8ClampedArray mit den RGBA-Werten
             console.log(imageData.width); // Bildbreite
@@ -432,15 +432,15 @@ $(document).ready(function() {
             });   
           }).catch((error) => {
               console.error("Fehler beim Dekomprimieren des JPEG:", error);
-          });
+          }); */
 		      // New Output End
 		      // Old Output Start
-		      /*let url = URL.createObjectURL(blob);
+		      let url = URL.createObjectURL(blob);
 		      imageElement.src = url;
 		      indicator.text()
           .then((result) => {
             trigger_Socket.socket.send(result);
-          })*/
+          })
 		      // Old Output End
         };
 		  };

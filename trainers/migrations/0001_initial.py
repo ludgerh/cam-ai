@@ -56,7 +56,7 @@ class Migration(migrations.Migration):
         ('startworking', models.CharField(default='00:00:00', max_length=8)),
         ('stopworking', models.CharField(default='24:00:00', max_length=8)),
         ('running', models.BooleanField(default=False)),
-        ('wsserver', models.CharField(default='wss://django.cam-ai.eu/', max_length=255)),
+        ('wsserver', models.CharField(default='wss://trainer.cam-ai.eu/', max_length=255)),
         ('wsname', models.CharField(default='', max_length=50)),
         ('wspass', models.CharField(default='', max_length=50)),
       ],

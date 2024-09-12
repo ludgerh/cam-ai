@@ -20,12 +20,14 @@ import numpy as np
 import asyncio
 import aiofiles
 import aiofiles.os
+import io
 from os import path, makedirs
 from time import time, sleep
 from datetime import datetime
 from logging import getLogger
 from traceback import format_exc
 from asgiref.sync import sync_to_async
+from zipfile import ZipFile
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -66,22 +68,32 @@ class remotetrainer(AsyncWebsocketConsumer):
       if bytes_data: 
         cod_x = self.myschoolline.model_xin
         cod_y = self.myschoolline.model_yin
-        filepath = (self.myschoolline.dir
-          + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
-          + '/' + self.frameinfo['name'][:-4]+'.jpg')
-        codpath = filepath[:-4]+'.cod'
-        mydir = path.dirname(filepath) 
-        if not await aiofiles.os.path.exists(mydir):
-          makedirs(mydir)
-        imgdata = cv.imdecode(np.frombuffer(bytes_data, dtype=np.uint8), (cv.IMREAD_COLOR))
-        if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
-          imgdata = cv.resize(imgdata, (cod_x, cod_y))
-          imgdata = cv.imencode('.jpg', imgdata)[1].tobytes()
-          async with aiofiles.open(codpath, mode="wb") as f:
-            await f.write(imgdata)
-        else:
-          async with aiofiles.open(codpath, mode="wb") as f:
-            await f.write(bytes_data)
+        ram_file = io.BytesIO(bytes_data)
+        with ZipFile(ram_file) as myzip:
+          for item in myzip.namelist():
+            if item[-4:] == '.bmp':
+              codpath = (self.myschoolline.dir
+                + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
+                + '/' + item[:-4] + '.cod')
+              mydir = path.dirname(codpath) 
+              if not await aiofiles.os.path.exists(mydir):
+                makedirs(mydir)
+              print(codpath)
+              imgdata = myzip.read(item)
+              imgdata = cv.imdecode(np.frombuffer(imgdata, dtype=np.uint8), cv.IMREAD_COLOR)
+              if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
+                imgdata = cv.resize(imgdata, (cod_x, cod_y))
+                imgdata = cv.imencode('.jpg', imgdata)[1].tobytes()
+                async with aiofiles.open(codpath, mode="wb") as f:
+                  await f.write(imgdata)
+              else:
+                async with aiofiles.open(codpath, mode="wb") as f:
+                  await f.write(bytes_data)
+              #jsondata =     
+        return(0)
+        
+        
+        
         try:  
           frameline = await trainframe.objects.aget(
             name=self.frameinfo['name'], 
@@ -154,7 +166,8 @@ class remotetrainer(AsyncWebsocketConsumer):
           }  
           await self.send(json.dumps(result))
         else: 
-          logger.warning('*** User ' + creator.username + ' has no quota for remote training.')
+          logger.warning('*** User ' + creator.username 
+            + ' has no quota for remote training.')
           myfit = fit(school = indict['school'])
           myfit.status = 'NoQuota'
           await myfit.asave()
@@ -202,7 +215,9 @@ class remotetrainer(AsyncWebsocketConsumer):
         elif indict['mode'] == 'sync':
           while True:
             try:
-              fitline = await fit.objects.filter(school = self.myschoolline.id).alatest('id')
+              fitline = (
+                await fit.objects.filter(school = self.myschoolline.id).alatest('id')
+              )  
               fitline = fitline.id
             except fit.DoesNotExist:
               fitline = 0
@@ -211,10 +226,14 @@ class remotetrainer(AsyncWebsocketConsumer):
               break
             else:
               await asyncio.sleep(1.0)
-          mytoken = await maketoken_async('MOD', self.myschoolline.id, 'Download School #'+str(self.myschoolline.id))
+          mytoken = await maketoken_async(
+            'MOD', self.myschoolline.id, 
+            'Download School #'+str(self.myschoolline.id)
+          )
           dlurl = settings.CLIENT_URL
           dlurl += 'trainers/downmodel/'
-          dlurl += str(self.myschoolline.id) + '/' + str(mytoken[0]) + '/' + mytoken[1] +'/'
+          dlurl += str(self.myschoolline.id) + '/' + str(mytoken[0])
+          dlurl += '/' + mytoken[1] +'/'
           result = dlurl
         elif indict['mode'] == 'check':
           fitline = await fit.objects.aget(id=self.lastfit)
@@ -260,6 +279,8 @@ class trainerutil(AsyncWebsocketConsumer):
       self.trainernr = None
       self.query_count = 0
       self.query_working = False
+      self.ws_session = None
+      
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())
@@ -270,8 +291,8 @@ class trainerutil(AsyncWebsocketConsumer):
       if self.trainernr is not None:
         if self.didrunout:
           trainers[self.trainernr].stop_out(self.schoolnr)
-        if self.trainerline.t_type in {2, 3}:
-          self.ws_session.close()
+        if self.ws_session is not None:
+          await self.ws_session.close()
       logger.debug('Disconnected, Code:'+ str(code))
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
@@ -437,8 +458,9 @@ class trainerutil(AsyncWebsocketConsumer):
           self.trainerline = await dbtrainer.objects.aget(school__id=self.schoolnr)
           self.trainernr = self.trainerline.id
           if self.trainerline.t_type in {2, 3}:
-            import aiohttp
-            self.ws_session = aiohttp.ClientSession()
+            if self.ws_session is None:
+              import aiohttp
+              self.ws_session = aiohttp.ClientSession()
             self.ws = await self.ws_session.ws_connect(self.trainerline.wsserver + 'ws/trainerutil/')
             self.ws_ts = time()
             temp = json.loads(text_data)

@@ -14,7 +14,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from os import nice
+from os import nice, makedirs
 from pathlib import Path
 from time import sleep, time
 from datetime import datetime
@@ -44,6 +44,8 @@ from .models import (status_line_event, status_line_video, status_line_school,
 
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
+if not recordingspath.exists():
+  makedirs(recordingspath)
 schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
 archivepath = Path(djconf.getconfig('archivepath', datapath + 'archive/'))
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
