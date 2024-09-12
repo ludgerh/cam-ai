@@ -47,7 +47,7 @@ class school(models.Model):
     on_delete=models.SET_DEFAULT, default=1)
   storage_quota = models.BigIntegerField(default=0)
   encrypted = models.BooleanField(default=True)
-  dir = models.CharField(max_length=256, default='')
+  dir = models.CharField(max_length=256, default='data/schools/model1/')
   trigger = models.IntegerField(default=500)
   lastmodelfile = models.DateTimeField(
     default=timezone.make_aware(datetime(1900, 1, 1)))

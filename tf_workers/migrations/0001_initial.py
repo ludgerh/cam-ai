@@ -63,7 +63,7 @@ class Migration(migrations.Migration):
           ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
           ('name', models.CharField(max_length=100)),
           ('creator', models.ForeignKey(default=1, on_delete=django.db.models.deletion.SET_DEFAULT, to=settings.AUTH_USER_MODEL)),
-          ('dir', models.CharField(default='data/schools/model1/', max_length=256)),
+          ('dir', models.CharField(default='', max_length=256)),
           ('trigger', models.IntegerField(default=500)),
           ('lastmodelfile', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
           ('active', models.IntegerField(default=1)),
