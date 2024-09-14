@@ -415,7 +415,6 @@ class c_eventer(c_device):
         item.to_email = ''
       is_ready = True
       if item.goes_to_school or item.isrecording or item.to_email:
-        print('*****', item.to_email, item.dbline.camera.creator, free_quota(item.dbline.camera.creator), '*****')
         if free_quota(item.dbline.camera.creator):
           if item.isrecording:
             with self.vid_deque_lock:
