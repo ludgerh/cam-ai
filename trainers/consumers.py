@@ -32,6 +32,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
 from tools.l_tools import djconf, seq_to_int
 from tools.c_logger import log_ini
 from access.c_access import access
@@ -78,9 +79,8 @@ class remotetrainer(AsyncWebsocketConsumer):
               mydir = path.dirname(codpath) 
               if not await aiofiles.os.path.exists(mydir):
                 makedirs(mydir)
-              print(codpath)
-              imgdata = myzip.read(item)
-              imgdata = cv.imdecode(np.frombuffer(imgdata, dtype=np.uint8), cv.IMREAD_COLOR)
+              jpgdata = myzip.read(item)
+              imgdata = cv.imdecode(np.frombuffer(jpgdata, dtype=np.uint8), cv.IMREAD_COLOR)
               if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
                 imgdata = cv.resize(imgdata, (cod_x, cod_y))
                 imgdata = cv.imencode('.jpg', imgdata)[1].tobytes()
@@ -88,9 +88,8 @@ class remotetrainer(AsyncWebsocketConsumer):
                   await f.write(imgdata)
               else:
                 async with aiofiles.open(codpath, mode="wb") as f:
-                  await f.write(bytes_data)
-              jsondata = json.loads(myzip.read(item + '.json'))   
-              print(jsondata)
+                  await f.write(jpgdata)
+              jsondata = json.loads(myzip.read(item + '.json'))  
               try:  
                 frameline = await trainframe.objects.aget(
                   name=item, 
@@ -109,24 +108,20 @@ class remotetrainer(AsyncWebsocketConsumer):
                   train_status = 1,
                 )
                 await frameline.asave()
-        return(0)
-        
-        
-        
-        try:
-          sizeline = await img_size.objects.aget(x=cod_x, y=cod_y)
-        except img_size.DoesNotExist:
-          sizeline = img_size(x=cod_x, y=cod_y)
-          await sizeline.asave()
-        await frameline.img_sizes.aadd(sizeline)
-        await frameline.asave()
+              try:
+                sizeline = await img_size.objects.aget(x=cod_x, y=cod_y)
+              except img_size.DoesNotExist:
+                sizeline = img_size(x=cod_x, y=cod_y)
+                await sizeline.asave()
+              await frameline.img_sizes.aadd(sizeline)
+              await frameline.asave()
         await self.send('OK')
         return()
         
       if text_data == 'Ping':
         return()
         
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -147,14 +142,16 @@ class remotetrainer(AsyncWebsocketConsumer):
           sizeline = img_size(x=self.myschoolline.model_xin,
             y=self.myschoolline.model_yin)
           await sizeline.asave()
-        async for item in trainframe.objects.filter(
+        result = []
+        query_list = await database_sync_to_async(list)(trainframe.objects.filter(
           school=indict['school'],
           img_sizes=sizeline,
-        ):
-          result =  (item.name, seq_to_int((item.c0, item.c1, item.c2, item.c3, item.c4, 
-            item.c5, item.c6, item.c7, item.c8, item.c9)))
-          await self.send(json.dumps(result))
-        await self.send(json.dumps(None))
+          deleted=False,
+        ))
+        for item in query_list:
+          result.append((item.name, seq_to_int((item.c0, item.c1, item.c2, item.c3, item.c4, 
+            item.c5, item.c6, item.c7, item.c8, item.c9))))
+        await self.send(json.dumps(result))
         
       elif indict['code'] == 'init_trainer':
         self.myschoolline = await school.objects.aget(id=indict['school'])
@@ -482,7 +479,7 @@ class trainerutil(AsyncWebsocketConsumer):
           self.didrunout = False
         if outlist['data'] == 'Busy':
           self.trainernr = None
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))						
 
       elif params['command'] == 'getqueueinfo':

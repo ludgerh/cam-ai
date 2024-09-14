@@ -86,7 +86,8 @@ class train_once_remote():
     self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
     remoteset = set()
     remotedict = {}
-    while (item := json.loads(self.ws.recv())):
+    remotelist = json.loads(self.ws.recv())
+    for item in remotelist:
       remotedict[item[0]] = item[1]
       remoteset.add(item[0])
     self.ws_ts = time()
@@ -132,16 +133,10 @@ class train_once_remote():
         except TimeoutError:
           i += 1
       count -= 1  
-    # Temporary testing
-    # remoteset = set()
-    # -----
     count = len(localset - remoteset)
-    print('#####', count)
-    
     zip_buffer = io.BytesIO()   
     with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
       for item in (localset - remoteset):
-        print(item, count)
         imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
         if imagedata.shape[1] > model_in_dims[0] or imagedata.shape[0] > model_in_dims[1]:
           imagedata = cv.resize(imagedata, model_in_dims)
@@ -149,15 +144,10 @@ class train_once_remote():
         zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
         jsondata = json.dumps(localdict[item]).encode()
         zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
-        
     zip_buffer.seek(0)
     zip_content = zip_buffer.read()
     self.ws.send_binary(zip_content)
     self.ws.recv()
-    return(1)
-    
-    
-    
     if self.t_type == 2:
       outdict = {
         'code' : 'checkfitdone',
