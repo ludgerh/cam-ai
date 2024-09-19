@@ -64,6 +64,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               </button>
               <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                 <a class="dropdown-item" href="/index/C/">All Cameras</a>
+                <a class="dropdown-item" href="/index/grid/C/">Grid View</a>
                 <div class="dropdown-divider"></div>
                 {% spaceless %}
                   {% for item in camlist %}
@@ -86,6 +87,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               </button>
               <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                 <a class="dropdown-item" href="/index/D/">All Motion Detectors</a>
+                <a class="dropdown-item" href="/index/grid/D/">Grid View</a>
                 <div class="dropdown-divider"></div>
                 {% spaceless %}
                   {% for item in detectorlist %}
@@ -105,6 +107,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                 {% if user.is_superuser %}
                   <a class="dropdown-item" href="/index/E/">All Previews</a>
+                  <a class="dropdown-item" href="/index/grid/E/">Grid View</a>
                   <div class="dropdown-divider"></div>
                 {% endif %}
                 {% spaceless %}
