@@ -31,18 +31,18 @@ Printed: index.html v1.1.17 22.02.2024
     {% spaceless %}
     {% for item in camlist %}
       {% if mode == 'C' %}
-        <div>
+        <div class="col" style="width:100%; height:100%; padding:0; margin:0;">
           <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
         </div>
       {% endif %}
       {% if mode == 'D' %}
-        <div>
+        <div class="col">
           <a href="/oneitem/detector/{{ item.id }}/">
           <img id="imagespace{{ item.id }}" /></a>
         </div>
       {% endif %}
       {% if mode == 'E' %}
-        <div>
+        <div class="col">
           <a href="/oneitem/eventer/{{ item.id }}/">
           <img id="imagespace{{ item.id }}" /></a>
         </div>
