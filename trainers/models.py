@@ -29,6 +29,7 @@ class trainer(models.Model):
   stopworking = models.CharField(max_length=8, default='24:00:00')
   running  = models.BooleanField(default=False)
   wsserver = models.CharField(max_length=255, default='wss://django.cam-ai.eu/')
+  wsid = models.IntegerField(default=0)
   wsname = models.CharField(max_length=50, default='')
   wspass = models.CharField(max_length=50, default='')
 

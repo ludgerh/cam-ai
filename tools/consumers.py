@@ -46,6 +46,7 @@ from users.models import userinfo
 from access.models import access_control
 from access.c_access import access
 from users.models import userinfo
+from users.userinfo import afree_quota
 from .health import totaldiscspace, freediscspace
 
 OUT = 0
@@ -145,7 +146,9 @@ def compress_backup(redis_key):
   for item in dirpath.rglob("*"):
     if not (
       str(item.relative_to(dirpath)).startswith('static')
-      or (str(item.relative_to(dirpath)).startswith(str(recordingspath.relative_to(Path(datapath)))+'/C'))
+      or (str(item.relative_to(dirpath)).startswith(
+        str(recordingspath.relative_to(Path(datapath)))+'/C'
+      ))
     ) : 
       glob_list.append(item)
   total =  len(glob_list)
@@ -184,7 +187,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.debug('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -192,14 +195,16 @@ class admin_tools_async(AsyncWebsocketConsumer):
 # functions for the client
 #*****************************************************************************
 
-      if params['command'] == 'makeschool':
+      if params['command'] == 'makeschool': #The clients part
         if not await self.check_create_school_priv():
           await self.close()
-        if using_websocket or remote_trainer:
+        mytrainer = await trainer.objects.aget(id=params['trainer_nr']) 
+        if mytrainer.wsserver != 'myself':
           from aiohttp import ClientSession
         myschool = school()
         myschool.name = params['name']
         myschool.creator = self.scope['user']
+        myschool.trainer = mytrainer
         await myschool.asave()
         myworker = await worker.objects.aget(school__id=myschool.id)  
         schooldir = schoolsdir + 'model' + str(myschool.id) + '/'
@@ -207,60 +212,43 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await myschool.asave(update_fields=('dir', ))
         await aiofiles.os.makedirs(schooldir+'frames', exist_ok=True)
         await aiofiles.os.makedirs(schooldir+'model', exist_ok=True)
-        if using_websocket or remote_trainer:
+        if mytrainer.wsserver != 'myself':
           async with ClientSession() as session:
-            print('*****', myworker.wsserver + 'ws/schoolutil/')
             async with session.ws_connect(myworker.wsserver + 'ws/schoolutil/') as ws:
               outdict = {
                 'code' : 'makeschool',
-                'name' : 'CL' + str(myworker.wsid)+': ' + params['name'],
-                'pass' : myworker.wspass,
-                'user' : myworker.wsid,
+                'name' : 'CL' + str(mytrainer.wsid)+': ' + params['name'],
+                'pass' : mytrainer.wspass,
+                'user' : mytrainer.wsid,
+                'trainer_nr' : 1,
               }
               await ws.send_str(json.dumps(outdict))
               message = await ws.receive()
               resultdict = json.loads(message.data)
-        if not using_websocket:
-          handle_src = await aiofiles.open(
-            schoolsdir + 'model1/model/' + model_type + '.h5', mode='r')
-          handle_dst = await aiofiles.open(
-            schooldir + 'model/' + model_type + '.h5', mode='w')
-          stat_src = await aiofiles.os.stat(
-            schoolsdir + 'model1/model/' + model_type + '.h5')
-          n_bytes = stat_src.st_size
-          fd_src = handle_src.fileno()
-          fd_dst = handle_dst.fileno()
-          await aiofiles.os.sendfile(fd_dst, fd_src, 0, n_bytes)
-        mytrainer = await trainer.objects.aget(school__id=myschool.id) 
-        mytrainer.active=True    
-        if using_websocket or remote_trainer:
+        if mytrainer.t_type == 2 and resultdict['status'] == 'OK':
+          if await afree_quota(self.scope['user']):
+            handle_src = await aiofiles.open(
+              schoolsdir + 'model1/model/' + model_type + '.h5', mode='r')
+            handle_dst = await aiofiles.open(
+              schooldir + 'model/' + model_type + '.h5', mode='w')
+            stat_src = await aiofiles.os.stat(
+              schoolsdir + 'model1/model/' + model_type + '.h5')
+            n_bytes = stat_src.st_size
+            fd_src = handle_src.fileno()
+            fd_dst = handle_dst.fileno()
+            await aiofiles.os.sendfile(fd_dst, fd_src, 0, n_bytes)
+          else:
+            resultdict['status'] = 'nolocalquota'
+        if mytrainer.wsserver != 'myself':
           if resultdict['status'] == 'OK':
             myschool.e_school = resultdict['school']
             await myschool.asave(update_fields=('e_school', ))
-            if remote_trainer:
-              trainer_type = 2
-            else:
-              trainer_type = 3  
-            mytrainer.t_type=trainer_type
-            mytrainer.wsserver=myworker.wsserver
-            mytrainer.wsname=myworker.wsname
-            mytrainer.wspass=myworker.wspass
-            await mytrainer.asave(update_fields=(
-              't_type',
-              'wsserver',
-              'wsname',
-              'wspass',
-              'active',
-            ))
-            while redis.get_start_trainer_busy():
-              sleep(long_brake)
-            redis.set_start_trainer_busy(mytrainer.id)
         else:
           resultdict = {'status' : 'OK', }
           myschool.model_type = model_type
           await myschool.asave(update_fields=('model_type', ))
           mytrainer.t_type=1
-          await mytrainer.asave(update_fields=('t_type', 'active', ))
+          await mytrainer.asave(update_fields=('t_type', ))
         if resultdict['status'] == 'OK':
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
@@ -274,56 +262,84 @@ class admin_tools_async(AsyncWebsocketConsumer):
           myschool.active = False
           await myschool.asave(update_fields=('active', ))
         outlist['data'] = resultdict
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
 
-      elif params['command'] == 'linkworker':
+      elif params['command'] == 'linkserver-c':
         if not self.scope['user'].is_superuser:
           await self.close()
-        from aiohttp import ClientSession
-        async with ClientSession() as session:
-          async with session.ws_connect(params['server'] + 'ws/aadmintools/') as ws:
-            outdict = {
-              'command' : 'linkserver',
-              'user' : params['user'],
-              'pass' : params['pass'],
-            }
-            await ws.send_str(json.dumps({
-              'tracker' : 0, 
-              'data' : outdict, 
-            }))
-            message = await ws.receive()
-            resultdict = json.loads(message.data)
-        if resultdict['data']['status'] == 'new': 
-          myworker = await worker.objects.aget(id=params['workernr'])
-          myworker.gpu_sim=-1
-          myworker.use_websocket=using_websocket
-          myworker.wsserver=params['server']
-          myworker.wsname=resultdict['data']['user']
-          myworker.wspass=params['pass']
-          myworker.wsid=resultdict['data']['idx']
-          await myworker.asave(update_fields=(
-            'gpu_sim',
-            'use_websocket',
-            'wsserver',
-            'wsname',
-            'wspass',
-            'wsid',
-          ))
-          while redis.get_start_worker_busy():
+        if params['user']:  
+          from aiohttp import ClientSession
+          async with ClientSession() as session:
+            async with session.ws_connect(params['server'] + 'ws/aadmintools/') as ws:
+              outdict = {
+                'command' : 'linkserver-s',
+                'user' : params['user'],
+                'pass' : params['pass'],
+              }
+              await ws.send_str(json.dumps({
+                'tracker' : 0, 
+                'data' : outdict, 
+              }))
+              message = await ws.receive()
+              resultdict = json.loads(message.data)
+          if params['type'] == 'w': #Worker 
+            if resultdict['data']['status'] == 'new': 
+              myworker = await worker.objects.aget(id=params['item_nr'])
+              myworker.gpu_sim=-1
+              myworker.use_websocket=using_websocket
+              myworker.wsserver=params['server']
+              myworker.wsname=resultdict['data']['user']
+              myworker.wspass=params['pass']
+              myworker.wsid=resultdict['data']['idx']
+              await myworker.asave(update_fields=(
+                'gpu_sim',
+                'use_websocket',
+                'wsserver',
+                'wsname',
+                'wspass',
+                'wsid',
+              ))
+              while redis.get_start_worker_busy():
+                sleep(long_brake)
+              redis.set_start_worker_busy(params['item_nr'])
+              myschools = school.objects.filter(tf_worker=params['item_nr'])
+              streamlist = []
+              async for item1 in myschools:
+                mystreams = dbstream.objects.filter(eve_school=item1, active=True, )
+                async for item2 in mystreams:
+                  streamlist.append(item2.id)
+              for i in streamlist:
+                while redis.get_start_stream_busy(): 
+                  sleep(long_brake)
+                redis.set_start_stream_busy(i)
+          elif params['type'] == 't': #Trainer
+            if resultdict['data']['status'] == 'new': 
+              mytrainer = await trainer.objects.aget(id=params['item_nr'])
+              mytrainer.wsserver=params['server']
+              mytrainer.wsname=resultdict['data']['user']
+              mytrainer.wspass=params['pass']
+              mytrainer.wsid=resultdict['data']['idx']
+              await mytrainer.asave(update_fields=(
+                'wsserver',
+                'wsname',
+                'wspass',
+                'wsid',
+              ))
+          outlist['data'] = resultdict['data']['status'] 
+          while redis.get_start_trainer_busy():
             sleep(long_brake)
-          redis.set_start_worker_busy(params['workernr'])
-          myschools = school.objects.filter(tf_worker=params['workernr'])
-          streamlist = []
-          async for item1 in myschools:
-            mystreams = dbstream.objects.filter(eve_school=item1, active=True, )
-            async for item2 in mystreams:
-              streamlist.append(item2.id)
-          for i in streamlist:
-            while redis.get_start_stream_busy(): 
-              sleep(long_brake)
-            redis.set_start_stream_busy(i)
-        outlist['data'] = resultdict['data']['status'] 
+          redis.set_start_trainer_busy(mytrainer.id)
+        else:
+          if params['type'] == 'w': #Worker 
+            myworker = await worker.objects.aget(id=params['item_nr'])
+            myworker.wsname=''
+            await myworker.asave(update_fields=('wsname',))
+          elif params['type'] == 't': #Trainer
+            mytrainer = await trainer.objects.aget(id=params['item_nr'])
+            mytrainer.wsname=''
+            await mytrainer.asave(update_fields=('wsname',))
+          outlist['data'] = 'unlinked' 
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         
@@ -381,7 +397,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         else:
           await self.close()
 
-      elif params['command'] == 'linkserver':
+      elif params['command'] == 'linkserver-s':
         outlist['data'] = {}
         try:
           myuser = await User.objects.aget(username = params['user'])
@@ -396,7 +412,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
             outlist['data']['status'] = 'noauth'
         else:
           outlist['data']['status'] = 'missing'
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         
       elif params['command'] == 'getinfo':
@@ -436,8 +452,10 @@ class admin_tools_async(AsyncWebsocketConsumer):
           await aioshutil.rmtree('temp/backup')
         await aioshutil.move(basepath, 'temp/backup') 
         await aioshutil.move(zipresult, basepath)
-        await aioshutil.move('temp/backup/camai/passwords.py', basepath + '/camai/passwords.py')
-        await aioshutil.move('temp/backup/eventers/c_alarm.py', basepath + '/eventers/c_alarm.py')
+        await aioshutil.move('temp/backup/camai/passwords.py', basepath 
+          + '/camai/passwords.py')
+        await aioshutil.move('temp/backup/eventers/c_alarm.py', basepath 
+          + '/eventers/c_alarm.py')
         await aioshutil.move('temp/backup/' + datapath, basepath + '/' + datapath)
         if env_type == 'venv':
           await aioshutil.move('temp/backup/env', basepath + '/env')
@@ -451,13 +469,17 @@ class admin_tools_async(AsyncWebsocketConsumer):
         cmd += 'pip install -r requirements.' + os_type + '; '
         cmd += 'python manage.py migrate; '
         result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
-        p = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, executable='/bin/bash')
+        p = await asyncio.create_subprocess_shell(
+          cmd, 
+          stdout=asyncio.subprocess.PIPE, 
+          executable='/bin/bash',
+        )
         output, _ = await p.communicate()
         for line in output.decode().split('\n'):
           logger.info(line);
         redis.set_shutdown_command(2)
         outlist['data'] = 'OK'
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while redis.get_watch_status():
           await asleep(long_brake) 

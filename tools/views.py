@@ -32,6 +32,7 @@ from streams.models import stream
 from users.models import userinfo
 from access.c_access import access
 from tf_workers.models import school, worker
+from trainers.models import trainer
 from tools.l_tools import djconf
 from .models import camurl
 #from .forms import UploadFileForm
@@ -131,8 +132,8 @@ class addschool(LoginRequiredMixin, TemplateView):
     })
     return context
 
-class linkworkers(LoginRequiredMixin, TemplateView):
-  template_name = 'tools/linkworkers.html'
+class linkservers(LoginRequiredMixin, TemplateView):
+  template_name = 'tools/linkservers.html'
 
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
@@ -159,8 +160,8 @@ class linkworkers(LoginRequiredMixin, TemplateView):
         school.objects.filter(active=True), 'S', 
         self.request.user, 'W'
       ),
-      'workerlist' : worker.objects.all(),
-      'os_type' : os_type[:3],
+      'workerlist' : worker.objects.filter(active=True),
+      'trainerlist' : trainer.objects.filter(active=True),
     })
     return context
 

@@ -24,33 +24,81 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
     </script>
 {% endif %}
-{% for item in workerlist %}
+<div class="mb-3 m-2 h3">List of local trainers:</div>
+{% for item in trainerlist %}
 <div class="mb-3 m-2 h4">
   {{ item.name }}  
-  <span id="form{{ item.id }}">
   {% if item.wsname %}
-    &#10003;
+    <span id="form1-t-{{ item.id }}">
   {% else %}
+    <span class="d-none" id="form1-t-{{ item.id }}">
+  {% endif %}
+  &#10003;
+  <button class="btn btn-primary m-2 unlink-button" type="button" idx="-t-{{ item.id }}">
+    Unlink</button>
+  </span>  
+  {% if item.wsname %}
+    <span class="d-none" id="form2-t-{{ item.id }}">
+  {% else %}
+    <span id="form2-t-{{ item.id }}">
+  {% endif %}
     <div>
-    <input type="text" class="mb-3 m-2" id="serverinput{{ item.id }}" placeholder="wss://yourserver" 
+    <input type="text" class="mb-3 m-2" id="serverinput-t-{{ item.id }}" placeholder="wss://yourserver" 
       value="{{ item.wsserver }}" size="40">
-    <button class="btn btn-primary m-2 check-button" type="button" idx="{{ item.id }}">
+    <button class="btn btn-primary m-2 check-button" type="button" idx="-t-{{ item.id }}">
       Check Server</button>
     </div>
-    <div class="mb-3 m-2 h5 border border-dark d-none" id="info{{ item.id }}">
+    <div class="mb-3 m-2 h5 border border-dark d-none" id="info-t-{{ item.id }}">
       <h4>This is a sample header.</h4>
       <h5>This is a sample text.</h5>
     </div>
     <div>
-    <input type="text" class="mb-3 m-2 d-none" id="userinput{{ item.id }}" placeholder="username" size="20">
-    <input type="text" class="mb-3 m-2 d-none" id="passinput{{ item.id }}" placeholder="password" size="20">
-    <button class="btn btn-primary m-2 link-button d-none" type="button" id="linkbutton{{ item.id }}" idx="{{ item.id }}">
+    <input type="text" class="mb-3 m-2 d-none" id="userinput-t-{{ item.id }}" placeholder="username" size="20">
+    <input type="text" class="mb-3 m-2 d-none" id="passinput-t-{{ item.id }}" placeholder="password" size="20">
+    <button class="btn btn-primary m-2 link-button d-none" type="button" id="linkbutton-t-{{ item.id }}" idx="-t-{{ item.id }}">
       Link to Server</button>
     </div>
-  {% endif %}
   </span>
 </div>
-<div class="mb-3 m-2 h4" id="status{{ item.id }}"></div>
+<div class="mb-3 m-2 h4" id="status-t-{{ item.id }}"></div>
+{% endfor %}
+<div class="mb-3 m-2 h3">List of local AI workers:</div>
+{% for item in workerlist %}
+<div class="mb-3 m-2 h4">
+  {{ item.name }}  
+  {% if item.wsname %}
+    <span id="form1-w-{{ item.id }}">
+  {% else %}
+    <span class="d-none" id="form1-w-{{ item.id }}">
+  {% endif %}
+  &#10003;
+  <button class="btn btn-primary m-2 unlink-button" type="button" idx="-w-{{ item.id }}">
+    Unlink</button>
+  </span>  
+  {% if item.wsname %}
+    <span class="d-none" id="form2-w-{{ item.id }}">
+  {% else %}
+    <span id="form2-w-{{ item.id }}">
+  {% endif %}
+  <div>
+  <input type="text" class="mb-3 m-2" id="serverinput-w-{{ item.id }}" placeholder="wss://yourserver" 
+    value="{{ item.wsserver }}" size="40">
+  <button class="btn btn-primary m-2 check-button" type="button" idx="-w-{{ item.id }}">
+    Check Server</button>
+  </div>
+  <div class="mb-3 m-2 h5 border border-dark d-none" id="info-w-{{ item.id }}">
+    <h4>This is a sample header.</h4>
+    <h5>This is a sample text.</h5>
+  </div>
+  <div>
+  <input type="text" class="mb-3 m-2 d-none" id="userinput-w-{{ item.id }}" placeholder="username" size="20">
+  <input type="text" class="mb-3 m-2 d-none" id="passinput-w-{{ item.id }}" placeholder="password" size="20">
+  <button class="btn btn-primary m-2 link-button d-none" type="button" id="linkbutton-w-{{ item.id }}" idx="-w-{{ item.id }}">
+    Link to Server</button>
+  </div>
+  </span>  
+</div>
+<div class="mb-3 m-2 h4" id="status-w-{{ item.id }}"></div>
 {% endfor %}
 
 <script>
@@ -94,21 +142,22 @@ $(document).ready(function() {
         };
         $(evt.target).removeClass('btn-warning');
       })
-      .catch(err => {console.log(err);});
     });
 
     $('.link-button').click(function(evt) {
       $(evt.target).addClass('btn-warning');
       admintoolsSocket.sendandwait({
-        'command' : 'linkworker',
-        'workernr' : parseInt($(evt.target).attr("idx")),
+        'command' : 'linkserver-c',
+        'type' : $(evt.target).attr("idx")[1],
+        'item_nr' : parseInt($(evt.target).attr("idx").slice(3)),
         'server' : $('#serverinput' + $(evt.target).attr("idx")).val(),
         'user' : $('#userinput' + $(evt.target).attr("idx")).val(),
         'pass' : $('#passinput' + $(evt.target).attr("idx")).val(),
       })  
       .then((result) => {
         if (result == 'new'){
-          $('#form' + $(evt.target).attr("idx")).html('&#10003;');
+          $('#form1' + $(evt.target).attr("idx")).removeClass('d-none');
+          $('#form2' + $(evt.target).attr("idx")).addClass('d-none');
           $('#status' 
             + $(evt.target).attr("idx")).text('Success: This worker is linked.');
         };
@@ -122,15 +171,33 @@ $(document).ready(function() {
         };
         if (result == 'missing'){
           $('#status' 
-            + $(evt.target).attr("idx")).text('Error: This account does not exist on taht server.');
+            + $(evt.target).attr("idx")).text('Error: This account does not exist on that server.');
         };
         $(evt.target).removeClass('btn-warning');
         
       })
-      .catch(err => {console.log(err);});
+    });
+    
+    $('.unlink-button').click(function(evt) {
+      $(evt.target).addClass('btn-warning');
+      admintoolsSocket.sendandwait({
+        'command' : 'linkserver-c',
+        'type' : $(evt.target).attr("idx")[1],
+        'item_nr' : parseInt($(evt.target).attr("idx").slice(3)),
+        'user' : '',
+      })  
+      .then((result) => {
+        if (result == 'unlinked'){
+          $('#form1' + $(evt.target).attr("idx")).addClass('d-none');
+          $('#form2' + $(evt.target).attr("idx")).removeClass('d-none');
+          $('#status' 
+            + $(evt.target).attr("idx")).text('Success: This worker is unlinked.');
+        };
+        $(evt.target).removeClass('btn-warning');
+        
+      })
     });
   })  
-  .catch(err => {console.log(err);});
 });
 </script>
 

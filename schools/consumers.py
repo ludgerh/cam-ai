@@ -624,9 +624,15 @@ class schoolutil(AsyncWebsocketConsumer):
 
   async def receive(self, text_data=None, bytes_data=None):
     try:
-      logger.debug('<-- ' + str(text_data))
-      indict=json.loads(text_data)
-      if indict['code'] == 'makeschool':
+      logger.info('<-- ' + str(text_data))
+      indict=json.loads(text_data) 
+           
+      if indict['code'] == 'makeschool': #The servers part
+        # 'code' : 'makeschool',
+        # 'name' : new school name,
+        # 'pass' : user pass,
+        # 'user' : user id,
+        # 'trainer_nr' : 1, (for now...)
         userline = await dbuser.objects.aget(id=indict['user'])
         hash = userline.password
         if not check_password(indict['pass'], hash):

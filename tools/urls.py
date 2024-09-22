@@ -21,7 +21,7 @@ app_name = 'tools'
 
 urlpatterns = [
 	path('addschool/', views.addschool.as_view(), name='addschool'),
-	path('linkworkers/', views.linkworkers.as_view(), name='linkworkers'),
+	path('linkservers/', views.linkservers.as_view(), name='linkservers'),
 	path('inst_cam_easy/', views.inst_cam_easy.as_view(), name='inst_cam_easy'),
 	path('inst_cam_expert/<str:ip>/<str:ports>/', views.inst_cam_expert.as_view(), name='inst_cam_expert'),
 	path('scan_cam_expert/', views.scan_cam_expert.as_view(), name='scan_cam_expert'),

@@ -24,10 +24,10 @@ from logging import getLogger
 from time import sleep, time
 from setproctitle import setproctitle
 from django.utils import timezone
-from django.db.utils import OperationalError
-from django.db import connections, connection
+from django.db import connections
 from tools.c_logger import log_ini
 from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
+from tools.c_tools import check_db_connect
 from tf_workers.models import school
 from users.models import userinfo
 from users.userinfo import free_quota
@@ -100,41 +100,37 @@ class trainer():
           active=True,
           tf_worker=self.dbline.id,
         )
-        while True:
-          try:
-            for item in schoollines:
-              with self.mylock:
-                if item.id not in self.job_queue_list:
-                  run_condition = False
-                  if item.extra_runs:
-                    item.extra_runs -= 1
-                    item.save(update_fields=["extra_runs"])
-                    run_condition=trainframe.objects.filter(school=item.id).count()
-                  else:
-                    filterdict = {
-                      'school' : item.id,
-                      'train_status__lt' : 2,}
-                    if not item.ignore_checked:
-                      filterdict['checked'] = True
-                    undone = trainframe.objects.filter(**filterdict)
-                    count = undone.count()
-                    if count:
-                      undone.update(train_status=1)
-                      alllines = 1
-                    else:
-                      alllines = trainframe.objects.filter(school=item.id).count()
-                    run_condition = (count >= item.trigger) and alllines
-                  if run_condition:
-                    myfit = fit(made=timezone.now(), 
-	                    school = item.id, 
-                      status = 'Queuing',
-                    )
-                    myfit.save()
-                    self.job_queue_list.append(item.id)
-                    self.job_queue.put((item, myfit)) 
-            break
-          except OperationalError:
-            connection.close()
+        check_db_connect()
+        for item in schoollines:
+          with self.mylock:
+            if item.id not in self.job_queue_list:
+              run_condition = False
+              if item.extra_runs:
+                item.extra_runs -= 1
+                item.save(update_fields=["extra_runs"])
+                run_condition=trainframe.objects.filter(school=item.id).count()
+              else:
+                filterdict = {
+                  'school' : item.id,
+                  'train_status__lt' : 2,}
+                if not item.ignore_checked:
+                  filterdict['checked'] = True
+                undone = trainframe.objects.filter(**filterdict)
+                count = undone.count()
+                if count:
+                  undone.update(train_status=1)
+                  alllines = 1
+                else:
+                  alllines = trainframe.objects.filter(school=item.id).count()
+                run_condition = (count >= item.trigger) and alllines
+              if run_condition:
+                myfit = fit(made=timezone.now(), 
+                  school = item.id, 
+                  status = 'Queuing',
+                )
+                myfit.save()
+                self.job_queue_list.append(item.id)
+                self.job_queue.put((item, myfit)) 
         sleep(10.0)
     except:
       self.logger.error('Error in process: ' + self.logname + ' (job_queue_thread)')
@@ -162,12 +158,8 @@ class trainer():
       self.job_queue = threadqueue()
       Thread(target=self.job_queue_thread, name='Trainer_JobQueueThread').start()
       while self.do_run:
-        while True:
-          try:
-            self.dbline = dbtrainer.objects.get(id=self.id)
-            break
-          except OperationalError:
-            connection.close()
+        check_db_connect()
+        self.dbline = dbtrainer.objects.get(id=self.id)
         timestr = ts2mysqltime(time())
         if((self.dbline.startworking < timestr) 
             and (self.dbline.stopworking > timestr)
@@ -199,17 +191,13 @@ class trainer():
               }
               if not myschool.ignore_checked:
                 filterdict['checked'] = True
-              while True:
-                try:
-                  trainframe.objects.filter(**filterdict).update(train_status=2)
-                  break
-                except OperationalError:
-                  connection.close()
+              check_db_connect()
+              trainframe.objects.filter(**filterdict).update(train_status=2)
               myschool.l_rate_start = '1e-6'
               myschool.save(update_fields=['l_rate_start'])
-              myuserinfo = userinfo.objects.get(user=myschool.creator)
-              myuserinfo.pay_tokens -= 1
-              myuserinfo.save(update_fields=['pay_tokens'])
+              #myuserinfo = userinfo.objects.get(user=myschool.creator)
+              #myuserinfo.pay_tokens -= 1
+              #myuserinfo.save(update_fields=['pay_tokens'])
             with self.mylock:
               self.job_queue_list.remove(myschool.id)
             gc.collect()

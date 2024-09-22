@@ -39,6 +39,8 @@ class c_viewer():
     if self.parent.type in {'C', 'D'}:
       self.drawpad = drawpad(self, self.logger)
     self.framebuffer = None  
+    
+#    self.counter = 0
           
   async def onf(self, client_nr):  
     if not self.client_dict[client_nr]['busy'].is_set():
@@ -67,6 +69,13 @@ class c_viewer():
         to = 3 #jpg
       else:
         to = 2 #bmp  
+#***
+#      if self.parent.type == 'C':
+#        if self.counter < 100:
+#          print('?????', self.counter)
+#          cv.imwrite('/home/cam_ai/temp/' + str(self.counter) + '.bmp', frame)
+#          self.counter += 1   
+#***     
       frame = c_convert(frame, typein=1, typeout=to, 
         xout=self.client_dict[client_nr]['outx'])
       if (int(redis.get('CAM-AI:KBInt')) 

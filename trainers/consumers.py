@@ -39,7 +39,6 @@ from access.c_access import access
 from tools.tokens import maketoken_async
 from tf_workers.models import school, worker
 from users.userinfo import afree_quota
-from trainers.models import fit
 from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
 from .c_trainers import trainers
 
@@ -80,7 +79,8 @@ class remotetrainer(AsyncWebsocketConsumer):
               if not await aiofiles.os.path.exists(mydir):
                 makedirs(mydir)
               jpgdata = myzip.read(item)
-              imgdata = cv.imdecode(np.frombuffer(jpgdata, dtype=np.uint8), cv.IMREAD_COLOR)
+              imgdata = cv.imdecode(np.frombuffer(
+                jpgdata, dtype=np.uint8), cv.IMREAD_COLOR)
               if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
                 imgdata = cv.resize(imgdata, (cod_x, cod_y))
                 imgdata = cv.imencode('.jpg', imgdata)[1].tobytes()
@@ -149,8 +149,8 @@ class remotetrainer(AsyncWebsocketConsumer):
           deleted=False,
         ))
         for item in query_list:
-          result.append((item.name, seq_to_int((item.c0, item.c1, item.c2, item.c3, item.c4, 
-            item.c5, item.c6, item.c7, item.c8, item.c9))))
+          result.append((item.name, seq_to_int((item.c0, item.c1, item.c2, item.c3, 
+            item.c4, item.c5, item.c6, item.c7, item.c8, item.c9))))
         await self.send(json.dumps(result))
         
       elif indict['code'] == 'init_trainer':
@@ -202,7 +202,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       elif indict['code'] == 'checkfitdone':
         if indict['mode'] == 'init':
           try:    
-            fitline = await fit.objects.filter(school = self.myschoolline.id).alatest('id')
+            fitline = await fit.objects.filter(school=self.myschoolline.id).alatest('id')
             self.lastfit = fitline.id
             model_type = self.myschoolline.model_type
           except fit.DoesNotExist:
@@ -458,7 +458,8 @@ class trainerutil(AsyncWebsocketConsumer):
             if self.ws_session is None:
               import aiohttp
               self.ws_session = aiohttp.ClientSession()
-            self.ws = await self.ws_session.ws_connect(self.trainerline.wsserver + 'ws/trainerutil/')
+            self.ws = await self.ws_session.ws_connect(
+              self.trainerline.wsserver + 'ws/trainerutil/')
             self.ws_ts = time()
             temp = json.loads(text_data)
             temp['data']['school']=self.schoolline.e_school

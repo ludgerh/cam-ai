@@ -51,7 +51,7 @@ $(document).ready(function() {
       aadmintoolsSocket.sendandwait({
         'command' : 'makeschool',
         'name' : $('#schoolname').val(),
-        'remote_ai' : true,
+        'trainer_nr' : 1, //for now...
       })  
       .then((result) => {
         if (result.status == 'OK'){
@@ -63,6 +63,12 @@ $(document).ready(function() {
         };
         if (result.status == 'nomore'){
           $('#status').text('Error: Maximum number of schools reached.');
+        };
+        if (result.status == 'nolocalquota'){
+          $('#status').text('Error: No more volume quota on your local system.');
+        };
+        if (result.status == 'noremotequota'){
+          $('#status').text('Error: No more volume quota on the remote server.');
         };
       })
       .catch(err => {console.log(err);});
