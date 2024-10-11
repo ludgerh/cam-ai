@@ -160,12 +160,12 @@ $('#shureModal').on('shown.bs.modal', function (event) {
   }
 {% endif %}
   if (action == 'checkone') {
-    $('.modal-title').text('Checking in the sected image...');
+    $('.modal-title').text('Checking in the selected image...');
     let img = button.getAttribute('img');
     $('.modalbutton').attr('img', img);
   }
   if (action == 'delone') {
-    $('.modal-title').text('Deleting the sected image...');
+    $('.modal-title').text('Deleting the selected image...');
     let img = button.getAttribute('img');
     $('.modalbutton').attr('img', img);
   }
@@ -186,6 +186,8 @@ let min_id = 0;
 let max_id = 0;
 let do_run;
 let get_images_active = false;
+let SchoolDButilSocket;
+let SchoolUtilSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
@@ -412,6 +414,14 @@ $(document).ready(function() {
   )
   .then((result) => {
     SchoolDButilSocket = result;
+    return(WSAsync(
+      ws_scheme + '//'
+      + window.location.host
+      + '/ws/schoolutil/'
+    ));
+  })
+  .then((result) => {
+    SchoolUtilSocket = result;
     return(SchoolDButilSocket.sendandwait({
       'command' : 'register_ai',
       'school' : {{ schoolnr }},
@@ -482,9 +492,10 @@ $(document).ready(function() {
       };
       if (action == 'delschool') {
         $('#delschoolbutton').addClass('btn-warning');
-        SchoolDButilSocket.sendandwait({
+        SchoolUtilSocket.sendandwait({
           'command' : 'delschool',
-          'school' : {{ schoolnr }},
+          'schoolnr' : {{ schoolnr }},
+          'trainernr' : {{ trainernr }},
         })
         .then((result) => {
           if (result.status == 'OK') {
@@ -493,13 +504,21 @@ $(document).ready(function() {
             if (result.status == 'streams_linked') {
               if (result.count == 1) {
                 $('#error_message').text(
-                  "There is one stream linked to this school, cannot delete."
+                  "There is one stream linked to this school, cannot delete. "
+                  + "Server: " + result.domain
                 );
               } else {  
                 $('#error_message').text("There are "+result.count
                   + " streams linked to this school, cannot delete.");
               };  
             };  
+            if (result.status == 'no_priv') {
+              $('#error_message').text(
+                "You have not enough rights on server "
+                + result.domain + ", cannot delete."
+              );
+            };  
+            
             $('#error_message').removeClass("d-none");
           };
         });

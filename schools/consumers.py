@@ -20,6 +20,7 @@ import cv2 as cv
 import aiofiles
 import aiofiles.os
 import aioshutil
+import aiohttp
 from glob import glob
 from os import path
 from random import randint
@@ -33,6 +34,7 @@ from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.hashers import check_password
+from camai.passwords import mydomain
 from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
 from tools.djangodbasync import savedbline, getonelinedict, filterlinesdict
@@ -40,11 +42,12 @@ from tools.c_logger import log_ini
 from tools.l_crypt import l_crypt
 from access.c_access import access
 from access.models import access_control
+from cleanup.models import status_line_school
 from schools.c_schools import get_taglist, check_extratags_async
 from tf_workers.c_tfworkers import tf_workers
 from tf_workers.models import school, worker
 from eventers.models import event, event_frame
-from trainers.models import trainframe
+from trainers.models import trainframe, trainer
 from users.models import userinfo
 from streams.models import stream
 
@@ -58,6 +61,11 @@ recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
 school_x_max = djconf.getconfigint('school_x_max', 500)
 school_y_max = djconf.getconfigint('school_y_max', 500)
+
+if mydomain:
+  myserver = mydomain
+else:
+  myserver = 'localhost'  
 
 #*****************************************************************************
 # SchoolDBUtil
@@ -80,8 +88,8 @@ class schooldbutil(AsyncWebsocketConsumer):
   async def connect(self):
     try:
       self.user = self.scope['user']
+      self.tf_w_index = None
       if self.user.is_authenticated:
-        self.tf_w_index = None
         await self.accept()
       else:
         await self.close()
@@ -103,7 +111,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.debug('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']
 
       if ((params['command'] == 'gettags') 
@@ -477,7 +485,8 @@ class schooldbutil(AsyncWebsocketConsumer):
           if params['eventnr'] == -1:
             eventlines = event.objects.filter(camera__id=params['streamnr'], xmax__gt=0)
           elif params['eventnr'] == 0:
-            eventlines = event.objects.filter(camera__id=params['streamnr'], xmax__gt=0, done=True)
+            eventlines = event.objects.filter(camera__id=params['streamnr'], xmax__gt=0, 
+              done=True)
           else:
             eventlines = event.objects.filter(id=params['eventnr'])
           streamnr =  params['streamnr']
@@ -579,29 +588,8 @@ class schooldbutil(AsyncWebsocketConsumer):
           await aioshutil.rmtree('temp/unpack/' + params['filesdir'])
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))			
-
-      elif params['command'] == 'delschool':
-        if await access.check_async('S', params['school'], self.scope['user'], 'W'):
-          schoolline = await school.objects.aget(id=params['school'])
-          modelpath = schoolline.dir
-          if (count := await stream.objects.filter(
-              active=True, 
-              eve_school=schoolline).acount()
-            ):
-            outlist['data'] = {
-              'status' : 'streams_linked', 
-              'count' : count, 
-            }
-          else:  
-            await aioshutil.rmtree(modelpath)
-            schoolline.active = False
-            await schoolline.asave(update_fields=('active', ))
-            outlist['data'] = {'status' : 'OK', }
-        else:  
-          outlist['data'] = {'status' : 'no_priv', }
-        logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
+        
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -611,63 +599,94 @@ class schooldbutil(AsyncWebsocketConsumer):
 # SchoolUtil
 #*****************************************************************************
 
-class schoolutil(AsyncWebsocketConsumer):		
-    
-  async def check_create_school_priv(self, userid):
-    if self.scope['user'].is_superuser:
-      return(True)
-    else:
-      userinfoline = await userinfo.objects.aget(user=userid)
-      limit = userinfoline.allowed_schools
-      schoolcount = await school.objects.filter(creator__id=userid, active=True).acount()
-      return((schoolcount, limit))
+class schoolutil(AsyncWebsocketConsumer):
 
-  async def receive(self, text_data=None, bytes_data=None):
+  async def connect(self):
     try:
-      logger.info('<-- ' + str(text_data))
-      indict=json.loads(text_data) 
-           
-      if indict['code'] == 'makeschool': #The servers part
-        # 'code' : 'makeschool',
-        # 'name' : new school name,
-        # 'pass' : user pass,
-        # 'user' : user id,
-        # 'trainer_nr' : 1, (for now...)
-        userline = await dbuser.objects.aget(id=indict['user'])
-        hash = userline.password
-        if not check_password(indict['pass'], hash):
-          result = {'status' : 'noauth'}
-          await self.send(json.dumps(result))
-          return()
-        quota =  await self.check_create_school_priv(indict['user'])
-        if quota[0] >= quota[1]:
-          result = {'status' : 'nomore', 'quota' : quota}
-          await self.send(json.dumps(result))
-          return()
-        quota = (quota[0] + 1, quota[1])
-        newschool = school()
-        newschool.name = indict['name']
-        await newschool.asave()
-        result = {'status' : 'OK', 'school' : newschool.id, 'quota' : quota }
-        newaccess = access_control()
-        newaccess.vtype = 'S'
-        newaccess.vid = newschool.id
-        newaccess.u_g = 'U'
-        newaccess.u_g_nr = indict['user']
-        newaccess.r_w = 'W'
-        await newaccess.asave()
-        await access.read_list_async()
-        schooldir = schoolsdir + 'model' + str(newschool.id) + '/'
-        await aiofiles.os.makedirs(schooldir+'frames', exist_ok=True)
-        await aiofiles.os.makedirs(schooldir+'model', exist_ok=True)
-        await aioshutil.copy(schoolsdir + 'model1/model/' + newschool.model_type + '.h5',
-          schooldir + 'model/' + newschool.model_type + '.h5')
-        newschool.dir = schooldir
-        newschool.creator_id = indict['user']
-        await newschool.asave(update_fields = ('dir', 'creator_id'))
-        await self.send(json.dumps(result))			
+      self.ws_session = None
+      self.authed = False
+      await self.accept()
     except:
-      logger.error('Error in consumer: ' + logname + ' (schoolutil)')
+      logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
-      logger.handlers.clear()			
+      logger.handlers.clear()
+
+  async def disconnect(self, code):
+    try:
+      if self.ws_session is not None:
+        await self.ws_session.close()
+    except:
+      logger.error('Error in consumer: ' + logname + ' (trainerutil)')
+      logger.error(format_exc())
+      logger.handlers.clear()
+
+  async def receive(self, text_data):
+    try:
+      #logger.info('<-- ' + text_data)
+      params = json.loads(text_data)['data']
+      outlist = {'tracker' : json.loads(text_data)['tracker']}	
+
+      if params['command'] == 'delschool':
+        if not self.authed:
+          self.schoolline = await school.objects.aget(id=params['schoolnr'])
+          self.trainerline = await trainer.objects.aget(school__id=params['schoolnr'])
+          self.user = self.scope['user']
+          if not self.user.is_authenticated:
+            self.user = await dbuser.objects.aget(username=params['name'])
+            if self.user.check_password(params['pass']):
+              logger.info('Successfull login:' + params['name'])
+              self.authed = True
+            if not self.authed:
+              logger.info('Login failure: ' + params['name'])
+              await self.close() 
+        if await access.check_async('S', params['schoolnr'], self.user, 'W'):
+          if (count := await stream.objects.filter(
+              active=True, 
+              eve_school=self.schoolline).acount()
+            ):
+            outlist['data'] = {
+              'status' : 'streams_linked', 
+              'count' : count, 
+              'domain' : myserver,
+            }
+          else:  
+            if self.trainerline.t_type in {2, 3}:
+              from aiohttp import ClientSession
+              async with ClientSession() as session:
+                async with session.ws_connect(self.trainerline.wsserver + 'ws/schoolutil/') as ws:
+                  temp = json.loads(text_data)
+                  temp['data']['schoolnr']=self.schoolline.e_school
+                  temp['data']['name']=self.trainerline.wsname
+                  temp['data']['pass']=self.trainerline.wspass
+                  await ws.send_str(json.dumps(temp))
+                  returned = await ws.receive() 
+              outlist['data'] = json.loads(returned.data)['data']    
+            else:
+              if await aiofiles.os.path.exists(self.schoolline.dir):
+                await aioshutil.rmtree(self.schoolline.dir)
+              else:
+                logger.warning('***** Dir ' + self.schoolline.dir + ' not found')
+              outlist['data'] = {'status' : 'OK', }
+            if outlist['data']['status'] == 'OK': 
+              self.schoolline.active = False
+              await self.schoolline.asave(update_fields=('active', ))
+              await access_control.objects.filter(
+                vtype = 'S', 
+                vid = params['schoolnr'], 
+              ).adelete()
+              await status_line_school.objects.filter(
+                school = self.schoolline, 
+              ).adelete()
+        else:  
+          outlist['data'] = {
+            'status' : 'no_priv', 
+            'domain' : myserver,
+          }
+        #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
+      
+    except:
+      logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
+      logger.error(format_exc())
+      logger.handlers.clear()	
 

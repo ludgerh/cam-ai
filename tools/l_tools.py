@@ -186,15 +186,12 @@ def randomfilter(outlength, *args):
       if type(arglist[i]) is list:
         arglist[i] = [arglist[i][j] for j in randIndex]
       elif isinstance(arglist[i], np.ndarray):
-        print('+++', arglist[i].shape[0])
-        print('!!!', len(randIndex))
         output = np.empty((0, arglist[i].shape[1]), arglist[i].dtype)
         for j in randIndex:
           if j < arglist[i].shape[0]:
             print(output.shape, arglist[i].shape)
             output = np.vstack((output, arglist[i][j]))
         arglist[i] = output
-        print('---', arglist[i].shape[0])
   return(arglist)
 
 def np_mov_avg(input, radius):

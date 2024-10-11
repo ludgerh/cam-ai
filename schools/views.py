@@ -40,7 +40,7 @@ from tf_workers.models import school
 from users.models import archive
 from users.userinfo import free_quota
 from eventers.models import event, event_frame
-from trainers.models import trainframe
+from trainers.models import trainframe, trainer
 
 
 datapath = djconf.getconfig('datapath', 'data/')
@@ -54,7 +54,7 @@ os.makedirs('temp/unpack', exist_ok=True)
 @login_required
 def images(request, schoolnr):
   if access.check('S', schoolnr, request.user, 'W'):
-    myschool = school.objects.get(pk = schoolnr)
+    myschool = school.objects.get(id=schoolnr)
     template = loader.get_template('schools/images.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -62,6 +62,7 @@ def images(request, schoolnr):
       'debug' : settings.DEBUG,
       'schoolnr' : schoolnr,
       'schoolname' : myschool.name,
+      'trainernr' : trainer.objects.get(id=myschool.trainer.id).id,
       'user' : request.user,
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
     }

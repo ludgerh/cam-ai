@@ -52,7 +52,7 @@ class train_once_remote():
     self.logger.info('*** Working on School #'
       +str(self.myschool.id)+', '+self.myschool.name+'...');
     self.logger.info('****************************************************');
-    from websocket import WebSocket #, enableTrace
+    from websocket import WebSocket#, enableTrace
     #enableTrace(True)
     self.ws = WebSocket()
     self.ws.connect(self.wsurl)
@@ -60,6 +60,7 @@ class train_once_remote():
       'code' : 'auth',
       'name' : self.wsname,
       'pass' : self.wspass,
+      'school' : self.myschool.e_school,
     }
     while True:
       try:
@@ -85,11 +86,18 @@ class train_once_remote():
     } 
     self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
     remoteset = set()
+    remoteset_with_size = set()
     remotedict = {}
-    remotelist = json.loads(self.ws.recv())
+    remotelist = []
+    while True:
+      if (item := json.loads(self.ws.recv())) == 'done':
+        break
+      remotelist.append(item)
     for item in remotelist:
       remotedict[item[0]] = item[1]
       remoteset.add(item[0])
+      if item[2]:
+        remoteset_with_size.add(item[0])
     self.ws_ts = time()
     pingproc = MultiTimer(interval=2, 
       function=self.send_ping, 
@@ -115,7 +123,7 @@ class train_once_remote():
     for item in (remoteset & localset):
       if remotedict[item] != localdict[item][10]:
         self.logger.info('(' + str(count) + ') Changed, deleting: ' + item)
-        localset.remove(item)
+        remoteset.remove(item)
       count -= 1  
     count = len(remoteset - localset)
     for item in (remoteset - localset):
@@ -133,10 +141,10 @@ class train_once_remote():
         except TimeoutError:
           i += 1
       count -= 1  
-    count = len(localset - remoteset)
+    count = len(localset - remoteset_with_size)
     zip_buffer = io.BytesIO()   
     with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
-      for item in (localset - remoteset):
+      for item in (localset - remoteset_with_size):
         imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
         if imagedata.shape[1] > model_in_dims[0] or imagedata.shape[0] > model_in_dims[1]:
           imagedata = cv.resize(imagedata, model_in_dims)
@@ -144,6 +152,8 @@ class train_once_remote():
         zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
         jsondata = json.dumps(localdict[item]).encode()
         zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
+        self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
+        count -= 1  
     zip_buffer.seek(0)
     zip_content = zip_buffer.read()
     self.ws.send_binary(zip_content)
@@ -183,6 +193,16 @@ class train_once_remote():
           break
         else:
           sleep(10.0)
+          
+    outdict = {
+      'code' : 'close_ws',
+    }
+    self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+    self.ws.recv()
+    #sleep(2.0)
+    self.ws.close()
+          
+    if self.t_type == 2:
       r = requests.get(dlurl, allow_redirects=True)
       datapath = djconf.getconfig('datapath', 'data/')
       dlfile = djconf.getconfig('schools_dir', datapath + 'schools/')
@@ -191,6 +211,5 @@ class train_once_remote():
       open(dlfile, 'wb').write(r.content)
       self.myschool.lastmodelfile = timezone.now()
       self.myschool.save(update_fields=["lastmodelfile"])
-      self.logger.info('Done...')
-    self.ws.close()
+    self.logger.info('Done...')
     return(0)

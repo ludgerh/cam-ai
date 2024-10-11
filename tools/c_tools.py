@@ -201,7 +201,6 @@ def check_db_connect():
     while True:
       try:
         dummy = dbsetting.objects.get(setting = 'version')
-        print(dummy.value) 
         break
       except OperationalError:
         connection.close()
@@ -213,7 +212,6 @@ async def acheck_db_connect():
     while True:
       try:
         dummy = await dbsetting.objects.aget(setting = 'version')
-        print(dummy.value) 
         break
       except OperationalError:
         connection.close()

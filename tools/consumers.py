@@ -34,9 +34,10 @@ from logging import getLogger
 from traceback import format_exc
 from zipfile import ZipFile, ZIP_DEFLATED
 from django.contrib.auth.models import User
+from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
-from camai.passwords import db_password, os_type, env_type 
+from camai.passwords import db_password, os_type, env_type, mydomain
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tf_workers.models import school, worker
@@ -51,6 +52,11 @@ from .health import totaldiscspace, freediscspace
 
 OUT = 0
 IN = 1
+
+if mydomain:
+  myserver = mydomain
+else:
+  myserver = 'localhost'  
 
 using_websocket = worker.objects.get(id = 1).use_websocket
 remote_trainer = worker.objects.get(id=1).remote_trainer
@@ -176,14 +182,15 @@ class admin_tools_async(AsyncWebsocketConsumer):
       logger.error(format_exc())
       logger.handlers.clear()
     
-  async def check_create_school_priv(self):
-    if self.scope['user'].is_superuser:
-      return(True)
+  async def check_create_school_priv(self, user):
+    # todo: Add volume quota
+    if user.is_superuser:
+      return((0,1))
     else:
-      userinfo_obj = await userinfo.objects.aget(user=self.scope['user'])
-      limit = userinfo_obj.allowed_schools
-      schoolcount = await school.objects.filter(creator=self.scope['user']).acount()
-      return(schoolcount < limit) 
+      userinfoline = await userinfo.objects.aget(user=user)
+      limit = userinfoline.allowed_schools
+      schoolcount = await school.objects.filter(creator=user, active=True).acount()
+      return((schoolcount, limit))
 
   async def receive(self, text_data):
     try:
@@ -196,41 +203,49 @@ class admin_tools_async(AsyncWebsocketConsumer):
 #*****************************************************************************
 
       if params['command'] == 'makeschool': #The clients part
-        if not await self.check_create_school_priv():
-          await self.close()
-        mytrainer = await trainer.objects.aget(id=params['trainer_nr']) 
-        if mytrainer.wsserver != 'myself':
+        userline = self.scope['user'] # More to come
+        if userline.is_anonymous:
+          userline = await User.objects.aget(id = params['user'])
+          hash = userline.password
+          if not check_password(params['pass'], hash):
+            outlist['data'] = {'status' : 'noauth', 'domain' : myserver}
+            await self.send(json.dumps(outlist))
+            return()
+        quota =  await self.check_create_school_priv(userline)
+        if quota[0] >= quota[1]:
+          outlist['data'] = {'status' : 'nomoreschools', 'quota' : quota, 'domain' : myserver}
+          await self.send(json.dumps(outlist))
+          return()
+        trainerline = await trainer.objects.aget(id=params['trainer_nr']) 
+        schoolline = school()
+        schoolline.name = params['name']
+        schoolline.creator = userline
+        schoolline.trainer = trainerline
+        await schoolline.asave() 
+        schoolline.dir = schoolsdir + 'model' + str(schoolline.id) + '/'
+        await schoolline.asave(update_fields=('dir', ))
+        await aiofiles.os.makedirs(schoolline.dir+'frames', exist_ok=True)
+        await aiofiles.os.makedirs(schoolline.dir+'model', exist_ok=True)
+        if trainerline.t_type in {2, 3}:
           from aiohttp import ClientSession
-        myschool = school()
-        myschool.name = params['name']
-        myschool.creator = self.scope['user']
-        myschool.trainer = mytrainer
-        await myschool.asave()
-        myworker = await worker.objects.aget(school__id=myschool.id)  
-        schooldir = schoolsdir + 'model' + str(myschool.id) + '/'
-        myschool.dir = schooldir
-        await myschool.asave(update_fields=('dir', ))
-        await aiofiles.os.makedirs(schooldir+'frames', exist_ok=True)
-        await aiofiles.os.makedirs(schooldir+'model', exist_ok=True)
-        if mytrainer.wsserver != 'myself':
           async with ClientSession() as session:
-            async with session.ws_connect(myworker.wsserver + 'ws/schoolutil/') as ws:
-              outdict = {
-                'code' : 'makeschool',
-                'name' : 'CL' + str(mytrainer.wsid)+': ' + params['name'],
-                'pass' : mytrainer.wspass,
-                'user' : mytrainer.wsid,
-                'trainer_nr' : 1,
-              }
+            async with session.ws_connect(trainerline.wsserver + 'ws/aadmintools/') as ws:
+              outdict = json.loads(text_data)
+              outdict['data']['name'] = 'CL' + str(trainerline.wsid)+': ' + params['name']
+              outdict['data']['pass'] = trainerline.wspass
+              outdict['data']['user'] = trainerline.wsid
+              outdict['data']['trainer_nr'] = 1
               await ws.send_str(json.dumps(outdict))
               message = await ws.receive()
-              resultdict = json.loads(message.data)
-        if mytrainer.t_type == 2 and resultdict['status'] == 'OK':
-          if await afree_quota(self.scope['user']):
+              resultdict = json.loads(message.data)['data']
+        else:
+          resultdict = {'status' : 'OK', 'school' : schoolline.id}      
+        if trainerline.t_type in {1, 2} and resultdict['status'] == 'OK':
+          if await afree_quota(userline):
             handle_src = await aiofiles.open(
               schoolsdir + 'model1/model/' + model_type + '.h5', mode='r')
             handle_dst = await aiofiles.open(
-              schooldir + 'model/' + model_type + '.h5', mode='w')
+              schoolline.dir + 'model/' + model_type + '.h5', mode='w')
             stat_src = await aiofiles.os.stat(
               schoolsdir + 'model1/model/' + model_type + '.h5')
             n_bytes = stat_src.st_size
@@ -238,29 +253,32 @@ class admin_tools_async(AsyncWebsocketConsumer):
             fd_dst = handle_dst.fileno()
             await aiofiles.os.sendfile(fd_dst, fd_src, 0, n_bytes)
           else:
-            resultdict['status'] = 'nolocalquota'
-        if mytrainer.wsserver != 'myself':
+            resultdict = {'status' : 'nomorequota', 'domain' : myserver}
+        if trainerline.t_type in {2, 3}:
           if resultdict['status'] == 'OK':
-            myschool.e_school = resultdict['school']
-            await myschool.asave(update_fields=('e_school', ))
+            schoolline.e_school = resultdict['school']
+            resultdict['school'] = schoolline.id
+            await schoolline.asave(update_fields=('e_school', ))
         else:
-          resultdict = {'status' : 'OK', }
-          myschool.model_type = model_type
-          await myschool.asave(update_fields=('model_type', ))
-          mytrainer.t_type=1
-          await mytrainer.asave(update_fields=('t_type', ))
+          if resultdict['status'] == 'OK':
+            resultdict['quota'] = (quota[0] + 1, quota[1])
+            schoolline.model_type = model_type
+            await schoolline.asave(update_fields=('model_type', ))
+            await aioshutil.copy(schoolsdir + 'model1/model/' + schoolline.model_type + '.h5',
+              schoolline.dir + 'model/' + schoolline.model_type + '.h5')
         if resultdict['status'] == 'OK':
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'
-            myaccess.vid = myschool.id
-            myaccess.u_g_nr = self.scope['user'].id
+            myaccess.vid = schoolline.id
+            myaccess.u_g_nr = userline.id
             myaccess.r_w = 'W'
             await myaccess.asave()
             await access.read_list_async()
         else:
-          myschool.active = False
-          await myschool.asave(update_fields=('active', ))
+          if await aiofiles.os.path.exists(schoolline.dir):
+            await aioshutil.rmtree(schoolline.dir)
+          schoolline.adelete()
         outlist['data'] = resultdict
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

@@ -180,10 +180,17 @@ class c_cleanup():
             check_db_connect()
             for frameline in trainframe.objects.filter(deleted = True):
               #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
-              myschooldir = Path(school.objects.get(id = frameline.school).dir)
+              schoolline = school.objects.get(id = frameline.school)
+              myschooldir = Path(schoolline.dir)
               del_path = myschooldir / 'frames' / frameline.name
               if del_path.exists():
                 del_path.unlink()
+              cod_path = (myschooldir / 'coded' 
+                / (str(schoolline.model_xin) 
+                + 'x' + str(schoolline.model_yin)) 
+                / (frameline.name[:-4]+'.cod'))
+              if cod_path.exists():
+                cod_path.unlink()
               frameline.delete()
 # ***** deleting files
           if self.do_run:

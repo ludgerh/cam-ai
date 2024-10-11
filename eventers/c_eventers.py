@@ -242,7 +242,7 @@ class c_eventer(c_device):
          
       if self.tag_list_active != present_school_nr:
         self.tag_list_active = present_school_nr
-        self.tag_list = get_taglist(school_active)
+        self.tag_list = get_taglist(self.tag_list_active)
       for i, item in list(self.eventdict.items()): 
         self.check_events(i, item) 
     while (

@@ -54,21 +54,19 @@ $(document).ready(function() {
         'trainer_nr' : 1, //for now...
       })  
       .then((result) => {
+        console.log(result);
         if (result.status == 'OK'){
           $('#status').html('&#10003;');
           $('.make-button').removeClass('btn-warning');
         };
         if (result.status == 'noauth'){
-          $('#status').text('Error: No valid login on server.');
+          $('#status').text('Error: No valid login on on this server: ' + result.domain);
         };
-        if (result.status == 'nomore'){
-          $('#status').text('Error: Maximum number of schools reached.');
+        if (result.status == 'nomoreschools'){
+          $('#status').text('Error: Maximum number of schools reached on this server: ' + result.domain);
         };
-        if (result.status == 'nolocalquota'){
-          $('#status').text('Error: No more volume quota on your local system.');
-        };
-        if (result.status == 'noremotequota'){
-          $('#status').text('Error: No more volume quota on the remote server.');
+        if (result.status == 'nomorequota'){
+          $('#status').text('Error: No more volume quota on this server: ' + result.domain);
         };
       })
       .catch(err => {console.log(err);});
