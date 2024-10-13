@@ -1,4 +1,4 @@
-{% extends 'main/basis.html' %}
+{% extends 'main/gridbasis.html' %}
 {% comment %}
 Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -29,25 +29,29 @@ Printed: index.html v1.1.17 22.02.2024
 <main style="margin:0px">
     <div class="row">
     {% spaceless %}
-    {% for item in camlist %}
-      {% if mode == 'C' %}
+    {% if mode == 'C' %}
+      {% for item in camlist %}
         <div class="col" style="width:100%; height:100%; padding:0; margin:0;">
-          <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespace{{ item.id }}" /></a>
+          <a href="/oneitem/cam/{{ item.id }}/"><img id="imagespace{{ item.id }}"/></a>
         </div>
-      {% endif %}
-      {% if mode == 'D' %}
+      {% endfor %}
+    {% endif %}
+    {% if mode == 'D' %}
+      {% for item in detectorlist %}
         <div class="col">
           <a href="/oneitem/detector/{{ item.id }}/">
-          <img id="imagespace{{ item.id }}" /></a>
+          <img id="imagespace{{ item.id }}"/></a>
         </div>
-      {% endif %}
-      {% if mode == 'E' %}
+      {% endfor %}
+    {% endif %}
+    {% if mode == 'E' %}
+      {% for item in list %}
         <div class="col">
           <a href="/oneitem/eventer/{{ item.id }}/">
-          <img id="imagespace{{ item.id }}" /></a>
+          <img id="imagespace{{ item.id }}"/></a>
         </div>
-      {% endif %}
-    {% endfor %}
+      {% endfor %}
+    {% endif %}
     {% endspaceless %}
     </div>
 </main>
@@ -58,10 +62,29 @@ let c_view_Socket;
 let trigger_Socket;
 let displaywidth = 375 // Screen width IPhone 7
 
+var counter = 0;
+var windowWidth = $(window).width();
+var windowHeight = $(window).height();
+
+{% for item in camlist %}
+    counter += 1;
+{% endfor %}
+
+
+if (counter == 1) {
+    displaywidth = windowWidth;
+} else if (counter > 1 && counter <= 4) {
+    displaywidth = Math.floor(windowWidth / 2);
+} else if (counter > 4 && counter <= 9) {
+    displaywidth = Math.floor(windowWidth / 3);
+}
+
+console.log(displaywidth);
+
 let imageElements = [];
 {% for item in camlist %} 
   let displayheight{{ item.id }} = 
-    Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
+    Math.round(displaywidth * windowheight / windowwidth)
   let xinput{{ item.id }}
   let yinput{{ item.id }}
   let wait{{ item.id }} = 0;
@@ -73,6 +96,11 @@ $(document).ready(function() {
     $('#imagespace{{ item.id }}').attr('width', displaywidth+'px');
     $('#imagespace{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
 {% endfor %}
+	document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+          window.location.href = window.location.protocol + '//' + window.location.host;
+      }
+  });
   WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
   .then((result) => {
     c_view_Socket = result;

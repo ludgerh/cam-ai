@@ -1,0 +1,107 @@
+{% comment %}
+Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
+<!doctype html>
+<html lang="en">
+  <head>
+    {% if emulatestatic %}
+    {% load static %}
+      <link rel="shortcut icon" href="{% static 'camai/git/img/favicon.ico' type='image/x-icon' %}">
+    {% else %}
+      <link rel="shortcut icon" href="https://static.cam-ai.de/{{ version }}/camai/git/img/favicon.ico">
+    {% endif %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    {% if emulatestatic %}
+    {% load static %}
+      <link rel="stylesheet" href="{% static 'camai/git/css/camai.css' %}">
+      <link rel="stylesheet" href="{% static 'oneitem/git/oneitem.css' %}">
+    {% else %}
+      <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
+      <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/oneitem/git/oneitem.css">
+    {% endif %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>CAM-AI client</title>
+  </head>
+  <body>
+    {% if debug %}
+      <h1>*** Debug-Mode ***</h1>
+    {% endif %}
+
+    {% block content %}No Content yet...{% endblock %}
+
+{% if user.is_authenticated %}
+<script>
+let active_bg = 'bg-success';
+let active_percentage = 1;
+if (typeof healthSocket == 'undefined') { 
+  let healthSocket;
+};
+
+function updatediscinfo() {
+  healthSocket.sendandwait({
+    'command' : 'getdiscinfo',
+  })
+  .then((result) => {
+    percentage = Math.round((1.0 - (result.free / result.total)) * 100); 
+    if (active_percentage != percentage) {
+      $('#freepercent').text(100 - percentage);
+      $('#totaldiscspace').text(result.totalstr);
+      $('#freediscspace').text(result.freestr);
+      $('#progressbar').css("width", percentage.toString() + "%");
+      if (percentage > 75) {
+        new_bg = 'bg-danger';
+      } else {
+        if (percentage > 50) {
+          new_bg = 'bg-warning';
+        } else {
+          new_bg = 'bg-success';
+        };
+      };
+      if (active_bg !== new_bg) {
+        $('#progressbar').removeClass(active_bg);
+        $('#progressbar').addClass(new_bg);
+        active_bg = new_bg;
+      };
+      active_percentage = percentage;
+    };
+  })
+  .catch(err => {console.log(err);});
+};
+
+$(document).ready(function() {
+  if (typeof healthSocket == 'undefined') { 
+    WSAsync(
+      ws_scheme + '//'
+      + window.location.host
+      + '/ws/health/'
+    )
+    .then((result) => {
+      healthSocket = result;
+      updatediscinfo();
+      setInterval(updatediscinfo, 60000);
+    })
+    .catch(err => {console.log(err);});
+  } else {
+    setInterval(updatediscinfo, 60000);
+  };
+});
+</script>
+{% endif %}
+  </body>
+</html>
+

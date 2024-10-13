@@ -64,7 +64,6 @@ def index(request, mode='C'):
 def indexgrid(request, mode='C'):
   template = loader.get_template('index/indexgrid.html')
   context = {
-    'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'mode' : mode,
@@ -79,14 +78,6 @@ def indexgrid(request, mode='C'):
     'eventerlist' : access.filter_items(
       stream.objects.filter(active=True).filter(eve_mode_flag__gt=0, demo=0), 'E', 
       request.user, 'R'
-    ),
-    'schoollist' : access.filter_items(
-      school.objects.filter(active=True), 'S', 
-      request.user, 'R'
-    ),
-    'schoollist_write' : access.filter_items(
-      school.objects.filter(active=True), 'S', 
-      request.user, 'W'
     ),
     'user' : request.user,
     'os_type' : os_type[:3],
