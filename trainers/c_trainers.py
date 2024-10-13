@@ -191,7 +191,7 @@ class trainer():
               }
               if not myschool.ignore_checked:
                 filterdict['checked'] = True
-              check_db_connect()
+              check_db_connect(logger=self.logger)
               trainframe.objects.filter(**filterdict).update(train_status=2)
               myschool.l_rate_start = '1e-6'
               myschool.save(update_fields=['l_rate_start'])

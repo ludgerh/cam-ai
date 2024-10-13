@@ -64,6 +64,7 @@ def index(request, mode='C'):
 def indexgrid(request, mode='C'):
   template = loader.get_template('index/indexgrid.html')
   context = {
+    'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'mode' : mode,

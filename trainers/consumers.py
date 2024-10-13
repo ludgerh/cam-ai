@@ -323,6 +323,7 @@ class trainerutil(AsyncWebsocketConsumer):
   async def connect(self):
     try:
       self.ws_ts = None
+      self.didrunout = None
       await self.accept()
       self.trainernr = None
       self.query_count = 0
@@ -377,7 +378,7 @@ class trainerutil(AsyncWebsocketConsumer):
         if self.trainerline.t_type in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoolline.e_school
-          await self.ws.send_str(json.dump/home/ludger/safe/sources/django/camai/trainers/s(temp))
+          await self.ws.send_str(json.dumps(temp))
           returned = await self.ws.receive()
           inforemote = json.loads(returned.data)['data']
           infolocal['nr_trained'] = inforemote['nr_trained']
