@@ -118,7 +118,6 @@ class train_once_remote():
       localdict[item.name] += [seq_to_int(localdict[item.name])]
       localdict[item.name] += [item.code]
       localset.add(item.name)
-    pingproc.stop()
     count = len(remoteset & localset)
     for item in (remoteset & localset):
       if remotedict[item] != localdict[item][10]:
@@ -156,6 +155,7 @@ class train_once_remote():
         count -= 1  
     zip_buffer.seek(0)
     zip_content = zip_buffer.read()
+    pingproc.stop()
     self.ws.send_binary(zip_content)
     self.ws.recv()
     if self.t_type == 2:

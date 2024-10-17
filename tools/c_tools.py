@@ -195,9 +195,9 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
     
 db_ts = time()
     
-def check_db_connect(logger=None):
+def check_db_connect(logger=None, force_check=False):
   global db_ts
-  if (new_time := time()) - db_ts > 3300.0: #55 Minutes 
+  if (new_time := time()) - db_ts > 3300.0 or force_check: #55 Minutes 
     if logger:
       logger.info(
         'check_db_connect: '

@@ -264,9 +264,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
             resultdict['quota'] = (quota[0] + 1, quota[1])
             schoolline.model_type = model_type
             await schoolline.asave(update_fields=('model_type', ))
-            await aioshutil.copy(schoolsdir + 'model1/model/' + schoolline.model_type + '.h5',
-              schoolline.dir + 'model/' + schoolline.model_type + '.h5')
         if resultdict['status'] == 'OK':
+          await aioshutil.copy(schoolsdir + 'model1/model/' + schoolline.model_type + '.h5',
+            schoolline.dir + 'model/' + schoolline.model_type + '.h5')
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'

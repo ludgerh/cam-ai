@@ -41,6 +41,7 @@ from .train_worker_remote import train_once_remote
 
 trainers = {}
 short_brake = djconf.getconfigfloat('short_brake', 0.01)
+long_brake = djconf.getconfigfloat('long_brake', 1.0)
       
       
 fitstochange = fit.objects.filter(status='Queuing')
@@ -128,6 +129,9 @@ class trainer():
                   school = item.id, 
                   status = 'Queuing',
                 )
+                myfit.save() 
+                myfit.made = timezone.now()
+                myfit.status = 'Queuing'
                 myfit.save()
                 self.job_queue_list.append(item.id)
                 self.job_queue.put((item, myfit)) 
@@ -191,7 +195,7 @@ class trainer():
               }
               if not myschool.ignore_checked:
                 filterdict['checked'] = True
-              check_db_connect(logger=self.logger)
+              check_db_connect(force_check=True)
               trainframe.objects.filter(**filterdict).update(train_status=2)
               myschool.l_rate_start = '1e-6'
               myschool.save(update_fields=['l_rate_start'])
