@@ -71,6 +71,7 @@ class remotetrainer(AsyncWebsocketConsumer):
   async def receive(self, text_data =None, bytes_data=None):
     try:
       if bytes_data: 
+        #logger.info('<-- binary')
         cod_x = self.myschoolline.model_xin
         cod_y = self.myschoolline.model_yin
         ram_file = io.BytesIO(bytes_data)
@@ -207,8 +208,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           else: 
             logger.warning('*** User ' + creator.username 
               + ' has no quota for remote training.')
-            myfit = fit(school = indict['school'])
-            myfit.status = 'NoQuota'
+            myfit = fit(school = indict['school'], status = 'NoQuota')
             await myfit.asave()
             result = {
               'status' : 'no_quota',
@@ -234,9 +234,8 @@ class remotetrainer(AsyncWebsocketConsumer):
         if self.mytrainerline.t_type in {2, 3}:
           await self.ws.send_str(json.dumps(indict))
         else:
-          schoolline = await school.objects.aget(id=self.myschoolline.id)
-          schoolline.extra_runs = 1
-          await schoolline.asave(update_fields=['extra_runs'])
+          self.myschoolline.extra_runs = 1
+          await self.myschoolline.asave(update_fields=['extra_runs'])
           
       elif indict['code'] == 'checkfitdone':
         if self.mytrainerline.t_type in {2, 3}:
@@ -323,6 +322,7 @@ class trainerutil(AsyncWebsocketConsumer):
   async def connect(self):
     try:
       self.ws_ts = None
+      self.didrunout = None
       await self.accept()
       self.trainernr = None
       self.query_count = 0
@@ -377,7 +377,7 @@ class trainerutil(AsyncWebsocketConsumer):
         if self.trainerline.t_type in {2, 3}:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoolline.e_school
-          await self.ws.send_str(json.dump/home/ludger/safe/sources/django/camai/trainers/s(temp))
+          await self.ws.send_str(json.dumps(temp))
           returned = await self.ws.receive()
           inforemote = json.loads(returned.data)['data']
           infolocal['nr_trained'] = inforemote['nr_trained']
@@ -560,7 +560,7 @@ class trainerutil(AsyncWebsocketConsumer):
           schoolline.extra_runs = 1
           await schoolline.asave(update_fields=['extra_runs'])
           outlist['data'] = 'OK' 
-          logger.debug('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
         else:
           self.close()		
