@@ -25,31 +25,74 @@ from glob import glob
 from getpass import getpass
 import platform
 
+run_all = True
+
+def cpuinfo():
+  with open("/proc/cpuinfo", "r") as f:
+    cpuinfo = f.read().splitlines()
+  result = {}  
+  processor = None
+  for line in cpuinfo:
+    if line:
+      list = line.split(':')
+      list = [list[0].strip(), list[1].strip()]
+      if list[0] == 'processor':
+        processor = list[1]
+        result[processor] = {}
+      if processor:
+        result[processor][list[0]] = list[1]
+      else:  
+        result[list[0]] = list[1]
+    else:
+      processor = None
+  return(result)  
+  
+def osinfo():
+  result = platform.freedesktop_os_release()
+  return(result) 
+  
+def sysinfo():
+  result = {}
+  cpu = cpuinfo()
+  if 'Model' in cpu and cpu['Model'][:12] == 'Raspberry Pi':   
+    result['hw'] = 'raspi'
+    result['hw_version'] = cpu['Model'].split()[2]
+  else:     
+    result['hw'] = 'pc'
+    result['hw_version'] = cpu['0']['cpu family']
+  myos = platform.freedesktop_os_release()
+  result['dist'] = myos['ID']
+  result['dist_version'] = myos['VERSION_ID']
+  return(result) 
+
 installdir = 'cam-ai'
-root_db_pass = None
-cam_ai_db_pass = None
+db_pass = None
 
 def sql_query(command):
-  subprocess.call(['mariadb', '-u', 'root', '-p'+root_db_pass, '-e', command]) 
+  subprocess.call(['mariadb', '-u', 'root', '-p'+db_pass, '-e', command]) 
 
 print('CAM-AI server setup tool')
+hw_os_code = sysinfo()
+print('Hardware & OS codes:', hw_os_code)
 
-print('Just for in case: Stopping c_server process (red failure message should be OK)...')
-subprocess.call(['sudo', 'systemctl', 'stop', 'c_server']) 
-print()
-
-release_code = platform.release()
-env_type = None
-if release_code[:2] == '6.':
-  if '-amd64' in release_code:
-    os_code = 'debian12'
-    env_type = 'conda'
-  elif '-rpi-' in release_code:
-    os_code = 'raspi12'
-    env_type = 'venv'
-if env_type is None:  
-  print('Unknown OS code:', os_code) 
+if ((((hw_os_code['hw'] == 'raspi' and 4 <= int(hw_os_code['hw_version']))
+    or hw_os_code['hw'] == 'pc')
+    and hw_os_code['dist'] == 'debian')
+    and int(hw_os_code['dist_version']) == 12):
+  print('Your system is compatible, we continue...')
+else:
+  print('Your system does not meet our specs, see your hardware & OS codes above.')
+  print('We need a PC or a Raspberry Pi with a Debian 12 OS.')
+  print('The Raspberry Pi needs to be at least version 4, better version 5...')
   exit(1) 
+  
+if hw_os_code['hw'] == 'raspi': 
+  os_code = 'raspi_' + hw_os_code['hw_version'] + '_' + hw_os_code['dist_version']
+  env_type = 'venv'
+elif hw_os_code['hw'] == 'pc':  
+  os_code = 'debian'+hw_os_code['dist_version']
+  env_type = 'conda' 
+  
 print('Detected OS:', os_code)
 print('Environment Type:', env_type)
 print()
@@ -66,75 +109,79 @@ zip_url = response['zipball_url']
 print('Installing ', new_version)
 print()
 
-selected = False
-while not selected:
-  print('Do you want to use the server from localhost? (y/N)')
-  uselocal = input(": ")
-  uselocal = (uselocal in {'y', 'Y', 'yes', 'Yes', 'YES'})
-  if uselocal:
-    print('We WILL use localhost.')
-  else:
-    print('We WILL NOT use localhost')
+if False or run_all:
+  selected = False
+  while not selected:
+    print('Do you want to use the server from localhost? (y/N)')
+    uselocal = input(": ")
+    uselocal = (uselocal in {'y', 'Y', 'yes', 'Yes', 'YES'})
+    if uselocal:
+      print('We WILL use localhost.')
+    else:
+      print('We WILL NOT use localhost')
+    print()
+    print('What is the internal address to access the server? (leave empty if none)')
+    print('(examples: cam-ai-raspi, debian-pc, 192.168.1.42)')
+    myip = input(": ")
+    if not myip:
+      print('We WILL NOT use internal IP,')
+    print()
+    if uselocal or myip:
+      selected = True
+    else:  
+      print('You need to choose at least one item, try again.')  
+      print()
+
+  while not db_pass:
+    dbpass1 = (getpass(prompt='Please choose a database password (required): '))
+    dbpass2 = (getpass(prompt='Please repeat: '))
+    if dbpass1 and dbpass1 == dbpass2:
+      db_pass = dbpass1
+    else:
+      print('The passwords did not match, try again.')  
+      print()
   print()
-  print('What is the internal address to access the server? (leave empty if none)')
-  print('(examples: cam-ai-raspi, debian-pc, 192.168.1.42)')
-  myip = input(": ")
-  if not myip:
-    print('We WILL NOT use internal IP,')
+
+  print('Would you like to grant external access to your Database? (y/N)')
+  db_external = input(": ")
+  db_external = (db_external in {'y', 'Y', 'yes', 'Yes', 'YES'})
+  if db_external:
+    print('We WILL grant external DB access.')
+  else:
+    print('We WILL NOT  grant external DB access.')
   print()
-  if uselocal or myip:
-    selected = True
-  else:  
-    print('You need to choose at least one item, try again.')  
-    print()
 
-while not root_db_pass:
-  dbpass1 = (getpass(prompt='Please choose a database root password (required): '))
-  dbpass2 = (getpass(prompt='Please repeat: '))
-  if dbpass1 and dbpass1 == dbpass2:
-    root_db_pass = dbpass1
-  else:
-    print('The passwords did not match, try again.')  
-    print()
-print()
+if False or run_all:
+  print('*******************************************')
+  print('*                                         *')
+  print('*  This will take a couple of minutes.    *')
+  print('*  Lean back, have a coffee and watch...  *')
+  print('*                                         *')
+  print('*******************************************')
+  print()
+  sleep(10.0)
+   
+if False or run_all:    
+  print('>>>>> Installing MariaDB and database...')   
+  subprocess.call(['sudo', 'apt', 'update']) 
+  subprocess.call(['sudo', 'apt', '-y', 'upgrade']) 
+  subprocess.call(['sudo', 'apt', '-y', 'install', 'mariadb-server']) 
+  subprocess.call(['sudo', 'mariadb-admin', '-u', 'root', 'password', db_pass])
+  sql_query("drop user if exists ''@'localhost';")
+  sql_query("drop user if exists ''@'%';")
+  sql_query("drop user if exists 'root'@'%';")
+  sql_query("drop database if exists test;")
+  sql_query("drop database if exists `CAM-AI`;")
+  sql_query("grant all on *.* to 'CAM-AI'@'localhost' identified by '" + db_pass 
+    + "' with grant option;")
+  if db_external:
+    sql_query("grant all on *.* to 'CAM-AI'@'%' identified by '" + db_pass 
+      + "' with grant option;")
+  sql_query("flush privileges;")
+  sql_query("create database `CAM-AI`;")
+  print() 
 
-while not cam_ai_db_pass:
-  dbpass1 = (getpass(
-    prompt='Please choose a database password for the user CAM-AI (required): '))
-  dbpass2 = (getpass(prompt='Please repeat: '))
-  if dbpass1 and dbpass1 == dbpass2:
-    cam_ai_db_pass = dbpass1
-  else:
-    print('The passwords did not match, try again.')  
-    print()
-print()
-
-print('*******************************************')
-print('*                                         *')
-print('*  This will take a couple of minutes.    *')
-print('*  Lean back, have a coffee and watch...  *')
-print('*                                         *')
-print('*******************************************')
-print()
-sleep(10.0)
-    
-print('>>>>> Installing MariaDB and database...')   
-subprocess.call(['sudo', 'apt', 'update']) 
-subprocess.call(['sudo', 'apt', '-y', 'upgrade']) 
-subprocess.call(['sudo', 'apt', '-y', 'install', 'mariadb-server']) 
-subprocess.call(['sudo', 'mariadb-admin', '-u', 'root', 'password', root_db_pass])
-sql_query("drop user if exists ''@'localhost';")
-sql_query("drop user if exists ''@'%';")
-sql_query("drop user if exists 'root'@'%';")
-sql_query("drop database if exists test;")
-sql_query("drop database if exists `CAM-AI`;")
-sql_query("grant all on *.* to 'CAM-AI'@'localhost' identified by '" + cam_ai_db_pass 
-  + "' with grant option;")
-sql_query("flush privileges;")
-sql_query("create database `CAM-AI`;")
-print() 
-
-if True:
+if False or run_all:
   print('>>>>> Getting and unpacking ZIP...')
   if not os.path.exists('temp'):
     os.makedirs('temp')  
@@ -159,7 +206,7 @@ if True:
   move(zipresult, installdir)
   print()
 
-if True:
+if False or run_all:
   print('>>>>> Installing reqired packages...')
   subprocess.call(['sudo', 'apt', '-y', 'install', 'python3-dev']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'default-libmysqlclient-dev']) 
@@ -171,15 +218,16 @@ if True:
   if env_type == 'venv':
     subprocess.call(['sudo', 'apt', '-y', 'install', 'python3-venv']) 
   print()
-    
+ 
+if False or run_all:  
   print('>>>>> Modifying system config...')
-  subprocess.call(['sudo', 'sed', '-i', '/^#***** CAM-AI setting/d', 
+  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
     '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^timeout/d', '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , 
     '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$atimeout 180;' , '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#***** CAM-AI setting/d', 
+  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
     '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^vm.overcommit_memory/d', '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^net.core.somaxconn/d', '/etc/sysctl.conf']) 
@@ -187,7 +235,7 @@ if True:
   subprocess.call(['sudo', 'sed', '-i', '$avm.overcommit_memory = 1' , 
     '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$anet.core.somaxconn=1024' , '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#***** CAM-AI disabled saving/d', 
+  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI disabled saving/d', 
     '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^save/d', '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^#save/d', '/etc/redis/redis.conf']) 
@@ -197,80 +245,89 @@ if True:
   subprocess.call(['sudo', 'sed', '-i', '$a#save 300 10' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#save 60 10000' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$asave ""' , '/etc/redis/redis.conf']) 
+  if db_external:
+    subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+      '/etc/mysql/mariadb.conf.d/50-server.cnf']) 
+    subprocess.call(['sudo', 'sed', '-i', '/^bind-address/d', 
+      '/etc/mysql/mariadb.conf.d/50-server.cnf']) 
+    subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , 
+      '/etc/mysql/mariadb.conf.d/50-server.cnf']) 
+    subprocess.call(['sudo', 'sed', '-i', '$abind-address = 0.0.0.0', 
+      '/etc/mysql/mariadb.conf.d/50-server.cnf']) 
+    subprocess.call(['sudo', 'systemctl', 'restart', 'mariadb']) 
   
-  #subprocess.call(['sudo', 'touch', '/etc/sudoers.d/010_CAM-AI_reboot_privilege']) 
-  #subprocess.call(['sudo', 'sed', '-i', '$acam_ai ALL=(root) NOPASSWD: /sbin/reboot' , '/etc/sudoers.d/010_CAM-AI_reboot_privilege']) 
-  #cmd = 'echo "cam_ai ALL=(root) NOPASSWD: /sbin/reboot" | sudo tee -a /etc/sudoers.d/010_CAM-AI_reboot_privilege'
-  #subprocess.call(cmd) 
-  
-  print()
+print()
 
 os.chdir(installdir)
 
-print('>>>>> Setting up Python environment...')
-if env_type == 'venv':
-  if not os.path.exists('env'):
-    subprocess.call(['python', '-m', 'venv', 'env']) 
-  cmd = 'source env/bin/activate; '
-else: #conda
-  cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-  cmd += 'conda activate tf; '
-cmd += 'pip install --upgrade pip; '
-cmd += 'pip install -r requirements.' + os_code + '; '
-result = subprocess.call(cmd, shell=True, executable='/bin/bash')
-  
-print('>>>>> Modifying ' + installdir + '/passwords.py...')
-if env_type == 'venv':
-  cmd = 'source env/bin/activate; '
-else: #conda
-  cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-  cmd += 'conda activate tf; '
-cmd += 'python get_django_code.py; '
-result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
-djangocode = result.split('\n')[0]
-if os.path.exists('camai/passwords.py'):
-  sourcefile = open('camai/passwords.py', 'r')
-else:  
-  sourcefile = open('camai/passwords.py.example', 'r')
-targetfile = open('camai/passwords.py-new', 'w')
-for line in sourcefile:
-  if line.startswith('security_key = '):
-      line = 'security_key = "' + djangocode + '"\n'
-  if line.startswith('localaccess = '):
-      line = 'localaccess = ' + str(uselocal) + '\n'
-  if line.startswith('myip = '):
-      if myip: 
-        line = 'myip = ["' + myip + '"]\n'
-      else:
-        line = 'myip = []\n'
-  if line.startswith('db_password = '):
-      line = 'db_password = "' + cam_ai_db_pass + '"\n'
-  if line.startswith('os_type = '):
-      line = 'os_type = "' + os_code + '"\n'
-  if line.startswith('env_type = '):
-      line = 'env_type = "' + env_type + '"\n'
-  targetfile.write(line)
-targetfile = open('camai/passwords.py-new', 'w')
-sourcefile.close()
-targetfile.close()
-if os.path.exists('camai/passwords.py'):
-  os.remove('/home/cam_ai/cam-ai/camai/passwords.py')
-os.rename('/home/cam_ai/cam-ai/camai/passwords.py-new', 
-  '/home/cam_ai/cam-ai/camai/passwords.py')
-print()
+if True or run_all:
+  print('>>>>> Setting up Python environment...')
+  if env_type == 'venv':
+    if not os.path.exists('env'):
+      subprocess.call(['python', '-m', 'venv', 'env']) 
+    cmd = 'source env/bin/activate; '
+  else: #conda
+    cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
+    cmd += 'conda activate tf; '
+  cmd += 'pip install --upgrade pip; '
+  cmd += 'pip install -r requirements.' + os_code + '; '
+  result = subprocess.call(cmd, shell=True, executable='/bin/bash')
 
-print('>>>>> Migrating the database...')
-if env_type == 'venv':
-  cmd = 'source env/bin/activate; '
-else: #conda
-  cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-  cmd += 'conda activate tf; '
-cmd += 'python manage.py migrate; '
-result = subprocess.call(cmd, shell=True, executable='/bin/bash')
-runserverfile = 'runserver.sh'
-copy(runserverfile, '..')
-os.chdir('..')
-os.chmod(runserverfile, 0o744)
+if False or run_all:
+  print('>>>>> Modifying ' + installdir + '/passwords.py...')
+  if env_type == 'venv':
+    cmd = 'source env/bin/activate; '
+  else: #conda
+    cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
+    cmd += 'conda activate tf; '
+  cmd += 'python get_django_code.py; '
+  result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
+  djangocode = result.split('\n')[0]
+  if os.path.exists('camai/passwords.py'):
+    sourcefile = open('camai/passwords.py', 'r')
+  else:  
+    sourcefile = open('camai/passwords.py.example', 'r')
+  targetfile = open('camai/passwords.py-new', 'w')
+  for line in sourcefile:
+    if line.startswith('security_key = '):
+        line = 'security_key = "' + djangocode + '"\n'
+    if line.startswith('localaccess = '):
+        line = 'localaccess = ' + str(uselocal) + '\n'
+    if line.startswith('myip = '):
+        if myip: 
+          line = 'myip = ["' + myip + '"]\n'
+        else:
+          line = 'myip = []\n'
+    if line.startswith('db_password = '):
+        line = 'db_password = "' + db_pass + '"\n'
+    if line.startswith('os_type = '):
+        line = 'os_type = "' + os_code + '"\n'
+    if line.startswith('env_type = '):
+        line = 'env_type = "' + env_type + '"\n'
+    targetfile.write(line)
+  targetfile = open('camai/passwords.py-new', 'w')
+  sourcefile.close()
+  targetfile.close()
+  if os.path.exists('camai/passwords.py'):
+    os.remove('/home/cam_ai/cam-ai/camai/passwords.py')
+  os.rename('/home/cam_ai/cam-ai/camai/passwords.py-new', 
+    '/home/cam_ai/cam-ai/camai/passwords.py')
+  print()
+
+if False or run_all:
+  print('>>>>> Migrating the database...')
+  if env_type == 'venv':
+    cmd = 'source env/bin/activate; '
+  else: #conda
+    cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
+    cmd += 'conda activate tf; '
+  cmd += 'python manage.py migrate; '
+  result = subprocess.call(cmd, shell=True, executable='/bin/bash')
+  runserverfile = 'runserver.sh'
+  copy(runserverfile, '..')
+  os.chdir('..')
+  os.chmod(runserverfile, 0o744)
+  
 print()
 print('*************************************************')
 print('*                                               *')

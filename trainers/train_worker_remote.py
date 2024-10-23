@@ -139,25 +139,31 @@ class train_once_remote():
           break
         except TimeoutError:
           i += 1
-      count -= 1  
-    count = len(localset - remoteset_with_size)
-    zip_buffer = io.BytesIO()   
-    with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
-      for item in (localset - remoteset_with_size):
-        imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
-        if imagedata.shape[1] > model_in_dims[0] or imagedata.shape[0] > model_in_dims[1]:
-          imagedata = cv.resize(imagedata, model_in_dims)
-        imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
-        zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
-        jsondata = json.dumps(localdict[item]).encode()
-        zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
-        self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
-        count -= 1  
-    zip_buffer.seek(0)
-    zip_content = zip_buffer.read()
-    pingproc.stop()
-    self.ws.send_binary(zip_content)
-    self.ws.recv()
+      count -= 1
+
+    datalist = list(localset - remoteset_with_size) 
+    count = len(datalist)
+    start = 0
+    step = 100
+    for i in range(start, len(datalist), step):
+      sublist = datalist[i:i+step]
+      zip_buffer = io.BytesIO()   
+      with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
+        for item in sublist:
+          imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
+          if imagedata.shape[1] > model_in_dims[0] or imagedata.shape[0] > model_in_dims[1]:
+            imagedata = cv.resize(imagedata, model_in_dims)
+          imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
+          zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
+          jsondata = json.dumps(localdict[item]).encode()
+          zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
+          self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
+          count -= 1  
+      zip_buffer.seek(0)
+      zip_content = zip_buffer.read()
+      self.ws.send_binary(zip_content)
+      self.ws.recv()
+    pingproc.stop()  
     if self.t_type == 2:
       outdict = {
         'code' : 'checkfitdone',

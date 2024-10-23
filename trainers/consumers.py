@@ -42,6 +42,8 @@ from users.userinfo import afree_quota
 from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
 from .c_trainers import trainers
 
+from random import randint
+
 logname = 'ws_trainers'
 logger = getLogger(logname)
 log_ini(logger, logname)
@@ -82,7 +84,10 @@ class remotetrainer(AsyncWebsocketConsumer):
           await self.ws.receive()
         else:
           with ZipFile(ram_file) as myzip:
+            i = len(myzip.namelist())
             for item in myzip.namelist():
+              logger.info('(' +str(i)+ ') Unpacking: ' + item)
+              i -= 1
               if item[-4:] == '.bmp':
                 codpath = (self.myschoolline.dir
                   + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
@@ -323,11 +328,13 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       self.ws_ts = None
       self.didrunout = None
+      self.status_string = 'Idle'
       await self.accept()
       self.trainernr = None
       self.query_count = 0
       self.query_working = False
       self.ws_session = None
+      self.new_click = False
       
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
@@ -394,6 +401,8 @@ class trainerutil(AsyncWebsocketConsumer):
           returned = await self.ws.receive()
           outlist['data'] = json.loads(returned.data)['data']
         else:
+          if 'new_click' in params and params['new_click']:
+            self.new_click = True
           all_fits = fit.objects.filter(school=params['school'])
           last_fit = await all_fits.alast()
           temp_count = await all_fits.acount()
@@ -408,15 +417,17 @@ class trainerutil(AsyncWebsocketConsumer):
               new_epoch = self.query_count < temp_count
               self.query_count = temp_count
               remove = False
-            if last_fit.status in {'Working', 'Queuing'}:  
-              unshow_modal = not self.query_working
+            if last_fit.status in {'Working', 'Queuing'}: 
+              self.new_click = False
+              self.status_string = last_fit.status  
               self.query_working = True
             else:  
-              unshow_modal = False
+              if self.new_click:
+                self.status_string = 'Preparing'  
+              else:
+                self.status_string = 'Idle'  
               self.query_working = False
             async for item in query_set:
-              if item.status == 'NoQuota':
-                unshow_modal = True
               result.append({
                 'id':item.id, 'made':item.made.strftime("%Y-%m-%d"), 
                 'nr_tr':item.nr_tr, 'nr_va':item.nr_va, 'minutes':item.minutes, 
@@ -438,9 +449,8 @@ class trainerutil(AsyncWebsocketConsumer):
           else:
             remove = 0
             new_epoch = False
-            unshow_modal = False
-          outlist['data'] = (result, remove, new_epoch, unshow_modal)
-        logger.debug('--> ' + str(outlist))
+          outlist['data'] = (result, remove, new_epoch, self.status_string)
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'getepochsinfo':

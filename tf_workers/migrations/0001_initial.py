@@ -4,7 +4,7 @@ import datetime
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-from django.utils.timezone import utc
+#from django.utils.timezone import utc
 
 def fill_table(apps, schema_editor):
   User = apps.get_model("auth", "user")
@@ -65,7 +65,10 @@ class Migration(migrations.Migration):
           ('creator', models.ForeignKey(default=1, on_delete=django.db.models.deletion.SET_DEFAULT, to=settings.AUTH_USER_MODEL)),
           ('dir', models.CharField(default='', max_length=256)),
           ('trigger', models.IntegerField(default=500)),
-          ('lastmodelfile', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
+          ('lastmodelfile', models.DateTimeField(default=datetime.datetime(
+            1900, 1, 1, 0, 0, 
+            tzinfo=datetime.timezone.utc, 
+          ))),
           ('active', models.IntegerField(default=1)),
           ('l_rate_min', models.CharField(default='1e-6', max_length=20)),
           ('l_rate_max', models.CharField(default='1e-6', max_length=20)),

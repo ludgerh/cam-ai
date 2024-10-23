@@ -3,7 +3,7 @@
 import datetime
 from django.db import migrations, models
 import django.db.models.deletion
-from django.utils.timezone import utc
+#from datetime.timezone import utc
 
 
 class Migration(migrations.Migration):
@@ -19,10 +19,21 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='event',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.BigAutoField(
+                  auto_created=True, 
+                  primary_key=True, 
+                  serialize=False, 
+                  verbose_name='ID',
+                )),
                 ('p_string', models.CharField(default='[]', max_length=255)),
-                ('start', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
-                ('end', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
+                ('start', models.DateTimeField(default=datetime.datetime(
+                  1900, 1, 1, 0, 0, 
+                  tzinfo=datetime.timezone.utc, 
+                ))),
+                ('end', models.DateTimeField(default=datetime.datetime(
+                  1900, 1, 1, 0, 0, 
+                  tzinfo=datetime.timezone.utc, 
+                ))),
                 ('xmin', models.IntegerField(default=0)),
                 ('xmax', models.IntegerField(default=0)),
                 ('ymin', models.IntegerField(default=0)),
@@ -52,7 +63,10 @@ class Migration(migrations.Migration):
             name='event_frame',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('time', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
+                ('time', models.DateTimeField(default=datetime.datetime(
+                  1900, 1, 1, 0, 0, 
+                  tzinfo=datetime.timezone.utc, 
+                ))),
                 ('status', models.SmallIntegerField(default=0)),
                 ('name', models.CharField(max_length=100)),
                 ('x1', models.IntegerField(default=0)),

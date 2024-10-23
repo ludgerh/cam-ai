@@ -84,6 +84,12 @@ class schooldbutil(AsyncWebsocketConsumer):
   @database_sync_to_async
   def geteventshortlist(self, page_nr):
     return(list(self.eventpage.get_elided_page_range(page_nr)))
+    
+  @database_sync_to_async  
+  def gettrainobjectlist(self, page_nr):
+    return(self.trainpage.page(page_nr).object_list)
+    
+    
 
   async def connect(self):
     try:
@@ -168,7 +174,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       if params['command'] == 'gettrainimages' :
         lines = []
-        async for line in self.trainpage.page(params['page_nr']).object_list:
+        async for line in await self.gettrainobjectlist(params['page_nr']):
           made_by_nr = await sync_to_async(lambda: line.made_by)()
           if made_by_nr is None:
             made_by = ''

@@ -173,13 +173,17 @@ class trainer():
             myschool = tempread[0]
             myfit = tempread[1]
             if self.dbline.t_type == 1:
-              gpu_process = Process(target = train_once_gpu, args = (myschool, myfit, 
-                self.dbline.gpu_nr, self.dbline.gpu_mem_limit, ))
-              gpu_process.start()
-              gpu_process.join()
-              trainresult = (gpu_process.exitcode)
+              train_process = Process(target = train_once_gpu, args = (
+                myschool, 
+                myfit, 
+                self.dbline.gpu_nr,
+                self.dbline.gpu_mem_limit,
+              ))
+              train_process.start()
+              train_process.join()
+              trainresult = (train_process.exitcode)
             elif (self.dbline.t_type in {2, 3}):
-              trainresult = train_once_remote(
+              my_tor = train_once_remote(
                 myschool, 
                 myfit, 
                 self.dbline.wsserver, 
@@ -187,7 +191,10 @@ class trainer():
                 self.dbline.wspass, 
                 self.dbline.t_type,
                 self.logger,
-              ).run()
+              )
+              train_process = Process(target = my_tor.run)
+              train_process.start()
+              trainresult = 0
             if not trainresult:
               filterdict = {
                 'school' : myschool.id,

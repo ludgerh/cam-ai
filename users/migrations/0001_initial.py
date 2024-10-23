@@ -4,7 +4,7 @@ import datetime
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-from django.utils.timezone import utc, now
+from django.utils.timezone import now
 
 def fill_table(apps, schema_editor):
   User = apps.get_model("auth", "user")
@@ -31,7 +31,10 @@ class Migration(migrations.Migration):
         ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
         ('allowed_schools', models.IntegerField(default=3)),
         ('allowed_streams', models.IntegerField(default=3)),
-        ('deadline', models.DateTimeField(default=datetime.datetime(2100, 1, 1, 0, 0, tzinfo=utc))),
+        ('deadline', models.DateTimeField(default=datetime.datetime(
+          2100, 1, 1, 0, 0, 
+          tzinfo=datetime.timezone.utc, 
+        ))),
         ('made', models.DateTimeField(default=now)),
         ('pay_tokens', models.IntegerField(default=0)),
       ],
@@ -44,7 +47,10 @@ class Migration(migrations.Migration):
         ('typecode', models.IntegerField(default=0)),
         ('number', models.IntegerField(default=0)),
         ('name', models.CharField(max_length=100)),
-        ('made', models.DateTimeField(default=datetime.datetime(1900, 1, 1, 0, 0, tzinfo=utc))),
+        ('made', models.DateTimeField(default=datetime.datetime(
+          1900, 1, 1, 0, 0, 
+          tzinfo=datetime.timezone.utc, 
+        ))),
         ('school', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='tf_workers.school')),
         ('users', models.ManyToManyField(to=settings.AUTH_USER_MODEL)),
       ],

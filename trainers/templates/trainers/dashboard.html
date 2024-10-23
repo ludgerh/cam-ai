@@ -26,10 +26,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endif %}
 <main>
   <div class="h2">Training dashboard for school: {{ school.name }}</div>
-  <div class="h2">Status: <span id="queue_status">?</span> Queue position: <span id="queue_pos">?</span></div>
+  <div class="h2">Queue Position: <span id="queue_pos">?</span></div>
+  <div class="h2">Job Status: <span id="job_status">Idle</span></div>
   {% if may_write %}
   <div class="h2">
-    <button type="button" id="train_button" class="btn btn-primary m-2" style="width: 180px;">Train AI now!</button>
+    <button type="button" id="train_button" class="btn btn-primary m-2" 
+      style="width: 180px;" disabled>Train AI now!</button>
   </div>
   <div class="h2">
     School Settings:
@@ -205,10 +207,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <script >
 
 let trainerutilSocket;
-let trainnowstarted = false;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-let modal_visible = false;
-let item_save;
+let new_click = false;
+let status_save;
+let training_done = false;
 
 let model_types_dict = {
 {% for item in model_types %}
@@ -268,43 +270,26 @@ function refresh_all() {
   })
   .then((result) => {
     if (result.pos) {
-{% if may_write %}
-      trainnowstarted = false;
       $('#train_button').prop("disabled",true);
-{% endif %}
-      if (result.pos > 1) {
-        $('#queue_status').text('Queuing');
-      } else {
-        $('#queue_status').text('Working');
-      }; 
-      $('#queue_pos').text(result.pos+'/'+result.len);
-    } else {
-{% if may_write %}
-      if (!trainnowstarted) {
-        $('#train_button').prop("disabled",false);
-      };
-{% endif %}
-      $('#queue_status').text('Idle');
-      $('#queue_pos').text('0/'+result.len);
     };
+    $('#queue_pos').text(result.pos+'/'+result.len);
     return(trainerutilSocket.sendandwait({
       'command' : 'getfitinfo',
       'school' : {{ school.id }},
+      'new_click' : new_click,
     }))
   })
   .then((result_all) => {
+    new_click = false;
     result = result_all[0];
     remove = result_all[1];
     new_epoch = result_all[2];
-    unshow_modal = result_all[3];
+    $('#job_status').text(result_all[3]);
+    if (result_all[3] == 'Preparing') {
+      $('#train_button').prop("disabled",true);
+    };
     if (remove) {
       $('#tablebody tr:last').remove();
-    };
-    if (unshow_modal) {
-      if (modal_visible) {
-        $('#mymodal').modal('hide');
-        modal_visible = false;
-      };  
     };
     result.forEach(function(item, index) {
       datestring = item.made;
@@ -335,12 +320,20 @@ function refresh_all() {
       newaddition += '<td>'+item.val_hit100.toPrecision(3)+'</td>';
       newaddition += '<td>'+item.val_cmetrics.toPrecision(3)+'</td>';
       newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/'+item.id+'/" target="_blank">'+item.status+'</a></td>';
-      item_save = item.pk;
       newaddition += '</tr>';
       $('#tablebody').append(newaddition);
+      status_save = item.status;
     });
     if (new_epoch) {
       $(document).scrollTop($(document).height()); 
+    };  
+    if (status_save == 'Done') {
+      if (training_done) {
+        $('#train_button').prop("disabled",false);
+        training_done = false;
+      };  
+    } else {
+      training_done = true;
     };  
     setTimeout(refresh_all, 10000);
   })
@@ -373,7 +366,7 @@ $(document).ready(function() {
         });
       })
       $('#train_button').click(function() {
-        modal_visible = true;
+        new_click = true;
         $('.modal-title').text('Synchronizing the Training Data');
         $('.modal-body').text('Depending on the amount of new data this may take some minutes...');
         $('#mymodal').modal('show');
@@ -384,6 +377,7 @@ $(document).ready(function() {
         })
         .then((result) => {
           $('#train_button').removeClass('btn-warning');
+          $('#mymodal').modal('hide');
         })
       });
       init_var('#trigger', 'trigger');

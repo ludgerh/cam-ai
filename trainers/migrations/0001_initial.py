@@ -22,7 +22,9 @@ class Migration(migrations.Migration):
     migrations.CreateModel(
       name='fit',
       fields=[
-        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, 
+          verbose_name='ID')
+        ),
         ('made', models.DateTimeField()),
         ('minutes', models.FloatField()),
         ('school', models.IntegerField()),
@@ -47,10 +49,15 @@ class Migration(migrations.Migration):
     migrations.CreateModel(
       name='trainer',
       fields=[
-        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, 
+          verbose_name='ID')
+        ),
         ('active', models.BooleanField(default=True)),
         ('name', models.CharField(default='New Trainer', max_length=256)),
-        ('t_type', models.IntegerField(choices=[(1, 'GPU'), (2, 'CPU'), (3, 'Remote'), (4, 'other')], default=3, verbose_name='trainer type')),
+        ('t_type', models.IntegerField(
+          choices=[(1, 'GPU'), (2, 'CPU'), (3, 'Remote'), (4, 'other')], 
+          default=2, verbose_name='trainer type')
+        ),
         ('gpu_nr', models.IntegerField(default=0, verbose_name='gpu number')),
         ('gpu_mem_limit', models.IntegerField(default=0, verbose_name='gpu mem limit')),
         ('startworking', models.CharField(default='00:00:00', max_length=8)),
@@ -65,7 +72,9 @@ class Migration(migrations.Migration):
     migrations.CreateModel(
       name='trainframe',
       fields=[
-        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, 
+          verbose_name='ID')
+        ),
         ('made', models.DateTimeField()),
         ('school', models.SmallIntegerField()),
         ('name', models.CharField(max_length=256)),
@@ -82,13 +91,17 @@ class Migration(migrations.Migration):
         ('c9', models.SmallIntegerField()),
         ('checked', models.SmallIntegerField()),
         ('train_status', models.SmallIntegerField(default=0)),
-        ('made_by', models.ForeignKey(default=None, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
+        ('made_by', models.ForeignKey(default=None, null=True, 
+          on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)
+        ),
       ],
     ),
     migrations.CreateModel(
       name='epoch',
       fields=[
-        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, 
+          verbose_name='ID')
+        ),
         ('seconds', models.FloatField(default=0)),
         ('loss', models.FloatField(default=0)),
         ('cmetrics', models.FloatField(default=0)),
@@ -97,7 +110,9 @@ class Migration(migrations.Migration):
         ('val_cmetrics', models.FloatField(default=0)),
         ('val_hit100', models.FloatField(default=0)),
         ('learning_rate', models.FloatField(default=0)),
-        ('fit', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='trainers.fit')),
+        ('fit', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, 
+          to='trainers.fit')
+        ),
       ],
     ),
   ]
