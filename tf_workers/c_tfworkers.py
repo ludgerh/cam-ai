@@ -85,10 +85,11 @@ class model_buffer(deque):
     else:  
       for frame in initem[0]:
         if self.websocket:
-          if ((frame.shape[1] * frame.shape[0]) > (self.xdim * self.ydim)):
+          if frame.shape[1] * frame.shape[0] > self.xdim * self.ydim:
             frame = cv.resize(frame, (self.xdim, self.ydim))
         else:
-          frame = cv.resize(frame, (self.xdim, self.ydim))
+          if frame.shape[1] != self.xdim or  frame.shape[0] != self.ydim:
+            frame = cv.resize(frame, (self.xdim, self.ydim))
         with self.bufferlock:
           super().append((frame, initem[1]))
 

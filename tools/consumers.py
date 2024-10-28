@@ -344,10 +344,10 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 'wspass',
                 'wsid',
               ))
+              while redis.get_start_trainer_busy():
+                sleep(long_brake)
+              redis.set_start_trainer_busy(mytrainer.id)
           outlist['data'] = resultdict['data']['status'] 
-          while redis.get_start_trainer_busy():
-            sleep(long_brake)
-          redis.set_start_trainer_busy(mytrainer.id)
         else:
           if params['type'] == 'w': #Worker 
             myworker = await worker.objects.aget(id=params['item_nr'])

@@ -221,7 +221,7 @@ class c_event(list):
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
 
   def save(self, cond_dict):
-    #print('*** Saving Event:', self.id)
+    print('*** Saving Event:', self.id)
     self.frames_filter(self.number_of_frames, cond_dict)
     frames_to_save = self.frames.values()
     self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
@@ -241,25 +241,26 @@ class c_event(list):
       except OperationalError:
         connection.close()
     self.mailimages = []
-    for item in frames_to_save:
+    for frame in frames_to_save:
       pathadd = str(self.dbline.camera.id)+'/'+str(randint(0,99))
       if not path.exists(schoolpath+pathadd):
         makedirs(schoolpath+pathadd)
-      filename = uniquename(schoolpath, pathadd+'/'+ts2filename(item[2], 
+      filename = uniquename(schoolpath, pathadd+'/'+ts2filename(frame[2], 
         noblank=True), 'bmp')
-      bmp_data =  cv.imencode('.bmp', item[1])[1].tobytes() 
+      bmp_data =  frame[8]
+      print(filename)  
       if c_event.crypt is not None:
         bmp_data = c_event.crypt.encrypt(bmp_data)
       with open(schoolpath+filename, "wb") as file:
         file.write(bmp_data)
       frameline = event_frame(
-        time = timezone.make_aware(datetime.fromtimestamp(item[2])),
+        time = timezone.make_aware(datetime.fromtimestamp(frame[2])),
         name = filename,
         encrypted = c_event.crypt is not None,
-        x1 = item[3],
-        x2 = item[4],
-        y1 = item[5],
-        y2 = item[6],
+        x1 = frame[3],
+        x2 = frame[4],
+        y1 = frame[5],
+        y2 = frame[6],
         event = self.dbline,
       )
       frameline.save()

@@ -49,6 +49,8 @@ from .c_event import c_event, resolve_rules
 from .c_alarm import alarm, alarm_init
 
 #from threading import enumerate
+import psutil
+from pympler.asizeof import asizeof
 
 class c_eventer(c_device):
 
@@ -98,6 +100,11 @@ class c_eventer(c_device):
 
       self.tf_w_index = self.tf_worker.register()
       self.tf_worker.run_out(self.tf_w_index)
+      self.xdim, self.ydim = self.tf_worker.get_xy(
+        self.dbline.eve_school.id,
+        self.tf_w_index
+      )
+      print('*****************************', (self.xdim, self.ydim))
 
       self.finished = False
       self.do_run = True
@@ -110,6 +117,7 @@ class c_eventer(c_device):
       self.run_one_ts = time()
       self.run_one_deque = deque()
       self.last_insert_ts = 0.0
+      
 
       Thread(target=self.inserter, name='InserterThread').start()
       
@@ -233,6 +241,11 @@ class c_eventer(c_device):
       
     if self.do_run and (time() - self.run_one_ts) > 1.0: # once per second
       self.run_one_ts = time()
+#++++++++++++++++++++  
+      process = psutil.Process()
+      print('Memory used:', round(process.memory_info().rss / 1000000), 'MB')
+      print('self.eventdict:', round(asizeof(self.eventdict) / 1000000), 'MB')
+#++++++++++++++++++++      
       while True:
         try:
           present_school_nr = self.dbline.eve_school.id
@@ -494,10 +507,13 @@ class c_eventer(c_device):
         if self.detectorqueue.empty():
           sleep(djconf.getconfigfloat('short_brake', 0.1))
           continue  
-        image, numbers = self.detectorqueue.get()
-        np_image = np.frombuffer(image, dtype=np.uint8)
-        np_image = np_image.reshape(numbers[5]-numbers[4], numbers[3]-numbers[2], 3) 
-        frame = [numbers[0], np_image] + list(numbers[1:])
+        image, numbers, bmpdata = self.detectorqueue.get()
+        image = np.frombuffer(image, dtype=np.uint8)
+        image = image.reshape(numbers[5]-numbers[4], numbers[3]-numbers[2], 3) 
+        if image.shape[1] * image.shape[0] > self.xdim * self.ydim:
+          image = cv.resize(image, (self.xdim, self.ydim))
+        frame = [numbers[0], image] + list(numbers[1:]) + [bmpdata]
+        del image
         if not self.dbline.cam_xres:
           self.dbline.refresh_from_db(fields=['cam_xres', 'cam_yres', ])
         if detector_to is None:
@@ -508,10 +524,11 @@ class c_eventer(c_device):
           continue
         detector_to = new_time
         if detector_buffer:
-          imglist = []  
+          imglist = []
+          bmplist = []
           for frame in detector_buffer:
-            np_image = cv.cvtColor(frame[1], cv.COLOR_BGR2RGB)
-            imglist.append(np_image)
+            imglist.append(cv.cvtColor(frame[1], cv.COLOR_BGR2RGB))
+            bmplist.append(frame[7])
           if self.tf_w_index is not None:
             while True:
               try:
@@ -528,7 +545,8 @@ class c_eventer(c_device):
             while predictions.shape[0] < len(detector_buffer):
               predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
           for i in range(len(detector_buffer)):
-            detector_buffer[i].append(predictions[i])
+            #detector_buffer[i].append(predictions[i])
+            detector_buffer[i] = detector_buffer[i][:7] + [predictions[i]] + [bmplist[i]]
             margin = self.dbline.eve_margin
             found = None
             for j, item in list(self.eventdict.items()):

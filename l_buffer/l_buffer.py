@@ -53,9 +53,11 @@ class l_buffer():
     self.storage = (
       'l_buffer:' + str(i) + ':bytes', 
       'l_buffer:' + str(i) + ':object',
+      'l_buffer:' + str(i) + ':bytes_2',
     )
     self.redis.delete(self.storage[0])
     self.redis.delete(self.storage[1])
+    self.redis.delete(self.storage[2])
     if self.call:
       self.do_run = True
       self.p = self.redis.pubsub(ignore_subscribe_messages=True)
@@ -90,12 +92,17 @@ class l_buffer():
       if self.queue:
         bytedata = self.redis.rpop(self.storage[0])
         objdata = self.redis.rpop(self.storage[1])
+        bytedata2 = self.redis.rpop(self.storage[2])
       else:
         bytedata = self.redis.get(self.storage[0])
         objdata = self.redis.get(self.storage[1])
+        bytedata2 = self.redis.get(self.storage[2])
       if objdata:
         objdata = pickle.loads(objdata)
-      result = (bytedata, objdata)
+      if bytedata2:
+        result = (bytedata, objdata, bytedata2)  
+      else:  
+        result = (bytedata, objdata)
       self.my_lock.release()
     else:
       result = None  
@@ -104,7 +111,7 @@ class l_buffer():
         self.redis.delete(self.storage[0])
     return(result)
 
-  def put(self, bytedata=b'', objdata=None, data=None):
+  def put(self, bytedata=b'', objdata=None, bytedata2=b''):
     if objdata:
       objdata = pickle.dumps(objdata)
     else:
@@ -114,9 +121,11 @@ class l_buffer():
       if self.queue:
         self.redis.lpush(self.storage[0], bytedata)
         self.redis.lpush(self.storage[1], objdata)
+        self.redis.lpush(self.storage[2], bytedata2)
       else:  
         self.redis.set(self.storage[0], bytedata)
         self.redis.set(self.storage[1], objdata)
+        self.redis.set(self.storage[2], bytedata2)
       if self.call: 
         self.redis.publish(self.storage[0], 'T') #Trigger
       self.my_lock.release()

@@ -135,13 +135,13 @@ class c_detector(c_device):
       if input is None:
         return(None)
       #print('Queuesize', self.id, ':', self.myeventer.detectorqueue.qsize())
-      if self.myeventer.detectorqueue.qsize() > 2 * self.dbline.det_max_rect:
-        if not self.warning_done:
-          self.logger.warning('Detector #' + str(self.id)
-            + ' skipped cycle, eventer queue > ' 
-            + str(2 * self.dbline.det_max_rect))
-          self.warning_done = True  
-        return(None)  
+      #if self.myeventer.detectorqueue.qsize() > 2 * self.dbline.det_max_rect:
+      #  if not self.warning_done:
+      #    self.logger.warning('Detector #' + str(self.id)
+      #      + ' skipped cycle, eventer queue > ' 
+      #      + str(2 * self.dbline.det_max_rect))
+      #    self.warning_done = True  
+      #  return(None)  
       frametime = input[2]
       if not (self.do_run and self.sl.greenlight(self.period, frametime)):
         return(None)
@@ -230,6 +230,7 @@ class c_detector(c_device):
             self.myeventer.detectorqueue.put(
               bytedata = aoi.tobytes(),
               objdata = (3, frametime, rect[0], rect[1], rect[2], rect[3]),
+              bytedata2 = cv.imencode('.bmp', aoi)[1].tostring(),
             )  
         else:
           self.background = np.float32(frame)
