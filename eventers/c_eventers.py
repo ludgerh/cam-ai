@@ -49,8 +49,8 @@ from .c_event import c_event, resolve_rules
 from .c_alarm import alarm, alarm_init
 
 #from threading import enumerate
-import psutil
-from pympler.asizeof import asizeof
+#import psutil
+#from pympler.asizeof import asizeof
 
 class c_eventer(c_device):
 
@@ -104,8 +104,6 @@ class c_eventer(c_device):
         self.dbline.eve_school.id,
         self.tf_w_index
       )
-      print('*****************************', (self.xdim, self.ydim))
-
       self.finished = False
       self.do_run = True
       self.do_webm = djconf.getconfigbool('do_webm', False)
@@ -242,9 +240,9 @@ class c_eventer(c_device):
     if self.do_run and (time() - self.run_one_ts) > 1.0: # once per second
       self.run_one_ts = time()
 #++++++++++++++++++++  
-      process = psutil.Process()
-      print('Memory used:', round(process.memory_info().rss / 1000000), 'MB')
-      print('self.eventdict:', round(asizeof(self.eventdict) / 1000000), 'MB')
+      #process = psutil.Process()
+      #print('Memory used:', round(process.memory_info().rss / 1000000), 'MB')
+      #print('self.eventdict:', round(asizeof(self.eventdict) / 1000000), 'MB')
 #++++++++++++++++++++      
       while True:
         try:

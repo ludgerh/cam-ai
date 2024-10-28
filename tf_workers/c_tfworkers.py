@@ -359,7 +359,14 @@ class tf_worker():
           environ["CUDA_VISIBLE_DEVICES"] = ''
         else:  
           environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
-        import tensorflow as tf 
+        print('##############################')
+        try:
+          import tensorflow as tf 
+        except: 
+          self.logger.error('Error in process: ' + self.logname)
+          self.logger.error(format_exc())
+          self.logger.handlers.clear()
+        print(tf)
         self.logger.info("TensorFlow version: "+tf.__version__)
         cpus = tf.config.list_physical_devices('CPU')
         self.logger.info('+++++ tf_worker CPUs: '+str(cpus))

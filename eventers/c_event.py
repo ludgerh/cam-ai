@@ -221,7 +221,7 @@ class c_event(list):
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
 
   def save(self, cond_dict):
-    print('*** Saving Event:', self.id)
+    #print('*** Saving Event:', self.id)
     self.frames_filter(self.number_of_frames, cond_dict)
     frames_to_save = self.frames.values()
     self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
@@ -248,7 +248,6 @@ class c_event(list):
       filename = uniquename(schoolpath, pathadd+'/'+ts2filename(frame[2], 
         noblank=True), 'bmp')
       bmp_data =  frame[8]
-      print(filename)  
       if c_event.crypt is not None:
         bmp_data = c_event.crypt.encrypt(bmp_data)
       with open(schoolpath+filename, "wb") as file:
