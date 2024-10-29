@@ -1,9 +1,10 @@
 #!/bin/bash 
 cd cam-ai 
-if [ "$1" = "venv" ] ; then
-  source env/bin/activate 
+if [ "$1" = "raspi" ] ; then
+  source ~/miniforge3/etc/profile.d/conda.sh
+  conda activate tf
 fi
-if [ "$1" = "conda" ] ; then
+if [ "$1" = "pc" ] ; then
   source ~/miniconda3/etc/profile.d/conda.sh
   conda activate tf
 fi

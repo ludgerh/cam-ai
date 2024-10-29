@@ -88,7 +88,7 @@ else:
   
 if hw_os_code['hw'] == 'raspi': 
   os_code = 'raspi_' + hw_os_code['hw_version'] + '_' + hw_os_code['dist_version']
-  env_type = 'venv'
+  env_type = 'conda'
 elif hw_os_code['hw'] == 'pc':  
   os_code = 'debian'+hw_os_code['dist_version']
   env_type = 'conda' 
@@ -215,19 +215,17 @@ if False or run_all:
   subprocess.call(['sudo', 'apt', '-y', 'install', 'libgeos-dev']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'redis']) 
   subprocess.call(['sudo', 'apt', '-y', 'install', 'pkg-config']) 
-  if env_type == 'venv':
-    subprocess.call(['sudo', 'apt', '-y', 'install', 'python3-venv']) 
   print()
  
 if False or run_all:  
   print('>>>>> Modifying system config...')
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+  subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI setting/d', 
     '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^timeout/d', '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , 
     '/etc/dhcp/dhclient.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$atimeout 180;' , '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+  subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI setting/d', 
     '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^vm.overcommit_memory/d', '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^net.core.somaxconn/d', '/etc/sysctl.conf']) 
@@ -235,7 +233,7 @@ if False or run_all:
   subprocess.call(['sudo', 'sed', '-i', '$avm.overcommit_memory = 1' , 
     '/etc/sysctl.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$anet.core.somaxconn=1024' , '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI disabled saving/d', 
+  subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI disabled saving/d', 
     '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^save/d', '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^#save/d', '/etc/redis/redis.conf']) 
@@ -246,7 +244,7 @@ if False or run_all:
   subprocess.call(['sudo', 'sed', '-i', '$a#save 60 10000' , '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '$asave ""' , '/etc/redis/redis.conf']) 
   if db_external:
-    subprocess.call(['sudo', 'sed', '-i', '/^#\*\*\*\*\* CAM-AI setting/d', 
+    subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI setting/d', 
       '/etc/mysql/mariadb.conf.d/50-server.cnf']) 
     subprocess.call(['sudo', 'sed', '-i', '/^bind-address/d', 
       '/etc/mysql/mariadb.conf.d/50-server.cnf']) 
@@ -255,32 +253,29 @@ if False or run_all:
     subprocess.call(['sudo', 'sed', '-i', '$abind-address = 0.0.0.0', 
       '/etc/mysql/mariadb.conf.d/50-server.cnf']) 
     subprocess.call(['sudo', 'systemctl', 'restart', 'mariadb']) 
-  
 print()
 
 os.chdir(installdir)
 
 if True or run_all:
   print('>>>>> Setting up Python environment...')
-  if env_type == 'venv':
-    if not os.path.exists('env'):
-      subprocess.call(['python', '-m', 'venv', 'env']) 
-    cmd = 'source env/bin/activate; '
-  else: #conda
+  if hw_os_code['hw'] == 'raspi':
+    cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
+  else:  
     cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-    cmd += 'conda activate tf; '
+  cmd += 'conda activate tf; '
   cmd += 'pip install --upgrade pip; '
   cmd += 'pip install -r requirements.' + os_code + '; '
   result = subprocess.call(cmd, shell=True, executable='/bin/bash')
 
 if False or run_all:
   print('>>>>> Modifying ' + installdir + '/passwords.py...')
-  if env_type == 'venv':
-    cmd = 'source env/bin/activate; '
-  else: #conda
+  if hw_os_code['hw'] == 'raspi':
+    cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
+  else:  
     cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-    cmd += 'conda activate tf; '
-  cmd += 'python get_django_code.py; '
+  cmd += 'conda activate tf; '
+  cmd += 'python ' + os.getcwd() + '/get_django_code.py; '
   result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
   djangocode = result.split('\n')[0]
   if os.path.exists('camai/passwords.py'):
@@ -316,11 +311,11 @@ if False or run_all:
 
 if False or run_all:
   print('>>>>> Migrating the database...')
-  if env_type == 'venv':
-    cmd = 'source env/bin/activate; '
-  else: #conda
+  if hw_os_code['hw'] == 'raspi':
+    cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
+  else:  
     cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-    cmd += 'conda activate tf; '
+  cmd += 'conda activate tf; '
   cmd += 'python manage.py migrate; '
   result = subprocess.call(cmd, shell=True, executable='/bin/bash')
   runserverfile = 'runserver.sh'
@@ -336,7 +331,7 @@ print('*                                               *')
 print('*************************************************')
 print()
 print('You can now start the server by entering this:')
-print('./runserver.sh '+env_type)
+print('./runserver.sh '+hw_os_code['hw'])
 print()
 print('And then surf to your new server in the browser using:')
 if uselocal:
