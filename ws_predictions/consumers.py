@@ -52,6 +52,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
       self.ws_id = 0
       self.worker_nr = 0
       self.ws_name = 'undefined'
+      self.mydatacache = {}
       await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')

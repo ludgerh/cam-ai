@@ -216,10 +216,17 @@ def check_db_connect(logger=None, force_check=False):
 async def acheck_db_connect(logger=None, force_check=False):
   global db_ts
   if (new_time := time()) - db_ts > 3300.0 or force_check: #55 Minutes 
+    if logger:
+      logger.info(
+        'check_db_connect: '
+        + str(new_time) + ', '
+        + str(db_ts) + ', '
+        + str(new_time - db_ts)
+      )
     while True:
       try:
         dummy = await dbsetting.objects.aget(setting = 'version')
         break
       except OperationalError:
-        connection.close()
+        await sync_to_async(connection.close)()
   db_ts = new_time     

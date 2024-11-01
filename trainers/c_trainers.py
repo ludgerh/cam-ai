@@ -101,7 +101,7 @@ class trainer():
           active=True,
           tf_worker=self.dbline.id,
         )
-        check_db_connect()
+        check_db_connect(force_check=True)
         for item in schoollines:
           with self.mylock:
             if item.id not in self.job_queue_list:
@@ -116,12 +116,14 @@ class trainer():
                   'train_status__lt' : 2,}
                 if not item.ignore_checked:
                   filterdict['checked'] = True
+                check_db_connect(force_check=True)
                 undone = trainframe.objects.filter(**filterdict)
                 count = undone.count()
                 if count:
                   undone.update(train_status=1)
                   alllines = 1
                 else:
+                  check_db_connect(force_check=True)
                   alllines = trainframe.objects.filter(school=item.id).count()
                 run_condition = (count >= item.trigger) and alllines
               if run_condition:
@@ -162,7 +164,7 @@ class trainer():
       self.job_queue = threadqueue()
       Thread(target=self.job_queue_thread, name='Trainer_JobQueueThread').start()
       while self.do_run:
-        check_db_connect()
+        check_db_connect(force_check=True)
         self.dbline = dbtrainer.objects.get(id=self.id)
         timestr = ts2mysqltime(time())
         if((self.dbline.startworking < timestr) 

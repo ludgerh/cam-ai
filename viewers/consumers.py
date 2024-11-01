@@ -19,8 +19,6 @@ import asyncio
 from logging import getLogger
 from traceback import format_exc
 from django.utils import timezone
-from django.db import connection
-from django.db.utils import OperationalError
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
@@ -28,8 +26,9 @@ from access.c_access import access
 from asgiref.sync import sync_to_async
 from streams.startup import streams
 from tools.c_redis import myredis
-from tools.c_logger import log_ini
 from tools.l_tools import djconf
+from tools.c_logger import log_ini
+from tools.c_tools import acheck_db_connect
 from tools.tokens import checktoken
 from .models import view_log
 
@@ -67,12 +66,8 @@ class triggerConsumer(AsyncWebsocketConsumer):
             dict_item['viewer'].pop_from_onf(dict_item['onf'])
           dict_item['log'].stop = timezone.now()
           dict_item['log'].active = False
-          while True:
-            try:
-              await dict_item['log'].asave(update_fields=["stop", "active", ])
-              break
-            except OperationalError:
-              connection.close()
+          await acheck_db_connect()
+          await dict_item['log'].asave(update_fields=["stop", "active", ])
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())

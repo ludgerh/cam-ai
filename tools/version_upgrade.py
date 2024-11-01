@@ -20,16 +20,8 @@ from .l_tools import version_flat, version_full
 proc_dict = OrderedDict()
 
 def temp_func():
-  print('Upgrading to 1.4.5')  
-proc_dict[version_flat('1.4.5')] = temp_func
-
-def temp_func():
-  print('Upgrading to 1.4.5a')  
-proc_dict[version_flat('1.4.5a')] = temp_func
-
-def temp_func():
-  print('Upgrading to 1.4.6')  
-proc_dict[version_flat('1.4.6')] = temp_func
+  print('Upgrading to 1.4.7f')  
+proc_dict[version_flat('1.4.7f')] = temp_func
 
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)

@@ -212,7 +212,7 @@ class train_once_remote():
       r = requests.get(dlurl, allow_redirects=True)
       datapath = djconf.getconfig('datapath', 'data/')
       dlfile = djconf.getconfig('schools_dir', datapath + 'schools/')
-      dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.h5'
+      dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.keras'
       self.logger.info('DL Model: ' + dlfile)
       open(dlfile, 'wb').write(r.content)
       self.myschool.lastmodelfile = timezone.now()
