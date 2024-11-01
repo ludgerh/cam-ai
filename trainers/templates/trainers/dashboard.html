@@ -193,8 +193,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>MWD</th><th>MWC</th>
           <th>MDr</th><th>LR0</th><th>LR1</th><th>LDM</th><th>LPa</th><th>LDe</th>
           <th>WMi</th><th>WMa</th><th>WBo</th><th>ESD</th><th>ESP</th><th>Min</th>
-          <th>Epochs</th><th>Loss</th><th>H100</th><th>Cmet</th><th>val_L</th>
-          <th>val_H</th><th>val_C</th><th>Status</th>
+          <th>Epochs</th><th>Loss</th><th>BinAcc</th><th>val_L</th><th>val_BinAcc</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -210,7 +210,7 @@ let trainerutilSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let new_click = false;
 let status_save;
-let training_done = false;
+let training_done = true;
 
 let model_types_dict = {
 {% for item in model_types %}
@@ -291,49 +291,51 @@ function refresh_all() {
     if (remove) {
       $('#tablebody tr:last').remove();
     };
-    result.forEach(function(item, index) {
-      datestring = item.made;
-      newaddition = '<tr>';
-      newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
-      newaddition += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
-      newaddition += '<td>'+item.model_type+'</td>';
-      newaddition += '<td>'+item.model_image_augmentation.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.model_weight_decay.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.model_weight_constraint.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.model_dropout.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.l_rate_start+'</td>';
-      newaddition += '<td>'+item.l_rate_stop+'</td>';
-      newaddition += '<td>'+item.l_rate_delta_min.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.l_rate_patience.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.l_rate_decrement.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.weight_min.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.weight_max.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.weight_boost.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.early_stop_delta_min.toPrecision(2)+'</td>';
-      newaddition += '<td>'+item.early_stop_patience.toPrecision(2)+'</td>';
-      newaddition += '<td>'+Math.round(item.minutes)+'</td>';
-      newaddition += '<td>'+item.epochs+'</td>';
-      newaddition += '<td>'+item.loss.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.hit100.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.cmetrics.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.val_loss.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.val_hit100.toPrecision(3)+'</td>';
-      newaddition += '<td>'+item.val_cmetrics.toPrecision(3)+'</td>';
-      newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/'+item.id+'/" target="_blank">'+item.status+'</a></td>';
-      newaddition += '</tr>';
-      $('#tablebody').append(newaddition);
-      status_save = item.status;
-    });
-    if (new_epoch) {
-      $(document).scrollTop($(document).height()); 
-    };  
-    if (status_save == 'Done') {
-      if (training_done) {
-        $('#train_button').prop("disabled",false);
-        training_done = false;
-      };  
+    if (!result.length) {
+      $('#train_button').prop("disabled",false);
     } else {
-      training_done = true;
+      result.forEach(function(item, index) {
+        datestring = item.made;
+        newaddition = '<tr>';
+        newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
+        newaddition += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
+        newaddition += '<td>'+item.model_type+'</td>';
+        newaddition += '<td>'+item.model_image_augmentation.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.model_weight_decay.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.model_weight_constraint.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.model_dropout.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.l_rate_start+'</td>';
+        newaddition += '<td>'+item.l_rate_stop+'</td>';
+        newaddition += '<td>'+item.l_rate_delta_min.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.l_rate_patience.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.l_rate_decrement.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.weight_min.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.weight_max.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.weight_boost.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.early_stop_delta_min.toPrecision(2)+'</td>';
+        newaddition += '<td>'+item.early_stop_patience.toPrecision(2)+'</td>';
+        newaddition += '<td>'+Math.round(item.minutes)+'</td>';
+        newaddition += '<td>'+item.epochs+'</td>';
+        newaddition += '<td>'+item.loss.toPrecision(3)+'</td>';
+        newaddition += '<td>'+item.binacc.toPrecision(3)+'</td>';
+        newaddition += '<td>'+item.val_loss.toPrecision(3)+'</td>';
+        newaddition += '<td>'+item.val_binacc.toPrecision(3)+'</td>';
+        newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/'+item.id+'/" target="_blank">'+item.status+'</a></td>';
+        newaddition += '</tr>';
+        $('#tablebody').append(newaddition);
+        status_save = item.status;
+      });
+      if (new_epoch) {
+        $(document).scrollTop($(document).height()); 
+      };  
+      if (status_save == 'Done' || status_save == 'Stopped') {
+        if (training_done) {
+          $('#train_button').prop("disabled",false);
+          training_done = false;
+        };  
+      } else {
+        training_done = true;
+      };  
     };  
     setTimeout(refresh_all, 10000);
   })

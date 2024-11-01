@@ -86,7 +86,7 @@ def dashboard(request, schoolnr):
 def downmodel(request, schoolnr, tokennr, token): 
   if checktoken((tokennr, token), 'MOD', schoolnr):
     myschool = school.objects.get(pk = schoolnr)
-    filename = myschool.dir + 'model/' + myschool.model_type + '.h5'
+    filename = myschool.dir + 'model/' + myschool.model_type + '.keras'
     modelfile = open(filename, 'rb')
     return FileResponse(modelfile)
   else:

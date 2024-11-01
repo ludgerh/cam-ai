@@ -431,10 +431,9 @@ class trainerutil(AsyncWebsocketConsumer):
               result.append({
                 'id':item.id, 'made':item.made.strftime("%Y-%m-%d"), 
                 'nr_tr':item.nr_tr, 'nr_va':item.nr_va, 'minutes':item.minutes, 
-                'epochs':item.epochs, 'loss':item.loss, 'cmetrics':item.cmetrics, 
-                'val_loss':item.val_loss, 'val_cmetrics':item.val_cmetrics, 
-                'hit100':item.hit100, 'val_hit100':item.val_hit100, 'status':item.status, 
-                'model_type':item.model_type, 
+                'epochs':item.epochs, 'loss':item.loss, 'binacc':item.binacc, 
+                'val_loss':item.val_loss, 'val_binacc':item.val_binacc, 
+                'status':item.status, 'model_type':item.model_type, 
                 'model_image_augmentation':item.model_image_augmentation, 
                 'model_weight_decay':item.model_weight_decay,
                 'model_weight_constraint':item.model_weight_constraint, 
@@ -623,7 +622,7 @@ class trainerutil(AsyncWebsocketConsumer):
           model_type_lines = model_type.objects.all()
           async for item in  model_type_lines:
             search_path = modeldir + 'model/' + item.name
-            if await aiofiles.os.path.exists(search_path + '.h5'):
+            if await aiofiles.os.path.exists(search_path + '.keras'):
               outlist['data'].append(item.name)
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

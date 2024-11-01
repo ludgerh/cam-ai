@@ -243,11 +243,11 @@ class admin_tools_async(AsyncWebsocketConsumer):
         if trainerline.t_type in {1, 2} and resultdict['status'] == 'OK':
           if await afree_quota(userline):
             handle_src = await aiofiles.open(
-              schoolsdir + 'model1/model/' + model_type + '.h5', mode='r')
+              schoolsdir + 'model1/model/' + model_type + '.keras', mode='r')
             handle_dst = await aiofiles.open(
-              schoolline.dir + 'model/' + model_type + '.h5', mode='w')
+              schoolline.dir + 'model/' + model_type + '.keras', mode='w')
             stat_src = await aiofiles.os.stat(
-              schoolsdir + 'model1/model/' + model_type + '.h5')
+              schoolsdir + 'model1/model/' + model_type + '.keras')
             n_bytes = stat_src.st_size
             fd_src = handle_src.fileno()
             fd_dst = handle_dst.fileno()
@@ -265,8 +265,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
             schoolline.model_type = model_type
             await schoolline.asave(update_fields=('model_type', ))
         if resultdict['status'] == 'OK':
-          await aioshutil.copy(schoolsdir + 'model1/model/' + schoolline.model_type + '.h5',
-            schoolline.dir + 'model/' + schoolline.model_type + '.h5')
+          await aioshutil.copy(schoolsdir + 'model1/model/' + schoolline.model_type + '.keras',
+            schoolline.dir + 'model/' + schoolline.model_type + '.keras')
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'

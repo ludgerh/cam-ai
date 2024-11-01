@@ -37,8 +37,6 @@ from websocket._exceptions import (WebSocketTimeoutException,
 from django.db.utils import OperationalError
 from django.db import connections, connection
 from tools.l_tools import QueueUnknownKeyword, djconf
-if djconf.getconfigbool('local_gpu', False):
-  from trainers.train_gpu_tools import cmetrics, hit100
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from .models import school, worker
@@ -359,14 +357,7 @@ class tf_worker():
           environ["CUDA_VISIBLE_DEVICES"] = ''
         else:  
           environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
-        print('##############################')
-        try:
-          import tensorflow as tf 
-        except: 
-          self.logger.error('Error in process: ' + self.logname)
-          self.logger.error(format_exc())
-          self.logger.handlers.clear()
-        print(tf)
+        import tensorflow as tf 
         self.logger.info("TensorFlow version: "+tf.__version__)
         cpus = tf.config.list_physical_devices('CPU')
         self.logger.info('+++++ tf_worker CPUs: '+str(cpus))
@@ -457,11 +448,12 @@ class tf_worker():
               or (myschool.lastmodelfile > self.allmodels[schoolnr]['time'])
               or (myschool.model_type != self.allmodels[schoolnr]['model_type'])
               )):
-            self.model_buffers[schoolnr].pause = True  
+            if schoolnr in self.model_buffers:  
+              self.model_buffers[schoolnr].pause = True  
             del self.allmodels[schoolnr]
             if schoolnr in self.activemodels:
               del self.activemodels[schoolnr]
-        model_path = myschool.dir+'model/'+myschool.model_type+'.h5'
+        model_path = myschool.dir+'model/'+myschool.model_type+'.keras'
       if not (schoolnr in self.allmodels):
         self.allmodels[schoolnr] = {}
         if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket: #remote or simulation
@@ -488,9 +480,7 @@ class tf_worker():
         else: #lokal GPU
           logger.info('***** Loading model file #'+str(schoolnr)
             + ', file: '+model_path)
-          tempmodel = self.load_model(
-            model_path, 
-            custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+          tempmodel = self.load_model(model_path)
           self.allmodels[schoolnr]['path'] = model_path  
           self.allmodels[schoolnr]['type'] = myschool.model_type
           self.allmodels[schoolnr]['weights'] = []
@@ -515,9 +505,7 @@ class tf_worker():
         logger.info('***** Loading model buffer #'+str(schoolnr)+', file: '
           + self.allmodels[schoolnr]['path'])
         if len(self.activemodels) < self.dbline.max_nr_models:
-          tempmodel = self.load_model(
-            self.allmodels[schoolnr]['path'], 
-            custom_objects={'cmetrics': cmetrics, 'hit100': hit100,})
+          tempmodel = self.load_model(self.allmodels[schoolnr]['path'])
           self.activemodels[schoolnr] = {}
           self.activemodels[schoolnr]['model'] = tempmodel
           self.activemodels[schoolnr]['type'] = self.allmodels[schoolnr]['type']
