@@ -39,8 +39,8 @@ from access.c_access import access
 from tools.tokens import maketoken_async
 from tf_workers.models import school
 from users.userinfo import afree_quota
+from startup.startup import trainers
 from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
-from .c_trainers import trainers
 
 from random import randint
 

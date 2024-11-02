@@ -23,7 +23,7 @@ from django.contrib.auth.models import User
 from tools.c_logger import log_ini
 from access.c_access import access
 from streams.models import stream
-from streams.startup import streams
+from startup.startup import streams
 
 logname = 'dyndns'
 logger = getLogger(logname)

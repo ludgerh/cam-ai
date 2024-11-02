@@ -44,7 +44,7 @@ from access.c_access import access
 from access.models import access_control
 from cleanup.models import status_line_school
 from schools.c_schools import get_taglist, check_extratags_async
-from tf_workers.c_tfworkers import tf_workers
+from startup.startup import tf_workers
 from tf_workers.models import school, worker
 from eventers.models import event, event_frame
 from trainers.models import trainframe, trainer

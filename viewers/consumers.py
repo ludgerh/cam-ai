@@ -24,7 +24,7 @@ from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
 from access.c_access import access
 from asgiref.sync import sync_to_async
-from streams.startup import streams
+from startup.startup import streams
 from tools.c_redis import myredis
 from tools.l_tools import djconf
 from tools.c_logger import log_ini

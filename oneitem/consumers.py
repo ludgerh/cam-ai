@@ -28,7 +28,7 @@ from tools.c_redis import myredis
 from tf_workers.models import school
 from streams.models import stream
 from eventers.models import evt_condition
-from streams.startup import streams
+from startup.startup import streams
 from drawpad.models import mask
 
 logname = 'ws_oneitem'

@@ -143,9 +143,16 @@ let graph_data = {
   labels: graph_labels,
   datasets: [
     {
-    label: 'val_BinAcc',
+    label: 'BinAcc',
     backgroundColor: 'rgb(200, 0, 0)',
     borderColor: 'rgb(200, 0, 0)',
+    yAxisID: 'A',
+    data: [],
+    },
+    {
+    label: 'val_BinAcc',
+    backgroundColor: 'rgb(0, 155, 0)',
+    borderColor: 'rgb(0, 155, 0)',
     yAxisID: 'A',
     data: [],
     },
@@ -204,7 +211,8 @@ function refresh_all() {
       result.forEach(function(item, index) {
         counter += 1;
         graph_labels.push(counter);
-        graph_data.datasets[0].data.push(item.val_binacc);
+        graph_data.datasets[0].data.push(item.binacc);
+        graph_data.datasets[1].data.push(item.val_binacc);
         graph_data.datasets[2].data.push(item.loss);
         graph_data.datasets[3].data.push(item.val_loss);
         newaddition += '<tr>';

@@ -120,10 +120,31 @@ let graph_data = {
   labels: graph_labels,
   datasets: [
     {
-    label: 'val_BinAcc',
+    label: 'BinAcc',
     backgroundColor: 'rgb(200, 0, 0)',
     borderColor: 'rgb(200, 0, 0)',
     yAxisID: 'A',
+    data: [],
+    },
+    {
+    label: 'val_BinAcc',
+    backgroundColor: 'rgb(0, 155, 0)',
+    borderColor: 'rgb(0, 155, 0)',
+    yAxisID: 'A',
+    data: [],
+    },
+    {
+    label: 'Loss',
+    backgroundColor: 'rgb(0, 0, 155)',
+    borderColor: 'rgb(0, 0, 155)',
+    yAxisID: 'B',
+    data: [],
+    },
+    {
+    label: 'val_Loss',
+    backgroundColor: 'rgb(200, 155, 0)',
+    borderColor: 'rgb(200, 155, 0)',
+    yAxisID: 'B',
     data: [],
     },
   ]
@@ -188,7 +209,10 @@ function refresh_all() {
         datestring = item.made;
         if (item.status == 'Done') {
           graph_labels.push(datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4));
-          graph_data.datasets[0].data.push(item.val_binacc);
+          graph_data.datasets[0].data.push(item.binacc);
+          graph_data.datasets[1].data.push(item.val_binacc);
+          graph_data.datasets[2].data.push(item.loss);
+          graph_data.datasets[3].data.push(item.val_loss);
         };
         newaddition += '<tr>';
         newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';

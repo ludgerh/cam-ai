@@ -38,7 +38,7 @@ from tools.c_logger import log_ini
 from tools.c_tools import hasoverlap, rect_btoa
 from viewers.c_viewers import c_viewer
 from l_buffer.l_buffer import l_buffer, c_buffer
-from tf_workers.c_tfworkers import tf_workers
+from startup.startup import tf_workers
 from tf_workers.models import school
 from streams.c_devices import c_device
 from streams.models import stream

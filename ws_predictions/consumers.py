@@ -28,7 +28,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.l_tools import djconf
 from access.c_access import access
-from tf_workers.c_tfworkers import tf_workers
+from startup.startup import tf_workers
 from tf_workers.models import worker
 from schools.c_schools import get_taglist
 

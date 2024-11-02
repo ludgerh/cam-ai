@@ -42,7 +42,6 @@ from tools.c_redis import saferedis
 from .models import school, worker
 from schools.c_schools import get_taglist
 
-tf_workers = {}
 taglist = get_taglist(1)
 redis = saferedis()
 

@@ -24,7 +24,7 @@ except  ImportError: # can be removed when everybody is up to date
   emulatestatic = False
 from access.c_access import access
 from streams.models import stream
-from streams.c_streams import streams
+from startup.startup import streams
 from tools.l_tools import djconf
 from tools.tokens import checktoken
 from tf_workers.models import school

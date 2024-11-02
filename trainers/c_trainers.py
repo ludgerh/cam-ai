@@ -39,7 +39,6 @@ from .train_worker_remote import train_once_remote
 
 #from threading import enumerate
 
-trainers = {}
 short_brake = djconf.getconfigfloat('short_brake', 0.01)
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
       

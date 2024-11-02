@@ -23,8 +23,6 @@ from detectors.c_detectors import c_detector
 from eventers.c_eventers import c_eventer
 from .c_cams import c_cam
 
-streams = {}
-
 class c_stream():
   def __init__(self, dbline):
     self.dbline = dbline

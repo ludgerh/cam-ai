@@ -28,7 +28,7 @@ from tools.c_logger import log_ini
 from tools.c_redis import myredis
 from tools.l_tools import djconf
 from streams.c_camera import get_ip_address, get_ip_network, search_executor
-from streams.c_streams import streams
+from startup.startup import streams
 from tf_workers.models import school
 from streams.models import stream as dbstream
 from users.models import userinfo
