@@ -462,9 +462,8 @@ class trainerutil(AsyncWebsocketConsumer):
           result = []
           async for item in epoch.objects.filter(fit=params['fitnr']):
             result.append({
-              'loss':item.loss, 'cmetrics':item.cmetrics, 'val_loss':item.val_loss, 
-              'val_cmetrics':item.val_cmetrics, 'hit100':item.hit100, 
-              'val_hit100':item.val_hit100, 'seconds':item.seconds, 
+              'loss':item.loss, 'binacc':item.binacc, 'val_loss':item.val_loss, 
+              'val_binacc':item.val_binacc, 'seconds':item.seconds, 
               'learning_rate':item.learning_rate,
             })
           outlist['data'] = result
@@ -503,7 +502,7 @@ class trainerutil(AsyncWebsocketConsumer):
           myuser = self.scope['user']
         else:
           myuser = await User.objects.aget(username=params['name'])
-          if myuser.check_password(params['pass']):
+          if await sync_to_async(myuser.check_password)(params['pass']):
             self.authed = True
           if not self.authed:
             await self.close() 

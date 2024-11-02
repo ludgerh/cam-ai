@@ -99,8 +99,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <thead>
         <tr>
           <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>Loss</th>
-          <th>H100</th><th>Cmet</th><th>val_Loss</th><th>val_H100</th><th>val_Cmet</th>
-          <th>Status</th>
+          <<th>BinAcc</th><th>val_Loss</th><th>val_BinAcc</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -121,17 +120,10 @@ let graph_data = {
   labels: graph_labels,
   datasets: [
     {
-    label: 'val_Cmetrics',
+    label: 'val_BinAcc',
     backgroundColor: 'rgb(200, 0, 0)',
     borderColor: 'rgb(200, 0, 0)',
     yAxisID: 'A',
-    data: [],
-    },
-    {
-    label: 'val_Hit100',
-    backgroundColor: 'rgb(0, 155, 0)',
-    borderColor: 'rgb(0, 155, 0)',
-    yAxisID: 'B',
     data: [],
     },
   ]
@@ -196,8 +188,7 @@ function refresh_all() {
         datestring = item.made;
         if (item.status == 'Done') {
           graph_labels.push(datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4));
-          graph_data.datasets[0].data.push(item.val_cmetrics);
-          graph_data.datasets[1].data.push(item.val_hit100);
+          graph_data.datasets[0].data.push(item.val_binacc);
         };
         newaddition += '<tr>';
         newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
@@ -205,11 +196,9 @@ function refresh_all() {
         newaddition += '<td>'+Math.round(item.minutes)+'</td>';
         newaddition += '<td>'+item.epochs+'</td>';
         newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.hit100.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.cmetrics.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_hit100.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_cmetrics.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
         newaddition += '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.id+'/">'+item.status+'</a></td>';
         newaddition += '</tr>';
         $('#tablebody').empty();

@@ -20,6 +20,7 @@ import cv2 as cv
 from asyncio import sleep as asleep
 from logging import getLogger
 from traceback import format_exc
+from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from django.db import connection
 from django.db.utils import OperationalError
@@ -111,7 +112,9 @@ class predictionsConsumer(AsyncWebsocketConsumer):
             self.user = await User.objects.aget(username=indict['name'])
           except User.DoesNotExist:
             self.user = None  
-          if self.user and self.user.check_password(indict['pass']):
+            
+          print('#####', self.user, indict['pass'])
+          if self.user and await sync_to_async(self.user.check_password)(indict['pass']):
             logger.debug('Success!')
             if not (indict['ws_id'] in self.datacache):
               self.datacache[indict['ws_id']] = {}
