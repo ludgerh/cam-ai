@@ -27,6 +27,7 @@ if validate $1; then
   mv cam-ai backup
   read -p "Press enter to continue"
   git clone https://github.com/ludgerh/cam-ai
+  echo "Warning: Dont repeat this if git did not work!"
   read -p "Press enter to continue"
   mv backup/camai/passwords.py cam-ai/camai/
   mv backup/plugins/ cam-ai/plugins

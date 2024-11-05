@@ -20,8 +20,10 @@ from .l_tools import version_flat, version_full
 proc_dict = OrderedDict()
 
 def temp_func():
-  print('Upgrading to 1.4.7f')  
-proc_dict[version_flat('1.4.7f')] = temp_func
+  print('Upgrading to 1.4.7i')  
+  from tf_workers.models import worker
+  worker.objects.all().update(timeout = 1.0)
+proc_dict[version_flat('1.4.7i')] = temp_func
 
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)
