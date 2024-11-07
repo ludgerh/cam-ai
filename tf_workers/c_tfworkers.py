@@ -584,7 +584,9 @@ class tf_worker():
         predictions = np.empty((0, len(taglist)), np.float32)
         for item in framelist:
           np.copyto(self.models[schoolnr]['int_input'](), item)
+          #ts = time()
           self.models[schoolnr]['model'].invoke()
+          #print('11111', time() - ts)
           line=np.zeros((1, len(taglist)), np.float32)
           np.copyto(line, self.models[schoolnr]['int_output']())
           predictions = np.vstack((predictions, line))
@@ -635,7 +637,6 @@ class tf_worker():
         if had_timeout:
           logtext += ' T'
         logger.info(logtext) 
-
 
 #***************************************************************************
 #

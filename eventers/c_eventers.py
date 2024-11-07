@@ -116,15 +116,14 @@ class c_eventer(c_device):
       self.run_one_deque = deque()
       self.last_insert_ts = 0.0
       
+      runner_ts = time()
 
       Thread(target=self.inserter, name='InserterThread').start()
       
       self.redis.delete('webm_queue:' + str(self.id))
       if self.do_webm:
-        self.webm_proc = Process(target=self.make_webm).start()
+        self.webm_proc = Process(target=self.make_webm).start()  
       while self.do_run:
-        #if self.dbline.id == 1:
-        #  print('*****', self.redis.view_from_dev('E', self.dbline.id), self.redis.record_from_dev('E', self.dbline.id), self.redis.data_from_dev('E', self.dbline.id))
         if not self.redis.check_if_counts_zero('E', self.dbline.id):
           frameline = self.dataqueue.get()
         else:
@@ -256,13 +255,31 @@ class c_eventer(c_device):
         self.tag_list = get_taglist(self.tag_list_active)
       for i, item in list(self.eventdict.items()): 
         self.check_events(i, item) 
+    #runner_ts = time()  
     while (
       self.do_run 
       and [i for i in self.eventdict if self.eventdict[i].check_out_ts is None]
       and frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts
       and not self.detectorqueue.empty()
     ):
+      #print(
+      #  '#####', 
+      #  self.id,
+      #  frame[2] - self.last_insert_ts,
+      #  frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts,
+      #  self.last_insert_ts,
+      #  frame[2],
+      #)  
       sleep(djconf.getconfigfloat('medium_brake', 0.1))
+    #print(
+    #  '?????', 
+    #  self.id,
+    #  frame[2] - self.last_insert_ts,
+    #  frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts,
+    #  self.last_insert_ts,
+    #  frame[2],
+    #)  
+    #print('?????', 1 / (time() - runner_ts))
     if self.redis.view_from_dev('E', self.dbline.id):
       while self.scrwidth is None:
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
@@ -314,7 +331,7 @@ class c_eventer(c_device):
                   event_i.end = max(event_i.end, event_j.end)
                   event_i.merge_frames(event_j)
                   del_set.add(j) 
-      if del_set:     
+      if del_set:   
         with self.eventdict_lock:
           for j in del_set:
             if j in self.eventdict:
@@ -489,7 +506,7 @@ class c_eventer(c_device):
               is_ready = False
           if is_ready:
             item.save(self.cond_dict)
-      if is_ready:
+      if is_ready: 
         with self.eventdict_lock:
           with self.display_lock:
             if i in self.eventdict:
@@ -534,6 +551,7 @@ class c_eventer(c_device):
                 break
               except OperationalError:
                 connection.close()
+            #ts = time()
             self.tf_worker.ask_pred(
               school_id, 
               imglist, 
@@ -542,8 +560,8 @@ class c_eventer(c_device):
             predictions = np.empty((0, len(self.tag_list)), np.float32)
             while predictions.shape[0] < len(detector_buffer):
               predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
+            #print('+++++', time() - ts)
           for i in range(len(detector_buffer)):
-            #detector_buffer[i].append(predictions[i])
             detector_buffer[i] = detector_buffer[i][:7] + [predictions[i]] + [bmplist[i]]
             margin = self.dbline.eve_margin
             found = None

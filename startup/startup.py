@@ -35,6 +35,7 @@ tf_workers = {}
 trainers = {}
 
 def restartcheck_thread():
+  from streams.c_streams import c_stream
   global restart_mode
   while do_run:
     if (command := redis.get_shutdown_command()):

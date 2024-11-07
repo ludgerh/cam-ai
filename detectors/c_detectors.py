@@ -101,6 +101,7 @@ class c_detector(c_device):
   def runner(self):
     try:
       super().runner()
+      self.adapt_fact = 1.15
       self.logname = 'detector #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
@@ -134,14 +135,23 @@ class c_detector(c_device):
     try:
       if input is None:
         return(None)
-      #print('Queuesize', self.id, ':', self.myeventer.detectorqueue.qsize())
-      #if self.myeventer.detectorqueue.qsize() > 2 * self.dbline.det_max_rect:
-      #  if not self.warning_done:
-      #    self.logger.warning('Detector #' + str(self.id)
-      #      + ' skipped cycle, eventer queue > ' 
-      #      + str(2 * self.dbline.det_max_rect))
-      #    self.warning_done = True  
-      #  return(None)  
+      evqsize = self.myeventer.detectorqueue.qsize()  
+      if self.period:
+        altp = self.period
+      else:
+        altp = 0.01  
+      if evqsize >= 5:
+        if self.dbline.det_fpslimit: 
+          self.period = min(self.period * self.adapt_fact, 5 / self.dbline.det_fpslimit)
+        else:
+          self.period = min(self.period * self.adapt_fact, 10.0)  
+      elif evqsize == 0:
+        if self.dbline.det_fpslimit: 
+          self.period = max(self.period / self.adapt_fact, 1 / self.dbline.det_fpslimit)
+        else:  
+          self.period = max(self.period / self.adapt_fact, 0.1)
+      if self.id == 1:
+        print('QS:', evqsize, '-', 1 / altp, '>>>', 1 / self.period)  
       frametime = input[2]
       if not (self.do_run and self.sl.greenlight(self.period, frametime)):
         return(None)
