@@ -211,7 +211,7 @@ def check_db_connect(logger=None, force_check=False):
         break
       except OperationalError:
         connection.close()
-  db_ts = new_time     
+    db_ts = new_time     
     
 async def acheck_db_connect(logger=None, force_check=False):
   global db_ts
@@ -229,4 +229,4 @@ async def acheck_db_connect(logger=None, force_check=False):
         break
       except OperationalError:
         await sync_to_async(connection.close)()
-  db_ts = new_time     
+    db_ts = new_time     

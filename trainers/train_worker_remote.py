@@ -27,14 +27,15 @@ from .models import trainframe
 
 class train_once_remote():
 
-  def __init__(self, myschool, myfit, wsserver, wsname, wspass, t_type, logger):
+  def __init__(self, myschool, myfit, dbline, logger):
     self.myschool = myschool
     self.myfit = myfit
-    self.t_type = t_type
+    self.t_type = dbline.t_type
     self.logger = logger
-    self.wsurl = wsserver+'ws/remotetrainer/'
-    self.wsname = wsname
-    self.wspass = wspass
+    self.wsurl = dbline.wsserver+'ws/remotetrainer/'
+    self.wsname = dbline.wsname
+    self.wspass = dbline.wspass
+    self.modeltype = dbline.modeltype
     self.ws_ts = None
 
   def send_ping(self):
@@ -209,10 +210,20 @@ class train_once_remote():
     self.ws.close()
           
     if self.t_type == 2:
+      if self.modeltype == 1:
+        dlurl += 'K/'
+      elif self.modeltype == 2:
+        dlurl += 'L/'
+      elif self.modeltype == 3:
+        dlurl += 'Q/'
       r = requests.get(dlurl, allow_redirects=True)
       datapath = djconf.getconfig('datapath', 'data/')
       dlfile = djconf.getconfig('schools_dir', datapath + 'schools/')
-      dlfile += 'model' + str(self.myschool.id) + '/model/' + model_type + '.keras'
+      dlfile += 'model' + str(self.myschool.id) + '/model/'
+      if self.modeltype == 1:
+        dlfile += model_type + '.keras'
+      else:
+        dlfile += model_type + '.tflite'
       self.logger.info('DL Model: ' + dlfile)
       open(dlfile, 'wb').write(r.content)
       self.myschool.lastmodelfile = timezone.now()

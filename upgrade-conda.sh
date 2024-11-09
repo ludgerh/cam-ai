@@ -15,8 +15,7 @@
 
 validate() {
     grep -F -q -x "$1" <<EOF
-raspi_4_12
-raspi-5-12
+raspi_12
 debian_12
 EOF
 }
@@ -47,5 +46,5 @@ if validate $1; then
   echo "Upgrade is done"
 else
   echo "Usage: upgrade-conda.sh [OSTYPE]"
-  echo "OSTYPE in raspi_4_12, raspi-5-12, debian_12"  
+  echo "OSTYPE in raspi-12, debian_12"  
 fi  

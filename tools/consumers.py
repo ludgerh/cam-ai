@@ -37,7 +37,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
-from camai.passwords import db_password, os_type, env_type, mydomain
+from camai.passwords import db_password, os_type, mydomain
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tf_workers.models import school, worker

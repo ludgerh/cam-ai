@@ -35,6 +35,19 @@ def cpuinfo():
     else:
       processor = None
   return(result)  
+
+def meminfo():
+  with open("/proc/meminfo", "r") as f:
+    meminfo = f.read().splitlines()
+  result = {}  
+  for line in meminfo:
+    if line:
+      list = line.split(':')
+      list = [list[0].strip(), list[1].strip()]
+      if list[0] == 'MemTotal':
+        templist = list[1].split()[0]
+        result['total'] = round(float(list[1].split()[0]) / 1000000.0)
+  return(result)  
   
 def osinfo():
   result = {
@@ -49,12 +62,14 @@ def osinfo():
 def sysinfo():
   result = {}
   cpu = cpuinfo()
+  mem = meminfo()
   if 'Model' in cpu and cpu['Model'][:12] == 'Raspberry Pi':   
     result['hw'] = 'raspi'
     result['hw_version'] = cpu['Model'].split()[2]
   else:     
     result['hw'] = 'pc'
-    result['hw_version'] = cpu['0']['cpu family']
+    result['hw_version'] = cpu['0']['cpu family']  
+  result['hw_ram'] = mem['total']
   myos = osinfo()
   result['dist'] = myos['dist']['ID']
   result['dist_version'] = myos['dist']['VERSION_ID']
@@ -68,3 +83,5 @@ def is_debian():
   
 def dist_version():
   return(int(sysinfo()['dist_version'])) 
+  
+system_info = sysinfo()

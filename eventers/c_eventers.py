@@ -551,7 +551,7 @@ class c_eventer(c_device):
                 break
               except OperationalError:
                 connection.close()
-            #ts = time()
+            ts = time()
             self.tf_worker.ask_pred(
               school_id, 
               imglist, 
@@ -560,7 +560,7 @@ class c_eventer(c_device):
             predictions = np.empty((0, len(self.tag_list)), np.float32)
             while predictions.shape[0] < len(detector_buffer):
               predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
-            #print('+++++', time() - ts)
+            #self.logger.info('+++++ ' + str(time() - ts))
           for i in range(len(detector_buffer)):
             detector_buffer[i] = detector_buffer[i][:7] + [predictions[i]] + [bmplist[i]]
             margin = self.dbline.eve_margin

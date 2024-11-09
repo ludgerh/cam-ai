@@ -187,10 +187,7 @@ class trainer():
               my_tor = train_once_remote(
                 myschool, 
                 myfit, 
-                self.dbline.wsserver, 
-                self.dbline.wsname, 
-                self.dbline.wspass, 
-                self.dbline.t_type,
+                self.dbline,
                 self.logger,
               )
               train_process = Process(target = my_tor.run)

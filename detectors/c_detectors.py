@@ -21,6 +21,7 @@ from traceback import format_exc
 from logging import getLogger
 from time import time, sleep
 from setproctitle import setproctitle
+from psutil import virtual_memory
 from django.db import connection
 from django.db.utils import OperationalError
 from tools.l_tools import djconf
@@ -101,7 +102,7 @@ class c_detector(c_device):
   def runner(self):
     try:
       super().runner()
-      self.adapt_fact = 1.15
+      self.adapt_fact = 1.5
       self.logname = 'detector #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
@@ -136,22 +137,24 @@ class c_detector(c_device):
       if input is None:
         return(None)
       evqsize = self.myeventer.detectorqueue.qsize()  
+      #self.logger.info('memory: ' + str(virtual_memory().percent) + '%')
+      if evqsize >= 5:
+        return(None)
       if self.period:
         altp = self.period
       else:
         altp = 0.01  
-      if evqsize >= 5:
+      if evqsize >= 5 or virtual_memory().percent > 80.0:
         if self.dbline.det_fpslimit: 
-          self.period = min(self.period * self.adapt_fact, 5 / self.dbline.det_fpslimit)
+          self.period = min(self.period * self.adapt_fact, 10 / self.dbline.det_fpslimit)
         else:
-          self.period = min(self.period * self.adapt_fact, 10.0)  
-      elif evqsize == 0:
+          self.period = min(self.period * self.adapt_fact, 20.0)  
+      elif evqsize == 0 and virtual_memory().percent < 80.0:
         if self.dbline.det_fpslimit: 
           self.period = max(self.period / self.adapt_fact, 1 / self.dbline.det_fpslimit)
         else:  
           self.period = max(self.period / self.adapt_fact, 0.1)
-      if self.id == 1:
-        print('QS:', evqsize, '-', 1 / altp, '>>>', 1 / self.period)  
+      #self.logger.info('#' + str(self.id) + ' QS: ' + str(evqsize) + ' - ' + str(1 / altp) + ' >>> ' + str(1 / self.period))  
       frametime = input[2]
       if not (self.do_run and self.sl.greenlight(self.period, frametime)):
         return(None)

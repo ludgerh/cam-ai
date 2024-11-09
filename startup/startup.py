@@ -22,6 +22,8 @@ from traceback import format_exc
 from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from django.apps import apps as django_apps
+from tools.l_sysinfo import system_info
+print(system_info)
 
 #from threading import enumerate
 
@@ -36,6 +38,7 @@ trainers = {}
 
 def restartcheck_thread():
   from streams.c_streams import c_stream
+  from streams.models import stream
   global restart_mode
   while do_run:
     if (command := redis.get_shutdown_command()):

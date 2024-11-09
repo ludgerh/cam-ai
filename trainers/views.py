@@ -83,10 +83,16 @@ def dashboard(request, schoolnr):
   else:
     return(HttpResponse('No Access'))
     
-def downmodel(request, schoolnr, tokennr, token): 
+def downmodel(request, schoolnr, tokennr, token, model_type='K'): 
   if checktoken((tokennr, token), 'MOD', schoolnr):
     myschool = school.objects.get(pk = schoolnr)
-    filename = myschool.dir + 'model/' + myschool.model_type + '.keras'
+    filename = myschool.dir + 'model/'
+    if model_type == 'K':
+      filename += myschool.model_type + '.keras'
+    elif model_type == 'L':
+      filename += myschool.model_type + '.tflite'
+    elif model_type == 'Q':
+      filename += 'q_' + myschool.model_type + '.tflite'
     modelfile = open(filename, 'rb')
     return FileResponse(modelfile)
   else:

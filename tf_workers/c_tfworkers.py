@@ -30,14 +30,14 @@ from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
 from inspect import currentframe, getframeinfo
-from django.db.utils import OperationalError
-from django.db import connections, connection
+from django.db import connections
 from tools.l_tools import QueueUnknownKeyword, djconf
 from tools.l_sysinfo import sysinfo
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
-from .models import school as school_model, worker
+from tools.c_tools import check_db_connect
 from schools.c_schools import get_taglist
+from .models import school as school_model, worker
 
 taglist = get_taglist(1)
 redis = saferedis()
@@ -433,6 +433,7 @@ class tf_worker():
     school_dbline = self.models[schoolnr]['dbline']
     self.models[schoolnr]['last_check'] = time()
     if self.check_ts + 60.0 < time() and self.models[schoolnr]['model_type'] is not None:
+      check_db_connect()
       self.models[schoolnr]['dbline'].refresh_from_db()
       if (school_dbline.lastmodelfile is not None
           and	(datetime.timestamp(school_dbline.lastmodelfile) > self.models[schoolnr]['time']
@@ -503,7 +504,7 @@ class tf_worker():
         xdata = np.random.rand(8,self.models[schoolnr]['xdim'],
           self.models[schoolnr]['ydim'],3)
         if self.dbline.use_litert: 
-          print(self.models[schoolnr]['model'].get_input_details()[0])
+          logger.info(str(self.models[schoolnr]['model'].get_input_details()[0]))
           self.models[schoolnr]['int_input']().fill(128)
           self.models[schoolnr]['model'].invoke()
 
