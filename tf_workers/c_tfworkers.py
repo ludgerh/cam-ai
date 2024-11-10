@@ -18,7 +18,8 @@ import json
 import numpy as np
 import cv2 as cv
 import pickle
-from os import environ
+import requests
+from os import environ, makedirs, path
 from multiprocessing import Process, Queue
 from collections import deque
 from time import sleep, time
@@ -37,7 +38,7 @@ from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from tools.c_tools import check_db_connect
 from schools.c_schools import get_taglist
-from .models import school as school_model, worker
+from .models import school as school_model, worker, school
 
 taglist = get_taglist(1)
 redis = saferedis()
@@ -156,10 +157,40 @@ class output_dist():
 #***************************************************************************
 
 class tf_worker():
+
   def __init__(self, idx):
-    #*** Common Vars
     self.id = idx
     self.dbline = worker.objects.get(id=self.id)
+    #*** Requirements
+    print('#####')
+    datapath = djconf.getconfig('datapath', 'data/')
+    schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
+    for schoolline in school.objects.filter(active = True, tf_worker = self.dbline):
+      schooldir = schoolsdir + 'model' + str(schoolline.id) + '/'
+      if not schoolline.dir:
+        schoolline.dir = schooldir
+        schoolline.save(update_fields=["dir"])
+      makedirs(schooldir + 'model/', exist_ok=True)
+      makedirs(schooldir + 'frames/', exist_ok=True)
+      if self.dbline.use_litert:
+        filename = schoolline.model_type + '.tflite'
+        typecode = 'Q'
+      else:
+        filename = schoolline.model_type + '.keras'
+        typecode = 'K'
+      dl_path = schooldir + 'model/' + filename
+      if not path.exists(dl_path):
+        if self.dbline.use_litert:
+          dl_url = ('https://static.cam-ai.de/models/standard/' 
+            + schoolline.model_type 
+            + '/quantized/efficientnetv2-b0.tflite')
+        else:
+          dl_url = ('https://static.cam-ai.de/models/standard/' 
+            + schoolline.model_type 
+            + '/keras/efficientnetv2-b0.keras')
+        r = requests.get(dl_url, allow_redirects=True)
+        open(dl_path, 'wb').write(r.content)
+    #*** Common Vars
 
     self.inqueue = Queue()
     self.registerqueue = Queue()
@@ -344,6 +375,7 @@ class tf_worker():
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
+      self.model_buffers = None
       if self.dbline.gpu_sim >= 0: # Random values
         self.cachedict = {}
       elif self.dbline.use_websocket: # Websocket
@@ -383,7 +415,9 @@ class tf_worker():
         self.model_buffers = {}
       self.is_ready = True
       schoolnr = -1
-      while (len(self.model_buffers) == 0) and self.do_run:
+      while (self.do_run 
+          and (self.model_buffers is None
+          or len(self.model_buffers) == 0)):
         if self.dbline.use_websocket:
           self.send_ping()
         sleep(djconf.getconfigfloat('long_brake', 1.0))

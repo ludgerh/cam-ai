@@ -22,7 +22,7 @@ class trainer(models.Model):
   active = models.BooleanField(default=True)
   name = models.CharField(max_length=256, default='New Trainer')
   t_type = models.IntegerField("trainer type", choices=((1, 'GPU'), (2, 'CPU'), 
-    (3, 'Remote'), (4, 'other')), default=3)
+    (3, 'Remote'), (4, 'other')), default=2)
   modeltype = models.IntegerField("model type", choices=((1, 'Keras'), (2, 'LiteRT'), 
     (3, 'LiteRTQ')), default=3) #Codes for download: K, L, Q
   gpu_nr = models.IntegerField("gpu number", default=1)

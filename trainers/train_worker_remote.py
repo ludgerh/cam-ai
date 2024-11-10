@@ -54,6 +54,7 @@ class train_once_remote():
       +str(self.myschool.id)+', '+self.myschool.name+'...');
     self.logger.info('****************************************************');
     from websocket import WebSocket#, enableTrace
+    from websocket._exceptions import WebSocketConnectionClosedException
     #enableTrace(True)
     self.ws = WebSocket()
     self.ws.connect(self.wsurl)
@@ -194,8 +195,15 @@ class train_once_remote():
         'school' : self.myschool.e_school,
       }
       while True:
-        self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-        result = json.loads(self.ws.recv())
+        while True:
+          try:
+            self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+            result = json.loads(self.ws.recv())
+            break
+          except  WebSocketConnectionClosedException:
+            self.logger.info('Reconnecting Websocket while waiting... ')
+            sleep(10.0)
+            self.ws.connect(self.wsurl)
         if result:
           break
         else:

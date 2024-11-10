@@ -45,6 +45,19 @@ def cpuinfo():
         result[list[0]] = list[1]
     else:
       processor = None
+  return(result)   
+
+def meminfo():
+  with open("/proc/meminfo", "r") as f:
+    meminfo = f.read().splitlines()
+  result = {}  
+  for line in meminfo:
+    if line:
+      list = line.split(':')
+      list = [list[0].strip(), list[1].strip()]
+      if list[0] == 'MemTotal':
+        templist = list[1].split()[0]
+        result['total'] = round(float(list[1].split()[0]) / 1000000.0)
   return(result)  
   
 def osinfo():
@@ -59,7 +72,9 @@ def sysinfo():
     result['hw_version'] = cpu['Model'].split()[2]
   else:     
     result['hw'] = 'pc'
-    result['hw_version'] = cpu['0']['cpu family']
+    result['hw_version'] = cpu['0']['cpu family'] 
+  mem = meminfo()
+  result['hw_ram'] = mem['total']
   myos = platform.freedesktop_os_release()
   result['dist'] = myos['ID']
   result['dist_version'] = myos['VERSION_ID']
@@ -75,27 +90,17 @@ print('CAM-AI server setup tool')
 hw_os_code = sysinfo()
 print('Hardware & OS codes:', hw_os_code)
 
-if ((((hw_os_code['hw'] == 'raspi' and 4 <= int(hw_os_code['hw_version']))
+if ((((hw_os_code['hw'] == 'raspi' and 4 <= int(hw_os_code['hw_version']) and 4 <= int(hw_os_code['hw_ram']))
     or hw_os_code['hw'] == 'pc')
     and hw_os_code['dist'] == 'debian')
     and int(hw_os_code['dist_version']) == 12):
   print('Your system is compatible, we continue...')
 else:
   print('Your system does not meet our specs, see your hardware & OS codes above.')
-  print('We need a PC or a Raspberry Pi with a Debian 12 OS.')
-  print('The Raspberry Pi needs to be at least version 4, better version 5...')
-  exit(1) 
-  
-if hw_os_code['hw'] == 'raspi': 
-  os_code = 'raspi_' + hw_os_code['dist_version']
-  env_type = 'conda'
-elif hw_os_code['hw'] == 'pc':  
-  os_code = 'debian_' + hw_os_code['dist_version']
-  env_type = 'conda' 
-  
-print('Detected OS:', os_code)
-print('Environment Type:', env_type)
-print()
+  print('We need a PC or a Raspberry Pi with Debian 12 OS.')
+  print('The Raspberry Pi needs to be at least version 4, better version 5.')
+  print('Minimum internal RAM 4 GB...')
+  exit(1)
 
 url = 'https://api.github.com/repos/ludgerh/cam-ai/releases/latest'
 response = requests.get(url)
@@ -107,7 +112,7 @@ response = json.loads(response.text)
 new_version = response['tag_name']
 zip_url = response['zipball_url']
 print('Installing ', new_version)
-print()
+print() 
 
 if False or run_all:
   selected = False
@@ -150,6 +155,11 @@ if False or run_all:
   else:
     print('We WILL NOT  grant external DB access.')
   print()
+else:
+  db_external = True
+  db_pass = 'test_pass'
+  uselocal = True
+  myip = 'cam-ai-raspi'
 
 if False or run_all:
   print('*******************************************')
@@ -257,7 +267,7 @@ print()
 
 os.chdir(installdir)
 
-if True or run_all:
+if False or run_all:
   print('>>>>> Setting up Python environment...')
   if hw_os_code['hw'] == 'raspi':
     cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
@@ -265,7 +275,7 @@ if True or run_all:
     cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
   cmd += 'conda activate tf; '
   cmd += 'pip install --upgrade pip; '
-  cmd += 'pip install -r requirements.' + os_code + '; '
+  cmd += 'pip install -r requirements.' + hw_os_code['hw'] + '_' + hw_os_code['dist_version'] + '; '
   result = subprocess.call(cmd, shell=True, executable='/bin/bash')
 
 if False or run_all:
@@ -295,10 +305,16 @@ if False or run_all:
           line = 'myip = []\n'
     if line.startswith('db_password = '):
         line = 'db_password = "' + db_pass + '"\n'
+    if line.startswith('hw_type = '):
+        line = 'hw_type = "' + hw_os_code['hw'] + '"\n'
+    if line.startswith('hw_version = '):
+        line = 'hw_version = "' + hw_os_code['hw_version'] + '"\n'
+    if line.startswith('hw_ram = '):
+        line = 'hw_ram = ' + str(hw_os_code['hw_ram']) + '\n'
     if line.startswith('os_type = '):
-        line = 'os_type = "' + os_code + '"\n'
-    if line.startswith('env_type = '):
-        line = 'env_type = "' + env_type + '"\n'
+        line = 'os_type = "' + hw_os_code['dist'] + '"\n'
+    if line.startswith('os_version = '):
+        line = 'os_version = "' + hw_os_code['dist_version'] + '"\n'
     targetfile.write(line)
   targetfile = open('camai/passwords.py-new', 'w')
   sourcefile.close()
@@ -318,10 +334,27 @@ if False or run_all:
   cmd += 'conda activate tf; '
   cmd += 'python manage.py migrate; '
   result = subprocess.call(cmd, shell=True, executable='/bin/bash')
-  runserverfile = 'runserver.sh'
-  copy(runserverfile, '..')
+  copy('runserver.sh', '..')
+  copy('upgrade-conda.sh', '..')
   os.chdir('..')
-  os.chmod(runserverfile, 0o744)
+  os.chmod('runserver.sh', 0o744)
+  os.chmod('upgrade-conda.sh', 0o744)
+  
+if True or run_all:
+  print('>>>>> Modifying the database...')
+  subprocess.call(['sudo', 'mariadb-admin', '-u', 'root', 'password', db_pass])
+  sql_query("update `CAM-AI`.tf_workers_worker set use_websocket = 0;")
+  if hw_os_code['hw'] == 'raspi':
+    sql_query("update `CAM-AI`.tf_workers_worker set use_litert = 1;")
+  else:  
+    sql_query("update `CAM-AI`.tf_workers_worker set use_litert = 0;")
+  sql_query("update `CAM-AI`.trainers_trainer set t_type = 2;")
+  if hw_os_code['hw'] == 'raspi':
+    sql_query("update `CAM-AI`.trainers_trainer set modeltype = 5;")
+  else:  
+    sql_query("update `CAM-AI`.tf_workers_worker set modeltype = 1;")
+  
+  
   
 print()
 print('*************************************************')
