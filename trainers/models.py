@@ -24,7 +24,7 @@ class trainer(models.Model):
   t_type = models.IntegerField("trainer type", choices=((1, 'GPU'), (2, 'CPU'), 
     (3, 'Remote'), (4, 'other')), default=2)
   modeltype = models.IntegerField("model type", choices=((1, 'Keras'), (2, 'LiteRT'), 
-    (3, 'LiteRTQ')), default=3) #Codes for download: K, L, Q
+    (3, 'LiteRTQ')), default=2) #Codes for download: K, L, Q
   gpu_nr = models.IntegerField("gpu number", default=1)
   gpu_mem_limit = models.IntegerField("gpu mem limit", default=0)
   startworking = models.CharField(max_length=8, default='00:00:00')

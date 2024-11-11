@@ -37,7 +37,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
-from camai.passwords import db_password, os_type, mydomain
+from camai.passwords import db_password, hw_type, os_version, mydomain
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tf_workers.models import school, worker
@@ -194,7 +194,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -242,16 +242,11 @@ class admin_tools_async(AsyncWebsocketConsumer):
           resultdict = {'status' : 'OK', 'school' : schoolline.id}      
         if trainerline.t_type in {1, 2} and resultdict['status'] == 'OK':
           if await afree_quota(userline):
-            handle_src = await aiofiles.open(
-              schoolsdir + 'model1/model/' + model_type + '.keras', mode='r')
-            handle_dst = await aiofiles.open(
-              schoolline.dir + 'model/' + model_type + '.keras', mode='w')
-            stat_src = await aiofiles.os.stat(
-              schoolsdir + 'model1/model/' + model_type + '.keras')
-            n_bytes = stat_src.st_size
-            fd_src = handle_src.fileno()
-            fd_dst = handle_dst.fileno()
-            await aiofiles.os.sendfile(fd_dst, fd_src, 0, n_bytes)
+            for ext in ('.keras', '.tflite'):
+              filename = model_type + ext
+              if await aiofiles.os.path.exists(schoolsdir + 'model1/model/' + filename):
+                await aioshutil.copy(schoolsdir + 'model1/model/' + filename,
+                  schoolline.dir + 'model/' + filename)
           else:
             resultdict = {'status' : 'nomorequota', 'domain' : myserver}
         if trainerline.t_type in {2, 3}:
@@ -265,8 +260,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
             schoolline.model_type = model_type
             await schoolline.asave(update_fields=('model_type', ))
         if resultdict['status'] == 'OK':
-          await aioshutil.copy(schoolsdir + 'model1/model/' + schoolline.model_type + '.keras',
-            schoolline.dir + 'model/' + schoolline.model_type + '.keras')
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'
@@ -465,28 +458,46 @@ class admin_tools_async(AsyncWebsocketConsumer):
             response = await result.content.read()
         with ZipFile(io.BytesIO(response)) as z:
           z.extractall("temp/expanded")
-        zipresult = glob('temp/expanded/ludgerh-cam-ai-*')[0]
+        if params['special']:
+          zipresult = glob('temp/expanded/cam-ai-*')[0]
+        else:
+          zipresult = glob('temp/expanded/ludgerh-cam-ai-*')[0]
+        print(zipresult) 
         if await aiofiles.os.path.exists('temp/backup'):
           await aioshutil.rmtree('temp/backup')
         await aioshutil.move(basepath, 'temp/backup') 
-        await aioshutil.move(zipresult, basepath)
-        await aioshutil.move('temp/backup/camai/passwords.py', basepath 
-          + '/camai/passwords.py')
-        await aioshutil.move('temp/backup/eventers/c_alarm.py', basepath 
-          + '/eventers/c_alarm.py')
-        await aioshutil.move('temp/backup/' + datapath, basepath + '/' + datapath)
-        if env_type == 'venv':
-          await aioshutil.move('temp/backup/env', basepath + '/env')
+        await aioshutil.move(zipresult, basepath) 
+        await aioshutil.copy(
+          'temp/backup/camai/passwords.py', 
+          basepath + '/camai/passwords.py'
+        )
+        if await aiofiles.os.path.exists(
+          'temp/backup/accounts/templates/django_registration/privacy.html'
+        ):
+          await aioshutil.copy(
+            'temp/backup/accounts/templates/django_registration/privacy.html', 
+            basepath + '/accounts/templates/django_registration/privacy.html'
+          )
+        if await aiofiles.os.path.exists(
+          'temp/backup/accounts/templates/django_registration/terms.html'
+        ):
+          await aioshutil.copy(
+            'temp/backup/accounts/templates/django_registration/terms.html', 
+            basepath + '/accounts/templates/django_registration/terms.html'
+          )
+        await aioshutil.copytree('temp/backup/' + datapath, basepath + '/' + datapath)
+        if await aiofiles.os.path.exists('temp/backup/plugins/'):
+          await aioshutil.copytree('temp/backup/plugins/', basepath + '/plugins/')
         chdir(basepath)
-        if env_type == 'venv':
-          cmd = 'source env/bin/activate; '
-        else: #conda
+        if hw_type == 'raspi':
+          cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
+        if hw_type == 'pc':
           cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-          cmd += 'conda activate tf; '
+        cmd += 'conda activate tf; '
         cmd += 'pip install --upgrade pip; '
-        cmd += 'pip install -r requirements.' + os_type + '; '
+        cmd += 'pip install -r requirements.' + hw_type + '_' + os_version + '; '
         cmd += 'python manage.py migrate; '
-        result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
+        #result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
         p = await asyncio.create_subprocess_shell(
           cmd, 
           stdout=asyncio.subprocess.PIPE, 
@@ -497,7 +508,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           logger.info(line);
         redis.set_shutdown_command(2)
         outlist['data'] = 'OK'
-        #logger.info('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while redis.get_watch_status():
           await asleep(long_brake) 

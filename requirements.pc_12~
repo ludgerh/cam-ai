@@ -58,7 +58,7 @@ multidict==6.1.0
 multitimer==0.3
 mysqlclient==2.2.5
 namex==0.0.8
-numpy==1.26.4
+numpy==2.0.2
 opencv-contrib-python==4.10.0.84
 opt_einsum==3.4.0
 optree==0.13.0

@@ -57,6 +57,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     Are you sure you want to upgrade the CAM-AI-Server?
     <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
   </div> 
+  <div class="h3"> 
+    <input type="text" class="mb-3 m-3" id="special_tag" size="10">
+    Special version tag. Please leave this empty if you don't know what you are doing.
+  </div>
   <div class="h2 d-none" id="line2">
     Downloading the new software. Please wait...
   </div>  
@@ -87,9 +91,17 @@ $(document).ready(function() {
           window.location.href = window.location.protocol + '//' + window.location.host;
         }, 60000);
       };
+      if ($('#special_tag').val().length == 0) {
+        dl_url = '{{ zip_url }}';
+        special = false;
+      } else {
+        dl_url = 'https://github.com/ludgerh/cam-ai/archive/refs/tags/' + $('#special_tag').val() + '.zip';
+        special = true;
+      }
       admintoolsSocket.sendandwait({
         'command' : 'upgrade',
-        'url' : '{{ zip_url }}',
+        'url'     : dl_url,
+        'special' : special,
       })
     });
   })

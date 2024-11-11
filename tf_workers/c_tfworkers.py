@@ -162,7 +162,6 @@ class tf_worker():
     self.id = idx
     self.dbline = worker.objects.get(id=self.id)
     #*** Requirements
-    print('#####')
     datapath = djconf.getconfig('datapath', 'data/')
     schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
     for schoolline in school.objects.filter(active = True, tf_worker = self.dbline):
@@ -183,7 +182,7 @@ class tf_worker():
         if self.dbline.use_litert:
           dl_url = ('https://static.cam-ai.de/models/standard/' 
             + schoolline.model_type 
-            + '/quantized/efficientnetv2-b0.tflite')
+            + '/litert/efficientnetv2-b0.tflite')
         else:
           dl_url = ('https://static.cam-ai.de/models/standard/' 
             + schoolline.model_type 
@@ -383,7 +382,6 @@ class tf_worker():
           self.reset_websocket()
       else: #Local CPU or GPU
         if self.dbline.use_litert:
-          print(sysinfo())
           if sysinfo()['hw'] == 'raspi':
             from tflite_runtime import interpreter as tflite
           else:
@@ -467,7 +465,7 @@ class tf_worker():
     school_dbline = self.models[schoolnr]['dbline']
     self.models[schoolnr]['last_check'] = time()
     if self.check_ts + 60.0 < time() and self.models[schoolnr]['model_type'] is not None:
-      check_db_connect()
+      check_db_connect(logger = self.logger)
       self.models[schoolnr]['dbline'].refresh_from_db()
       if (school_dbline.lastmodelfile is not None
           and	(datetime.timestamp(school_dbline.lastmodelfile) > self.models[schoolnr]['time']
@@ -520,7 +518,7 @@ class tf_worker():
         self.models[schoolnr]['path'] = model_path  
         self.models[schoolnr]['model_type'] = school_dbline.model_type
         if self.dbline.use_litert:
-          interpreter = self.tflite.Interpreter(model_path = model_path)
+          interpreter = self.tflite.Interpreter(model_path = model_path, num_threads = 2)
           interpreter.allocate_tensors()
           self.models[schoolnr]['model'] = interpreter
           self.models[schoolnr]['int_input'] = interpreter.tensor(interpreter.get_input_details()[0]["index"])
@@ -619,9 +617,7 @@ class tf_worker():
         predictions = np.empty((0, len(taglist)), np.float32)
         for item in framelist:
           np.copyto(self.models[schoolnr]['int_input'](), item)
-          #ts = time()
           self.models[schoolnr]['model'].invoke()
-          #print('11111', time() - ts)
           line=np.zeros((1, len(taglist)), np.float32)
           np.copyto(line, self.models[schoolnr]['int_output']())
           predictions = np.vstack((predictions, line))

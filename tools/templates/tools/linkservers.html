@@ -107,6 +107,17 @@ let admintoolsSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
+let trainer_servers = {};
+{% for item in trainerlist %}
+  trainer_servers[{{ item.id }}] = '{{ item.wsserver }}'.split('/')[2];
+{% endfor %}
+console.log(trainer_servers);
+let worker_servers = {};
+{% for item in workerlist %}
+  worker_servers[{{ item.id }}] = '{{ item.wsserver }}'.split('/')[2];
+{% endfor %}
+console.log(worker_servers);
+
 $(document).ready(function() {
   WSAsync(
     ws_scheme + '//'
@@ -126,8 +137,18 @@ $(document).ready(function() {
         if (result.status == 'connect'){
           $('#info' + $(evt.target).attr("idx")).html(result.info);
           $('#info' + $(evt.target).attr("idx")).removeClass('d-none');
-          $('#status' 
-            + $(evt.target).attr("idx")).text('We got the server info.');
+          itemnr = parseInt($(evt.target).attr("idx")[3]);
+          if ($(evt.target).attr("idx")[1] == 't') {
+            serverdomain = trainer_servers[itemnr];
+          };  
+          if ($(evt.target).attr("idx")[1] == 'w') {
+            serverdomain = worker_servers[itemnr];
+          };  
+          new_html = 'You have no account for this server? <a href="https://';
+          new_html += serverdomain;
+          new_html += '/accounts/register/" target="_blank" '
+          new_html += 'rel="noopener noreferrer">Get one here...</a>';
+          $('#status' + $(evt.target).attr("idx")).html(new_html);
           $('#userinput' + $(evt.target).attr("idx")).removeClass('d-none');
           $('#passinput' + $(evt.target).attr("idx")).removeClass('d-none');
           $('#linkbutton' + $(evt.target).attr("idx")).removeClass('d-none');
