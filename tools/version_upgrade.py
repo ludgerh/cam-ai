@@ -20,10 +20,18 @@ from .l_tools import version_flat, version_full
 proc_dict = OrderedDict()
 
 def temp_func():
-  print('Upgrading to 1.4.7i')  
   from tf_workers.models import worker
   worker.objects.all().update(timeout = 1.0)
 proc_dict[version_flat('1.4.7i')] = temp_func
+
+def temp_func():
+  from camai.passwords import hw_type
+  if hw_type == 'raspi': 
+    from tf_workers.models import worker
+    from trainers.models import trainer
+    worker.objects.all().update(use_litert = True)
+    trainer.objects.all().update(modeltype = 2)  
+proc_dict[version_flat('1.4.7o')] = temp_func
 
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)

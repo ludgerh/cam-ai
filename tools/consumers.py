@@ -194,7 +194,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -462,7 +462,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
           zipresult = glob('temp/expanded/cam-ai-*')[0]
         else:
           zipresult = glob('temp/expanded/ludgerh-cam-ai-*')[0]
-        print(zipresult) 
         if await aiofiles.os.path.exists('temp/backup'):
           await aioshutil.rmtree('temp/backup')
         await aioshutil.move(basepath, 'temp/backup') 
@@ -508,7 +507,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           logger.info(line);
         redis.set_shutdown_command(2)
         outlist['data'] = 'OK'
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while redis.get_watch_status():
           await asleep(long_brake) 
