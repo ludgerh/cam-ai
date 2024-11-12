@@ -15,67 +15,74 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
 {% block content %}
+
 {% if mayadd %}
-{% if emulatestatic %}
-  {% load static %}
-  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
-  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
-{% else %}
-  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
-  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
-{% endif %}
-<div class="mb-3 m-2">
-  <label for="schoolname" class="form-label h4">Name of the new school:</label>
-  <input type="text" class="form-control" id="schoolname">
-</div>
-<div class="mb-3 m-2 h4" id="status"></div>
-<div>
-  <button class="btn btn-primary m-2 make-button" type="button">Make new school</button>
-</div>
-<script>
+  {% if is_linked %}
+    {% if emulatestatic %}
+      {% load static %}
+      <script src="{% static 'camai/git/js/wstools.js' %}"></script>
+      <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
+    {% else %}
+      <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
+      <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
+    {% endif %}
+    <div class="mb-3 m-2">
+      <label for="schoolname" class="form-label h4">Name of the new school:</label>
+      <input type="text" class="form-control" id="schoolname">
+    </div>
+    <div class="mb-3 m-2 h4" id="status"></div>
+    <div>
+      <button class="btn btn-primary m-2 make-button" type="button">Make new school</button>
+    </div>
+    <script>
 
-let aadmintoolsSocket;
+    let aadmintoolsSocket;
 
-let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+    let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
-$(document).ready(function() {
-  WSAsync(
-    ws_scheme + '//'
-    + window.location.host
-    + '/ws/aadmintools/'
-  )
-  .then((result) => {
-    aadmintoolsSocket = result;
-    $('.make-button').click(function() {
-      $('.make-button').addClass('btn-warning');
-      aadmintoolsSocket.sendandwait({
-        'command' : 'makeschool',
-        'name' : $('#schoolname').val(),
-        'trainer_nr' : 1, //for now...
-      })  
+    $(document).ready(function() {
+      WSAsync(
+        ws_scheme + '//'
+        + window.location.host
+        + '/ws/aadmintools/'
+      )
       .then((result) => {
-        console.log(result);
-        if (result.status == 'OK'){
-          $('#status').html('&#10003;');
-          $('.make-button').removeClass('btn-warning');
-        };
-        if (result.status == 'noauth'){
-          $('#status').text('Error: No valid login on on this server: ' + result.domain);
-        };
-        if (result.status == 'nomoreschools'){
-          $('#status').text('Error: Maximum number of schools reached on this server: ' + result.domain);
-        };
-        if (result.status == 'nomorequota'){
-          $('#status').text('Error: No more volume quota on this server: ' + result.domain);
-        };
-      })
+        aadmintoolsSocket = result;
+        $('.make-button').click(function() {
+          $('.make-button').addClass('btn-warning');
+          aadmintoolsSocket.sendandwait({
+            'command' : 'makeschool',
+            'name' : $('#schoolname').val(),
+            'trainer_nr' : 1, //for now...
+          })  
+          .then((result) => {
+            console.log(result);
+            if (result.status == 'OK'){
+              $('#status').html('&#10003;');
+              $('.make-button').removeClass('btn-warning');
+            };
+            if (result.status == 'noauth'){
+              $('#status').text('Error: No valid login on on this server: ' + result.domain);
+            };
+            if (result.status == 'nomoreschools'){
+              $('#status').text('Error: Maximum number of schools reached on this server: ' + result.domain);
+            };
+            if (result.status == 'nomorequota'){
+              $('#status').text('Error: No more volume quota on this server: ' + result.domain);
+            };
+          })
+          .catch(err => {console.log(err);});
+        });
+
+      })  
       .catch(err => {console.log(err);});
     });
-
-  })  
-  .catch(err => {console.log(err);});
-});
-</script>
+    </script>
+  {% else %}
+    <div class="h2 m-2">
+    You cannot create your own schools while you are not linked to any CAM-AI-Server.<br>
+    Please get an account and link to server...
+  {% endif %}
 {% else %}
   <div class="h2 m-2">
   You can create {{ schoollimit }} schools.<br>

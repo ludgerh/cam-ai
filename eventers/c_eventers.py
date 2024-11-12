@@ -141,8 +141,8 @@ class c_eventer(c_device):
       self.tf_worker.stop_out(self.tf_w_index)
       self.tf_worker.unregister(self.tf_w_index)
       self.logger.handlers.clear()
-#      for thread in enumerate(): 
-#        print(thread)
+      #for thread in enumerate(): 
+      #  print(thread)
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
@@ -255,31 +255,13 @@ class c_eventer(c_device):
         self.tag_list = get_taglist(self.tag_list_active)
       for i, item in list(self.eventdict.items()): 
         self.check_events(i, item) 
-    #runner_ts = time()  
     while (
       self.do_run 
       and [i for i in self.eventdict if self.eventdict[i].check_out_ts is None]
       and frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts
       and not self.detectorqueue.empty()
     ):
-      #print(
-      #  '#####', 
-      #  self.id,
-      #  frame[2] - self.last_insert_ts,
-      #  frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts,
-      #  self.last_insert_ts,
-      #  frame[2],
-      #)  
       sleep(djconf.getconfigfloat('medium_brake', 0.1))
-    #print(
-    #  '?????', 
-    #  self.id,
-    #  frame[2] - self.last_insert_ts,
-    #  frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts,
-    #  self.last_insert_ts,
-    #  frame[2],
-    #)  
-    #print('?????', 1 / (time() - runner_ts))
     if self.redis.view_from_dev('E', self.dbline.id):
       while self.scrwidth is None:
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
@@ -544,23 +526,21 @@ class c_eventer(c_device):
           for frame in detector_buffer:
             imglist.append(cv.cvtColor(frame[1], cv.COLOR_BGR2RGB))
             bmplist.append(frame[7])
-          if self.tf_w_index is not None:
+          if self.do_run and self.tf_w_index is not None:
             while True:
               try:
                 school_id = self.dbline.eve_school.id
                 break
               except OperationalError:
                 connection.close()
-            ts = time()
             self.tf_worker.ask_pred(
               school_id, 
               imglist, 
               self.tf_w_index,
             )  
             predictions = np.empty((0, len(self.tag_list)), np.float32)
-            while predictions.shape[0] < len(detector_buffer):
+            while self.do_run and predictions.shape[0] < len(detector_buffer):
               predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
-            #self.logger.info('+++++ ' + str(time() - ts))
           for i in range(len(detector_buffer)):
             detector_buffer[i] = detector_buffer[i][:7] + [predictions[i]] + [bmplist[i]]
             margin = self.dbline.eve_margin

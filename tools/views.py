@@ -127,8 +127,8 @@ class addschool(LoginRequiredMixin, TemplateView):
       ),
       'schoollimit' : schoollimit,
       'schoolcount' : schoolcount,
-      'mayadd' : (schoollimit > schoolcount),
-      'os_type' : os_type[:3],
+      'mayadd'      : schoollimit > schoolcount,
+      'is_linked'   : len(trainer.objects.get(id=1).wsname) > 0,
     })
     return context
 

@@ -317,7 +317,7 @@ class tf_worker():
     try:
       while True:
         received = self.inqueue.get()
-        #print('TFW in', received)
+        #print('TFW in', received[:2])
         if (received[0] == 'stop'):
           self.do_run = False
           while not self.inqueue.empty():

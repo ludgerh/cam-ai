@@ -56,13 +56,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           style="width: 120px;">Delete all!
         </button>
       </span>
-      <span style="white-space:nowrap;">
-         <button 
-          type="button" id="delschoolbutton" class="btn btn-primary m-2" 
-          action="delschool" data-bs-toggle="modal" data-bs-target="#shureModal" 
-          style="width: 120px;">Delete school
-        </button>
-      </span>
+      {% if schoolnr > 1 %}
+        <span style="white-space:nowrap;">
+           <button 
+            type="button" id="delschoolbutton" class="btn btn-primary m-2" 
+            action="delschool" data-bs-toggle="modal" data-bs-target="#shureModal" 
+            style="width: 120px;">Delete school
+          </button>
+        </span>
+      {% endif %}
       {% comment %}
       {% if user.is_superuser %}
         <span style="white-space:nowrap;">

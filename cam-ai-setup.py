@@ -349,6 +349,7 @@ if True or run_all:
   else:  
     sql_query("update `CAM-AI`.tf_workers_worker set use_litert = 0;")
   sql_query("update `CAM-AI`.trainers_trainer set t_type = 2;")
+  sql_query("update `CAM-AI`.trainers_trainer set active = 1;")
   if hw_os_code['hw'] == 'raspi':
     sql_query("update `CAM-AI`.trainers_trainer set modeltype = 2;")
   else:  
