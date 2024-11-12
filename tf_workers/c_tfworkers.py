@@ -200,10 +200,10 @@ class tf_worker():
     self.check_ts = time()
     self.models = {}
     self.active_models = 0
-    for item in school_model.objects.filter(active = True):
-      self.models[item.id] = {}
-      self.models[item.id]['dbline'] = item
-      self.models[item.id]['model_type'] = None
+    #for item in school_model.objects.filter(active = True):
+    #  self.models[item.id] = {}
+    #  self.models[item.id]['dbline'] = item
+    #  self.models[item.id]['model_type'] = None
     
     #self.new_model_lock = Lock()
 
@@ -375,6 +375,7 @@ class tf_worker():
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
       self.model_buffers = None
+      self.load_model = None
       if self.dbline.gpu_sim >= 0: # Random values
         self.cachedict = {}
       elif self.dbline.use_websocket: # Websocket
@@ -462,6 +463,12 @@ class tf_worker():
     self.run_process.start()  
 
   def check_model(self, schoolnr, logger, test_pred = False):
+    if schoolnr not in self.models:
+      self.models[schoolnr] = {}
+      self.models[schoolnr]['dbline'] = school_model.objects.get(
+        id = schoolnr,
+      )
+      self.models[schoolnr]['model_type'] = None
     school_dbline = self.models[schoolnr]['dbline']
     self.models[schoolnr]['last_check'] = time()
     if self.check_ts + 60.0 < time() and self.models[schoolnr]['model_type'] is not None:
@@ -526,6 +533,8 @@ class tf_worker():
           self.models[schoolnr]['xdim'] = interpreter.get_input_details()[0]['shape_signature'][2]
           self.models[schoolnr]['ydim'] = interpreter.get_input_details()[0]['shape_signature'][1]
         else: 
+          while self.load_model is None:
+            sleep(djconf.getconfigfloat('long_brake', 1.0))
           loaded_model = self.load_model(model_path)
           self.models[schoolnr]['model'] = loaded_model
           self.models[schoolnr]['xdim'] = loaded_model.layers[0].input_shape[2]

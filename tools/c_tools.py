@@ -194,6 +194,7 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
     await f.write(myimage)
     
 db_ts = time()
+dummyline = dbsetting.objects.get(setting = 'version')
     
 def check_db_connect(logger=None, force_check=False):
   global db_ts
@@ -207,7 +208,7 @@ def check_db_connect(logger=None, force_check=False):
       )
     while True:
       try:
-        dummy = dbsetting.objects.get(setting = 'version')
+        dummyline.refresh_from_db()
         break
       except OperationalError:
         connection.close()
@@ -225,7 +226,7 @@ async def acheck_db_connect(logger=None, force_check=False):
       )
     while True:
       try:
-        dummy = await dbsetting.objects.aget(setting = 'version')
+        await dummyline.arefresh_from_db()
         break
       except OperationalError:
         await sync_to_async(connection.close)()

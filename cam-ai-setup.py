@@ -25,7 +25,7 @@ from glob import glob
 from getpass import getpass
 import platform
 
-run_all = True
+run_all = False
 
 def cpuinfo():
   with open("/proc/cpuinfo", "r") as f:
@@ -278,7 +278,7 @@ if False or run_all:
   cmd += 'pip install -r requirements.' + hw_os_code['hw'] + '_' + hw_os_code['dist_version'] + '; '
   result = subprocess.call(cmd, shell=True, executable='/bin/bash')
 
-if False or run_all:
+if True or run_all:
   print('>>>>> Modifying ' + installdir + '/passwords.py...')
   if hw_os_code['hw'] == 'raspi':
     cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
@@ -293,6 +293,7 @@ if False or run_all:
   else:  
     sourcefile = open('camai/passwords.py.example', 'r')
   targetfile = open('camai/passwords.py-new', 'w')
+  found_set = set()
   for line in sourcefile:
     if line.startswith('security_key = '):
         line = 'security_key = "' + djangocode + '"\n'
@@ -307,16 +308,31 @@ if False or run_all:
         line = 'db_password = "' + db_pass + '"\n'
     if line.startswith('hw_type = '):
         line = 'hw_type = "' + hw_os_code['hw'] + '"\n'
+        found_set.add('hw_type')
     if line.startswith('hw_version = '):
         line = 'hw_version = "' + hw_os_code['hw_version'] + '"\n'
+        found_set.add('hw_version')
     if line.startswith('hw_ram = '):
         line = 'hw_ram = ' + str(hw_os_code['hw_ram']) + '\n'
+        found_set.add('hw_ram')
     if line.startswith('os_type = '):
         line = 'os_type = "' + hw_os_code['dist'] + '"\n'
+        found_set.add('os_type')
     if line.startswith('os_version = '):
         line = 'os_version = "' + hw_os_code['dist_version'] + '"\n'
+        found_set.add('os_version')
     targetfile.write(line)
-  targetfile = open('camai/passwords.py-new', 'w')
+  for item in (
+    ('hw_type', 'hw'), 
+    ('hw_version', 'hw_version'), 
+    ('hw_ram', 'hw_ram'), 
+    ('os_type', 'dist'), 
+    ('os_version', 'dist_version'),
+  ):
+    if item[0] not in found_set:
+      value = hw_os_code[item[1]]
+      line = item[0] + ' = "' + str(hw_os_code[item[1]]) + '"\n'
+      targetfile.write(line)
   sourcefile.close()
   targetfile.close()
   if os.path.exists('camai/passwords.py'):
@@ -340,7 +356,7 @@ if False or run_all:
   os.chmod('runserver.sh', 0o744)
   os.chmod('upgrade-conda.sh', 0o744)
   
-if True or run_all:
+if False or run_all:
   print('>>>>> Modifying the database...')
   subprocess.call(['sudo', 'mariadb-admin', '-u', 'root', 'password', db_pass])
   sql_query("update `CAM-AI`.tf_workers_worker set use_websocket = 0;")
