@@ -25,12 +25,11 @@ from django.contrib.auth.views import (
 )
 from django.views.generic.base import TemplateView
 from django.contrib.auth.models import User
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from tools.l_tools import djconf
 from users.models import userinfo
+
+emulatestatic = safe_import('emulatestatic') 
 
 class MyLoginView(LoginView):
   def get_context_data(self, *args, **kwargs):

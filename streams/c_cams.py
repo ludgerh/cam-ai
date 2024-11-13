@@ -30,7 +30,6 @@ from glob import glob
 from subprocess import Popen, PIPE
 from django.db import connection
 from django.db.utils import OperationalError
-from camai.passwords import os_type
 from tools.c_logger import log_ini
 from tools.l_tools import djconf, ts2filename
 from viewers.c_viewers import c_viewer
@@ -427,10 +426,7 @@ class c_cam(c_device):
     outparams1 += ' -pix_fmt bgr24'
     if det_frame_rate:
       outparams1 += ' -r ' + str(det_frame_rate)
-    if os_type == 'raspi11':
-      outparams1 += ' -vsync cfr'
-    else:
-      outparams1 += ' -fps_mode cfr'
+    outparams1 += ' -fps_mode cfr'
     outparams1 += ' pipe:1'
     inparams = ' -i "' + source_string + '"'
     generalparams = ' -v fatal'

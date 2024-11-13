@@ -18,15 +18,13 @@ from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import TemplateView
 from django.http import HttpResponse
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from streams.models import stream
 from access.c_access import access
 from tf_workers.models import school
 from tools.l_tools import djconf
-from camai.passwords import os_type
+
+emulatestatic = safe_import('emulatestatic') 
 
 class health(LoginRequiredMixin, TemplateView):
   template_name = 'cleanup/cleanup.html'
@@ -62,7 +60,6 @@ class health(LoginRequiredMixin, TemplateView):
         school.objects.filter(active=True), 'S', 
         self.request.user, 'W'
       ),
-      'os_type' : os_type[:3],
     })
     return context
 

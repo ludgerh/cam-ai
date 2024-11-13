@@ -26,10 +26,7 @@ from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
 from django.core.files.storage import FileSystemStorage
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.c_tools import c_convert
@@ -41,6 +38,8 @@ from users.models import archive
 from users.userinfo import free_quota
 from eventers.models import event, event_frame
 from trainers.models import trainframe, trainer
+
+emulatestatic = safe_import('emulatestatic') 
 
 
 datapath = djconf.getconfig('datapath', 'data/')

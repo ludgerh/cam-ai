@@ -20,10 +20,7 @@ from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.tokens import checktoken
@@ -32,6 +29,8 @@ from users.models import archive
 from .models import event, event_frame
 from .models import alarm as dbalarm
 from streams.models import stream
+
+emulatestatic = safe_import('emulatestatic') 
 
 datapath = djconf.getconfig('datapath', 'data/')
 archivepath = djconf.getconfig('archivepath', datapath + 'archive/')

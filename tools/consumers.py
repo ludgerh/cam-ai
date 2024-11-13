@@ -36,8 +36,8 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
+from camai.c_settings import safe_import
 from tools.c_logger import log_ini
-from camai.passwords import db_password, hw_type, os_version, mydomain
 from tools.l_tools import djconf, displaybytes
 from tools.c_redis import myredis
 from tf_workers.models import school, worker
@@ -49,6 +49,11 @@ from access.c_access import access
 from users.models import userinfo
 from users.userinfo import afree_quota
 from .health import totaldiscspace, freediscspace
+
+db_password = safe_import('db_password') 
+hw_type = safe_import('hw_type') 
+os_version = safe_import('os_version') 
+mydomain = safe_import('mydomain') 
 
 OUT = 0
 IN = 1
@@ -488,9 +493,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
             'temp/backup/accounts/templates/django_registration/terms.html', 
             basepath + '/accounts/templates/django_registration/terms.html'
           )
-        await aioshutil.copytree('temp/backup/' + datapath, basepath + '/' + datapath)
+        await aioshutil.move('temp/backup/' + datapath, basepath + '/' + datapath)
         if await aiofiles.os.path.exists('temp/backup/plugins/'):
-          await aioshutil.copytree('temp/backup/plugins/', basepath + '/plugins/')
+          await aioshutil.move('temp/backup/plugins/', basepath + '/plugins/')
         chdir(basepath)
         if hw_type == 'raspi':
           cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '

@@ -34,7 +34,7 @@ from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.hashers import check_password
-from camai.passwords import mydomain
+from camai.c_settings import safe_import
 from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
 from tools.djangodbasync import savedbline, getonelinedict, filterlinesdict
@@ -50,6 +50,8 @@ from eventers.models import event, event_frame
 from trainers.models import trainframe, trainer
 from users.models import userinfo
 from streams.models import stream
+
+mydomain = safe_import('mydomain') 
 
 logname = 'ws_schools'
 logger = getLogger(logname)

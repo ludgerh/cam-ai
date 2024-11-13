@@ -15,6 +15,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from collections import OrderedDict
+from camai.c_settings import safe_import
 from .l_tools import version_flat, version_full
 
 proc_dict = OrderedDict()
@@ -25,7 +26,7 @@ def temp_func():
 proc_dict[version_flat('1.4.7i')] = temp_func
 
 def temp_func():
-  from camai.passwords import hw_type
+  hw_type = safe_import('hw_type') 
   if hw_type == 'raspi': 
     from tf_workers.models import worker
     from trainers.models import trainer

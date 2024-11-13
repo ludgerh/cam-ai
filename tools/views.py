@@ -24,10 +24,7 @@ from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
 from django.http import HttpResponse
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from streams.models import stream
 from users.models import userinfo
 from access.c_access import access
@@ -36,7 +33,8 @@ from trainers.models import trainer
 from tools.l_tools import djconf
 from .models import camurl
 #from .forms import UploadFileForm
-from camai.passwords import os_type
+
+emulatestatic = safe_import('emulatestatic') 
       
 class cam_inst_view(LoginRequiredMixin, TemplateView):   
 
@@ -72,7 +70,6 @@ class cam_inst_view(LoginRequiredMixin, TemplateView):
       'streamlimit' : streamlimit,
       'streamcount' : streamcount,
       'mayadd' : (streamlimit > streamcount),
-      'os_type' : os_type[:3],
     })
     return context
 

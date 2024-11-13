@@ -22,6 +22,7 @@ from traceback import format_exc
 from logging import getLogger
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from django.apps import apps as django_apps
+from camai.c_settings import safe_import
 from tools.l_sysinfo import system_info
 print(system_info)
 
@@ -122,14 +123,8 @@ def run():
   print('***** Software-Version: ', software_version, '*****')
   old_version = djconf.getconfig('version', '0.0.0')
   djconf.setconfig('version', software_version)
-  try:
-    from camai.passwords import data_path
-  except  ImportError: # can be removed when everybody is up to date
-    data_path = 'data/' 
-  try:  
-    from camai.passwords import db_database
-  except  ImportError: # can be removed when everybody is up to date
-    db_database = 'CAM-AI' 
+  data_path = safe_import('data_path') 
+  db_database = safe_import('db_database') 
   print('***** DataPath: ', data_path, '*****')
   djconf.setconfig('datapath', data_path)
   print('***** Database: ', db_database, '*****')

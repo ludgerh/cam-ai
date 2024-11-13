@@ -96,6 +96,15 @@ def len_from_redis_queue(name, idx):
 class c_cleanup():
   def __init__(self, *args, **kwargs):
     self.inqueue = Queue()
+    self.model_dims = {}
+    for schoolline in school.objects.filter(active = True):
+      myschooldir = schoolline.dir
+      self.model_dims[schoolline.id] = []
+      for item in model_type.objects.all():
+        dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
+        if ((Path(myschooldir) / 'coded' / dim_code).exists()
+            and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
+          self.model_dims[schoolline.id].append(dim_code)
 
   def run(self):
     self.run_process = Process(target=self.runner)
@@ -339,13 +348,14 @@ class c_cleanup():
               if item.is_file() and item.suffix == '.bmp':
                 if myschooldir + 'frames/' + subdir + '/' + item.as_posix() not in files_to_delete_list_local:
                   fileset.add(subdir+'/'+item.stem)
-      self.model_dims = []
+      if schoolline.id not in self.model_dims:
+        self.model_dims[schoolline.id] = []
       for item in model_type.objects.all():
         dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
         if ((Path(myschooldir) / 'coded' / dim_code).exists()
             and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
-          self.model_dims.append(dim_code)
-      for dim in self.model_dims:
+          self.model_dims[schoolline.id].append(dim_code)
+      for dim in self.model_dims[schoolline.id]:
         for item in (Path(myschooldir) / 'coded' / dim).iterdir():
           if item.is_file() and item.suffix == '.cod':
             if myschooldir + 'frames/' + dim + '/' + item.as_posix() not in files_to_delete_list_local:

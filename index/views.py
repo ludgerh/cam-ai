@@ -18,15 +18,13 @@ from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from access.c_access import access
 from streams.models import stream
 from tf_workers.models import school
 from tools.l_tools import djconf
-from camai.passwords import os_type
+
+emulatestatic = safe_import('emulatestatic') 
 
 @login_required
 def index(request, mode='C'):
@@ -57,7 +55,6 @@ def index(request, mode='C'):
       request.user, 'W'
     ),
     'user' : request.user,
-    'os_type' : os_type[:3],
   }
   return(HttpResponse(template.render(context)))
   
@@ -81,7 +78,6 @@ def indexgrid(request, mode='C'):
       request.user, 'R'
     ),
     'user' : request.user,
-    'os_type' : os_type[:3],
   }
   return(HttpResponse(template.render(context)))
 
@@ -112,6 +108,5 @@ def landing(request):
       request.user, 'W'
     ),
     'user' : request.user,
-    'os_type' : os_type[:3],
   }
   return(HttpResponse(template.render(context)))

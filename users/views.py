@@ -15,10 +15,7 @@
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
 from django_tables2 import SingleTableMixin
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from access.c_access import access
 from tools.l_tools import djconf
 from streams.models import stream
@@ -26,6 +23,8 @@ from tools.tokens import checktoken
 from .filters import archivefilter, myFilterView
 from .models import archive as dbarchive
 from .tables import archivetable
+
+emulatestatic = safe_import('emulatestatic') 
 
 class archive(SingleTableMixin, myFilterView):
   table_class = archivetable

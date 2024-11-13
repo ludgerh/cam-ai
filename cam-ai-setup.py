@@ -293,7 +293,6 @@ if True or run_all:
   else:  
     sourcefile = open('camai/passwords.py.example', 'r')
   targetfile = open('camai/passwords.py-new', 'w')
-  found_set = set()
   for line in sourcefile:
     if line.startswith('security_key = '):
         line = 'security_key = "' + djangocode + '"\n'
@@ -308,31 +307,15 @@ if True or run_all:
         line = 'db_password = "' + db_pass + '"\n'
     if line.startswith('hw_type = '):
         line = 'hw_type = "' + hw_os_code['hw'] + '"\n'
-        found_set.add('hw_type')
     if line.startswith('hw_version = '):
         line = 'hw_version = "' + hw_os_code['hw_version'] + '"\n'
-        found_set.add('hw_version')
     if line.startswith('hw_ram = '):
         line = 'hw_ram = ' + str(hw_os_code['hw_ram']) + '\n'
-        found_set.add('hw_ram')
     if line.startswith('os_type = '):
         line = 'os_type = "' + hw_os_code['dist'] + '"\n'
-        found_set.add('os_type')
     if line.startswith('os_version = '):
         line = 'os_version = "' + hw_os_code['dist_version'] + '"\n'
-        found_set.add('os_version')
     targetfile.write(line)
-  for item in (
-    ('hw_type', 'hw'), 
-    ('hw_version', 'hw_version'), 
-    ('hw_ram', 'hw_ram'), 
-    ('os_type', 'dist'), 
-    ('os_version', 'dist_version'),
-  ):
-    if item[0] not in found_set:
-      value = hw_os_code[item[1]]
-      line = item[0] + ' = "' + str(hw_os_code[item[1]]) + '"\n'
-      targetfile.write(line)
   sourcefile.close()
   targetfile.close()
   if os.path.exists('camai/passwords.py'):

@@ -18,16 +18,15 @@ from django.contrib.auth.decorators import login_required
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from access.c_access import access
 from tf_workers.models import school
 from schools.c_schools import get_taglist
 from tools.l_tools import djconf
 from tools.tokens import checktoken
 from .models import model_type
+
+emulatestatic = safe_import('emulatestatic') 
 
 @login_required
 def trainer(request, schoolnr):

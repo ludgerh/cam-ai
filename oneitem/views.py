@@ -18,10 +18,7 @@ from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-try:  
-  from camai.passwords import emulatestatic
-except  ImportError: # can be removed when everybody is up to date
-  emulatestatic = False
+from camai.c_settings import safe_import
 from access.c_access import access
 from streams.models import stream
 from startup.startup import streams
@@ -29,7 +26,8 @@ from tools.l_tools import djconf
 from tools.tokens import checktoken
 from tf_workers.models import school
 from .forms import CamForm , DetectorForm, EventerForm
-from camai.passwords import os_type
+
+emulatestatic = safe_import('emulatestatic') 
 
 @login_required
 def onecam(request, camnr, tokennr=0, token=None):
@@ -109,7 +107,6 @@ def onecam(request, camnr, tokennr=0, token=None):
       ),
       'myurl' : myurl,
       'form' : form,
-      'os_type' : os_type[:3],
     }
   return(render(request, 'oneitem/onecam.html', context))
 
@@ -194,7 +191,6 @@ def onedetector(request, detectornr, tokennr=0, token=None):
       ),
       'myurl' : myurl,
       'form' : form,
-      'os_type' : os_type[:3],
     }
   return(render(request, 'oneitem/onedetector.html', context))
 
@@ -276,6 +272,5 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
       ),
       'myurl' : myurl,
       'form' : form,
-      'os_type' : os_type[:3],
     }
   return(render(request, 'oneitem/oneeventer.html', context))
