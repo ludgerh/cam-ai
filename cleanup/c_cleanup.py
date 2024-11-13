@@ -356,16 +356,17 @@ class c_cleanup():
             and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
           self.model_dims[schoolline.id].append(dim_code)
       for dim in self.model_dims[schoolline.id]:
-        for item in (Path(myschooldir) / 'coded' / dim).iterdir():
-          if item.is_file() and item.suffix == '.cod':
-            if myschooldir + 'frames/' + dim + '/' + item.as_posix() not in files_to_delete_list_local:
-              fileset.add(item.stem)
-          elif item.is_dir():
-            subdir = item.name
-            for item in (Path(myschooldir) / 'coded' / dim / subdir).iterdir():
-              if item.is_file() and item.suffix == '.cod':
-                if myschooldir + 'frames/' + dim + '/' + subdir + '/' + item.as_posix() not in files_to_delete_list_local:
-                  fileset.add(subdir+'/'+item.stem) 
+        if (Path(myschooldir) / 'coded' / dim).exists():
+          for item in (Path(myschooldir) / 'coded' / dim).iterdir():
+            if item.is_file() and item.suffix == '.cod':
+              if myschooldir + 'frames/' + dim + '/' + item.as_posix() not in files_to_delete_list_local:
+                fileset.add(item.stem)
+            elif item.is_dir():
+              subdir = item.name
+              for item in (Path(myschooldir) / 'coded' / dim / subdir).iterdir():
+                if item.is_file() and item.suffix == '.cod':
+                  if myschooldir + 'frames/' + dim + '/' + subdir + '/' + item.as_posix() not in files_to_delete_list_local:
+                    fileset.add(subdir+'/'+item.stem) 
       dbsetquery = trainframe.objects.filter(deleted = False, school=schoolline.id)
       dbset = {'.'.join(item.name.split('.')[:-1]) for item in dbsetquery}
       schools_correct = fileset & dbset

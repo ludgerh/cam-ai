@@ -123,23 +123,18 @@ class output_dist():
   def __init__(self, tf_w_index):
     self.nametag = 'out_dist:' + str(tf_w_index) + ':'
     self.used_adresses = set()
-    self.tsp_dict={}
-    self.tsg_dict={}
     
   def put(self, tf_w_index, data, timeout = None):
-    self.tsp_dict[tf_w_index] = time()
     while redis.exists(self.nametag + str(tf_w_index)): 
       sleep(djconf.getconfigfloat('short_brake', 0.01))
     self.used_adresses.add(tf_w_index) 
     redis.set(self.nametag + str(tf_w_index), pickle.dumps(data)) 
-    self.tsp_dict[tf_w_index] = time()
     
   def get(self, tf_w_index):
-    self.tsg_dict[tf_w_index] = time()
     while (result := redis.get(self.nametag + str(tf_w_index))) is None: 
       sleep(djconf.getconfigfloat('short_brake', 0.01))
+    data = pickle.loads(result) 
     redis.delete(self.nametag + str(tf_w_index))
-    self.tsg_dict[tf_w_index] = time()
     return(pickle.loads(result))
     
   def clean_one(self, tf_w_index):
@@ -200,12 +195,6 @@ class tf_worker():
     self.check_ts = time()
     self.models = {}
     self.active_models = 0
-    #for item in school_model.objects.filter(active = True):
-    #  self.models[item.id] = {}
-    #  self.models[item.id]['dbline'] = item
-    #  self.models[item.id]['model_type'] = None
-    
-    #self.new_model_lock = Lock()
 
     #*** Client Var
     self.run_out_procs = {}
@@ -702,8 +691,8 @@ class tf_worker():
               break
             else: 
               self.pred_out_lock.release()
-              sleep(djconf.getconfigfloat('very_short_brake', 0.001))
-              break
+              sleep(djconf.getconfigfloat('very_short_brake', 0.01))
+              #break
         else:
           raise QueueUnknownKeyword(received[0])
     except:
@@ -735,7 +724,7 @@ class tf_worker():
       self.is_ready = None
       self.inqueue.put(('get_is_ready', index))
       while self.is_ready is None:
-        sleep(djconf.getconfigfloat('very_short_brake', 0.001))
+        sleep(djconf.getconfigfloat('very_short_brake', 0.01))
     return(self.is_ready)
 
   def get_xy(self, school, index):
@@ -771,7 +760,7 @@ class tf_worker():
     while True:
       self.pred_out_lock.acquire()
       if ((userindex not in self.pred_out_dict) 
-          or (self.pred_out_dict[userindex] is None)):
+          or self.pred_out_dict[userindex] is None):
         self.pred_out_lock.release()
         sleep(djconf.getconfigfloat('short_brake', 0.01))
       else:  

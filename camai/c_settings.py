@@ -56,10 +56,10 @@ def safe_import(item, default=None, logger=None):
         if not isinstance(result, str):
           result = str(result)
           if logger is None:
-            print('*** Wrong var type in passwords.py: ' 
+            print('!!!!! Wrong var type in passwords.py: ' 
               + item + ' should be string. We adjusted for now...')
           else:
-            logger.warning('*** Wrong var type in passwords.py: ' + item 
+            logger.warning('!!!!! Wrong var type in passwords.py: ' + item 
               + ' should be string. We adjusted for now...')
   except NameError:
     if default is None:
@@ -70,9 +70,9 @@ def safe_import(item, default=None, logger=None):
     else:    
       result = default
     if logger is None:
-      print('*** Missing setting in passwords.py: ' + item + ' - Using default: ' 
+      print('!!!!! Missing setting in passwords.py: ' + item + ' - Using default: ' 
         + str(result))
     else:
-      logger.warning('*** Missing setting in passwords.py: ' + item 
+      logger.warning('!!!!! Missing setting in passwords.py: ' + item 
         + ' - Using default: ' + str(result))
   return(result)

@@ -532,7 +532,7 @@ class c_eventer(c_device):
                 school_id = self.dbline.eve_school.id
                 break
               except OperationalError:
-                connection.close()
+                connection.close() 
             self.tf_worker.ask_pred(
               school_id, 
               imglist, 
