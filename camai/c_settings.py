@@ -43,10 +43,24 @@ system_defaults = {
   'os_type' : si['dist'],
   'os_version' : si['dist_version'],
 }
+result_types = {
+  'hw_version' : 'str',
+  'os_version' : 'str',
+}
 
 def safe_import(item, default=None, logger=None):
   try:
     result = eval(item)
+    if item in result_types:
+      if result_types[item] == 'str':
+        if not isinstance(result, str):
+          result = str(result)
+          if logger is None:
+            print('*** Wrong var type in passwords.py: ' 
+              + item + ' should be string. We adjusted for now...')
+          else:
+            logger.warning('*** Wrong var type in passwords.py: ' + item 
+              + ' should be string. We adjusted for now...')
   except NameError:
     if default is None:
       if item in system_defaults:
@@ -56,8 +70,9 @@ def safe_import(item, default=None, logger=None):
     else:    
       result = default
     if logger is None:
-      print('*** Missing setting in passwords.py: ' + item + ' - Using default: ' + str(result))
+      print('*** Missing setting in passwords.py: ' + item + ' - Using default: ' 
+        + str(result))
     else:
-      logger.warning('*** Missing setting in passwords.py: ' + item + ' - Using default: ' + str(result))
+      logger.warning('*** Missing setting in passwords.py: ' + item 
+        + ' - Using default: ' + str(result))
   return(result)
-

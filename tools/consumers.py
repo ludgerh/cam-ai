@@ -458,6 +458,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           await self.close()
         basepath = getcwd() 
         chdir('..')
+        print('#####', params['url'])
         async with aiohttp.ClientSession() as session:
           async with session.get(params['url']) as result:
             response = await result.content.read()
