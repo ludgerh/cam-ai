@@ -75,6 +75,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                   <div class="dropdown-divider"></div>
                   <a class="dropdown-item" href="/tools/inst_cam_easy/">Camera installation (ONVIF/ISAPI)</a>
                   <a class="dropdown-item" href="/tools/scan_cam_expert/">Expert install</a>
+                  {% if user.is_superuser or user.is_staff %}
+                    <a class="dropdown-item" href="/tools/inst_virt_cam/">Virtual camera installation</a>
+                  {% endif %}
                 {% endspaceless %}
               </ul>
             </div>

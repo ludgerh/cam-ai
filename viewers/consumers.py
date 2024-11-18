@@ -68,7 +68,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
           dict_item['log'].active = False
           await protected_dba(
             dict_item['log'].asave, 
-            kwargs = {'update_fields'  ["stop", "active", ], }, 
+            kwargs = {'update_fields' : ["stop", "active", ], }, 
           )
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')

@@ -178,7 +178,6 @@ def reduce_image(infile, outfile, x=0, y=0, crypt=None):
     myimage = cv.imread(infile)
   myimage = do_reduction(myimage, x, y) 
   cv.imwrite(outfile, myimage)
-  #print('Out:', outfile, myimage.shape, crypt) 
   
 async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
   if outfile is None:
@@ -189,7 +188,6 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
     myimage = crypt.decrypt(myimage)
   myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
   myimage = do_reduction(myimage, x, y) 
-  #print('Out:', outfile, myimage.shape, crypt) 
   myimage = cv.imencode('.bmp', myimage)[1].tobytes()
   async with aiofiles.open(outfile, mode="wb") as f:
     await f.write(myimage)

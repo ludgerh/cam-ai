@@ -34,6 +34,13 @@ def temp_func():
     trainer.objects.all().update(modeltype = 2)  
 proc_dict[version_flat('1.4.7o')] = temp_func
 
+def temp_func():
+  hw_type = safe_import('hw_type') 
+  if hw_type == 'raspi': 
+    from tf_workers.models import worker
+    worker.objects.all().update(use_websocket = False)
+proc_dict[version_flat('1.5.1')] = temp_func
+
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)
   newflat = version_flat(new_str)

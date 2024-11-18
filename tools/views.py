@@ -20,6 +20,7 @@ from requests import get as rget
 from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render
@@ -77,7 +78,7 @@ class inst_cam_easy(cam_inst_view):
   template_name = 'tools/inst_cam_easy.html'
 
 class inst_cam_expert(cam_inst_view):
-  template_name = 'tools/inst_cam_expert.html'  
+  template_name = 'tools/inst_cam_expert.html' 
 
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
@@ -86,7 +87,33 @@ class inst_cam_expert(cam_inst_view):
       'ipaddress' : kwargs['ip'],
       'ports' : json.loads(kwargs['ports']),
     })
-    return context
+    return context 
+
+@login_required
+def inst_virt_cam(request):
+  context = {
+    'version' : djconf.getconfig('version', 'X.Y.Z'),
+    'emulatestatic' : emulatestatic,
+    'school' : schoolnr,
+  }
+  if request.method == 'POST' and request.FILES['file']:
+    uploaded_file = request.FILES['file']
+    fs = FileSystemStorage(location='temp/upload')
+    filename = fs.save(uploaded_file.name, uploaded_file)
+    file_path = fs.path(filename)
+    if os.path.exists('temp/unpack/' + filename):
+      rmtree('temp/unpack/' + filename)
+    os.makedirs('temp/unpack/' + filename)
+    with ZipFile(file_path, 'r') as zip_ref:
+      zip_ref.extractall('temp/unpack/' + filename) 
+    zipresult = glob('temp/unpack/' + filename + '/*')
+    os.remove(file_path)
+    context['file_number'] = len(zipresult)
+    context['file_name'] = uploaded_file.name
+    return render(request, 'tools/upload_success.html', context)
+  else:
+    return render(request, 'tools/inst_virt_cam.html', context)
+  
 
 class scan_cam_expert(cam_inst_view):
   template_name = 'tools/scan_cam_expert.html'
