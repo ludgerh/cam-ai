@@ -36,7 +36,7 @@ from tools.l_tools import QueueUnknownKeyword, djconf
 from tools.l_sysinfo import sysinfo
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
-from tools.c_tools import check_db_connect
+from tools.c_tools import protected_db
 from schools.c_schools import get_taglist
 from .models import school as school_model, worker, school
 
@@ -454,15 +454,15 @@ class tf_worker():
   def check_model(self, schoolnr, logger, test_pred = False):
     if schoolnr not in self.models:
       self.models[schoolnr] = {}
-      self.models[schoolnr]['dbline'] = school_model.objects.get(
-        id = schoolnr,
+      #self.models[schoolnr]['dbline'] = school_model.objects.get(id = schoolnr)
+      self.models[schoolnr]['dbline'] = protected_db(
+        school_model.objects.get, kwargs = {'id' : schoolnr, }
       )
       self.models[schoolnr]['model_type'] = None
     school_dbline = self.models[schoolnr]['dbline']
     self.models[schoolnr]['last_check'] = time()
     if self.check_ts + 60.0 < time() and self.models[schoolnr]['model_type'] is not None:
-      check_db_connect(logger = self.logger)
-      self.models[schoolnr]['dbline'].refresh_from_db()
+      protected_db(self.models[schoolnr]['dbline'].refresh_from_db)
       if (school_dbline.lastmodelfile is not None
           and	(datetime.timestamp(school_dbline.lastmodelfile) > self.models[schoolnr]['time']
           or school_dbline.model_type != self.models[schoolnr]['model_type']
@@ -474,14 +474,11 @@ class tf_worker():
         self.active_models -= 1
       self.check_ts = time()
     if self.models[schoolnr]['model_type'] is None: 
-    
       if self.active_models >= self.dbline.max_nr_models:
         nr_to_replace = min(self.models, key= lambda x: self.models[x]['last_check'])	
         self.models[nr_to_replace]['model_type'] = None   
         del self.models[nr_to_replace]['model']
         self.active_models -= 1
-    
-    
       if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket: #remote or simulation
         self.models[schoolnr]['time'] = time()
         self.models[schoolnr]['model_type'] = 'simulation'

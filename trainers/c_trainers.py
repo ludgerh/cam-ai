@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.db import connections
 from tools.c_logger import log_ini
 from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
-from tools.c_tools import check_db_connect
+from tools.c_tools import protected_db, list_from_queryset
 from tf_workers.models import school
 from users.models import userinfo
 from users.userinfo import free_quota
@@ -100,8 +100,7 @@ class trainer():
           active=True,
           tf_worker=self.dbline.id,
         )
-        check_db_connect(force_check=True)
-        for item in schoollines:
+        for item in list_from_queryset(schoollines):
           with self.mylock:
             if item.id not in self.job_queue_list:
               run_condition = False
@@ -115,16 +114,14 @@ class trainer():
                   'train_status__lt' : 2,}
                 if not item.ignore_checked:
                   filterdict['checked'] = True
-                check_db_connect(force_check=True)
                 undone = trainframe.objects.filter(**filterdict)
-                count = undone.count()
+                count = len(list_from_queryset(undone))
                 if count:
                   undone.update(train_status=1)
                   alllines = 1
                 else:
-                  check_db_connect(force_check=True)
                   alllines = trainframe.objects.filter(school=item.id).count()
-                run_condition = (count >= item.trigger) and alllines
+                run_condition = (count >= item.trigger) and list_from_queryset(alllines)
               if run_condition:
                 myfit = fit(made=timezone.now(), 
                   school = item.id, 
@@ -163,8 +160,7 @@ class trainer():
       self.job_queue = threadqueue()
       Thread(target=self.job_queue_thread, name='Trainer_JobQueueThread').start()
       while self.do_run:
-        check_db_connect(force_check=True)
-        self.dbline = dbtrainer.objects.get(id=self.id)
+        self.dbline = protected_db(dbtrainer.objects.get, kwargs = {'id' : self.id, })
         timestr = ts2mysqltime(time())
         if((self.dbline.startworking < timestr) 
             and (self.dbline.stopworking > timestr)
@@ -200,7 +196,10 @@ class trainer():
               }
               if not myschool.ignore_checked:
                 filterdict['checked'] = True
-              check_db_connect(force_check=True)
+              protected_db(
+                trainframe.objects.filter(**filterdict).update, 
+                kwargs = {'train_status' : 2}
+              )
               trainframe.objects.filter(**filterdict).update(train_status=2)
               myschool.l_rate_start = '1e-6'
               myschool.save(update_fields=['l_rate_start'])
@@ -239,12 +238,10 @@ class trainer():
   def out_reader_proc(self):
     try:
       while (received := self.outqueue.get())[0] != 'stop':
-        #print('Out:', received)
         if (received[0] == 'getqueueinfo'):
           self.queueinfobuffers[received[1]] = received[2]
         else:
           raise QueueUnknownKeyword(received[0])
-      #print('Finished:', received)
     except:
       self.logger.error('Error in process: ' + self.logname + ' (out_reader_proc)')
       self.logger.error(format_exc())

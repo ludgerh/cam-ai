@@ -31,6 +31,7 @@ system_defaults = {
   'myip' : [],
   'mydomain' : '',
   'httpsport' : '',
+  'mail_client_url' : '',
   'smtp_account' : '',
   'smtp_password' : '',
   'smtp_server' : '',

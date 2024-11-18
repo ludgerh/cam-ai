@@ -23,7 +23,7 @@ from users.models import userinfo
 from .c_logger import log_ini
 from .l_tools import djconf
 from .l_smtp import smtp_send_mail
-from .c_tools import check_db_connect
+from .c_tools import list_from_queryset
 from django.conf import settings
 
 logname = 'health'
@@ -42,9 +42,11 @@ def setdiscspace():
   global freediscspace
   global useddiscspace
   totaldiscspace, useddiscspace, freediscspace = disk_usage("/")
-  check_db_connect(force_check=True)
+  #check_db_connect(force_check=True)
   if useddiscspace > totaldiscspace * 0.95:
-    for userline in userinfo.objects.filter(user__is_superuser = True):
+    for userline in list_from_queryset(
+        userinfo.objects.filter(user__is_superuser = True)
+      ):
       if not userline.mail_flag_discspace95:
         print('Server Capacity 95')
         smtp_send_mail(

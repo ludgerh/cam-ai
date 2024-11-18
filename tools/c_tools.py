@@ -17,7 +17,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import cv2 as cv
 import numpy as np
 import aiofiles
-from time import time
+from time import time, sleep
+from random import randint
 from django.db import connection
 from django.db.utils import OperationalError
 from tools.models import setting as dbsetting
@@ -193,41 +194,40 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
   async with aiofiles.open(outfile, mode="wb") as f:
     await f.write(myimage)
     
-db_ts = time()
-dummyline = dbsetting.objects.get(setting = 'version')
+def protected_db(function, args = (), kwargs = {}, logger = None):
+  while True:
+    try:
+      result = function(*args, **kwargs)
+      break
+    except OperationalError:
+      if logger:
+        logger.warning('*** Protected DB access failled. Retrying...')
+      connection.close()
+      sleep(0.1)  
+  return(result) 
     
-def check_db_connect(logger=None, force_check=False):
-  global db_ts
-  if (new_time := time()) - db_ts > 3300.0 or force_check: #55 Minutes 
-    if logger:
-      logger.info(
-        'check_db_connect: '
-        + str(new_time) + ', '
-        + str(db_ts) + ', '
-        + str(new_time - db_ts)
-      )
-    while True:
-      try:
-        dummyline.refresh_from_db()
-        break
-      except OperationalError:
-        connection.close()
-    db_ts = new_time     
-    
-async def acheck_db_connect(logger=None, force_check=False):
-  global db_ts
-  if (new_time := time()) - db_ts > 3300.0 or force_check: #55 Minutes 
-    if logger:
-      logger.info(
-        'check_db_connect: '
-        + str(new_time) + ', '
-        + str(db_ts) + ', '
-        + str(new_time - db_ts)
-      )
-    while True:
-      try:
-        await dummyline.arefresh_from_db()
-        break
-      except OperationalError:
-        await sync_to_async(connection.close)()
-    db_ts = new_time     
+async def protected_dba(function, args = (), kwargs = {}, logger = None):
+  while True:
+    try:
+      result = await function(*args, **kwargs)
+      break
+    except OperationalError:
+      if logger:
+        logger.warning('*** Protected DB access failled. Retrying...')
+      connection.close()
+      sleep(0.1)
+  return(result) 
+  
+def list_from_queryset(qs, logger = None):
+  while True:
+    result = [] 
+    try:
+      for item in qs:
+        result.append(item)
+      break  
+    except OperationalError:
+      if logger:
+        logger.warning('*** Protected DB access failled. Retrying...')
+      connection.close()
+      sleep(0.1)
+  return(result) 

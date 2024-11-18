@@ -30,7 +30,7 @@ from django.db import connections
 from django.conf import settings
 from tools.l_tools import djconf, get_dir_size
 from tools.l_smtp import smtp_send_mail
-from tools.c_tools import check_db_connect
+from tools.c_tools import list_from_queryset
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from eventers.models import event, event_frame
@@ -131,8 +131,7 @@ class c_cleanup():
       clean_redis('videos_mp4')
       clean_redis('videos_webm')
       clean_redis('videos_jpg')
-      check_db_connect()
-      for streamline in stream.objects.filter(active = True):
+      for streamline in list_from_queryset(stream.objects.filter(active = True)):
         clean_redis('events_frames_correct', streamline.id)
         clean_redis('events_frames_missingframes', streamline.id)
         clean_redis('eframes_correct', streamline.id)
@@ -148,8 +147,9 @@ class c_cleanup():
           self.health_check()
 # ***** cleaning up eventframes
           if self.do_run:
-            check_db_connect()
-            for frameline in event_frame.objects.filter(deleted = True):
+            for frameline in list_from_queryset(
+                event_frame.objects.filter(deleted = True)
+              ):
               #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
               del_path = schoolframespath / frameline.name
               if del_path.exists():
@@ -160,8 +160,7 @@ class c_cleanup():
               eventline.save(update_fields = ['numframes'])
 # ***** cleaning up events
           if self.do_run:
-            check_db_connect()
-            for eventline in event.objects.filter(deleted = True):
+            for eventline in list_from_queryset(event.objects.filter(deleted = True)):
               #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
               framelines = event_frame.objects.filter(event__id = eventline.id)
               for frameline in framelines:
@@ -177,8 +176,9 @@ class c_cleanup():
               eventline.delete()  
 # ***** cleaning up trainframes
           if self.do_run:
-            check_db_connect()
-            for frameline in trainframe.objects.filter(deleted = True):
+            for frameline in list_from_queryset(
+                trainframe.objects.filter(deleted = True)
+              ):
               #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
               schoolline = school.objects.get(id = frameline.school)
               myschooldir = Path(schoolline.dir)
@@ -194,11 +194,11 @@ class c_cleanup():
               frameline.delete()
 # ***** deleting files
           if self.do_run:
-            check_db_connect()
-            for fileline in files_to_delete.objects.all():
+            for fileline in list_from_queryset(files_to_delete.objects.all()):
               delpath = Path(fileline.name)
               if delpath.exists():
-                if (not fileline.min_age) or delpath.stat().st_mtime < time() - fileline.min_age:
+                if ((not fileline.min_age) 
+                    or delpath.stat().st_mtime < time() - fileline.min_age):
                   #self.logger.info('Cleanup: Deleting file: ' + str(delpath))
                   delpath.unlink() 
               fileline.delete()
@@ -233,37 +233,54 @@ class c_cleanup():
   def health_check(self): 
     self.logger.info('Cleanup: Starting health check')
     timestamp = timezone.make_aware(datetime.now())
-    check_db_connect()
-    files_to_delete_list = [item.name for item in files_to_delete.objects.all()]
+    files_to_delete_list = [item.name for item in list_from_queryset(
+      files_to_delete.objects.all()
+    )]
     for streamline in stream.objects.filter(active = True):
       my_status_events = status_line_event(made = timestamp, stream = streamline)
 # ***** checking temp events
-      check_db_connect()
-      eventquery = event.objects.filter(deleted = False, camera = streamline.id, xmax__lte=0)
-      events_temp = {item.id for item in eventquery if datetime.timestamp(item.start) < time() - 300.0}
+      eventquery = list_from_queryset(
+        event.objects.filter(deleted = False, camera = streamline.id, xmax__lte=0)
+      )
+      events_temp = {item.id for item in eventquery 
+        if datetime.timestamp(item.start) < time() - 300.0}
       my_status_events.events_temp = len(events_temp)
       add_to_redis_queue('events_temp', streamline.id, events_temp)
 # ***** checking eventframes vs events
-      check_db_connect()
-      eventframequery = event_frame.objects.filter(deleted = False, event__camera = streamline.id)
+      eventframequery = list_from_queryset(
+        event_frame.objects.filter(deleted = False, event__camera = streamline.id)
+      )
       eventframeset = {item.event.id for item in eventframequery}
-      eventvideoquery = event.objects.filter(deleted = False, xmax__gt=0, camera = streamline.id).exclude(videoclip__exact = '') 
+      eventvideoquery = event.objects.filter(
+        deleted = False, 
+        xmax__gt=0, 
+        camera = streamline.id).exclude(videoclip__exact = '', 
+      ) 
       eventvideoset = {item.id for item in eventvideoquery}   
-      eventquery = event.objects.filter(deleted = False, xmax__gt=0, camera = streamline.id)
+      eventquery = event.objects.filter(
+        deleted = False, 
+        xmax__gt=0, 
+        camera = streamline.id, 
+      )
       eventset = {item.id for item in eventquery}
       events_frames_correct = eventset & (eventframeset | eventvideoset)
       my_status_events.events_frames_correct = len(events_frames_correct)
       add_to_redis('events_frames_correct', streamline.id, len(events_frames_correct))
       events_frames_missingframes = eventset - (eventframeset | eventvideoset)
       my_status_events.events_frames_missingframes = len(events_frames_missingframes)
-      add_to_redis_queue('events_frames_missingframes', streamline.id, events_frames_missingframes)
+      add_to_redis_queue(
+        'events_frames_missingframes', 
+        streamline.id, 
+        events_frames_missingframes, 
+      )
 # ***** checking eventframes vs files
       framefileset = {
         item.relative_to(schoolframespath).as_posix() 
         for item in (schoolframespath / str(streamline.id)).rglob('*.bmp')
       }
-      check_db_connect()
-      framedbquery = event_frame.objects.filter(deleted = False, event__camera = streamline.id)
+      framedbquery = list_from_queryset(
+        event_frame.objects.filter(deleted = False, event__camera = streamline.id)
+      )
       framedbset = {item.name for item in framedbquery}
       eframes_correct = framefileset & framedbset
       my_status_events.eframes_correct = len(eframes_correct)
@@ -308,8 +325,9 @@ class c_cleanup():
     add_to_redis('videos_webm', 0, len(videos_webm))
     fileset = videos_jpg & videos_mp4
     fileset_all = videos_jpg | videos_mp4 | videos_webm
-    check_db_connect()
-    mydbset = event.objects.filter(deleted = False, videoclip__startswith = 'E_')
+    mydbset = list_from_queryset(
+      event.objects.filter(deleted = False, videoclip__startswith = 'E_')
+    )
     dbset = set()
     dbtimedict = {}
     for item in mydbset:
@@ -326,8 +344,7 @@ class c_cleanup():
     add_to_redis_queue('videos_missingfiles', 0, videos_missingfiles)
     my_status_videos.save()
 # ***** checking trainframesdb vs files
-    check_db_connect()
-    for schoolline in school.objects.filter(active = True):
+    for schoolline in list_from_queryset(school.objects.filter(active = True)):
       my_status_schools = status_line_school(made = timestamp, school = schoolline)
       myschooldir = schoolline.dir
       files_to_delete_list_local = {
@@ -340,13 +357,23 @@ class c_cleanup():
       if framespath.exists():
         for item in framespath.iterdir():
           if item.is_file() and item.suffix == '.bmp':
-            if myschooldir + 'frames/' + item.as_posix() not in files_to_delete_list_local:
+            if (
+                myschooldir 
+                + 'frames/' 
+                + item.as_posix()
+              ) not in files_to_delete_list_local:
               fileset.add(item.stem)
           elif item.is_dir():
             subdir = item.name
             for item in (Path(myschooldir) / 'frames' / subdir).iterdir():
               if item.is_file() and item.suffix == '.bmp':
-                if myschooldir + 'frames/' + subdir + '/' + item.as_posix() not in files_to_delete_list_local:
+                if (
+                    myschooldir 
+                    + 'frames/' 
+                    + subdir 
+                    + '/' 
+                    + item.as_posix()
+                  ) not in files_to_delete_list_local:
                   fileset.add(subdir+'/'+item.stem)
       if schoolline.id not in self.model_dims:
         self.model_dims[schoolline.id] = []
@@ -359,13 +386,27 @@ class c_cleanup():
         if (Path(myschooldir) / 'coded' / dim).exists():
           for item in (Path(myschooldir) / 'coded' / dim).iterdir():
             if item.is_file() and item.suffix == '.cod':
-              if myschooldir + 'frames/' + dim + '/' + item.as_posix() not in files_to_delete_list_local:
+              if (
+                    myschooldir 
+                    + 'frames/' 
+                    + dim 
+                    + '/' 
+                    + item.as_posix()
+                  ) not in files_to_delete_list_local:
                 fileset.add(item.stem)
             elif item.is_dir():
               subdir = item.name
               for item in (Path(myschooldir) / 'coded' / dim / subdir).iterdir():
                 if item.is_file() and item.suffix == '.cod':
-                  if myschooldir + 'frames/' + dim + '/' + subdir + '/' + item.as_posix() not in files_to_delete_list_local:
+                  if (
+                      myschooldir 
+                      + 'frames/' 
+                      + dim 
+                      + '/' 
+                      + subdir 
+                      + '/' 
+                      + item.as_posix()
+                    ) not in files_to_delete_list_local:
                     fileset.add(subdir+'/'+item.stem) 
       dbsetquery = trainframe.objects.filter(deleted = False, school=schoolline.id)
       dbset = {'.'.join(item.name.split('.')[:-1]) for item in dbsetquery}
@@ -380,14 +421,15 @@ class c_cleanup():
       add_to_redis_queue('schools_missingfiles', schoolline.id, schools_missingfiles)
       my_status_schools.save()
     #self.logger.info('Cleanup: Getting stream file sizes') 
-    check_db_connect()
-    for streamline in stream.objects.all(): 
+    for streamline in list_from_queryset(stream.objects.all()): 
       result = get_dir_size(schoolframespath / str(streamline.id))
       for eventline in event.objects.filter(camera = streamline, double = False):
         if eventline.videoclip:
           for ext in ('.mp4', '.webm', '.jpg'):
             if (recordingspath / eventline.videoclip).with_suffix(ext).exists():
-              result += (recordingspath / eventline.videoclip).with_suffix(ext).stat().st_size
+              result += (
+                (recordingspath / eventline.videoclip).with_suffix(ext).stat().st_size
+              )
       for archiveline in archive.objects.filter(stream = streamline):
         if archiveline.typecode == 0:
           filepath = archivepath / 'frames' / archiveline.name
@@ -401,15 +443,13 @@ class c_cleanup():
       streamline.storage_quota = result
       streamline.save(update_fields = ['storage_quota'])
     #self.logger.info('Cleanup: Getting school file sizes') 
-    check_db_connect()
-    for schoolline in school.objects.all():
+    for schoolline in list_from_queryset(school.objects.all()):
       myschooldir = schoolline.dir
       result = get_dir_size(Path(myschooldir))
       schoolline.storage_quota = result
       schoolline.save(update_fields = ['storage_quota'])
     #self.logger.info('Cleanup: Getting users storage used') 
-    check_db_connect()
-    for userline in userinfo.objects.all():
+    for userline in list_from_queryset(userinfo.objects.all()):
       result = 0
       for streamline in stream.objects.filter(creator = userline.user):
         result += streamline.storage_quota

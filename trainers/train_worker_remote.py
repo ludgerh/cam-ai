@@ -22,6 +22,7 @@ from multitimer import MultiTimer
 from zipfile import ZipFile, ZIP_DEFLATED
 from django.utils import timezone
 from tools.l_tools import djconf, seq_to_int
+from tools.c_tools import list_from_queryset
 from users.userinfo import afree_quota
 from .models import trainframe
 
@@ -111,7 +112,7 @@ class train_once_remote():
     }
     if not self.myschool.ignore_checked:
       filterdict['checked'] = True
-    localsearch = trainframe.objects.filter(**filterdict)
+    localsearch = list_from_queryset(trainframe.objects.filter(**filterdict))
     localset = set()
     localdict = {}
     for item in localsearch:

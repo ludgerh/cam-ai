@@ -221,7 +221,7 @@ class c_event(list):
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
 
   def save(self, cond_dict):
-    #print('*** Saving Event:', self.id)
+    print('*** Saving Event:', self.id)
     self.frames_filter(self.number_of_frames, cond_dict)
     frames_to_save = self.frames.values()
     self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
@@ -263,8 +263,11 @@ class c_event(list):
         event = self.dbline,
       )
       frameline.save()
-      self.mailimages.append(frameline.id)
-    if len(self.to_email) > 0:
+      if self.to_email:
+        self.mailimages.append([frameline.id, frame[2], frame[8], 'bmp'])
+      else:
+        self.mailimages.append([frameline.id])
+    if self.to_email:
       self.send_emails()
 
   def send_emails(self):
@@ -282,36 +285,38 @@ class c_event(list):
         plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
       plain_text += 'Here are the images: \n'  
       for item in self.mailimages:
-        plain_text += clienturl + 'schools/getbmp/0/' + str(item) + '/3/1/200/200/'
+        plain_text += clienturl + 'schools/getbmp/0/' + str(item[0]) + '/3/1/200/200/'
         plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/ \n' 
       html_text = '<html><body><p>Hello CAM-AI user, <br>\n' 
       html_text += 'We had some movement. <br> \n' 
       if self.savename:
+        filename = (self.dbline.videoclip + '.jpg')
+        filepath = djconf.getconfig('recordingspath', datapath + 'recordings/') + filename
+        with open(filepath, "rb") as f:
+          jpegdata = f.read()
+        self.mailimages.append([0, None, jpegdata, 'jpeg'])
         html_text += '<br>Here is the movie (click on the image): <br> \n' 
         html_text += ('<a href="' + clienturl + 'schools/getbigmp4/' 
           + str(self.dbline.id) + '/')
         html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
         html_text += '" target="_blank">'
-        html_text += ('<img src="' + clienturl + 'eventers/eventjpg/' 
-          + str(self.dbline.id) + '/')
-        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.jpg'
-        html_text += '" style="width: 400px; height: auto"</a> <br>\n'
+        html_text += '<img src="cid:image0" style="width: 400px; height: auto"</a> <br>\n'
       html_text += 'Here are the images: <br> \n'
       for item in self.mailimages:
-        html_text += '<a href="' + clienturl + 'schools/getbigbmp/0/' + str(item) + '/'
-        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
-        html_text += '" target="_blank">'
-        html_text += ('<img src="' + clienturl + 'schools/getbmp/0/' + str(item) 
-          + '/3/1/200/200/')
-        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
-        html_text += '" style="width: 200px; height: 200px; object-fit: contain"</a> \n'
+        if item[3] == 'bmp':
+          html_text += '<a href="' + clienturl + 'schools/getbigbmp/0/' + str(item[0]) + '/'
+          html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
+          html_text += '" target="_blank">'
+          html_text += ('<img src="cid:image' + str(item[0]) 
+            + '" style="width: 200px; height: 200px; object-fit: contain"</a> \n')
       html_text += '<br> \n'
       smtp_send_mail(
         subject,
         plain_text,
         'CAM-AI Emailer<' + settings.EMAIL_FROM + '>',
-        receiver,
-        html_text,
-        self.logger,
+        [receiver],
+        html_message = html_text,
+        logger = self.logger,
+        images = self.mailimages,
       )  
 

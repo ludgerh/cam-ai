@@ -112,9 +112,6 @@ def upload_file(request, schoolnr):
     zipresult = glob('temp/unpack/' + filename + '/*')
     os.remove(file_path)
     context['file_number'] = len(zipresult)
-    
-    
-    # Do something with the uploaded file
     context['file_name'] = uploaded_file.name
     return render(request, 'schools/upload_success.html', context)
   else:

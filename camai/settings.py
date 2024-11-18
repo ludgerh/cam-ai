@@ -31,6 +31,7 @@ localaccess = safe_import('localaccess')
 myip = safe_import('myip') 
 mydomain = safe_import('mydomain') 
 httpsport = safe_import('httpsport') 
+mail_client_url = safe_import('mail_client_url') 
 smtp_account = safe_import('smtp_account') 
 smtp_password = safe_import('smtp_password') 
 smtp_server = safe_import('smtp_server') 
@@ -73,6 +74,8 @@ if mydomain:
     trustedorigin += (':'+httpsport)
   CLIENT_URL = trustedorigin + '/'
   CSRF_TRUSTED_ORIGINS = [trustedorigin]
+if mail_client_url:  
+  CLIENT_URL = mail_client_url  
 
 # Application definition
 

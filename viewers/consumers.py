@@ -28,7 +28,7 @@ from startup.startup import streams
 from tools.c_redis import myredis
 from tools.l_tools import djconf
 from tools.c_logger import log_ini
-from tools.c_tools import acheck_db_connect
+from tools.c_tools import protected_dba
 from tools.tokens import checktoken
 from .models import view_log
 
@@ -66,8 +66,10 @@ class triggerConsumer(AsyncWebsocketConsumer):
             dict_item['viewer'].pop_from_onf(dict_item['onf'])
           dict_item['log'].stop = timezone.now()
           dict_item['log'].active = False
-          await acheck_db_connect()
-          await dict_item['log'].asave(update_fields=["stop", "active", ])
+          await protected_dba(
+            dict_item['log'].asave, 
+            kwargs = {'update_fields'  ["stop", "active", ], }, 
+          )
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
