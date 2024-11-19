@@ -75,7 +75,9 @@ def setdiscspace():
         userline.mail_flag_discspace95 = True 
         userline.save(update_fields = ['mail_flag_discspace95', ]) 
   else:  
-    for userline in userinfo.objects.filter(user__is_superuser = True):  
+    for userline in list_from_queryset(
+        userinfo.objects.filter(user__is_superuser = True)
+      ):  
       if userline.mail_flag_discspace95:
         userline.mail_flag_discspace95 = False 
         userline.save(update_fields = ['mail_flag_discspace95', ]) 
