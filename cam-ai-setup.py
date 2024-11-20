@@ -25,7 +25,7 @@ from glob import glob
 from getpass import getpass
 import platform
 
-run_all = False
+run_all = True
 
 def cpuinfo():
   with open("/proc/cpuinfo", "r") as f:

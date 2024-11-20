@@ -15,9 +15,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import json
+import os
 #from pprint import pprint
 from requests import get as rget
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
@@ -94,21 +96,17 @@ def inst_virt_cam(request):
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
-    'school' : schoolnr,
   }
   if request.method == 'POST' and request.FILES['file']:
     uploaded_file = request.FILES['file']
     fs = FileSystemStorage(location='temp/upload')
     filename = fs.save(uploaded_file.name, uploaded_file)
     file_path = fs.path(filename)
+    print(file_path)
     if os.path.exists('temp/unpack/' + filename):
       rmtree('temp/unpack/' + filename)
     os.makedirs('temp/unpack/' + filename)
-    with ZipFile(file_path, 'r') as zip_ref:
-      zip_ref.extractall('temp/unpack/' + filename) 
-    zipresult = glob('temp/unpack/' + filename + '/*')
-    os.remove(file_path)
-    context['file_number'] = len(zipresult)
+    context['file_number'] = 123
     context['file_name'] = uploaded_file.name
     return render(request, 'tools/upload_success.html', context)
   else:

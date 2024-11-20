@@ -448,7 +448,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
         redis.set_shutdown_command(1)
         while redis.get_watch_status():
           await asleep(long_brake) 
-        ossystem('sudo shutdown now')
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

@@ -213,8 +213,8 @@ class trainer():
             pass
         sleep(10.0)
       self.finished = True
-#      for thread in enumerate(): 
-#        print(thread)
+      #for thread in enumerate(): 
+      #  print(thread)
       self.logger.info('Finished Process '+self.logname+'...')
       self.logger.handlers.clear()
     except:

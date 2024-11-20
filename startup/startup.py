@@ -90,11 +90,17 @@ def newexit(*args):
   for i in trainers:
     print('Closing trainer #', i)
     trainers[i].stop()  
-  print(restart_mode)  
-  if restart_mode in {0, 1}:
+  #print('*** restart_mode', restart_mode)  
+  if restart_mode == 0:
     redis.set_watch_status(0) 
     #for thread in enumerate(): 
     #  print(thread)
+    sys.exit(0)
+  elif restart_mode == 1:
+    redis.set_watch_status(0) 
+    #for thread in enumerate(): 
+    #  print(thread)
+    os.system('sudo shutdown now')
     sys.exit(0)
   elif restart_mode == 2:
     redis.set_watch_status(2) 
