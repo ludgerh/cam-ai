@@ -68,6 +68,7 @@ class c_viewer():
       if self.client_dict[client_nr]['do_compress']:
         to = 3 #jpg
       else:
+<<<<<<< HEAD
         to = 2 #bmp  
 #***
 #      if self.parent.type == 'C':
@@ -76,6 +77,9 @@ class c_viewer():
 #          cv.imwrite('/home/cam_ai/temp/' + str(self.counter) + '.bmp', frame)
 #          self.counter += 1   
 #***     
+=======
+        to = 2 #bmp   
+>>>>>>> 9fa7c75 (A179 2024-10-13-15:24)
       frame = c_convert(frame, typein=1, typeout=to, 
         xout=self.client_dict[client_nr]['outx'])
       if (int(redis.get('CAM-AI:KBInt')) 
