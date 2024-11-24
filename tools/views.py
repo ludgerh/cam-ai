@@ -16,6 +16,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 import os
+import cv2 as cv
+from shutil import move
+from time import sleep
 #from pprint import pprint
 from requests import get as rget
 from django.conf import settings
@@ -25,19 +28,27 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from camai.c_settings import safe_import
+from startup.startup import streams
+from tools.l_tools import djconf
+from tools.c_redis import myredis
 from streams.models import stream
 from users.models import userinfo
 from access.c_access import access
 from tf_workers.models import school, worker
 from trainers.models import trainer
-from tools.l_tools import djconf
 from .models import camurl
 #from .forms import UploadFileForm
 
+redis = myredis()
+
 emulatestatic = safe_import('emulatestatic') 
+datapath = djconf.getconfig('datapath', 'data/')
+virt_cam_path = djconf.getconfig('virt_cam_path', datapath + 'virt_cam_path/')
+os.makedirs(virt_cam_path, exist_ok = True)
+long_brake = djconf.getconfigfloat('long_brake', 1.0)
       
 class cam_inst_view(LoginRequiredMixin, TemplateView):   
 
@@ -90,28 +101,50 @@ class inst_cam_expert(cam_inst_view):
       'ports' : json.loads(kwargs['ports']),
     })
     return context 
-
-@login_required
-def inst_virt_cam(request):
-  context = {
-    'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : emulatestatic,
-  }
-  if request.method == 'POST' and request.FILES['file']:
+    
+class inst_virt_cam(cam_inst_view):
+  template_name = 'tools/inst_virt_cam.html'  
+  
+  def post(self, request):
+    newstream = stream()
+    newstream.save()
     uploaded_file = request.FILES['file']
     fs = FileSystemStorage(location='temp/upload')
     filename = fs.save(uploaded_file.name, uploaded_file)
     file_path = fs.path(filename)
-    print(file_path)
-    if os.path.exists('temp/unpack/' + filename):
-      rmtree('temp/unpack/' + filename)
-    os.makedirs('temp/unpack/' + filename)
-    context['file_number'] = 123
-    context['file_name'] = uploaded_file.name
-    return render(request, 'tools/upload_success.html', context)
-  else:
-    return render(request, 'tools/inst_virt_cam.html', context)
-  
+    filename = 'virt_cam_' + str(newstream.id) + '.' + filename.split('.')[-1]
+    move(file_path, virt_cam_path + filename)
+    newstream.cam_url = filename
+    newstream.eve_school = school.objects.filter(active=True).first()
+    newstream.creator = request.user
+    cap = cv.VideoCapture(virt_cam_path + filename)
+    newstream.cam_xres = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    newstream.cam_yres = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    newstream.cam_virtual_fps = cap.get(cv.CAP_PROP_FPS)
+    newstream.name = 'Virtual Camera ' + str(round(newstream.cam_virtual_fps, 2)) + 'fps'
+    newstream.save(update_fields=(
+      'name',
+      'cam_url', 
+      'eve_school', 
+      'creator', 
+      'cam_xres', 
+      'cam_yres', 
+      'cam_virtual_fps', 
+    ))
+    if not request.user.is_superuser:
+      myaccess = access_control()
+      myaccess.vtype = 'X'
+      myaccess.vid = newlineid
+      myaccess.u_g_nr = request.user.id
+      myaccess.r_w = 'W'
+      myaccess.save()
+      access.read_list_async()
+    while redis.get_start_stream_busy():
+      sleep(long_brake)
+    redis.set_start_stream_busy(newstream.id)
+    while (not (newstream.id in streams)):
+      sleep(long_brake)
+    return redirect('/')
 
 class scan_cam_expert(cam_inst_view):
   template_name = 'tools/scan_cam_expert.html'

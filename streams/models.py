@@ -33,6 +33,8 @@ class stream(models.Model):
   cam_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
   cam_view = models.BooleanField(default=True)
+  #cam_is_virtual = models.BooleanField(default=False)
+  cam_virtual_fps = models.FloatField(default=0.0) #0.0: Not virtual
   cam_xres = models.IntegerField(default=0)
   cam_yres = models.IntegerField(default=0)
   cam_fpslimit = models.FloatField("Image FPS limit", default=2.0)

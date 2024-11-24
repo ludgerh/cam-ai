@@ -134,7 +134,7 @@ class c_detector(c_device):
 
   def run_one(self, input):
     try:
-      if input is None:
+      if input is None or input[2] == 0.0:
         return(None)
       evqsize = self.myeventer.detectorqueue.qsize()  
       #self.logger.info('memory: ' + str(virtual_memory().percent) + '%')

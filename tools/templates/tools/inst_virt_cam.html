@@ -41,6 +41,8 @@ Uploading your file. Please wait...
 
 <script>
 
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+
 $(document).ready(function() {
   $("#formButton").click(function() {
     $('#please_wait').removeClass("d-none");

@@ -234,3 +234,9 @@ class myredis(saferedis):
     
   def get_ptz_pos(self, idx):
     return(json.loads(self.get('C:'+str(idx)+':ptzpos')))  
+    
+  def set_virt_time(self, idx, value):  
+    self.set('C:'+str(idx)+':virt_time', value) 
+    
+  def get_virt_time(self, idx):  
+    return(float(self.get('C:'+str(idx)+':virt_time')))  

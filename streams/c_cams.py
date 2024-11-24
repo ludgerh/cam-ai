@@ -37,6 +37,9 @@ from .c_devices import c_device
 from .models import stream
 from .c_camera import c_camera, logger_init
 
+datapath = djconf.getconfig('datapath', 'data/')
+virt_cam_path = djconf.getconfig('virt_cam_path', datapath + 'virt_cam_path/')
+
 class c_cam(c_device):
   def __init__(self, *args, **kwargs):
     self.type = 'C'
@@ -47,32 +50,35 @@ class c_cam(c_device):
     self.ff_proc = None
     self.getting_newprozess = False
     self.wd_proc = None
-    self.mp4_proc = None
     self.do_run = True
     self.finished = False
-    datapath = djconf.getconfig('datapath', 'data/')
-    self.recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
     self.framewait = 0.0
-    self.checkmp4busy = False
-    self.mycam = None
-    self.cam_fps = 0.0
-    self.video_codec = -1
-    self.video_codec_name = '?'
-    self.audio_codec = -1
-    self.vid_count = None
-    
-    if not path.exists(self.recordingspath):
-      makedirs(self.recordingspath)
     if self.dbline.cam_view:
       self.viewer = c_viewer(self, self.logger)
+    self.mycam = None
+    if self.dbline.cam_virtual_fps:
+      self.virt_ts = 0.0
+      self.virt_step = 1.0 / self.dbline.cam_virtual_fps
+      self.file_over = False
+      self.file_end = False
     else:
-      self.viewer = None
-    for f in glob(self.recordingspath + 'C' + str(self.dbline.id).zfill(4) 
-        + '_????????.mp4'):
-      try:
-        remove(f)
-      except:
-        self.logger.warning('Cam-Task failed to delete: '+f)
+      self.mp4_proc = None
+      datapath = djconf.getconfig('datapath', 'data/')
+      self.recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
+      self.checkmp4busy = False
+      self.cam_fps = 0.0
+      self.video_codec = -1
+      self.video_codec_name = '?'
+      self.audio_codec = -1
+      self.vid_count = None
+      if not path.exists(self.recordingspath):
+        makedirs(self.recordingspath)
+      for f in glob(self.recordingspath + 'C' + str(self.dbline.id).zfill(4) 
+          + '_????????.mp4'):
+        try:
+          remove(f)
+        except:
+          self.logger.warning('Cam-Task failed to delete: '+f)
 
   def in_queue_handler(self, received):
     try:
@@ -111,7 +117,12 @@ class c_cam(c_device):
   def run_one(self):
     if not self.do_run:
       return(None)
-    thistime = time()
+    if self.dbline.cam_virtual_fps:
+      self.virt_ts += self.virt_step
+      self.redis.set_virt_time(self.id, self.virt_ts)
+      in_ts = self.virt_ts
+    else:
+      in_ts = time()
     while True:
       if (self.redis.check_if_counts_zero('C', self.dbline.id) 
           or self.dbline.cam_pause):
@@ -190,7 +201,7 @@ class c_cam(c_device):
         self.imagecheck = imagesum
     if frame is None:
       return(None)
-    self.wd_ts = thistime
+    self.wd_ts = in_ts
     fps = self.som.gettime()
     if fps:
       self.dbline.cam_fpsactual = fps
@@ -204,7 +215,10 @@ class c_cam(c_device):
       self.redis.fps_to_dev('C', self.dbline.id, fps)
     if self.dbline.cam_apply_mask and (self.viewer.drawpad.mask is not None):
       frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
-    return((3, frame, thistime))
+    if self.dbline.cam_virtual_fps and self.file_end:
+      in_ts = 0.0
+      self.file_end = False  
+    return((3, frame, in_ts))
 
   def runner(self):
     try:
@@ -214,38 +228,48 @@ class c_cam(c_device):
       log_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Cam #'+str(self.dbline.id))
       logger_init(self.logger)
-      self.mycam = c_camera(
-        self.id,
-        control_mode = self.dbline.cam_control_mode,
-        control_ip=self.dbline.cam_control_ip, 
-        control_port=self.dbline.cam_control_port, 
-        control_user=self.dbline.cam_control_user, 
-        control_pass=self.dbline.cam_control_passwd, 
-        url=self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
-      )
-      self.mp4timestamp = 0.0
-      self.wd_ts = time()
-      self.wd_proc = MultiTimer(interval=10, function=self.watchdog, 
+      if self.dbline.cam_virtual_fps:
+        self.wd_ts = 0.0
+        wd_interval = 1.0
+      else:
+        self.mycam = c_camera(
+          self.id,
+          control_mode = self.dbline.cam_control_mode,
+          control_ip=self.dbline.cam_control_ip, 
+          control_port=self.dbline.cam_control_port, 
+          control_user=self.dbline.cam_control_user, 
+          control_pass=self.dbline.cam_control_passwd, 
+          url=self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
+        )
+        self.mp4timestamp = 0.0
+        self.wd_ts = time()
+        wd_interval = 10.0
+      self.wd_proc = MultiTimer(interval=wd_interval, function=self.watchdog, 
         runonstart=False)
       self.wd_proc.start()
-      self.mp4_proc = MultiTimer(interval=1, function=self.checkmp4, 
-        runonstart=False)
-      self.mp4_proc.start()
+      if not self.dbline.cam_virtual_fps:
+        self.mp4_proc = MultiTimer(interval=1, function=self.checkmp4, 
+          runonstart=False)
+        self.mp4_proc.start()
       self.imagecheck = 0
       self.online = False
-      maxcounter = 0
-      while self.do_run:
-        self.try_connect(maxcounter)
-        if self.online:
-          maxcounter = 0
-          break
-        else:
-          if maxcounter < 300:
-            maxcounter += 1
-          counter = maxcounter
-          while self.do_run and (counter > 0):
-            counter -= 1
-            sleep(djconf.getconfigfloat('long_brake', 1.0))
+      if self.dbline.cam_virtual_fps:
+        self.online = True
+        self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
+      else:
+        maxcounter = 0
+        while self.do_run:
+          self.try_connect(maxcounter)
+          if self.online:
+            maxcounter = 0
+            break
+          else:
+            if maxcounter < 300:
+              maxcounter += 1
+            counter = maxcounter
+            while self.do_run and (counter > 0):
+              counter -= 1
+              sleep(djconf.getconfigfloat('long_brake', 1.0))
       while self.do_run:
         frameline = self.run_one()
         if frameline is not None:
@@ -256,9 +280,6 @@ class c_cam(c_device):
               and (self.redis.view_from_dev('D', self.dbline.id) 
               or self.redis.data_from_dev('D', self.dbline.id))):
             self.mydetector.dataqueue.put(frameline)
-          #if self.dbline.id == 1:
-          #  print(self.dbline.eve_mode_flag 
-          #      and (not self.redis.check_if_counts_zero('E', self.dbline.id)))
           if (self.dbline.eve_mode_flag 
               and (not self.redis.check_if_counts_zero('E', self.dbline.id))): 
             self.mydetector.myeventer.dataqueue.put(frameline)
@@ -269,9 +290,10 @@ class c_cam(c_device):
       if self.wd_proc is not None:
         self.wd_proc.stop()
         self.wd_proc.join()
-      if self.mp4_proc is not None:
-        self.mp4_proc.stop()
-        self.mp4_proc.join()
+      if not self.dbline.cam_virtual_fps:
+        if self.mp4_proc is not None:
+          self.mp4_proc.stop()
+          self.mp4_proc.join()
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
@@ -387,20 +409,31 @@ class c_cam(c_device):
 
   def watchdog(self):
     try:
-      timediff = time() - self.wd_ts
-      if timediff <= 60:
-        return()
-      if not self.cam_active:
-        return()
-      if (timediff <= 180) and (self.getting_newprozess):
-        return()
-      if not (self.redis.view_from_dev('C', self.dbline.id)
-          or self.redis.data_from_dev('C', self.dbline.id)):
-        return()
-      self.wd_ts = time()
-      self.logger.info('*** Wakeup for Camera #'
-        + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
-      self.stopprocess()
+      if self.dbline.cam_virtual_fps:
+        if self.ff_proc is None or self.ff_proc.poll() is None:
+          return()
+        else:
+          self.file_end = True  
+      else:
+        timediff = time() - self.wd_ts
+        if timediff <= 60:
+          return()
+        if not self.cam_active:
+          return()
+        if (timediff <= 180) and (self.getting_newprozess):
+          return()
+        if not (self.redis.view_from_dev('C', self.dbline.id)
+            or self.redis.data_from_dev('C', self.dbline.id)):
+          return()
+        self.wd_ts = time()
+      if self.dbline.cam_virtual_fps:
+        self.logger.info('*** Restarting Video, VirtCam #'
+          + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
+      else:
+        self.logger.info('*** Wakeup for Camera #'
+          + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
+      if not self.dbline.cam_virtual_fps:
+        self.stopprocess()
       self.newprocess() 
       self.getting_newprozess = True
     except:
@@ -409,34 +442,45 @@ class c_cam(c_device):
       self.logger.handlers.clear()
 
   def newprocess(self):
-    if self.dbline.cam_fpslimit and self.dbline.cam_fpslimit < self.cam_fps:
+    if (not self.dbline.cam_virtual_fps 
+        and self.dbline.cam_fpslimit 
+        and self.dbline.cam_fpslimit < self.cam_fps):
       det_frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
     else:
       det_frame_rate = 0.0
     self.wd_ts = time()
-    self.mydetector.myeventer.inqueue.put(('purge_videos', ))
-    source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
-    if self.redis.record_from_dev(self.type, self.dbline.id):
-      self.vid_count = 0
-      filepath = (self.recordingspath + 'C' 
-        + str(self.dbline.id).zfill(4) + '_%08d.mp4')
-    else:
+    if self.dbline.cam_virtual_fps:
+      source_string = virt_cam_path + self.dbline.cam_url
       filepath = None
-    outparams1 = ' -map 0:'+str(self.video_codec) + ' -map -0:a -f rawvideo'
+    else:
+      self.mydetector.myeventer.inqueue.put(('purge_videos', ))
+      source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
+      if self.redis.record_from_dev(self.type, self.dbline.id):
+        self.vid_count = 0
+        filepath = (self.recordingspath + 'C' 
+          + str(self.dbline.id).zfill(4) + '_%08d.mp4')
+      else:
+        filepath = None
+    outparams1 = ''  
+    if not self.dbline.cam_virtual_fps:
+      outparams1 += ' -map 0:'+str(self.video_codec) + ' -map -0:a'
+    outparams1 += ' -f rawvideo'
     outparams1 += ' -pix_fmt bgr24'
     if det_frame_rate:
       outparams1 += ' -r ' + str(det_frame_rate)
-    outparams1 += ' -fps_mode cfr'
+    if not self.dbline.cam_virtual_fps:
+      outparams1 += ' -fps_mode cfr'
     outparams1 += ' pipe:1'
     inparams = ' -i "' + source_string + '"'
     generalparams = ' -v fatal'
-    if source_string[:4].upper() == 'RTSP':
-      generalparams += ' -rtsp_transport tcp'
-    if self.dbline.cam_red_lat:
-      generalparams += ' -fflags nobuffer'
-      generalparams += ' -flags low_delay'
-    if self.video_codec_name not in {'h264', 'hevc'}:
-      generalparams += ' -use_wallclock_as_timestamps 1'
+    if not self.dbline.cam_virtual_fps:
+      if source_string[:4].upper() == 'RTSP':
+        generalparams += ' -rtsp_transport tcp'
+      if self.dbline.cam_red_lat:
+        generalparams += ' -fflags nobuffer'
+        generalparams += ' -flags low_delay'
+      if self.video_codec_name not in {'h264', 'hevc'}:
+        generalparams += ' -use_wallclock_as_timestamps 1'
     outparams2 = ''
     if filepath:
       self.ffmpeg_recording = True

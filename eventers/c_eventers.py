@@ -66,7 +66,6 @@ class c_eventer(c_device):
     self.tf_worker.eventer = self
     self.dataqueue = c_buffer(block=True, timeout=5.0)
     self.detectorqueue = l_buffer(queue=True, timeout=5.0)
-    self.buffer_ts = time()
     self.display_ts = 0
     self.nr_of_cond_ed = 0
     self.read_conditions()
@@ -97,6 +96,7 @@ class c_eventer(c_device):
       self.vid_deque_lock = t_lock()
       self.vid_str_dict = {}
       self.set_cam_counts()
+      self.display_deque = deque()
 
       self.tf_w_index = self.tf_worker.register()
       self.tf_worker.run_out(self.tf_w_index)
@@ -322,7 +322,11 @@ class c_eventer(c_device):
         break
 
   def display_events(self, frame):
-    newimage = frame[1].copy()
+    self.display_deque.append(frame) 
+    if self.display_deque[0][2] > self.last_insert_ts:
+      return()
+    newframe = self.display_deque.popleft()
+    newframe = (3, newframe[1].copy(), self.display_deque[0][2])
     with self.display_lock:
       eventlist = list(self.eventdict.items())
       for i, item in eventlist:
@@ -340,13 +344,13 @@ class c_eventer(c_device):
             displaylist.sort(key=lambda x: -x[1])
             displaylist = displaylist[:3]
             if displaylist:
-              cv.rectangle(newimage, rect_btoa(item), colorcode, self.linewidth)
+              cv.rectangle(newframe[1], rect_btoa(item), colorcode, self.linewidth)
               if item[2] < (self.dbline.cam_yres - item[3]):
                 y0 = item[3] + 30 * self.textheight
               else:
                 y0 = item[2] - (10 + (len(displaylist) - 1) * 30) * self.textheight
               for j in range(len(displaylist)):
-                cv.putText(newimage, 
+                cv.putText(newframe[1], 
                   self.tag_list[displaylist[j][0]].name[:3]
                   +' - '+str(round(displaylist[j][1],2)), 
                   (item[0]+2, y0 + j * 30 * self.textheight), 
@@ -361,13 +365,13 @@ class c_eventer(c_device):
                   pmax = predictions[j]
                   imax = j
             if resolve_rules(self.cond_dict[1], predictions):
-              cv.rectangle(newimage, rect_btoa(item), (255, 0, 0), 
+              cv.rectangle(newframe[1], rect_btoa(item), (255, 0, 0), 
                 self.linewidth)
-              cv.putText(newimage, self.tag_list[imax].name[:3], 
+              cv.putText(newframe[1], self.tag_list[imax].name[:3], 
                 (item[0]+10, item[2]+30), 
                 cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
                   self.textthickness, cv.LINE_AA)
-    self.viewer.inqueue.put((3, newimage, frame[2]))
+    self.viewer.inqueue.put(newframe)
 
   def make_webm(self):
     try:
@@ -399,9 +403,15 @@ class c_eventer(c_device):
       self.logger.error(format_exc())
       self.logger.handlers.clear()
     
-
   def check_events(self, i, item):
-    if (item.end < time() - self.dbline.eve_event_time_gap 
+  #Hier ist das nächste Problem: time() passt nicht zu der virtuellen Zeit aus der Datei.
+  #Möglicherweise die Lösung: Virtuelle Zeit vom CAM-Prozess im Redis ablegen lassen...
+  #virt_time()...
+    if self.dbline.cam_virtual_fps:
+      newtime = self.redis.get_virt_time(self.id)
+    else:
+      newtime = time()  
+    if (item.end < newtime - self.dbline.eve_event_time_gap 
         or item.end > item.start + 120.0):
       item.check_out_ts = item.end
     if self.cond_dict[5]:

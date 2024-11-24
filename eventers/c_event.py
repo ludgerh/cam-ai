@@ -21,6 +21,7 @@ from random import randint
 from os import path, makedirs
 from time import time
 from collections import OrderedDict
+from threading import Lock as t_lock
 from django.db import connection
 from django.conf import settings
 from django.utils import timezone
@@ -28,6 +29,7 @@ from django.db.utils import OperationalError
 from tools.l_tools import ts2filename, uniquename, np_mov_avg, djconf
 from tools.l_smtp import smtp_send_mail
 from tools.l_crypt import l_crypt
+from tools.c_tools import do_reduction
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 from .models import event, event_frame
@@ -101,79 +103,82 @@ class c_event(list):
   crypt = None
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, idx, logger):
-    super().__init__()
-    self.id = idx
-    self.tf_worker = tf_worker
-    self.eventer_id = eventer_dbl.id
-    self.eventer_name = eventer_dbl.name
-    self.tf_w_index = tf_w_index
-    self.xmax = eventer_dbl.cam_xres - 1
-    self.ymax = eventer_dbl.cam_yres - 1
-    self.margin = margin
-    self.number_of_frames = djconf.getconfigint('frames_event', 32)
-    self.isrecording = False
-    self.goes_to_school = False
-    self.to_email = ''
-    self.ts = None
-    self.savename = ''
-    self.schoolnr = eventer_dbl.eve_school.id
-    self.dbline = event()
-    self.dbline.camera = eventer_dbl
-    self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
-    self.tag_list = get_taglist(self.schoolnr)
-    self.start = frame[2]
-    self.end = frame[2]
-    self.append(max(0, frame[3] - margin))
-    self.append(min(self.xmax, frame[4] + margin))
-    self.append(max(0, frame[5] - margin))
-    self.append(min(self.ymax, frame[6] + margin))
-    self.append([frame[7]]) #Predictions
-    self.logger = logger
-    self.frames = OrderedDict([(0, frame)])
-    self.last_frame_index = 1
-    self.shrink_factor = eventer_dbl.eve_shrink_factor
-    self.focus_max = np.max(frame[7][1:])
-    self.focus_time = frame[2]
-    self.dbline.camera = eventer_dbl
-    self.check_out_ts = None
-    if c_event.crypt is None:
-      if self.dbline.camera.encrypted:
-        if self.dbline.camera.crypt_key:
-          c_event.crypt = l_crypt(key=self.dbline.camera.crypt_key)
-        else:
-          c_event.crypt = l_crypt()
-          self.dbline.camera.crypt_key = c_event.crypt.key
-          self.dbline.camera.save(update_fields=['crypt_key'])
+    self.event_lock = t_lock()
+    with self.event_lock:
+      super().__init__()
+      self.id = idx
+      self.tf_worker = tf_worker
+      self.eventer_id = eventer_dbl.id
+      self.eventer_name = eventer_dbl.name
+      self.tf_w_index = tf_w_index
+      self.xmax = eventer_dbl.cam_xres - 1
+      self.ymax = eventer_dbl.cam_yres - 1
+      self.margin = margin
+      self.number_of_frames = djconf.getconfigint('frames_event', 32)
+      self.isrecording = False
+      self.goes_to_school = False
+      self.to_email = ''
+      self.ts = None
+      self.savename = ''
+      self.schoolnr = eventer_dbl.eve_school.id
+      self.dbline = event()
+      self.dbline.camera = eventer_dbl
+      self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
+      self.tag_list = get_taglist(self.schoolnr)
+      self.start = frame[2]
+      self.end = frame[2]
+      self.append(max(0, frame[3] - margin))
+      self.append(min(self.xmax, frame[4] + margin))
+      self.append(max(0, frame[5] - margin))
+      self.append(min(self.ymax, frame[6] + margin))
+      self.append([frame[7]]) #Predictions
+      self.logger = logger
+      self.frames = OrderedDict([(0, frame)])
+      self.last_frame_index = 1
+      self.shrink_factor = eventer_dbl.eve_shrink_factor
+      self.focus_max = np.max(frame[7][1:])
+      self.focus_time = frame[2]
+      self.dbline.camera = eventer_dbl
+      self.check_out_ts = None
+      if c_event.crypt is None:
+        if self.dbline.camera.encrypted:
+          if self.dbline.camera.crypt_key:
+            c_event.crypt = l_crypt(key=self.dbline.camera.crypt_key)
+          else:
+            c_event.crypt = l_crypt()
+            self.dbline.camera.crypt_key = c_event.crypt.key
+            self.dbline.camera.save(update_fields=['crypt_key'])
 
   def add_frame(self, frame):
-    s_factor = self.shrink_factor
-    if (frame[3] - self.margin) <= self[0]:
-      self[0] = max(0, frame[3] - self.margin)
-    else:
-      self[0] = round(((frame[3] - self.margin) * s_factor + self[0]) 
-        / (s_factor+1.0))
-    if (frame[4] + self.margin) >= self[1]:
-      self[1] = min(self.xmax, frame[4] + self.margin)
-    else:
-      self[1] = round(((frame[4] + self.margin) * s_factor + self[1]) 
-        / (s_factor+1.0))
-    if (frame[5] - self.margin) <= self[2]:
-      self[2] = max(0, frame[5] - self.margin)
-    else:
-      self[2] = round(((frame[5] - self.margin) * s_factor + self[2]) 
-        / (s_factor+1.0))
-    if (frame[6] + self.margin) >= self[3]:
-      self[3] = min(self.ymax, frame[6] + self.margin)
-    else:
-      self[3] = round(((frame[6] + self.margin) * s_factor + self[3]) 
-        / (s_factor+1.0))
-    self.end = frame[2]
-    self[4].append(frame[7]) 
-    self.frames[self.last_frame_index] = frame
-    self.last_frame_index += 1
-    if (new_max := np.max(frame[7][1:])) > self.focus_max:
-      self.focus_max = new_max
-      self.focus_time = frame[2]
+    with self.event_lock:
+      s_factor = self.shrink_factor
+      if (frame[3] - self.margin) <= self[0]:
+        self[0] = max(0, frame[3] - self.margin)
+      else:
+        self[0] = round(((frame[3] - self.margin) * s_factor + self[0]) 
+          / (s_factor+1.0))
+      if (frame[4] + self.margin) >= self[1]:
+        self[1] = min(self.xmax, frame[4] + self.margin)
+      else:
+        self[1] = round(((frame[4] + self.margin) * s_factor + self[1]) 
+          / (s_factor+1.0))
+      if (frame[5] - self.margin) <= self[2]:
+        self[2] = max(0, frame[5] - self.margin)
+      else:
+        self[2] = round(((frame[5] - self.margin) * s_factor + self[2]) 
+          / (s_factor+1.0))
+      if (frame[6] + self.margin) >= self[3]:
+        self[3] = min(self.ymax, frame[6] + self.margin)
+      else:
+        self[3] = round(((frame[6] + self.margin) * s_factor + self[3]) 
+          / (s_factor+1.0))
+      self.end = frame[2]
+      self[4].append(frame[7]) 
+      self.frames[self.last_frame_index] = frame
+      self.last_frame_index += 1
+      if (new_max := np.max(frame[7][1:])) > self.focus_max:
+        self.focus_max = new_max
+        self.focus_time = frame[2]
 
   def merge_frames(self, the_other_one):
     self.frames = {**self.frames, **the_other_one.frames}
@@ -264,7 +269,12 @@ class c_event(list):
       )
       frameline.save()
       if self.to_email:
-        self.mailimages.append([frameline.id, frame[2], frame[8], 'bmp'])
+        imagedata = cv.imdecode(
+          np.frombuffer(frame[8], dtype=np.uint8), cv.IMREAD_UNCHANGED
+        )
+        imagedata = do_reduction(imagedata, 200, 200)
+        imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
+        self.mailimages.append([frameline.id, frame[2], imagedata, 'jpg', 'image'])
       else:
         self.mailimages.append([frameline.id])
     if self.to_email:
@@ -294,16 +304,21 @@ class c_event(list):
         filepath = djconf.getconfig('recordingspath', datapath + 'recordings/') + filename
         with open(filepath, "rb") as f:
           jpegdata = f.read()
-        self.mailimages.append([0, None, jpegdata, 'jpeg'])
-        html_text += '<br>Here is the movie (click on the image): <br> \n' 
+        jpegdata = cv.imdecode(
+          np.frombuffer(jpegdata, dtype=np.uint8), cv.IMREAD_UNCHANGED
+        )
+        jpegdata = do_reduction(jpegdata, 400, 400)
+        jpegdata = cv.imencode('.jpg', jpegdata)[1].tobytes()
+        self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
+        html_text += '<br>Here is the movie (click on the image to see): <br> \n' 
         html_text += ('<a href="' + clienturl + 'schools/getbigmp4/' 
           + str(self.dbline.id) + '/')
         html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
         html_text += '" target="_blank">'
-        html_text += '<img src="cid:image0" style="width: 400px; height: auto"</a> <br>\n'
+        html_text += '<img src="cid:image0" style="width: 400px; height: auto"></a> <br>\n'
       html_text += 'Here are the images: <br> \n'
       for item in self.mailimages:
-        if item[3] == 'bmp':
+        if item[4] == 'image':
           html_text += '<a href="' + clienturl + 'schools/getbigbmp/0/' + str(item[0]) + '/'
           html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
           html_text += '" target="_blank">'
