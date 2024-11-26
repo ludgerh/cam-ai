@@ -58,7 +58,7 @@ def index(request, mode='C'):
   }
   return(HttpResponse(template.render(context)))
   
-def indexgrid(request, mode='C'):
+def indexgrid(request, mode='C', start=0, end=0):
   template = loader.get_template('index/indexgrid.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),

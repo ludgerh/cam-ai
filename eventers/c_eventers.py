@@ -114,7 +114,7 @@ class c_eventer(c_device):
       self.motion_frame = [0,0,0.0]
       self.run_one_ts = time()
       self.run_one_deque = deque()
-      self.last_insert_ts = 0.0
+      self.last_insert_ts = float('inf')
       
       runner_ts = time()
 
@@ -258,7 +258,7 @@ class c_eventer(c_device):
     while (
       self.do_run 
       and [i for i in self.eventdict if self.eventdict[i].check_out_ts is None]
-      and frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts
+      #and frame[2] + self.dbline.eve_sync_factor >= self.last_insert_ts
       and not self.detectorqueue.empty()
     ):
       sleep(djconf.getconfigfloat('medium_brake', 0.1))
@@ -323,10 +323,10 @@ class c_eventer(c_device):
 
   def display_events(self, frame):
     self.display_deque.append(frame) 
-    if self.display_deque[0][2] > self.last_insert_ts:
+    if self.display_deque[0][2] > self.last_insert_ts + self.dbline.eve_sync_factor:
       return()
     newframe = self.display_deque.popleft()
-    newframe = (3, newframe[1].copy(), self.display_deque[0][2])
+    newframe = (3, newframe[1].copy(), newframe[2])
     with self.display_lock:
       eventlist = list(self.eventdict.items())
       for i, item in eventlist:

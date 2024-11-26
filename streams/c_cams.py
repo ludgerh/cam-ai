@@ -442,12 +442,13 @@ class c_cam(c_device):
       self.logger.handlers.clear()
 
   def newprocess(self):
-    if (not self.dbline.cam_virtual_fps 
-        and self.dbline.cam_fpslimit 
-        and self.dbline.cam_fpslimit < self.cam_fps):
-      det_frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
-    else:
-      det_frame_rate = 0.0
+    inp_frame_rate = 0.0
+    if self.dbline.cam_virtual_fps:
+      if self.dbline.cam_fpslimit and self.dbline.cam_fpslimit < self.dbline.cam_virtual_fps:
+        inp_frame_rate = min(self.dbline.cam_fpslimit, self.dbline.cam_virtual_fps)
+    else:  
+      if self.dbline.cam_fpslimit and self.dbline.cam_fpslimit < self.cam_fps:
+        inp_frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
     self.wd_ts = time()
     if self.dbline.cam_virtual_fps:
       source_string = virt_cam_path + self.dbline.cam_url
@@ -466,9 +467,8 @@ class c_cam(c_device):
       outparams1 += ' -map 0:'+str(self.video_codec) + ' -map -0:a'
     outparams1 += ' -f rawvideo'
     outparams1 += ' -pix_fmt bgr24'
-    if det_frame_rate:
-      outparams1 += ' -r ' + str(det_frame_rate)
-    if not self.dbline.cam_virtual_fps:
+    if inp_frame_rate:
+      outparams1 += ' -r ' + str(inp_frame_rate)
       outparams1 += ' -fps_mode cfr'
     outparams1 += ' pipe:1'
     inparams = ' -i "' + source_string + '"'

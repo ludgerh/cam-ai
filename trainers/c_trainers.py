@@ -120,8 +120,8 @@ class trainer():
                   undone.update(train_status=1)
                   alllines = 1
                 else:
-                  alllines = trainframe.objects.filter(school=item.id).count()
-                run_condition = (count >= item.trigger) and list_from_queryset(alllines)
+                  alllines = len(list_from_queryset(trainframe.objects.filter(school=item.id)))
+                run_condition = (count >= item.trigger) and alllines
               if run_condition:
                 myfit = fit(made=timezone.now(), 
                   school = item.id, 

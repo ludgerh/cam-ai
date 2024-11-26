@@ -26,30 +26,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <main>
 <div class="h2 m-2">
-Please upload one video file (.MOV, .AVI or .MP4):
+We had a problem with your upload: {{ text }}
 </div>
-<form method="post" enctype="multipart/form-data">
-  {% csrf_token %}
-  <label for="file">Select a file:</label>
-  <input type="file" id="file" name="file">
-  <input type="submit" value="Upload" id="formButton">
-</form>
-<div class="h2 m-2 d-none" id="please_wait">
-Uploading your file. Please wait...
+<div class="h2 m-2">
+Length: {{ length }} Seconds.
 </div>
+</main>
 
 <script>
-
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-
-$(document).ready(function() {
-  $("#formButton").click(function() {
-    $('#please_wait').removeClass("d-none");
-  });
-});
-
 </script>
 
-
-</main>
 {% endblock %}

@@ -26,6 +26,7 @@ urlpatterns = [
 	path('inst_cam_expert/<str:ip>/<str:ports>/', views.inst_cam_expert.as_view(), name='inst_cam_expert'),
 	path('scan_cam_expert/', views.scan_cam_expert.as_view(), name='scan_cam_expert'),
 	path('inst_virt_cam/', views.inst_virt_cam.as_view(), name='inst_virt_cam'),
+	path('virt_cam_error/<str:text>/<int:length>/', views.virt_cam_error.as_view(), name='virt_cam_error'),
 	path('shutdown/', views.shutdown.as_view(), name='shutdown'),
 	path('upgrade/', views.upgrade.as_view(), name='upgrade'),
 	path('backup/', views.backup.as_view(), name='backup'),

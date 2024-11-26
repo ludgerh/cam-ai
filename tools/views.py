@@ -19,8 +19,9 @@ import os
 import cv2 as cv
 from shutil import move
 from time import sleep
-#from pprint import pprint
+from pprint import pprint
 from requests import get as rget
+from subprocess import Popen, PIPE
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.contrib.auth import logout
@@ -106,12 +107,30 @@ class inst_virt_cam(cam_inst_view):
   template_name = 'tools/inst_virt_cam.html'  
   
   def post(self, request):
-    newstream = stream()
-    newstream.save()
     uploaded_file = request.FILES['file']
     fs = FileSystemStorage(location='temp/upload')
     filename = fs.save(uploaded_file.name, uploaded_file)
     file_path = fs.path(filename)
+    cmds = ['ffprobe', '-v', 'fatal']
+    cmds += ['-print_format', 'json', '-show_streams', file_path]
+    p = Popen(cmds, stdout=PIPE)
+    output, _ = p.communicate()
+    probe = json.loads(output)
+    pprint(probe)
+    if len(probe):
+      duration = 0.0
+      for item in probe['streams']:
+        duration = max(duration, float(item['duration']))
+      if duration < 1.0:
+        print('Too short', duration)
+        return redirect('/tools/virt_cam_error/too_short/'+str(round(duration * 1000))+'/')
+      else:   
+        print('OK', duration)
+    else:
+      print('This is not a Video File.')
+      return redirect('/tools/virt_cam_error/no_video/0/')
+    newstream = stream()
+    newstream.save()
     filename = 'virt_cam_' + str(newstream.id) + '.' + filename.split('.')[-1]
     move(file_path, virt_cam_path + filename)
     newstream.cam_url = filename
@@ -145,6 +164,17 @@ class inst_virt_cam(cam_inst_view):
     while (not (newstream.id in streams)):
       sleep(long_brake)
     return redirect('/')
+    
+class virt_cam_error(cam_inst_view):
+  template_name = 'tools/virt_cam_error.html'  
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'text' : kwargs['text'],
+      'length' : kwargs['length'] / 1000.0,
+    })
+    return context 
 
 class scan_cam_expert(cam_inst_view):
   template_name = 'tools/scan_cam_expert.html'

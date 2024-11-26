@@ -23,5 +23,6 @@ urlpatterns = [
 	path('landing/', landing, name='landing'),
 	path('', landing, name='landing'),
 	path('grid/<str:mode>/', indexgrid, name='indexgrid'),
+	path('grid/<str:mode>/<int:start>/<int:end>/', indexgrid, name='indexgrid'),
 ]
 
