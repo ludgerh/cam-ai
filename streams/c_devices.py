@@ -47,7 +47,10 @@ class c_device():
     if self.type == 'C':
       limit = 0
     elif self.type == 'D':
-      limit = self.dbline.det_fpslimit
+      if self.dbline.cam_virtual_fps:
+        limit = 0
+      else:  
+        limit = self.dbline.det_fpslimit
     elif self.type == 'E':
       limit = self.dbline.eve_fpslimit
     if limit == 0:

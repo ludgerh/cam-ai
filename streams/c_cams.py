@@ -28,10 +28,9 @@ from multitimer import MultiTimer
 from traceback import format_exc
 from glob import glob
 from subprocess import Popen, PIPE
-from django.db import connection
-from django.db.utils import OperationalError
 from tools.c_logger import log_ini
 from tools.l_tools import djconf, ts2filename
+from tools.c_tools import protected_db
 from viewers.c_viewers import c_viewer
 from .c_devices import c_device
 from .models import stream
@@ -205,13 +204,7 @@ class c_cam(c_device):
     fps = self.som.gettime()
     if fps:
       self.dbline.cam_fpsactual = fps
-      mystreamline = stream.objects.filter(id = self.dbline.id)
-      while True:
-        try:
-          mystreamline.update(cam_fpsactual = fps)
-          break
-        except OperationalError:
-          connection.close()
+      protected_db(self.dbline.save, kwargs = {'update_fields' : ['cam_fpsactual', ]})
       self.redis.fps_to_dev('C', self.dbline.id, fps)
     if self.dbline.cam_apply_mask and (self.viewer.drawpad.mask is not None):
       frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
@@ -340,12 +333,10 @@ class c_cam(c_device):
         return()    
       self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
       self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
-      while True:
-        try:
-          self.dbline.save(update_fields=['cam_xres', 'cam_yres'])
-          break
-        except OperationalError:
-          connection.close()
+      protected_db(self.dbline.save, kwargs = {'update_fields' : [
+        'cam_xres', 
+        'cam_yres', 
+      ]})
       if self.dbline.cam_audio_codec == -1:
         self.audio_codec = 0
         try:
@@ -361,12 +352,6 @@ class c_cam(c_device):
       else:  
         self.audio_codec_name = 'none'
       self.logger.info('+++++ Audio codec: ' + self.audio_codec_name)
-      while True:
-        try:
-          self.dbline.save(update_fields=['cam_xres', 'cam_yres'])
-          break
-        except OperationalError:
-          connection.close()
       self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
 
   def checkmp4(self):
@@ -547,12 +532,7 @@ class c_cam(c_device):
       self.ff_proc.send_signal(SIGTERM)
       self.ff_proc.wait()
       self.ff_proc = None
-    while True:
-      try:
-        self.dbline.refresh_from_db()
-        break
-      except OperationalError:
-        connection.close()
+    protected_db(self.dbline.refresh_from_db, )
     self.newprocess() 
     self.logger.info('Cam #'+str(self.dbline.id)+' is on')
 

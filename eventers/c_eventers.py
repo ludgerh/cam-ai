@@ -64,8 +64,11 @@ class c_eventer(c_device):
       self.viewer = None
     self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
-    self.dataqueue = c_buffer(block=True, timeout=5.0)
-    self.detectorqueue = l_buffer(queue=True, timeout=5.0)
+    self.dataqueue = c_buffer(block_get=True, timeout=5.0)
+    if self.dbline.cam_virtual_fps:
+      self.detectorqueue = l_buffer(block_put=True, timeout=5.0)
+    else:
+      self.detectorqueue = l_buffer(queue=True, timeout=5.0)
     self.display_ts = 0
     self.nr_of_cond_ed = 0
     self.read_conditions()

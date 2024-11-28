@@ -22,10 +22,8 @@ from logging import getLogger
 from time import time, sleep
 from setproctitle import setproctitle
 from psutil import virtual_memory
-from django.db import connection
-from django.db.utils import OperationalError
 from tools.l_tools import djconf
-from tools.c_tools import rect_atob, rect_btoa, merge_rects
+from tools.c_tools import rect_atob, rect_btoa, merge_rects, protected_db
 from tools.c_redis import myredis
 from tools.c_logger import log_ini
 from l_buffer.l_buffer import c_buffer
@@ -41,7 +39,7 @@ class c_detector(c_device):
       self.type = 'D'
       super().__init__(*args, **kwargs)
       self.mode_flag = self.dbline.det_mode_flag
-      self.dataqueue = c_buffer(block=True, timeout=5.0)
+      self.dataqueue = c_buffer(block_put=True, block_get=True, timeout=5.0)
       self.firstdetect = True
       self.ts_background = time()
       self.finished = True
@@ -136,29 +134,30 @@ class c_detector(c_device):
     try:
       if input is None or input[2] == 0.0:
         return(None)
-      evqsize = self.myeventer.detectorqueue.qsize()  
-      #self.logger.info('memory: ' + str(virtual_memory().percent) + '%')
-      if evqsize >= 5:
-        return(None)
-      if self.period:
-        altp = self.period
-      else:
-        altp = 0.01  
-      if evqsize >= 5 or virtual_memory().percent > 80.0:
-        if self.dbline.det_fpslimit: 
-          self.period = min(self.period * self.adapt_fact, 10 / self.dbline.det_fpslimit)
+      if not self.dbline.cam_virtual_fps:
+        evqsize = self.myeventer.detectorqueue.qsize()  
+        #self.logger.info('memory: ' + str(virtual_memory().percent) + '%')
+        if evqsize >= 5:
+          return(None)
+        if self.period:
+          altp = self.period
         else:
-          self.period = min(self.period * self.adapt_fact, 20.0)  
-      elif evqsize == 0 and virtual_memory().percent < 80.0:
-        if self.dbline.det_fpslimit: 
-          self.period = max(self.period / self.adapt_fact, 1 / self.dbline.det_fpslimit)
-        else:  
-          self.period = max(self.period / self.adapt_fact, 0.1)
-      #self.logger.info('#' + str(self.id) + ' QS: ' + str(evqsize) + ' - ' + str(1 / altp) + ' >>> ' + str(1 / self.period))  
+          altp = 0.01  
+        if evqsize >= 5 or virtual_memory().percent > 80.0:
+          if self.dbline.det_fpslimit: 
+            self.period = min(self.period * self.adapt_fact, 10 / self.dbline.det_fpslimit)
+          else:
+            self.period = min(self.period * self.adapt_fact, 20.0)  
+        elif evqsize == 0 and virtual_memory().percent < 80.0:
+          if self.dbline.det_fpslimit: 
+            self.period = max(self.period / self.adapt_fact, 1 / self.dbline.det_fpslimit)
+          else:  
+            self.period = max(self.period / self.adapt_fact, 0.1)
+        #self.logger.info('#' + str(self.id) + ' QS: ' + str(evqsize) + ' - ' + str(1 / altp) + ' >>> ' + str(1 / self.period))  
       frametime = input[2]
       if not (self.do_run and self.sl.greenlight(self.period, frametime)):
         return(None)
-      if self.run_lock: 
+      if self.run_lock and not self.dbline.cam_virtual_fps: 
         return(None)
       self.run_lock = True
       frame = input[1]
@@ -259,13 +258,7 @@ class c_detector(c_device):
       fps = self.som.gettime()
       if fps:
         self.dbline.det_fpsactual = fps
-        mystreamline = stream.objects.filter(id = self.dbline.id)
-        while True:
-          try:
-            mystreamline.update(det_fpsactual = fps)
-            break
-          except OperationalError:
-            connection.close()
+        protected_db(self.dbline.save, kwargs = {'update_fields' : ['det_fpsactual', ]})
         self.redis.fps_to_dev(self.type, self.dbline.id, fps)
       self.run_lock = False
       return((3, buffer1, frametime))

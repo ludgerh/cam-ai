@@ -16,7 +16,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 """
-block = Block get() until new data
+block_put = Block put() until the previous data was read
+
+block_get = Block get() until new data
 When using this, stop() must be called from the getting process to finalize 
 shutdown.
 
@@ -38,13 +40,16 @@ from tools.c_redis import saferedis
 class l_buffer():
   redis_list = []
 
-  def __init__(self, block=False, call=None, queue=None, timeout=None):
-    self.block = block
+  def __init__(self, block_put=False, block_get=False, call=None, queue=None, 
+      timeout=None):
+    self.block_put = block_put
+    self.block_get = block_get
     self.call = call
     self.queue = queue
     self.timeout = timeout
     self.redis = saferedis() 
-    self.blockdelay = 0.01  
+    self.blockdelay_put = 0.01  
+    self.blockdelay_get = 0.01  
     i = 0
     while i in l_buffer.redis_list:
       i += 1
@@ -77,17 +82,16 @@ class l_buffer():
       sleep(0.01) 
     
   def get(self):
-    if self.block:
+    if self.block_get:
       ts1 = time()
       while (not self.redis.exists(self.storage[0])):
         if time() - ts1 > 5:
           return(None)
         else:  
-          sleep(self.blockdelay)
-          if self.blockdelay < 1.0:
-            self.blockdelay += 0.01  
-      self.blockdelay = 0.01  
-    #with self.my_lock:
+          sleep(self.blockdelay_get)
+          if self.blockdelay_get < 1.0:
+            self.blockdelay_get += 0.01  
+      self.blockdelay_get = 0.01  
     if self.my_lock.acquire(timeout = self.timeout):
       if self.queue:
         bytedata = self.redis.rpop(self.storage[0])
@@ -106,12 +110,22 @@ class l_buffer():
       self.my_lock.release()
     else:
       result = None  
-    if self.block:
+    if self.block_put or self.block_get:
       if not self.queue:
         self.redis.delete(self.storage[0])
     return(result)
 
   def put(self, bytedata=b'', objdata=None, bytedata2=b''):
+    if self.block_put:
+      ts1 = time()
+      while (self.redis.exists(self.storage[0])):
+        if time() - ts1 > 5:
+          return(None)
+        else:  
+          sleep(self.blockdelay_put)
+          if self.blockdelay_put < 1.0:
+            self.blockdelay_put += 0.01  
+      self.blockdelay_put = 0.01  
     if objdata:
       objdata = pickle.dumps(objdata)
     else:

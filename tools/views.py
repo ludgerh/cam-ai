@@ -19,7 +19,6 @@ import os
 import cv2 as cv
 from shutil import move
 from time import sleep
-from pprint import pprint
 from requests import get as rget
 from subprocess import Popen, PIPE
 from django.conf import settings
@@ -41,7 +40,9 @@ from access.c_access import access
 from tf_workers.models import school, worker
 from trainers.models import trainer
 from .models import camurl
+
 #from .forms import UploadFileForm
+#from pprint import pprint
 
 redis = myredis()
 
@@ -116,7 +117,7 @@ class inst_virt_cam(cam_inst_view):
     p = Popen(cmds, stdout=PIPE)
     output, _ = p.communicate()
     probe = json.loads(output)
-    pprint(probe)
+    #pprint(probe)
     if len(probe):
       duration = 0.0
       for item in probe['streams']:
