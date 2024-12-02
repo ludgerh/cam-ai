@@ -14,29 +14,38 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+from os import path
 from email.mime.image import MIMEImage
 from django.core.mail import send_mail, EmailMultiAlternatives
 from threading import Thread
 from time import sleep
 
-def smtp_send_try_mail(*args, html_message = None, images = None, logger = None, ):
+def smtp_send_try_mail(*args, html_message = None, images = [], attachments = [], 
+    logger = None, ): 
   count = 0
   done = False
   while count < 5:
     count += 1
-    if images:
+    if not (images or attachments):
+      result = send_mail(*args, 
+        html_message = html_message, 
+        fail_silently=True, 
+      )
+    else:
       email = EmailMultiAlternatives(*args)
       email.attach_alternative(html_message, "text/html")
       for item in images:
         mime_image = MIMEImage(item[2], _subtype=item[3])
         mime_image.add_header('Content-ID', 'image' + str(item[0]))
         email.attach(mime_image)
-      result = email.send()
-    else:
-      result = send_mail(*args, 
-        html_message = html_message, 
-        fail_silently=True
-      )
+      for item in attachments:
+        if path.exists(item[1]):
+          with open(item[1], "rb") as attachment:
+            email.attach(item[0], attachment.read(), item[2])
+        else:
+          if logger:
+            logger.warning('***** File not found: ' + item[1])     
+      result = email.send(fail_silently=True, )
     if result:  
       done = True
       break

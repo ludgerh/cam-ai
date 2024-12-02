@@ -37,22 +37,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     {% endif %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>CAM-AI Server Shutdown</title>
+    <title>CAM-AI Sending Logfiles</title>
   </head>
   <body>
 
 <main>  
   <div class="h2">
-    Are you sure you want to shutdown the CAM-AI-Server?
+    Are you sure you want to ssend your logfiles to the CAM-AI support team?
     <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
   </div> 
   <div class="h2 d-none" id="line2">
-    The server is terminating and then being shut down. Please wait...
-  </div>  
-  <div class="h2 d-none" id="line3">
-    We are done. 
-    Once the servers (Raspi 4: network LED stopped blinking, Raspi 5: front LED turned red), 
-    you can take the power from the server. Goodbye!
+    The email was launched...
   </div>  
 </main>
   
@@ -71,18 +66,14 @@ $(document).ready(function() {
     admintoolsSocket = result;
     $('#continue-button').click(function() {
       $('#continue-button').prop('disabled', true);
-      $('#line2').removeClass("d-none");
-      admintoolsSocket.socket.onclose = function(e) {
-        setTimeout(function () {
-          $('#line3').removeClass("d-none");
-        }, 30000);
-      };
       admintoolsSocket.sendandwait({
-        'command' : 'shutdown',
-      });
+        'command' : 'sendlogs',
+      })
+      .then((result) => {
+        $('#line2').removeClass("d-none");
+      })
     });
-  })
-  .catch(err => {console.log(err);});
+  });
 });
 
 </script>  

@@ -159,7 +159,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
             user=myuser,
             active=True,
           )
-          await my_log_line.asave()
+          await protected_dba(my_log_line.asave)
           self.viewer_dict[params['mode']][params['idx']]['log'] = my_log_line
           outlist['data'] = {
             'outx' : outx, 

@@ -33,12 +33,14 @@ from multiprocessing import Process
 from logging import getLogger
 from traceback import format_exc
 from zipfile import ZipFile, ZIP_DEFLATED
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
 from camai.c_settings import safe_import
 from tools.c_logger import log_ini
 from tools.l_tools import djconf, displaybytes
+from tools.l_smtp import smtp_send_mail
 from tools.c_redis import myredis
 from tf_workers.models import school, worker
 from trainers.models import trainer
@@ -442,7 +444,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         
-      if params['command'] == 'shutdown':
+      elif params['command'] == 'shutdown':
         if not self.scope['user'].is_superuser:
           await self.close()
         redis.set_shutdown_command(1)
@@ -520,6 +522,28 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))	
         while redis.get_watch_status():
           await asleep(long_brake) 
+        
+      elif params['command'] == 'sendlogs':
+        if not self.scope['user'].is_superuser:
+          await self.close()
+        datapath = djconf.getconfig('datapath', 'data/')
+        logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
+        smtp_send_mail(
+          'The Log files',
+          'These are the Log Files',
+          'CAM-AI Emailer<' + settings.EMAIL_FROM + '>',
+          ['support@booker-hellerhoff.de', ],
+          html_message = 'These are the Log Files (HTML)',
+          logger = logger,
+          attachments = (
+            ('c_server.err', logpath + 'c_server.err', 'text/plain'), 
+            ('c_server.log', logpath + 'c_server.log', 'text/plain'), 
+          ),
+        )  
+          
+        outlist['data'] = 'OK'
+        logger.debug('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
     except:
       logger.error('Error in consumer: ' + logname + ' (admin_tools_async)')
       logger.error(format_exc())

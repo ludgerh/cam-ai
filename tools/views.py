@@ -356,3 +356,20 @@ def restore(request):
 def logout_and_redirect(request):
   logout(request)
   return redirect('/')
+
+class sendlogs(TemplateView):
+  template_name = 'tools/sendlogs.html'
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'emulatestatic' : emulatestatic,
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
+    })
+    return context
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))

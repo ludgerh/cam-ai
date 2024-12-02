@@ -409,9 +409,6 @@ class c_eventer(c_device):
       self.logger.handlers.clear()
     
   def check_events(self, i, item):
-  #Hier ist das nächste Problem: time() passt nicht zu der virtuellen Zeit aus der Datei.
-  #Möglicherweise die Lösung: Virtuelle Zeit vom CAM-Prozess im Redis ablegen lassen...
-  #virt_time()...
     if self.dbline.cam_virtual_fps:
       newtime = self.redis.get_virt_time(self.id)
     else:

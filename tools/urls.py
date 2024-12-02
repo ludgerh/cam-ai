@@ -28,6 +28,7 @@ urlpatterns = [
 	path('inst_virt_cam/', views.inst_virt_cam.as_view(), name='inst_virt_cam'),
 	path('virt_cam_error/<str:text>/<int:length>/', views.virt_cam_error.as_view(), name='virt_cam_error'),
 	path('shutdown/', views.shutdown.as_view(), name='shutdown'),
+	path('sendlogs/', views.sendlogs.as_view(), name='sendlogs'),
 	path('upgrade/', views.upgrade.as_view(), name='upgrade'),
 	path('backup/', views.backup.as_view(), name='backup'),
 	path('restore/', views.restore, name='restore'),
