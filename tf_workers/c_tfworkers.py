@@ -126,13 +126,13 @@ class output_dist():
     
   def put(self, tf_w_index, data, timeout = None):
     while redis.exists(self.nametag + str(tf_w_index)): 
-      sleep(djconf.getconfigfloat('short_brake', 0.01))
+      sleep(djconf.getconfigfloat('medium_brake', 0.1))
     self.used_adresses.add(tf_w_index) 
     redis.set(self.nametag + str(tf_w_index), pickle.dumps(data)) 
     
   def get(self, tf_w_index):
     while (result := redis.get(self.nametag + str(tf_w_index))) is None: 
-      sleep(djconf.getconfigfloat('short_brake', 0.01))
+      sleep(djconf.getconfigfloat('medium_brake', 0.1))
     data = pickle.loads(result) 
     redis.delete(self.nametag + str(tf_w_index))
     return(pickle.loads(result))
@@ -436,7 +436,7 @@ class tf_worker():
                   self.process_buffer(schoolnr, self.logger, timeout)
                 self.model_buffers[schoolnr].ts = time() 
               else:
-                sleep(djconf.getconfigfloat('short_brake', 0.01))
+                sleep(djconf.getconfigfloat('medium_brake', 0.1))
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
       self.logger.handlers.clear()
@@ -759,7 +759,7 @@ class tf_worker():
       if ((userindex not in self.pred_out_dict) 
           or self.pred_out_dict[userindex] is None):
         self.pred_out_lock.release()
-        sleep(djconf.getconfigfloat('short_brake', 0.01))
+        sleep(djconf.getconfigfloat('medium_brake', 0.1))
       else:  
         result = self.pred_out_dict[userindex]
         self.pred_out_dict[userindex] = None

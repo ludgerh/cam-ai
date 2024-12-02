@@ -26,7 +26,10 @@ def free_quota(myuser):
     else:
       return(0)  
   else:
-    userline = userinfo.objects.get(user = myuser)
+    try:
+      userline = userinfo.objects.get(user = myuser)
+    except userinfo.DoesNotExist:
+      return(0) 
     if (diff := userline.storage_quota - userline.storage_used) > 0:
       return(diff)
     else:

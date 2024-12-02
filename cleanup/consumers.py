@@ -217,7 +217,10 @@ class cleanup(AsyncWebsocketConsumer):
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
-            frame_line = await trainframe.objects.aget(name = item.decode() + '.bmp')
+            frame_line = await trainframe.objects.aget(
+              name = item.decode() + '.bmp',
+              school = params['school'], 
+            )
             frame_line.deleted = True
             await frame_line.asave(update_fields = ['deleted'])
             outlist['callback'] = True

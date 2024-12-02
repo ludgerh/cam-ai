@@ -69,7 +69,7 @@ def add_to_redis(name, idx, myvalue):
 def get_from_redis(name, idx):
   mytag = 'cleanup:' + name + ':' + str(idx)
   while (not myredis.exists(mytag)):
-    sleep(djconf.getconfigfloat('short_brake', 0.1))
+    sleep(djconf.getconfigfloat('medium_brake', 0.1))
   return(int(myredis.get(mytag)))
    
 def add_to_redis_queue(name, idx, myset):

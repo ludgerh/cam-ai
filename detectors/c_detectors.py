@@ -39,7 +39,10 @@ class c_detector(c_device):
       self.type = 'D'
       super().__init__(*args, **kwargs)
       self.mode_flag = self.dbline.det_mode_flag
-      self.dataqueue = c_buffer(block_put=True, block_get=True, timeout=5.0)
+      if self.dbline.cam_virtual_fps:
+        self.dataqueue = c_buffer(block_put=True, block_get=True, timeout=5.0)
+      else:  
+        self.dataqueue = c_buffer(block_get=True, timeout=5.0)
       self.firstdetect = True
       self.ts_background = time()
       self.finished = True
@@ -80,7 +83,7 @@ class c_detector(c_device):
           self.dbline.det_max_rect = received[1]
         elif (received[0] == 'reset'):
           while self.run_lock:
-            sleep(djconf.getconfigfloat('short_brake', 0.1))
+            sleep(djconf.getconfigfloat('medium_brake', 0.1))
           self.run_lock = True  
           self.dbline.refresh_from_db()
           self.scaledown = self.get_scale_down()
@@ -117,7 +120,7 @@ class c_detector(c_device):
       while self.do_run:
         frameline = self.run_one(self.dataqueue.get())
         if frameline is None:
-          sleep(djconf.getconfigfloat('short_brake', 0.1))
+          sleep(djconf.getconfigfloat('medium_brake', 0.1))
         else:
           if self.dbline.det_view and self.redis.view_from_dev('D', self.dbline.id):
             self.viewer.inqueue.put(frameline)

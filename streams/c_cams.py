@@ -140,7 +140,7 @@ class c_cam(c_device):
         else:
           if not self.do_run:
             return(None)
-          sleep(djconf.getconfigfloat('short_brake', 0.01))
+          sleep(djconf.getconfigfloat('medium_brake', 0.1))
       else:
         if self.cam_active:
           if (not self.redis.record_from_dev('C', self.dbline.id)

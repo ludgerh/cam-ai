@@ -137,7 +137,7 @@ class c_eventer(c_device):
             and self.sl.greenlight(self.period, frameline[2])):
           self.run_one(frameline) 
         else:
-          sleep(djconf.getconfigfloat('short_brake', 0.01))
+          sleep(djconf.getconfigfloat('medium_brake', 0.1))
       self.dataqueue.stop()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
@@ -326,7 +326,9 @@ class c_eventer(c_device):
 
   def display_events(self, frame):
     self.display_deque.append(frame) 
-    if self.display_deque[0][2] > self.last_insert_ts + self.dbline.eve_sync_factor:
+    if (self.display_deque[0][2] > self.last_insert_ts + self.dbline.eve_sync_factor
+        and not self.detectorqueue.empty()):
+      sleep(djconf.getconfigfloat('medium_brake', 0.1))
       return()
     newframe = self.display_deque.popleft()
     newframe = (3, newframe[1].copy(), newframe[2])
@@ -515,7 +517,7 @@ class c_eventer(c_device):
         sleep(djconf.getconfigfloat('long_brake', 1.0))
       while self.do_run:
         if self.detectorqueue.empty():
-          sleep(djconf.getconfigfloat('short_brake', 0.1))
+          sleep(djconf.getconfigfloat('medium_brake', 0.1))
           continue  
         image, numbers, bmpdata = self.detectorqueue.get()
         image = np.frombuffer(image, dtype=np.uint8)
