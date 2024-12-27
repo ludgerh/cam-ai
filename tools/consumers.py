@@ -77,6 +77,7 @@ logname = 'ws_tools'
 logger = getLogger(logname)
 log_ini(logger, logname)
 datapath = djconf.getconfig('datapath', 'data/')
+logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
 textpath = djconf.getconfig('textpath', datapath + 'texts/')
 smtp_email = djconf.getconfig('smtp_email', forcedb=False)
@@ -526,8 +527,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'sendlogs':
         if not self.scope['user'].is_superuser:
           await self.close()
-        datapath = djconf.getconfig('datapath', 'data/')
-        logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
         smtp_send_mail(
           'The Log files',
           params['message'],
