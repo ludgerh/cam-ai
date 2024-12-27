@@ -27,7 +27,6 @@ from logging import getLogger
 from datetime import datetime
 from django.utils import timezone
 from django.db import connections
-from django.conf import settings
 from tools.l_tools import djconf, get_dir_size
 from tools.l_smtp import smtp_send_mail
 from tools.c_tools import list_from_queryset
@@ -471,7 +470,7 @@ class c_cleanup():
             'Thank you for choosing CAM-AI. \n'
             'Best regards, \n'
             'The CAM-AI Team',
-            'CAM-AI<' + settings.EMAIL_FROM + '>',
+            'CAM-AI<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
             userline.user.email,
             '<br>Dear CAM-AI User,<br>\n'
             '<br>We want to inform you that your CAM-AI storage is now 75% full.\n'
@@ -495,7 +494,7 @@ class c_cleanup():
               'Thank you for choosing CAM-AI. \n'
               'Best regards, \n'
               'The CAM-AI Team',
-              'CAM-AI<' + settings.EMAIL_FROM + '>',
+              'CAM-AI<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
               userline.user.email,
               '<br>Dear CAM-AI User,<br>\n'
               '<br>We are reaching out to inform you that your CAM-AI storage is currently full. \n'

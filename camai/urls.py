@@ -48,6 +48,7 @@ if (argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith(
     path('users/', include('users.urls')),
     path('tools/', include('tools.urls')),
     path('cleanup/', include('cleanup.urls')),
+    path('config/', include('config.urls')),
     path('', include('index.urls')),
   ]
 else:

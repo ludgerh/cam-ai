@@ -51,8 +51,16 @@ datapath = djconf.getconfig('datapath', 'data/')
 virt_cam_path = djconf.getconfig('virt_cam_path', datapath + 'virt_cam_path/')
 os.makedirs(virt_cam_path, exist_ok = True)
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
+
+class myTemplateView(LoginRequiredMixin, TemplateView):
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))
       
-class cam_inst_view(LoginRequiredMixin, TemplateView):   
+class cam_inst_view(myTemplateView):   
 
   def get_context_data(self, **kwargs):
     streamlimit = userinfo.objects.get(user = self.request.user.id).allowed_streams
@@ -180,7 +188,7 @@ class virt_cam_error(cam_inst_view):
 class scan_cam_expert(cam_inst_view):
   template_name = 'tools/scan_cam_expert.html'
 
-class addschool(LoginRequiredMixin, TemplateView):
+class addschool(myTemplateView):
   template_name = 'tools/addschool.html'
 
   def get_context_data(self, **kwargs):
@@ -218,7 +226,7 @@ class addschool(LoginRequiredMixin, TemplateView):
     })
     return context
 
-class linkservers(LoginRequiredMixin, TemplateView):
+class linkservers(myTemplateView):
   template_name = 'tools/linkservers.html'
 
   def get_context_data(self, **kwargs):
@@ -251,13 +259,7 @@ class linkservers(LoginRequiredMixin, TemplateView):
     })
     return context
 
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
-
-class shutdown(TemplateView):
+class shutdown(myTemplateView):
   template_name = 'tools/shutdown.html'
 
   def get_context_data(self, **kwargs):
@@ -267,14 +269,8 @@ class shutdown(TemplateView):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
     })
     return context
-
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
       
-class upgrade(TemplateView):
+class upgrade(myTemplateView):
   template_name = 'tools/upgrade.html'
 
   def get_context_data(self, **kwargs):
@@ -290,14 +286,8 @@ class upgrade(TemplateView):
       'zip_url' : response['zipball_url']
     })
     return context
-
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
       
-class backup(LoginRequiredMixin, TemplateView):
+class backup(myTemplateView):
   template_name = 'tools/backup.html'
 
   def get_context_data(self, **kwargs):
@@ -307,12 +297,6 @@ class backup(LoginRequiredMixin, TemplateView):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
     })
     return context
-
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
     
 def downbackup(request):
   if request.user.is_superuser:
@@ -324,7 +308,7 @@ def downbackup(request):
     return HttpResponse('No Access.')
 
       
-#class restore(LoginRequiredMixin, TemplateView):
+#class restore(myTemplateView):
 #  template_name = 'tools/restore.html'
 
 #  def get_context_data(self, **kwargs):
@@ -357,7 +341,7 @@ def logout_and_redirect(request):
   logout(request)
   return redirect('/')
 
-class sendlogs(TemplateView):
+class sendlogs(LoginRequiredMixin, TemplateView):
   template_name = 'tools/sendlogs.html'
 
   def get_context_data(self, **kwargs):
@@ -365,11 +349,7 @@ class sendlogs(TemplateView):
     context.update({
       'emulatestatic' : emulatestatic,
       'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'smtp_server' : djconf.getconfig('smtp_server', forcedb=False),
+      'smtp_account' : djconf.getconfig('smtp_account', forcedb=False),
     })
     return context
-
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))

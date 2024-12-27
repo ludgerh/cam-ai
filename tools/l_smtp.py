@@ -17,11 +17,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 from os import path
 from email.mime.image import MIMEImage
 from django.core.mail import send_mail, EmailMultiAlternatives
+from django.core.mail.backends.smtp import EmailBackend
 from threading import Thread
 from time import sleep
+from tools.l_tools import djconf
 
 def smtp_send_try_mail(*args, html_message = None, images = [], attachments = [], 
-    logger = None, ): 
+    logger = None, ):  
+  custom_backend = EmailBackend(
+    host = djconf.getconfig('smtp_server', forcedb=False),
+    port = djconf.getconfigint('smtp_port', forcedb=False),
+    username = djconf.getconfig('smtp_account', forcedb=False),
+    password = djconf.getconfig('smtp_password', forcedb=False),
+    use_tls = djconf.getconfigbool('smtp_use_tls', forcedb=False),
+    timeout = 5.0,
+  )
   count = 0
   done = False
   while count < 5:
@@ -30,9 +40,11 @@ def smtp_send_try_mail(*args, html_message = None, images = [], attachments = []
       result = send_mail(*args, 
         html_message = html_message, 
         fail_silently=True, 
+        connection=custom_backend,
       )
     else:
-      email = EmailMultiAlternatives(*args)
+      kwargs={'connection' : custom_backend, }
+      email = EmailMultiAlternatives(*args, **kwargs)
       email.attach_alternative(html_message, "text/html")
       for item in images:
         mime_image = MIMEImage(item[2], _subtype=item[3])
@@ -45,7 +57,7 @@ def smtp_send_try_mail(*args, html_message = None, images = [], attachments = []
         else:
           if logger:
             logger.warning('***** File not found: ' + item[1])     
-      result = email.send(fail_silently=True, )
+      result = email.send(fail_silently=True,)
     if result:  
       done = True
       break

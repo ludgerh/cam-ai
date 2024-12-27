@@ -37,7 +37,7 @@ system_defaults = {
   'smtp_server' : '',
   'smtp_port' : 587,
   'smtp_email' : '',
-  'smtp_use_ssl' : True,
+  'smtp_use_tls' : True,
   'hw_type' : si['hw'],
   'hw_version' : si['hw_version'],
   'hw_ram' : si['hw_ram'],

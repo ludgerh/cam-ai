@@ -24,7 +24,6 @@ from .c_logger import log_ini
 from .l_tools import djconf
 from .l_smtp import smtp_send_mail
 from .c_tools import list_from_queryset
-from django.conf import settings
 
 logname = 'health'
 logger = getLogger(logname)
@@ -59,7 +58,7 @@ def setdiscspace():
           'Thank you for choosing CAM-AI. \n'
           'Best regards, \n'
           'The CAM-AI Team',
-          'CAM-AI<' + settings.EMAIL_FROM + '>',
+          'CAM-AI<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
           userline.user.email,
           '<br>Dear CAM-AI Server Administrator,<br>\n'
           '<br>We would like to inform you that your server’s storage capacity has reached 95%.\n'

@@ -33,7 +33,6 @@ from multiprocessing import Process
 from logging import getLogger
 from traceback import format_exc
 from zipfile import ZipFile, ZIP_DEFLATED
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -80,6 +79,7 @@ log_ini(logger, logname)
 datapath = djconf.getconfig('datapath', 'data/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
 textpath = djconf.getconfig('textpath', datapath + 'texts/')
+smtp_email = djconf.getconfig('smtp_email', forcedb=False)
 if not ospath.exists(textpath):
   makedirs(textpath)
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
@@ -201,7 +201,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -530,17 +530,16 @@ class admin_tools_async(AsyncWebsocketConsumer):
         logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
         smtp_send_mail(
           'The Log files',
-          'These are the Log Files',
-          'CAM-AI Emailer<' + settings.EMAIL_FROM + '>',
-          ['support@booker-hellerhoff.de', ],
-          html_message = 'These are the Log Files (HTML)',
+          params['message'],
+          'CAM-AI Emailer<' + smtp_email + '>',
+          ['support@cam-ai.de', ],
+          html_message = params['message'].replace('\n', '<br>'),
           logger = logger,
           attachments = (
             ('c_server.err', logpath + 'c_server.err', 'text/plain'), 
             ('c_server.log', logpath + 'c_server.log', 'text/plain'), 
           ),
         )  
-          
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

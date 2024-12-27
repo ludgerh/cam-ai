@@ -328,7 +328,7 @@ class c_event(list):
       smtp_send_mail(
         subject,
         plain_text,
-        'CAM-AI Emailer<' + settings.EMAIL_FROM + '>',
+        'CAM-AI Emailer<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
         [receiver],
         html_message = html_text,
         logger = self.logger,

@@ -43,9 +43,33 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <main>  
   <div class="h2">
-    Are you sure you want to ssend your logfiles to the CAM-AI support team?
-    <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
+    {% if smtp_server %}
+      SMTP host: {{ smtp_server }}
+    {% else %}
+      Please configure SMTP host to send emails
+    {% endif %}
   </div> 
+  <div class="h2">
+    {% if smtp_account %}
+      SMTP account: {{ smtp_account }}
+    {% else %}
+      Please configure SMTP account to send emails
+    {% endif %}
+  </div> 
+  <div class="h2">
+    Please add some information (in German or English): <b>What</b> happened <b>when</b> after you did <b>what</b>?
+  </div> 
+  <div class="h4">
+    <textarea id="message" rows="10" cols="50">?</textarea>
+  </div> 
+  {% if smtp_server %}
+    {% if smtp_account %}
+      <div class="h2">
+        Are you sure you want to send your logfiles to the CAM-AI support team?
+        <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
+      </div> 
+    {% endif %}
+  {% endif %}
   <div class="h2 d-none" id="line2">
     The email was launched...
   </div>  
@@ -57,6 +81,10 @@ let admintoolsSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 $(document).ready(function() {
+  messagetext = 'Date and time of error:\n\n';
+  messagetext += 'Action performed:\n\n';
+  messagetext += 'Resulting problem:\n\n';
+  $('#message').text(messagetext);
   WSAsync(
     ws_scheme + '//'
     + window.location.host
@@ -68,6 +96,7 @@ $(document).ready(function() {
       $('#continue-button').prop('disabled', true);
       admintoolsSocket.sendandwait({
         'command' : 'sendlogs',
+        'message' : $('#message').text(),
       })
       .then((result) => {
         $('#line2').removeClass("d-none");
