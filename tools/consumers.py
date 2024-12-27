@@ -201,7 +201,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
