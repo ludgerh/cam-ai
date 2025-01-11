@@ -41,8 +41,7 @@ def setdiscspace():
   global freediscspace
   global useddiscspace
   totaldiscspace, useddiscspace, freediscspace = disk_usage("/")
-  #if useddiscspace > totaldiscspace * 0.95:
-  if True:
+  if useddiscspace > totaldiscspace * 0.95:
     for userline in list_from_queryset(
         userinfo.objects.filter(user__is_superuser = True)
       ):
