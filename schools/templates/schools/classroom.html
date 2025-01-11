@@ -1,6 +1,6 @@
 {% extends 'eventers/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -51,8 +51,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     </div>
   </div>
   {% endif %}
-
-  <h2 class="m-2">Camera Stream: {{ stream.name }}{{ has_quota }}</h2>
+  <h2 class="m-2">Camera Stream: {{ stream.name }}</h2>
   <h4>
     <span style="white-space:nowrap; display: inline-block;">
       <nav aria-label="Page navigation" style="display: inline-block;">
@@ -70,9 +69,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     </span>
   </h4>
   <div class="container-fluid float-left" id="gallery">
-    <div done=0 class="row" id="lastrow">
-	    <h4 id="endtrigger">...</h4>
-    </div>
   </div>
 </main>
 <script>
@@ -80,8 +76,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% if may_write_stream %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
   const button = event.relatedTarget;
-  const nr_todel = button.getAttribute('idnr');
-  $('.delbutton').attr('id', nr_todel);
+  $('.delbutton').attr('idnr', button.getAttribute('idnr'));
+  $('.delbutton').attr('rownr', button.getAttribute('rownr'));
 })
 {% endif %}
 
@@ -89,29 +85,32 @@ let taglines;
 let SchoolDBUtilSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let do_run;
+let next_event;
+let last_visible;
 let page_nr = 1;
 let events;
-let events_ready;
-let events_count;
-let last_event_visible;
-let get_lines_active = false;
+let get_lines_busy = false;
 let indices = {};
 let framelines = {};
 
 function isInViewport(elementid) {
-  element = document.getElementById(elementid)
-  let rect = element.getBoundingClientRect();
-  return (
-    rect.top >= 0 &&
-    rect.left >= 0 &&
-    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-  );
+  element = document.getElementById(elementid);
+  if (element) {
+    let rect = element.getBoundingClientRect();
+    return(
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
+  } else {
+    return(false);
+  };
 };
 
 function draw_all_lines() {
   do_run = 0;
-  $('#gallery').children().slice(0,-1).remove();
+  $('#gallery').children().remove();
 
   SchoolDBUtilSocket.sendandwait({
     'command' : 'seteventpage',
@@ -153,275 +152,292 @@ function draw_all_lines() {
   })
   .then((result) => {
     events = result;
-    events_count = events.length;
-    events_ready = 0;
-    last_event_visible = 0;
+    next_event = 0;
+    last_visible = -1;
     do_run = 1;
     getlines();
   }) 
 };
 
 function getlines() {
-  if (get_lines_active) {
-    setTimeout(getcards, 100);
-  } else {  
-    get_lines_active = true;
-    let numbers = [];
-    let idxs = [];
-    let counts = [];
-    while ((events_ready < events_count) 
-        && ((events_ready - last_event_visible) < 32)
-        && isInViewport('endtrigger')
-        && do_run) {
-      let event_processing = events_ready; 
-      events_ready += 1;
-      numbers.push(idxs.length);
-      idxs.push(events[event_processing].id);
-      counts.push(event_processing);
-    };  
-    numbers.forEach((nr) => {
-      newaddition = '<div done=0 class="row eventrow" id="' + events[counts[nr]].id + '">';
-	    newaddition += '<h4>' + events[counts[nr]].id + ' ' + events[counts[nr]].p_string;
-	    newaddition += ' S:' + events[counts[nr]].start;
-	    newaddition += ' E:' + events[counts[nr]].end;
-		  newaddition += ' XMIN:' + events[counts[nr]].xmin;
-		  newaddition += ' XMAX:' + events[counts[nr]].xmax;
-		  newaddition += ' YMIN:' + events[counts[nr]].ymin;
-		  newaddition += ' YMAX:' + events[counts[nr]].ymax;
-		  newaddition += ' N:' + events[counts[nr]].numframes;
-	    newaddition += '</h4>';
-      newaddition += '</div>';
-      
-      $('#lastrow').before(newaddition);
-      last_event_visible = counts[nr];
-    });
-    get_lines_active = false;
-    getimages();
-  };  
-};
-
-getimages = function() {
-  $('.eventrow').each(function() {
-    if ($(this).attr('done') == 0) {
-      if (isInViewport($(this).attr('id'))) {
-        $(this).attr('done', 1);
-        indices[$(this).attr('id')] = [];
-	      SchoolDBUtilSocket.sendandwait({
-		      'command' : 'geteventframes',
-		      'event' : $(this).attr('id'),
-	      })
-	      .then((result) => {
-	        let countdown = result.length;
-	        for (const item of result) {
-			      indices[$(this).attr('id')].push(item);
-            mycard = $('<div id="card'+item+'" class="card m-1 p-0"'
-              + 'style="width: 212px; height: auto;">'
-              + '<a href="/schools/getbigbmp/0/'
-			        + item + '/'
-			        + '" target="_blank">'
-			        + '<img src="/schools/getbmp/0/'
-			        + item + '/3/1/210/210/'
-              +'" style="width: 210px; height: 210px; object-fit: contain"</a>'
-            + '</div>');
-            mycard.appendTo($(this));
-	        };
-	        SchoolDBUtilSocket.sendandwait({
-		        'command' : 'getpredictions',
-		        'idxs' : indices[$(this).attr('id')],
-		        'school' : {{ school.id }},
-            'is_school' : true,
-	        })
-          .then((predictions) => {
-		        for (let j=0; j<predictions.length; j++) {
-		          cblines = '<div class="checklist h4">';
-		          for (let k=0; k<taglines.length; k++) {
-{% if may_write_school %}
-				        cblines += '<input type="checkbox" class="checkboxx" data-k="'+k+'"';
-				        if (predictions[j][k] >= 0.5) {
-					        cblines += ' checked>';
-				        } else {
-					        cblines += '>';
-				        };
-{% endif %}
-				        cblines += '<span> '+taglines[k].substr(0,3)+': ';
-				        cblines += Math.round(predictions[j][k]*10000)
-						        /10000+'</span><br>';
-			        };
-			        cblines += '</div>';
-              cblines = $(cblines)
-              cblines.appendTo($('#card'+indices[$(this).attr('id')][j]));
-{% if may_write_school %}
-			        cblines.children('input:checkbox').change(function(evt) {
-                let k = $(evt.target).data('k');
-                if ($(evt.target).prop('checked')) {
-                  if (predictions[j][k] >= 0.5) {
-                    $(evt.target).next().removeClass('bluegrey');
-                  } else {
-                    $(evt.target).next().addClass('bluegrey');
-                  };
-                } else {
-                  if (predictions[j][k] >= 0.5) {
-                    $(evt.target).next().addClass('bluegrey');
-                  } else {
-                    $(evt.target).next().removeClass('bluegrey');
-                  };
-                };
-              });
-              countdown -= 1;
-{% endif %}
-            };
-{% if may_write_school %}
-            if (!countdown) {
-	            $('#myselect' + $(this).attr('id')).removeClass('disabled');
-	            $('#d_button' + $(this).attr('id')).removeClass('disabled');
-	            $('#n_button' + $(this).attr('id')).removeClass('disabled');
-	            $('#dc_button' + $(this).attr('id')).removeClass('disabled');
-	            $('#nc_button' + $(this).attr('id')).removeClass('disabled');
-{% if has_quota %}
-	            $('#s_button' + $(this).attr('id')).removeClass('disabled');
-{% endif %}
-	            $('#del_button' + $(this).attr('id')).removeClass('disabled');
-            };
-{% endif %}
-          })
-{% if may_write_school %}
-          buttonline = '<h4>Who / what is this?<br>';
-		      buttonline += '<select id="myselect'+$(this).attr('id')
-		        + '" class="btn btn-primary disabled">';
-		      buttonline += '<option value="0">Choose...</option>';
-		      for (let j=1; j<taglines.length; j++) {
-			      buttonline += '<option value="'+(j)+'">'
-				      +taglines[j]+'</option>';
-		      };
-		      buttonline += '</select>&nbsp;&nbsp;&nbsp;';
-		      buttonline += '<input type="button" class="btn btn-primary my-1 disabled" ' 
-		        + 'id="d_button' + $(this).attr('id')
-            + '" value="Day" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
-		      buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
-		        + 'id="n_button' + $(this).attr('id')
-            + '" value="Night" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
-		      buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
-		        + 'id="dc_button' + $(this).attr('id')
-		        + '" value="Day Clean" style="width: 110px;">'
-            + '</input>&nbsp;&nbsp;&nbsp;';
-		      buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
-		        + 'id="nc_button'
-            + $(this).attr('id')+'" value="Night Clean" style="width: 110px;">'
-            + '</input>&nbsp;&nbsp;&nbsp;';
-		      buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
-		        + 'id="s_button' + $(this).attr('id')+'" idnr="' + $(this).attr('id')
-            + '" value="Submit" style="width: 110px;"></input><br>';
-		      buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
-		        + 'id="del_button' + $(this).attr('id') + '" '
-		        + 'idnr="'+$(this).attr('id') + '" '
-		        + 'data-bs-toggle="modal" data-bs-target="#deleteModal" '
-            + 'value="Remove"></input>';
-          buttonline += '</h4>';
-          $(buttonline).appendTo($(this));
-		      $('#myselect'+$(this).attr('id')).change(function(evt) {
-            targets = 
-              $(evt.target).parents().parents().children('.card').children('.checklist');
-			      if ($(evt.target).val() > 0) {
-				      targets.children('input:checkbox:not([data-k=0])')
-                .prop('checked', false);
-				      targets.children('[data-k="'+(parseInt($(evt.target).val()))+'"]')
-                .prop('checked', true);
-              targets.children().trigger("change");
-			      }
-		      });
-		      $('#d_button'+$(this).attr('id')).click(function(evt) {
-            targets = 
-              $(evt.target).parents().parents().children('.card').children('.checklist');
-			      $(evt.target).removeClass('btn-primary');
-			      $(evt.target).addClass('btn-success');
-			      setTimeout(function() {
-			      $(evt.target).removeClass('btn-success');
-			      $(evt.target).addClass('btn-primary');
-			      }, 1000);
-			      targets.children('[data-k=0]').prop("checked", false);
-            targets.children().trigger("change");
-		      });
-		      $('#n_button'+$(this).attr('id')).click(function(evt) {
-            targets = 
-              $(evt.target).parents().parents().children('.card').children('.checklist');
-			      $(evt.target).removeClass('btn-primary');
-			      $(evt.target).addClass('btn-success');
-			      setTimeout(function() {
-			      $(evt.target).removeClass('btn-success');
-			      $(evt.target).addClass('btn-primary');
-			      }, 1000);
-			      targets.children('[data-k=0]').prop("checked", true);
-            targets.children().trigger("change");
-		      });
-		      $('#dc_button'+$(this).attr('id')).click(function(evt) {
-            targets = 
-              $(evt.target).parents().parents().children('.card').children('.checklist');
-			      $(evt.target).removeClass('btn-primary');
-			      $(evt.target).addClass('btn-success');
-			      setTimeout(function() {
-			      $(evt.target).removeClass('btn-success');
-			      $(evt.target).addClass('btn-primary');
-			      }, 1000);
-			      targets.children('input:checkbox').prop('checked', false);
-            targets.children().trigger("change");
-            $('#crd'+nr_todel).filter('[dtype="'+dtype+'"]').remove(); 
-		      });
-		      $('#nc_button'+$(this).attr('id')).click(function(evt) {
-            targets = 
-              $(evt.target).parents().parents().children('.card').children('.checklist');
-			      $(evt.target).removeClass('btn-primary');
-			      $(evt.target).addClass('btn-success');
-			      setTimeout(function() {
-			      $(evt.target).removeClass('btn-success');
-			      $(evt.target).addClass('btn-primary');
-			      }, 1000);
-			      targets.children('input:checkbox').prop('checked', false);
-			      targets.children('[data-k=0]').prop("checked", true);
-            targets.children().trigger("change");
-		      });
-		      $('#s_button'+$(this).attr('id')).click(function(evt) {
-			      cblist = [];
-            targets = 
-              $(evt.target).parents().parents().children('.card').children('.checklist');
-			      targets.each( function (i, v) {
-				      let checkboxes = [];
-				      $(v).children('input:checkbox').each( function (ii, vv) {
-					      if ($(vv).prop('checked')) {
-						      checkboxes.push(1);
-					      } else {
-						      checkboxes.push(0);
-					      };
-				      });
-				      cblist.push(checkboxes);
-			      });
-			      SchoolDBUtilSocket.sendandwait({
-				      'command' : 'settags',
-				      'event' : $(this).attr('idnr'),
-				      'cblist' : cblist,
-		          'school' : {{ school.id }},
-			      })
-			      .then((result) => {
-				      if (result === 'OK') {
-					      if($(evt.target).hasClass('btneventrow-success')) {
-			            $(evt.target).removeClass('btn-success');
-			            $(evt.target).addClass('btn-primary');
-						      setTimeout(function() {
-			              $(evt.target).removeClass('btn-primary');
-			              $(evt.target).addClass('btn-success');
-						      }, 1000);
-					      } else {
-			            $(evt.target).removeClass('btn-primary');
-			            $(evt.target).addClass('btn-success');
-					      };
-				      }
-			      })
-		      });
-{% endif %}
-        })
+  if (get_lines_busy) {
+    return;
+  }; 
+  get_lines_busy = true;
+  i = 0;
+  for (item of events) {
+    item.count = i;
+    i++;
+  };
+  for (const item of events) {
+    if (item.count > last_visible) {
+      if ($('#' + item.count).length && isInViewport(item.count)) { //exists?
+        last_visible = item.count;
+      } else {
+        break;
       };
     };
-  });
+  };
+  if (next_event > last_visible + 10) {
+    get_lines_busy = false;
+    return;
+  };
+  events_to_put = events.slice(next_event, last_visible + 10 + 1);
+  next_event = last_visible + 10 + 1;
+  let idxs = [];
+  let counts = [];
+  for (const item of events_to_put) {
+    idxs.push(item.id);
+    counts.push(item.count);
+  };
+  for (const item of counts) {
+    event_item = events[item];
+    newaddition = '<div done=0 class="row eventrow" id="row' + item + '">';
+    newaddition += '<h4>' + event_item.id + ' ' + event_item.p_string;
+    newaddition += ' S:' + event_item.start;
+    newaddition += ' E:' + event_item.end;
+	  newaddition += ' XMIN:' + event_item.xmin;
+	  newaddition += ' XMAX:' + event_item.xmax;
+	  newaddition += ' YMIN:' + event_item.ymin;
+	  newaddition += ' YMAX:' + event_item.ymax;
+	  newaddition += ' N:' + event_item.numframes;
+    newaddition += '</h4>';
+    newaddition += '</div>';
+    $('#gallery').append(newaddition);
+    getimages(item);
+  };
+  get_lines_busy = false;
 };
+
+function getimages (count) {
+  SchoolDBUtilSocket.sendandwait({
+    'command' : 'geteventframes',
+    'event' : events[count].id,
+    'count' : count,
+  })
+  .then((result) => {
+    let frame_count = result[0];
+    frames = result[1];
+    let countdown = frames.length;
+    idxs = [];
+    for (const item of frames) {
+      idxs.push(item);
+      mycard = '<div id="card'+item+'" class="card m-1 p-0"'
+      mycard += 'style="width: 212px; height: auto;">'
+      mycard += '<a href="/schools/getbigbmp/0/'
+      mycard += item + '/'
+      mycard += '" target="_blank">'
+      mycard += '<img src="/schools/getbmp/0/'
+      mycard += item + '/3/1/210/210/'
+      mycard += '" style="width: 210px; height: 210px; object-fit: contain"</a>'
+      mycard += '</div>';
+      $('#row' + frame_count).append(mycard);
+    };
+    SchoolDBUtilSocket.sendandwait({
+      'command' : 'getpredictions',
+      'idxs' : idxs,
+      'counts' : frame_count,
+      'school' : {{ school.id }},
+      'is_school' : true,
+    })
+    .then((result) => {
+      count = result[0];
+      idxs = result[1];
+      predictions = result[2];
+      for (let j=0; j<predictions.length; j++) {
+        cblines = '<div class="checklist h4">';
+        for (let k=0; k<taglines.length; k++) {
+{% if may_write_school %}
+	        cblines += '<input type="checkbox" class="checkboxx" data-k="' + k + '"';
+	        if (predictions[j][k] >= 0.5) {
+		        cblines += ' checked>';
+	        } else {
+		        cblines += '>';
+	        };
+{% endif %}
+	        cblines += '<span pred="'+predictions[j][k]+'"> '+taglines[k].substr(0,3)+': ';
+	        cblines += Math.round(predictions[j][k]*10000)
+			        /10000+'</span><br>';
+        };
+        cblines += '</div>';
+        $('#card'+idxs[j]).append(cblines);
+{% if may_write_school %}
+        $('#card'+idxs[j]).find('input:checkbox').change(function(evt) {
+          if ($(evt.target).prop('checked')) {
+            if ($(evt.target).next().attr('pred') >= 0.5) {
+              $(evt.target).next().removeClass('bluegrey');
+            } else {
+              $(evt.target).next().addClass('bluegrey');
+            };
+          } else {
+            if ($(evt.target).next().attr('pred') >= 0.5) {
+              $(evt.target).next().addClass('bluegrey');
+            } else {
+              $(evt.target).next().removeClass('bluegrey');
+            };
+          };
+        });
+        countdown -= 1;
+{% endif %}
+      };
+{% if may_write_school %}
+      if (!countdown) {
+        $('#row' + count).find('input:checkbox').trigger("change");
+        $('#myselect' + frame_count).removeClass('disabled');
+        $('#d_button' + frame_count).removeClass('disabled');
+        $('#n_button' + frame_count).removeClass('disabled');
+        $('#dc_button' + frame_count).removeClass('disabled');
+        $('#nc_button' + frame_count).removeClass('disabled');
+{% if has_quota %}
+        $('#s_button' + frame_count).removeClass('disabled');
+{% endif %}
+        $('#del_button' + frame_count).removeClass('disabled');
+      };
+{% endif %}
+    })
+{% if may_write_school %}
+    buttonline = '<h4>Who / what is this?<br>';
+    buttonline += '<select id="myselect'+frame_count
+      + '" class="btn btn-primary disabled">';
+    buttonline += '<option value="0">Choose...</option>';
+    for (let j=1; j<taglines.length; j++) {
+      buttonline += '<option value="'+(j)+'">'
+	      +taglines[j]+'</option>';
+    };
+    buttonline += '</select>&nbsp;&nbsp;&nbsp;';
+    buttonline += '<input type="button" class="btn btn-primary my-1 disabled" ' 
+      + 'id="d_button' + frame_count
+      + '" value="Day" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
+    buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
+      + 'id="n_button' + frame_count
+      + '" value="Night" style="width: 110px;"></input>&nbsp;&nbsp;&nbsp;';
+    buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
+      + 'id="dc_button' + frame_count
+      + '" value="Day Clean" style="width: 110px;">'
+      + '</input>&nbsp;&nbsp;&nbsp;';
+    buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
+      + 'id="nc_button'
+      + frame_count+'" value="Night Clean" style="width: 110px;">'
+      + '</input>&nbsp;&nbsp;&nbsp;';
+    buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
+      + 'id="s_button' + frame_count+'" idnr="' + events[frame_count].id
+      + '" value="Submit" style="width: 110px;"></input><br>';
+    buttonline += '<input type="button" class="btn btn-primary my-1 disabled" '
+      + 'id="del_button' + frame_count + '" rownr="' + frame_count + '" '
+      + 'idnr="'+ events[frame_count].id + '" '
+      + 'data-bs-toggle="modal" data-bs-target="#deleteModal" '
+      + 'value="Remove"></input>';
+    buttonline += '</h4>';
+    $('#row' + count).append(buttonline);
+    $('#myselect'+frame_count).change(function(evt) {
+      if ($(evt.target).val() > 0) {
+        myrow = $(evt.target).parent().parent()
+        targets = myrow.find('input:checkbox:not([data-k=0])');
+	      targets.prop('checked', false);
+	      targets.removeAttr('checked');
+	      targets = myrow.find('input:checkbox[data-k="' + $(evt.target).val() + '"]');
+	      targets.prop('checked', true);
+        targets.attr('checked', 'checked');
+	      targets = myrow.find('input:checkbox');
+        console.log(targets);
+        targets.trigger("change");
+      }
+    });
+    $('#d_button'+frame_count).click(function(evt) {
+      $(evt.target).removeClass('btn-primary');
+      $(evt.target).addClass('btn-success');
+      setTimeout(function() {
+        $(evt.target).removeClass('btn-success');
+        $(evt.target).addClass('btn-primary');
+      }, 1000);
+      myrow = $(evt.target).parent().parent();
+      targets = myrow.find('input:checkbox[data-k=0]');
+      targets.prop('checked', false);
+	    targets.removeAttr('checked');
+      targets.trigger("change");
+    });
+    $('#n_button'+frame_count).click(function(evt) {
+      $(evt.target).removeClass('btn-primary');
+      $(evt.target).addClass('btn-success');
+      setTimeout(function() {
+        $(evt.target).removeClass('btn-success');
+        $(evt.target).addClass('btn-primary');
+      }, 1000);
+      myrow = $(evt.target).parent().parent();
+      targets = myrow.find('input:checkbox[data-k=0]');
+      targets.prop('checked', true);
+      targets.attr('checked', 'checked');
+      targets.trigger("change");
+    });
+    $('#dc_button'+frame_count).click(function(evt) {
+      $(evt.target).removeClass('btn-primary');
+      $(evt.target).addClass('btn-success');
+      setTimeout(function() {
+        $(evt.target).removeClass('btn-success');
+        $(evt.target).addClass('btn-primary');
+      }, 1000);
+      myrow = $(evt.target).parent().parent();
+      targets = myrow.find('input:checkbox');
+      targets.prop('checked', false);
+	    targets.removeAttr('checked');
+      targets.trigger("change");
+    });
+    $('#nc_button'+frame_count).click(function(evt) {
+      $(evt.target).removeClass('btn-primary');
+      $(evt.target).addClass('btn-success');
+      setTimeout(function() {
+        $(evt.target).removeClass('btn-success');
+        $(evt.target).addClass('btn-primary');
+      }, 1000);
+      myrow = $(evt.target).parent().parent();
+      targets1 = myrow.find('input:checkbox');
+      targets1.prop('checked', false);
+	    targets1.removeAttr('checked');
+      targets2 = myrow.find('input:checkbox[data-k=0]');
+      targets2.prop('checked', true);
+      targets2.attr('checked', 'checked');
+      targets1.trigger("change");
+    });
+    $('#s_button'+frame_count).click(function(evt) {
+      cblist = [];
+      myrow = $(evt.target).parent().parent();
+      targets1 = myrow.find('.checklist');
+      targets1.each(function(i, v) { 
+	      let checkboxes = [];
+        $(v).children('input:checkbox').each( function (ii, vv) {
+		      if ($(vv).prop('checked')) {
+			      checkboxes.push(1);
+		      } else {
+			      checkboxes.push(0);
+		      };
+        });
+	      cblist.push(checkboxes);
+      });
+      SchoolDBUtilSocket.sendandwait({
+	      'command' : 'settags',
+	      'event' : $(this).attr('idnr'),
+	      'cblist' : cblist,
+        'school' : {{ school.id }},
+      })
+      .then((result) => {
+	      if (result === 'OK') {
+		      if($(evt.target).hasClass('btn-success')) {
+            $(evt.target).removeClass('btn-success');
+            $(evt.target).addClass('btn-primary');
+			      setTimeout(function() {
+              $(evt.target).removeClass('btn-primary');
+              $(evt.target).addClass('btn-success');
+			      }, 1000);
+		      } else {
+            $(evt.target).removeClass('btn-primary');
+            $(evt.target).addClass('btn-success');
+		      };
+	      }
+      })
+    });
+{% endif %}
+  })
+}  
 
 $(document).ready(function () {
   $('#pagesizeselect').change(function() {
@@ -432,12 +448,12 @@ $(document).ready(function () {
   $('.delbutton').click(function(evt) {
     SchoolDBUtilSocket.sendandwait({
       'command' : 'remfrschool',
-      'event' : $(this).attr('id'),
+      'event' : $(this).attr('idnr'),
     })
     .then((result) => {
       if (result === 'OK') {
         $('#deleteModal').modal('hide');
-        $('#'+$(this).attr('id')+'.eventrow').remove(); 
+        $('#row'+$(this).attr('rownr')).remove(); 
       }
     })
   });
@@ -464,12 +480,6 @@ $(document).ready(function () {
 		taglines = result;
     $(window).on('resize scroll', function() {
       getlines();
-    });
-    getimages();
-	})
-	.then(() => {
-    $(window).on('resize scroll', function() {
-      getimages();
     });
 		return(SchoolDBUtilSocket.sendandwait({
 			'command' : 'register_ai',

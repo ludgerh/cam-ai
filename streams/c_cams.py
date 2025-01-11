@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -29,8 +29,7 @@ from traceback import format_exc
 from glob import glob
 from subprocess import Popen, PIPE
 from tools.c_logger import log_ini
-from tools.l_tools import djconf, ts2filename
-from tools.c_tools import protected_db
+from tools.l_tools import djconf, ts2filename, protected_db
 from viewers.c_viewers import c_viewer
 from .c_devices import c_device
 from .models import stream

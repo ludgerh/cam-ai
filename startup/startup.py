@@ -147,16 +147,6 @@ def run():
   djconf.setconfig('smtp_server', smtp_server)
   djconf.setconfigint('smtp_port', smtp_port)
   djconf.setconfig('smtp_email', smtp_email)
-  try:
-    from camai.passwords import smtp_use_ssl
-    djconf.setconfigbool('smtp_use_tls', smtp_use_ssl)
-  except ImportError:
-    pass
-  try:
-    from camai.passwords import smtp_use_tls
-    djconf.setconfigbool('smtp_use_tls', smtp_use_tls)
-  except ImportError:
-    pass
   from tf_workers.models import worker
   from tf_workers.c_tfworkers import tf_worker
   from trainers.models import trainer as trainerdb

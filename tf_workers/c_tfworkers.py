@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -32,11 +32,10 @@ from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
 from inspect import currentframe, getframeinfo
 from django.db import connections
-from tools.l_tools import QueueUnknownKeyword, djconf
+from tools.l_tools import QueueUnknownKeyword, djconf, protected_db
 from tools.l_sysinfo import sysinfo
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
-from tools.c_tools import protected_db
 from schools.c_schools import get_taglist
 from .models import school as school_model, worker, school
 

@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -31,14 +31,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 {% if may_write %}
 <main>
-  <div class="accordion" id="accordionExample">
+  <div class="accordion" id="settings_accordion">
 	  <div class="accordion-item">
 		  <h2 class="accordion-header" id="heading{{ item.id }}">
         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ item.id }}" aria-expanded="true" aria-controls="collapse{{ item.id }}">
           General settings
         </button>
       </h2>
-      <div id="collapse{{ item.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ item.id }}" data-bs-parent="#accordionExample">
+      <div id="collapse{{ item.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ item.id }}" data-bs-parent="#settings_accordion">
         <div class="accordion-body">
           <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" 
 			        method="post" id="oneform">
@@ -85,7 +85,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     {% for i in '12345'|make_list %}
     <div class="accordion-item">
 	    <h2 class="accordion-header">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ i }}" aria-expanded="true" aria-controls="collapse{{ i }}">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+          data-bs-target="#collapse{{ i }}" aria-expanded="true" rea={{ i }}
+          aria-controls="collapse{{ i }}">
           {% if i == '1' %}
             Conditions for showing event frame
           {% endif %}
@@ -104,7 +106,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </button>
       </h2>   
 	  </div>
-	  <div id="collapse{{ i }}" class="accordion-collapse collapse" aria-labelledby="heading{{ i }}" data-bs-parent="#accordionExample">
+	  <div id="collapse{{ i }}" class="accordion-collapse collapse" aria-labelledby="heading{{ i }}" data-bs-parent="#settings_accordion">
       <div class="accordion-body">
         <div class="col-auto my-2"><h4>If...</h4>
           <ul id="li_gr_{{ i }}" class="list-group">
@@ -117,7 +119,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 		    </div>
       </div>
     </div>
-	  <div class="row my-1 d-none">
+	  <div class="row my-1  rea{{ i }} d-none">
 		  <div class="col-auto my-2"><h4>If...</h4>
         <ul id="li_gr_{{ i }}" class="list-group">
         </ul>
@@ -459,10 +461,11 @@ $(document).ready(function() {
 		})
 	});
 
-	$('#conditions').children(':even').click((evt) => {
-		let bstr_row = $(evt.target).closest('.row').next();
+	$('#settings_accordion').children('.accordion-item').click((evt) => {
 		let myreaction = $(evt.target).attr("rea");
-		if (myreaction > 0) {
+		let bstr_row = $('#settings_accordion').find('.rea' + myreaction);
+		console.log('Reaction', myreaction);
+		if (myreaction) {
 			if (bstr_row.hasClass('d-none')) {
 				oneitemSocket.sendandwait({
 					'command' : 'cond_open',
@@ -470,7 +473,7 @@ $(document).ready(function() {
 				})
 				.then((result) => {
 					if (result === 'OK') {
-						bstr_row.removeClass('d-none');
+						//bstr_row.removeClass('d-none');
 					};
 				})
 			} else {

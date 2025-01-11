@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@ import aiofiles
 import aiofiles.os
 import aioshutil
 import aiohttp
+from asyncio.exceptions import CancelledError as AIOCancelledError
 from glob import glob
 from os import path
 from random import randint
@@ -264,7 +265,10 @@ class schooldbutil(AsyncWebsocketConsumer):
               myimage = cv.cvtColor(myimage, cv.COLOR_BGR2RGB)
               imglist.append(myimage)
             except FileNotFoundError:
-              logger.error('File not found: ' + imagepath)
+              logger.error('***File not found: ' + imagepath)
+            except AIOCancelledError:
+              logger.warning('** getpredictions was cancelled')
+              return()
           self.tf_worker.ask_pred(
             params['school'], 
             imglist, 
@@ -273,7 +277,8 @@ class schooldbutil(AsyncWebsocketConsumer):
           predictions = np.empty((0, len(classes_list)), np.float32)
           while predictions.shape[0] < len(imglist):
             predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
-          outlist['data'] = predictions.tolist()
+            
+          outlist['data'] = (params['counts'], params['idxs'], predictions.tolist())
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))
 
@@ -412,7 +417,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         result = []
         async for item in framelines:
           result.append(item.id)
-        outlist['data'] = result
+        outlist['data'] = (params['count'], result)
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 

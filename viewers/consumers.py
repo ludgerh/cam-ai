@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -26,9 +26,8 @@ from access.c_access import access
 from asgiref.sync import sync_to_async
 from startup.startup import streams
 from tools.c_redis import myredis
-from tools.l_tools import djconf
+from tools.l_tools import djconf, aprotected_db
 from tools.c_logger import log_ini
-from tools.c_tools import protected_dba
 from tools.tokens import checktoken
 from .models import view_log
 

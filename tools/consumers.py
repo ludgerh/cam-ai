@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -36,11 +36,12 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
+from tools.l_tools import djconf, displaybytes
+from tools.l_smtp import l_smtp, l_msg
 from camai.c_settings import safe_import
 from tools.c_logger import log_ini
-from tools.l_tools import djconf, displaybytes
-from tools.l_smtp import smtp_send_mail
 from tools.c_redis import myredis
+from tools.c_tools import aget_smtp_conf
 from tf_workers.models import school, worker
 from trainers.models import trainer
 from streams.models import stream as dbstream
@@ -521,23 +522,29 @@ class admin_tools_async(AsyncWebsocketConsumer):
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while redis.get_watch_status():
-          await asleep(long_brake) 
-        
+          await asleep(long_brake)
       elif params['command'] == 'sendlogs':
-        if not self.scope['user'].is_superuser:
-          await self.close()
-        smtp_send_mail(
+        smtp_conf = await aget_smtp_conf()
+        my_smtp = l_smtp(**smtp_conf)
+        my_smtp.answer
+        my_msg = l_msg(
+          smtp_conf['sender_email'],
+          'support@cam-ai.de',
           'The Log files',
           params['message'],
-          'CAM-AI Emailer<' + smtp_email + '>',
-          ['support@cam-ai.de', ],
-          html_message = params['message'].replace('\n', '<br>'),
-          logger = logger,
-          attachments = (
-            ('c_server.err', logpath + 'c_server.err', 'text/plain'), 
-            ('c_server.log', logpath + 'c_server.log', 'text/plain'), 
-          ),
-        )  
+          html = params['message'].replace('\n', '<br>'),
+        )
+        my_msg.attach_file(logpath + 'c_server.err') 
+        my_msg.attach_file(logpath + 'c_server.log')  
+        my_smtp.sendmail(
+          smtp_conf['sender_email'],
+          'support@cam-ai.de',
+          my_msg,
+        )
+        if my_smtp.result_code:
+          self.logger.error('SMTP: ' + my_smtp.answer)
+          self.logger.error(str(my_smtp.last_error))
+        my_smtp.quit()
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

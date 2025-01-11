@@ -17,12 +17,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import os
 import json
 from socket import gaierror
-from smtplib import (
-  SMTPAuthenticationError, 
-  SMTPNotSupportedError, 
-  SMTPRecipientsRefused,
-  SMTPSenderRefused,
-)
 from importlib import reload
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import TemplateView
@@ -33,6 +27,7 @@ from django.core.mail.backends.smtp import EmailBackend
 from django.http import HttpResponseRedirect
 from camai.c_settings import safe_import
 from tools.l_tools import djconf
+from tools.l_smtp import l_smtp, l_msg
 from access.c_access import access
 from streams.models import stream
 from tf_workers.models import school
@@ -114,7 +109,6 @@ class smtp(myFormView):
       'password' : '****', 
       'port' : djconf.getconfigint('smtp_port', forcedb=False),
       'email' : djconf.getconfig('smtp_email', forcedb=False),
-      'use_tls' : djconf.getconfigbool('smtp_use_tls', forcedb=False),
       'test_email' : test_email, 
     }
     
@@ -147,48 +141,42 @@ class smtp(myFormView):
         mailpassword = djconf.getconfig('smtp_password', forcedb=False)
       else:
         mailpassword = form.cleaned_data['password']  
-      custom_backend = EmailBackend(
-          host=form.cleaned_data['server'],
-          port=form.cleaned_data['port'],
-          username=form.cleaned_data['account'],
-          password=mailpassword,
-          #password="Grmbl!123_Wmpf",
-          use_tls=form.cleaned_data['use_tls'],
-          timeout=5.0,
+      sender_email = 'CAM-AI SMTP Email Test<' + form.cleaned_data['email'] + '>'
+      tested_server =  {
+        'host' : form.cleaned_data['server'],
+        'port' : form.cleaned_data['port'],
+        'user' : form.cleaned_data['account'],
+        'password' : mailpassword,
+        'sender_email' : sender_email,
+      }  
+      my_smtp = l_smtp(**tested_server)
+      my_msg = l_msg(
+        sender_email,
+        test_email,
+        'CAM-AI Testmail',
+        'The sending was successful, the settings are correct.',
       )
-      print(form.cleaned_data, mailpassword)
-      try:
-        result = send_mail(
-          'CAM-AI Testmail',
-          'The sending was successful, the settings are correct.',
-          'CAM-AI Emailer<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
-          [test_email],
-          connection=custom_backend,
-        )
-      except gaierror:
-        form.add_error('server', 'SMTP server not available')
+      if my_smtp.is_connected():
+        my_smtp.sendmail(sender_email, test_email, my_msg)
+      my_smtp.quit()  
+      if my_smtp.result_code:  
+        if my_smtp.result_code == 1:
+          form.add_error('server', str(my_smtp.result_code) + ': ' + my_smtp.answer)
+        elif my_smtp.result_code == 2:
+          form.add_error('server', str(my_smtp.result_code) + ': ' + my_smtp.answer)
+        elif my_smtp.result_code == 3:
+          form.add_error('port', str(my_smtp.result_code) + ': ' + my_smtp.answer)
+        elif my_smtp.result_code == 4:
+          form.add_error('account', str(my_smtp.result_code) + ': ' + my_smtp.answer)
+        elif my_smtp.result_code == 5:
+          form.add_error('server', str(my_smtp.result_code) + ': ' + my_smtp.answer)
+        elif my_smtp.result_code == 6:
+          form.add_error('server', str(my_smtp.result_code) + ': ' + my_smtp.answer)
+        elif my_smtp.result_code == 10001:
+          form.add_error('account', str(my_smtp.result_code) + ': ' + my_smtp.answer)
+        else: 
+          form.add_error('server', str(my_smtp.result_code) + ': ' + my_smtp.answer)
         return self.form_invalid(form)
-      except SMTPAuthenticationError:
-        form.add_error('account', 'Wrong account name or password')
-        return self.form_invalid(form)
-      except ConnectionRefusedError:
-        form.add_error('port', 'Wrong port number')
-        return self.form_invalid(form)
-      except SMTPNotSupportedError:
-        form.add_error('use_tls', 'TLS required')
-        return self.form_invalid(form)
-      except TimeoutError:
-        form.add_error('server', 'SMTP server does not answer')
-        return self.form_invalid(form)
-      except SMTPRecipientsRefused as e:
-        form.add_error('test_email', str(e.args))
-        return self.form_invalid(form)
-      except SMTPSenderRefused as e:
-        form.add_error('test_email', str(e.args))
-        return self.form_invalid(form)
-      #except:
-      #  form.add_error('server', 'Something else went wrong')
-      #  return self.form_invalid(form)
     changes = {}
     for item in form.cleaned_data.items():
       if item[0] == 'server':
@@ -211,10 +199,6 @@ class smtp(myFormView):
         if item[1] != djconf.getconfig('smtp_email', forcedb=False):
           djconf.setconfig('smtp_email', item[1])
           changes['smtp_email'] = item[1]
-      elif item[0] == 'use_tls':
-        if item[1] != djconf.getconfigbool('smtp_use_tls', forcedb=False):
-          djconf.setconfigbool('smtp_use_tls', item[1])
-          changes['smtp_use_tls'] = item[1]
     print('Changes', changes)      
     if changes:
       sourcefile = open('camai/passwords.py', 'r')

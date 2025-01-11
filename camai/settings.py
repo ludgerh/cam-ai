@@ -37,7 +37,6 @@ smtp_password = safe_import('smtp_password')
 smtp_server = safe_import('smtp_server') 
 smtp_port = safe_import('smtp_port') 
 smtp_email = safe_import('smtp_email') 
-smtp_use_tls = safe_import('smtp_use_tls') 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -257,5 +256,4 @@ EMAIL_HOST = smtp_server
 EMAIL_HOST_PASSWORD = smtp_password
 EMAIL_HOST_USER = smtp_account
 EMAIL_PORT = smtp_port
-EMAIL_USE_TLS = smtp_use_tls
 EMAIL_FROM = smtp_email

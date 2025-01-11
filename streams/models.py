@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -92,7 +92,6 @@ class stream(models.Model):
   eve_event_time_gap = models.IntegerField("new event gap", default=60)
   eve_margin = models.IntegerField("frame margin", default=20)
   eve_school = models.ForeignKey(school, on_delete=models.SET_DEFAULT, default=1)
-  eve_all_predictions = models.BooleanField(default=True)
   eve_gpu_nr_cv = models.IntegerField(default=0)
 
   def __str__(self):

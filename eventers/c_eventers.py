@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -337,7 +337,7 @@ class c_eventer(c_device):
       for i, item in eventlist:
         if not item.check_out_ts:
           predictions = item.pred_read(max=1.0)
-          if self.dbline.eve_all_predictions or (self.nr_of_cond_ed > 0):
+          if resolve_rules(self.cond_dict[1], predictions):
             if self.nr_of_cond_ed <= 0:
               self.last_cond_ed = 1
             if resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
@@ -360,21 +360,6 @@ class c_eventer(c_device):
                   +' - '+str(round(displaylist[j][1],2)), 
                   (item[0]+2, y0 + j * 30 * self.textheight), 
                   cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
-                  self.textthickness, cv.LINE_AA)
-          else:
-            imax = -1
-            pmax = -1
-            for j in range(1,len(predictions)):
-              if predictions[j] >= 0.0:
-                if predictions[j] > pmax:
-                  pmax = predictions[j]
-                  imax = j
-            if resolve_rules(self.cond_dict[1], predictions):
-              cv.rectangle(newframe[1], rect_btoa(item), (255, 0, 0), 
-                self.linewidth)
-              cv.putText(newframe[1], self.tag_list[imax].name[:3], 
-                (item[0]+10, item[2]+30), 
-                cv.FONT_HERSHEY_SIMPLEX, self.textheight, (255, 0, 0), 
                   self.textthickness, cv.LINE_AA)
     self.viewer.inqueue.put(newframe)
 

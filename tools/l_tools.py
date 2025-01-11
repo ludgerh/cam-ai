@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -82,15 +82,29 @@ class djconfig():
         return(value.decode())
     else:
       if (not forcedb) and (param in self.mycache):
-        return(self.mycache[param])
+        return(self.mycache[param])   
     try:
-      while True:
-        try:
-          line = setting.objects.get(setting=param)
-          break
-        except OperationalError:
-          connection.close()
-      result = line.value
+      result = protected_db(setting.objects.get, kwargs = {'setting' : param, }).value
+    except setting.DoesNotExist:
+      result = default
+    if self.redis:
+      self.myredis.set('djconfig:'+param, result)
+    else:
+      self.mycache[param] = result
+    return(result)
+
+  async def agetconfig(self, param, default=None, forcedb=False):
+    if self.redis:
+      if (not forcedb) and (value := self.myredis.get('djconfig:'+param)):
+        return(value.decode())
+    else:
+      if (not forcedb) and (param in self.mycache):
+        return(self.mycache[param])   
+    try:
+      result = (await aprotected_db(
+        setting.objects.aget, 
+        kwargs = {'setting' : param, },
+      )).value
     except setting.DoesNotExist:
       result = default
     if self.redis:
@@ -116,11 +130,25 @@ class djconfig():
     else:
       return(int(temp))
 
+  async def agetconfigint(self, param, default=None, forcedb=False):
+    temp = await self.agetconfig(param, forcedb=forcedb)
+    if temp is None:
+      return(default)
+    else:
+      return(int(temp))
+
   def setconfigfloat(self, param, value):
     self.setconfig(param, str(value))
 
   def getconfigfloat(self, param, default=None, forcedb=False):
-    temp = self.getconfig(param)
+    temp = self.getconfig(param, forcedb=forcedb)
+    if temp is None:
+      return(default)
+    else:
+      return(float(temp))
+
+  async def agetconfigfloat(self, param, default=None, forcedb=False):
+    temp = await self.agetconfig(param, forcedb=forcedb)
     if temp is None:
       return(default)
     else:
@@ -133,6 +161,20 @@ class djconfig():
     if type(default) == bool:
       default = bool_to_string(default) 
     temp = self.getconfig(param, default)
+    if temp:
+      if temp in ('1', 'true', 'True', 'yes', 'Yes', 'ja', 'Ja'): 
+	      return(True)
+      elif temp in ('0', 'false', 'False', 'no', 'No', 'nein', 'Nein'): 
+	      return(False)
+      else:
+	      return(None)
+    else:
+      return(default)
+
+  async def agetconfigbool(self, param, default=None, forcedb=False):
+    if type(default) == bool:
+      default = bool_to_string(default) 
+    temp = await self.agetconfig(param, default)
     if temp:
       if temp in ('1', 'true', 'True', 'yes', 'Yes', 'ja', 'Ja'): 
 	      return(True)
@@ -340,4 +382,28 @@ def get_dir_size(path='.'):
   except FileNotFoundError:
     total = 0        
   return total
+    
+def protected_db(function, args = (), kwargs = {}, logger = None):
+  while True:
+    try:
+      result = function(*args, **kwargs)
+      break
+    except OperationalError:
+      if logger:
+        logger.warning('*** Protected DB access failled. Retrying...')
+      connection.close()
+      sleep(0.1)  
+  return(result) 
+    
+async def aprotected_db(function, args = (), kwargs = {}, logger = None):
+  while True:
+    try:
+      result = await function(*args, **kwargs)
+      break
+    except OperationalError:
+      if logger:
+        logger.warning('*** Protected DB access failled. Retrying...')
+      connection.close()
+      sleep(0.1)
+  return(result) 
 

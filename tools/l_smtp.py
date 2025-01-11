@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -14,61 +14,160 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from os import path
+from socket import gaierror
+from smtplib import (
+  SMTP,
+  SMTPAuthenticationError, 
+  SMTPServerDisconnected,
+  SMTPRecipientsRefused,
+  SMTPConnectError,
+  SMTPSenderRefused,
+)
+from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
-from django.core.mail import send_mail, EmailMultiAlternatives
-from django.core.mail.backends.smtp import EmailBackend
-from threading import Thread
-from time import sleep
-from tools.l_tools import djconf
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email import encoders
 
-def smtp_send_try_mail(*args, html_message = None, images = [], attachments = [], 
-    logger = None, ):  
-  custom_backend = EmailBackend(
-    host = djconf.getconfig('smtp_server', forcedb=False),
-    port = djconf.getconfigint('smtp_port', forcedb=False),
-    username = djconf.getconfig('smtp_account', forcedb=False),
-    password = djconf.getconfig('smtp_password', forcedb=False),
-    use_tls = djconf.getconfigbool('smtp_use_tls', forcedb=False),
-    timeout = 5.0,
-  )
-  count = 0
-  done = False
-  while count < 5:
-    count += 1
-    if not (images or attachments):
-      result = send_mail(*args, 
-        html_message = html_message, 
-        fail_silently=True, 
-        connection=custom_backend,
-      )
+class l_msg(MIMEMultipart):
+
+  def __init__(self, sender_email, receiver_email, subject, plain_body, html=None):
+    super().__init__('mixed')
+    self["From"] = sender_email
+    self["To"] = receiver_email
+    self["Subject"] = subject
+    if html:
+      part = MIMEMultipart("alternative")
+      part.attach(MIMEText(plain_body, "plain"))
+      part.attach(MIMEText(html, "html"))
     else:
-      kwargs={'connection' : custom_backend, }
-      email = EmailMultiAlternatives(*args, **kwargs)
-      email.attach_alternative(html_message, "text/html")
-      for item in images:
-        mime_image = MIMEImage(item[2], _subtype=item[3])
-        mime_image.add_header('Content-ID', 'image' + str(item[0]))
-        email.attach(mime_image)
-      for item in attachments:
-        if path.exists(item[1]):
-          with open(item[1], "rb") as attachment:
-            email.attach(item[0], attachment.read(), item[2])
-        else:
-          if logger:
-            logger.warning('***** File not found: ' + item[1])     
-      result = email.send(fail_silently=True,)
-    if result:  
-      done = True
-      break
-    else: 
-      if logger is not None:
-        logger.warning('*** ['+str(count)+'] Email sending to: ' + args[3][0] + ' failed')
-      sleep(60)
-  if done: 
-    if logger is not None:
-      logger.info('*** ['+str(count)+'] Sent email to: ' + args[3][0]) # args[3] is receiver
+      part = MIMEText(plain_body, 'plain')
+    self.attach(part)
       
-def smtp_send_mail(*args, **kwargs):
-  Thread(target = smtp_send_try_mail, name = 'SMTPSendThread', 
-    args = args, kwargs = kwargs).start()
+  def attach_file(self, file_path):
+    with open(file_path, "rb") as f:
+      part = MIMEBase("application", "octet-stream")
+      part.set_payload(f.read())
+    encoders.encode_base64(part)
+    part.add_header(
+        "Content-Disposition",
+        f"attachment; filename={file_path.split('/')[-1]}"
+    )
+    self.attach(part)
+    
+  def attach_jpeg(self, jpeg_data, c_id = None):  
+    mime_image = MIMEImage(jpeg_data, _subtype='jpeg')
+    if c_id:
+      mime_image.add_header('Content-ID', c_id)
+    self.attach(mime_image)
+    
+  def get_size(self):
+    return len(self.as_string()) 
+    
+
+class l_smtp(SMTP):
+
+  def __init__(self, **kwargs):
+    if kwargs['host'] == '':
+      self.answer = 'There is no valid SMTP configuration.'
+      self.last_error = (6, 'No SMTP config')
+      self.result_code = 6
+      return()
+    self.allowed_size = None
+    self.answer = 'OK'
+    self.last_error = (0, 'OK')
+    self.result_code = 0
+    if 'timeout' not in kwargs:
+      kwargs['timeout'] = 5.0
+    if 'user' in kwargs:
+      self.user = kwargs['user']
+    else:
+      self.user = ''  
+    if 'password' in kwargs:
+      self.password = kwargs['password']
+    else:
+      self.password = ''  
+    try: 
+    #if True:
+      super().__init__(
+        host = kwargs['host'],
+        port = kwargs['port'],
+        timeout = kwargs['timeout'],
+      )
+      self.ehlo()
+      if 'debug' in kwargs:
+        self.set_debuglevel(kwargs['debug'])
+      if 'starttls' in self.esmtp_features:
+        self.starttls()
+        self.ehlo()
+      if 'user' in kwargs: 
+        if 'password' in kwargs: 
+          self.login(kwargs['user'], kwargs['password'])  
+        else:  
+          self.login(kwargs['user'], '') 
+      #print('**** SMTP Features', self.esmtp_features)   
+      self.allowed_size = int(self.esmtp_features['size'])
+    except gaierror as e:
+      self.answer = 'Domain is not reachable. Spelling?'
+      self.last_error = e.args
+      self.result_code = 1
+    except TimeoutError as e:
+      self.answer = 'Timeout. Wrong server? Wrong port?'
+      self.last_error = e.args
+      self.result_code = 2
+    except ConnectionRefusedError as e:
+      self.answer = 'Server refused connection. Wrong server? Wrong port?'
+      self.last_error = e.args
+      self.result_code = 3
+    except SMTPAuthenticationError as e:
+      self.answer = 'Authentication error. Wrong username? Wrong password?'
+      self.last_error = e.args
+      self.result_code = 4
+    except SMTPConnectError as e:
+      self.answer = 'Server refused to connect your IP.'
+      self.last_error = e.args
+      self.result_code = 5
+    except Exception as e:
+      self.answer = 'Something else went wrong: ' + str(e.args) 
+      self.last_error = e.args
+      self.result_code = 1001
+      
+  def sendmail(self, *args):
+    msg = args[2]
+    if self.allowed_size and msg.get_size() > self.allowed_size:
+      self.answer = 'This Email is too large for the SMTP-Server.'
+      self.last_error = (10001, 'Email too large')
+      self.result_code = 10001
+      return({'Server-Error' : 'Email too large', })
+    self.answer = 'OK'
+    self.last_error = (0, 'OK')
+    try:
+    #if True:
+      return super().sendmail(*args[:2], msg.as_string()) 
+    #"""  
+    except SMTPRecipientsRefused as e:
+      self.answer = 'Server refused to take the mail. Wrong username? Wrong password? Wrong testing email?'
+      self.last_error = e.args
+      self.result_code = 10002
+    except SMTPSenderRefused as e:
+      self.answer = 'Server refused to take the mail. Wrong username? Wrong password? Wrong sending email?'
+      self.last_error = e.args
+      self.result_code = 10003
+    except Exception as e:
+      self.answer = 'Something else went wrong: ' + str(e.args) 
+      self.last_error = e.args 
+      self.result_code = 11001
+      return({'Server-Error' : 'Other error', })
+    #"""
+ 
+  def is_connected(self):
+    try:
+      self.noop()
+      return(True)
+    except SMTPServerDisconnected:
+      return(False)
+      
+  def quit(self):
+    if self.is_connected():
+      super().quit()
+      

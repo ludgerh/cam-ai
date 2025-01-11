@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,8 +22,8 @@ from logging import getLogger
 from time import time, sleep
 from setproctitle import setproctitle
 from psutil import virtual_memory
-from tools.l_tools import djconf
-from tools.c_tools import rect_atob, rect_btoa, merge_rects, protected_db
+from tools.l_tools import djconf, protected_db
+from tools.c_tools import rect_atob, rect_btoa, merge_rects
 from tools.c_redis import myredis
 from tools.c_logger import log_ini
 from l_buffer.l_buffer import c_buffer

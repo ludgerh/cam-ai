@@ -1,6 +1,6 @@
 {% extends 'schools/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -102,11 +102,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   </h4>
   <div class="container-fluid float-left">
     <div class="row" id="gallery">
-      <div id="lastcol" class="col-sm-auto m-0 p-0">
-        <div class="card m-1 p-0" style="border: 1; width: 212px; height: auto;">
-          <div id="endtrigger">...</div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -180,28 +175,31 @@ $('#shureModal').on('shown.bs.modal', function (event) {
 
 let taglines;
 let frames;
-let frames_ready;
-let frames_count;
-let last_frame_visible;
+let next_frame;
+let last_visible;
 let page_nr = 1;
 let min_id = 0;
 let max_id = 0;
 let do_run;
-let get_images_active = false;
+let get_images_busy = false;
 let SchoolDButilSocket;
 let SchoolUtilSocket;
 
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 function isInViewport(elementid) {
-  element = document.getElementById(elementid)
-  let rect = element.getBoundingClientRect();
-  return (
-    rect.top >= 0 &&
-    rect.left >= 0 &&
-    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-  );
+  element = document.getElementById(elementid);
+  if (element) {
+    let rect = element.getBoundingClientRect();
+    return(
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
+  } else {
+    return(false);
+  };
 };
 
 $('#selectclass').change(function() {
@@ -227,7 +225,7 @@ $('#pagesizeselect').change(function() {
 function draw_all_cards() {
   $('#error_message').addClass("d-none");
   do_run = 0;
-  $('#gallery').children().slice(0,-1).remove();
+  $('#gallery').children().remove();
 
   SchoolDButilSocket.sendandwait({
     'command' : 'settrainpage',
@@ -275,111 +273,126 @@ function draw_all_cards() {
       min_id = frames[0].id;
       max_id = frames[frames.length-1].id;
     };
-    frames_count = frames.length;
-    frames_ready = 0;
-    last_frame_visible = 0;
-    /*wait_for_done();*/
+    next_frame = 0;
+    last_visible = -1;
     do_run = 1;
     getimages();
   })
 };
 
 function getimages() {
-  if (get_images_active) {
-    setTimeout(getimages, 100);
-  } else {  
-    get_images_active = true;
-    let numbers = [];
-    let idxs = [];
-    let counts = [];
-    while ((frames_ready < frames_count) 
-        && ((frames_ready - last_frame_visible) < 32)
-        && isInViewport('endtrigger')
-        && do_run) {
-      let frame_processing = frames_ready; 
-      frames_ready += 1;
-      numbers.push(idxs.length);
-      idxs.push(frames[frame_processing].id);
-      counts.push(frame_processing);
-    };  
-    if (idxs.length) {
-      SchoolDButilSocket.sendandwait({
-        'command' : 'getpredictions',
-        'idxs' :  idxs,
-        'school' : {{ schoolnr }},
-        'is_school' : false,
-      })
-      .then((predictions) => {
-        if (do_run) {
-          numbers.forEach((nr) => {
-            newaddition = '<div id="col' + frames[counts[nr]].id;
-            newaddition += '" class="col-sm-auto m-0 p-0">';
-            newaddition += '<div class="card m-1 p-0"';
-            newaddition += 'style="border: 1; width: 212px; height: auto;" done=0>';
-            newaddition += frames[counts[nr]].made;
-            newaddition += '<a href="/schools/getbigbmp/1/' + frames[counts[nr]].id;
-            newaddition += '/" target="_blank">';
-            newaddition += '<img idx=' + frames[counts[nr]].id;
-            newaddition += ' style="width: 210px;';
-            newaddition += ' height: 210px; object-fit: contain"';
-            newaddition += ' src="/schools/getbmp/1/' + frames[counts[nr]].id;
-            newaddition += '/3/1/210/210/"></a><br><div class="checklist h4">';
-            for (let i=0; i<taglines.length; i++) {
-              {% if may_write %}
-                newaddition += '<input type="checkbox" class="tc';
-                newaddition += frames[counts[nr]].id+'"';
-                newaddition += ' img="'+frames[counts[nr]].id+'" cnt="'+i+'"';
-                if (frames[counts[nr]].cs[i] >= 0.5) {
-                  newaddition += ' checked>';
-                } else {
-                  newaddition += '>';
-                };
-              {% endif %}
-              if (predictions[nr][i] >= 0.5) {
-                if (frames[counts[nr]].cs[i] < 0.5) {
-                  newaddition += '<span class="bluegrey">';
-                } else {
-                  newaddition += '<span>';
-                };
+  if (get_images_busy) {
+    return;
+  }; 
+  get_images_busy = true;
+  i = 0;
+  for (item of frames) {
+    item.count = i;
+    i++;
+  };
+  for (const item of frames) {
+    if (item.count > last_visible) {
+      frame_id = 'col' + item.id;
+      if ($('#' + frame_id).length && isInViewport(frame_id)) { //exists?
+        last_visible = item.count;
+      } else {
+        break;
+      };
+    };
+  };
+  if (next_frame > last_visible + 100) {
+    get_images_busy = false;
+    return;
+  };
+  frames_to_put = frames.slice(next_frame, last_visible + 100 + 1);
+  next_frame = last_visible + 100 + 1;
+  let idxs = [];
+  let counts = [];
+  for (const item of frames_to_put) {
+    idxs.push(item.id);
+    counts.push(item.count);
+  };
+  if (idxs.length) {
+    SchoolDButilSocket.sendandwait({
+      'command' : 'getpredictions',
+      'idxs' :  idxs,
+      'counts' : counts,
+      'school' : {{ schoolnr }},
+      'is_school' : false,
+    })
+    .then((result) => {
+      if (do_run) {
+        counts = result[0];
+        idxs = result[1];
+        predictions = result[2];
+        let nr = 0;
+        for (const item of idxs) {
+          frame_item = frames[counts[nr]];
+          newaddition = '<div id="col' + item + '" class="col-sm-auto m-0 p-0"> ';
+          newaddition += '<div class="card m-1 p-0" ';
+          newaddition += 'style="border: 1; width: 212px; height: auto;" done=0>';
+          newaddition += frame_item.made;
+          newaddition += '<a href="/schools/getbigbmp/1/' + item;
+          newaddition += '/" target="_blank">';
+          newaddition += '<img idx=' + item;
+          newaddition += ' style="width: 210px;';
+          newaddition += ' height: 210px; object-fit: contain"';
+          newaddition += ' src="/schools/getbmp/1/' + item;
+          newaddition += '/3/1/210/210/"></a><br><div class="checklist h4">';
+          for (let i=0; i<taglines.length; i++) {
+            {% if may_write %}
+              newaddition += '<input type="checkbox" class="tc' + item + '"';
+              newaddition += ' img="'+item+'" cnt="'+i+'"';
+              if (frame_item.cs[i] >= 0.5) {
+                newaddition += ' checked>';
               } else {
-                if (frames[counts[nr]].cs[i] >= 0.5) {
-                  newaddition += '<span class="bluegrey">';
-                } else {
-                  newaddition += '<span>';
-                };
+                newaddition += '>';
               };
-              newaddition += taglines[i].substr(0,3)+': ';
-              newaddition += Math.round(predictions[nr][i]*10000)
-                  /10000+'</span><br>';
+            {% endif %}
+            if (predictions[nr][i] >= 0.5) {
+              if (frame_item.cs[i] < 0.5) {
+                newaddition += '<span class="bluegrey">';
+              } else {
+                newaddition += '<span>';
               };
-            newaddition += '<h6>'+counts[nr]+': Tagged by ';
-            newaddition += frames[counts[nr]].made_by+'</h6>';
-            {% if may_write %}
-              newaddition += '<button type="button" img="'+frames[counts[nr]].id
-              newaddition += '" class="btn btn-primary m-1" action="checkone"';
-              newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
-              newaddition += ' style="width: 80px;">Check</button>';
-              newaddition += '<button type="button" img="'+frames[counts[nr]].id;
-              newaddition += '" class="btn btn-primary m-1" action="delone"';
-              newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
-              newaddition += ' style="width: 80px;">Delete</button>';
-            {% endif %}
-            newaddition += '</div>';
-            newaddition += '</div>';
-            newaddition += '</div>';
-            $('#lastcol').before(newaddition);
-            {% if may_write %}
-              $('.tc'+frames[counts[nr]].id).change(function(event) {
-                tagcheck_changed(event);
-              });
-            {% endif %}
-            last_frame_visible = counts[nr];
-          });
+            } else {
+              if (frame_item.cs[i] >= 0.5) {
+                newaddition += '<span class="bluegrey">';
+              } else {
+                newaddition += '<span>';
+              };
+            };
+            newaddition += taglines[i].substr(0,3)+': ';
+            newaddition += Math.round(predictions[nr][i]*10000)
+                /10000+'</span><br>';
+            };
+          newaddition += '<h6>'+frame_item.count+': Tagged by ';
+          newaddition += frame_item.made_by+'</h6>';
+          {% if may_write %}
+            newaddition += '<button type="button" img="'+item
+            newaddition += '" class="btn btn-primary m-1" action="checkone"';
+            newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
+            newaddition += ' style="width: 80px;">Check</button>';
+            newaddition += '<button type="button" img="'+item;
+            newaddition += '" class="btn btn-primary m-1" action="delone"';
+            newaddition += ' data-bs-toggle="modal" data-bs-target="#shureModal"';
+            newaddition += ' style="width: 80px;">Delete</button>';
+          {% endif %}
+          newaddition += '</div>';
+          newaddition += '</div>';
+          newaddition += '</div>';
+          $('#gallery').append(newaddition);
+          {% if may_write %}
+            $('.tc'+item).change(function(event) {
+              tagcheck_changed(event);
+            });
+          {% endif %}
+          nr++;
         };
-      })
-    };  
-    get_images_active = false;
+      };
+    })
   };  
+  get_images_busy = false;
 };
 
 {% if may_write %}

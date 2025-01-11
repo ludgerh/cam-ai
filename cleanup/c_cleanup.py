@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -28,8 +28,8 @@ from datetime import datetime
 from django.utils import timezone
 from django.db import connections
 from tools.l_tools import djconf, get_dir_size
-from tools.l_smtp import smtp_send_mail
-from tools.c_tools import list_from_queryset
+from tools.l_smtp import l_smtp, l_msg
+from tools.c_tools import list_from_queryset, get_smtp_conf
 from tools.c_logger import log_ini
 from tools.c_redis import saferedis
 from eventers.models import event, event_frame
@@ -461,51 +461,72 @@ class c_cleanup():
           userline.mail_flag_quota75 = False
       if result > userline.storage_quota * 0.75:
         if not userline.mail_flag_quota75:
-          smtp_send_mail(
-            'Notice: Your CAM-AI Storage is 75% Full',
-            'Dear CAM-AI User, \n'
-            'We want to inform you that your CAM-AI storage is now 75% full. \n'
-            'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events. \n'
-            'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
-            'Thank you for choosing CAM-AI. \n'
-            'Best regards, \n'
-            'The CAM-AI Team',
-            'CAM-AI<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
+          smtp_conf = get_smtp_conf()
+          my_smtp = l_smtp(**smtp_conf)
+          my_msg = l_msg(
+            smtp_conf['sender_email'],
             userline.user.email,
-            '<br>Dear CAM-AI User,<br>\n'
-            '<br>We want to inform you that your CAM-AI storage is now 75% full.\n'
-            'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events.<br>\n'
-            '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
-            '<br>Thank you for choosing CAM-AI.<br>\n'
-            '<br>Best regards,<br>\n'
-            'The CAM-AI Team<br>\n'
-            '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>',
-            self.logger,
-          )  
+            'Notice: Your CAM-AI Storage is 75% Full',
+            ('Dear CAM-AI User, \n'
+              + 'We want to inform you that your CAM-AI storage is now 75% full. \n'
+              + 'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events. \n'
+              + 'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
+              + 'Thank you for choosing CAM-AI. \n'
+              + 'Best regards, \n'
+              + 'The CAM-AI Team'),
+            html = ('<br>Dear CAM-AI User,<br>\n'
+              + '<br>We want to inform you that your CAM-AI storage is now 75% full.\n'
+              + 'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events.<br>\n'
+              + '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
+              + '<br>Thank you for choosing CAM-AI.<br>\n'
+              + '<br>Best regards,<br>\n'
+              + 'The CAM-AI Team<br>\n'
+              + '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>'
+            )
+          )
+          my_smtp.sendmail(
+            smtp_conf['sender_email'],
+            userline.user.email,
+            my_msg,
+          )
+          if my_smtp.result_code:
+            self.logger.error('SMTP: ' + my_smtp.answer)
+            self.logger.error(str(my_smtp.last_error))
+          my_smtp.quit()
           userline.mail_flag_quota75 = True
         if result > userline.storage_quota:
           if not userline.mail_flag_quota100:
-            smtp_send_mail(
-              'Action Required: Your CAM-AI Storage is Full',
-              'Dear CAM-AI User, \n'
-              'We are reaching out to inform you that your CAM-AI storage is currently full. \n'
-              'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space. \n'
-              'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
-              'Thank you for choosing CAM-AI. \n'
-              'Best regards, \n'
-              'The CAM-AI Team',
-              'CAM-AI<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
+            smtp_conf = get_smtp_conf()
+            my_smtp = l_smtp(**smtp_conf)
+            my_msg = l_msg(
+              smtp_conf['sender_email'],
               userline.user.email,
-              '<br>Dear CAM-AI User,<br>\n'
-              '<br>We are reaching out to inform you that your CAM-AI storage is currently full. \n'
-              'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space.<br>\n'
-              '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
-              '<br>Thank you for choosing CAM-AI.<br>\n'
-              '<br>Best regards,<br>\n'
-              'The CAM-AI Team<br>\n'
-              '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>',
-              self.logger,
-            )  
+              'Action Required: Your CAM-AI Storage is Full',
+              ('Dear CAM-AI User, \n'
+                + 'We are reaching out to inform you that your CAM-AI storage is currently full. \n'
+                + 'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space. \n'
+                + 'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
+                + 'Thank you for choosing CAM-AI. \n'
+                + 'Best regards, \n'
+                + 'The CAM-AI Team'),
+              html = ('<br>Dear CAM-AI User,<br>\n'
+                + '<br>We are reaching out to inform you that your CAM-AI storage is currently full. \n'
+                + 'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space.<br>\n'
+                + '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
+                + '<br>Thank you for choosing CAM-AI.<br>\n'
+                + '<br>Best regards,<br>\n'
+                + 'The CAM-AI Team<br>\n'
+                + '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>'
+              ))
+            my_smtp.sendmail(
+              smtp_conf['sender_email'],
+              userline.user.email,
+              my_msg,
+            )
+            if my_smtp.result_code:
+              self.logger.error('SMTP: ' + my_smtp.answer)
+              self.logger.error(str(my_smtp.last_error))
+            my_smtp.quit()
             userline.mail_flag_quota100 = True
       userline.save(update_fields = ['storage_used', 'mail_flag_quota75', 'mail_flag_quota100',]) 
     self.logger.info('Cleanup: Finished health check')     

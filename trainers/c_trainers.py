@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -26,8 +26,8 @@ from setproctitle import setproctitle
 from django.utils import timezone
 from django.db import connections
 from tools.c_logger import log_ini
-from tools.l_tools import QueueUnknownKeyword, ts2mysqltime, djconf
-from tools.c_tools import protected_db, list_from_queryset
+from tools.l_tools import protected_db, QueueUnknownKeyword, ts2mysqltime, djconf
+from tools.c_tools import list_from_queryset
 from tf_workers.models import school
 from users.models import userinfo
 from users.userinfo import free_quota

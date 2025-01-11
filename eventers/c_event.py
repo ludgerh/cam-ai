@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -27,9 +27,9 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.utils import OperationalError
 from tools.l_tools import ts2filename, uniquename, np_mov_avg, djconf
-from tools.l_smtp import smtp_send_mail
 from tools.l_crypt import l_crypt
-from tools.c_tools import do_reduction
+from tools.l_smtp import l_smtp, l_msg
+from tools.c_tools import do_reduction, get_smtp_conf
 from tools.tokens import maketoken
 from schools.c_schools import get_taglist
 from .models import event, event_frame
@@ -300,22 +300,25 @@ class c_event(list):
       html_text = '<html><body><p>Hello CAM-AI user, <br>\n' 
       html_text += 'We had some movement. <br> \n' 
       if self.savename:
-        filename = (self.dbline.videoclip + '.jpg')
-        filepath = djconf.getconfig('recordingspath', datapath + 'recordings/') + filename
-        with open(filepath, "rb") as f:
-          jpegdata = f.read()
-        jpegdata = cv.imdecode(
-          np.frombuffer(jpegdata, dtype=np.uint8), cv.IMREAD_UNCHANGED
-        )
-        jpegdata = do_reduction(jpegdata, 400, 400)
-        jpegdata = cv.imencode('.jpg', jpegdata)[1].tobytes()
-        self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
-        html_text += '<br>Here is the movie (click on the image to see): <br> \n' 
-        html_text += ('<a href="' + clienturl + 'schools/getbigmp4/' 
-          + str(self.dbline.id) + '/')
-        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
-        html_text += '" target="_blank">'
-        html_text += '<img src="cid:image0" style="width: 400px; height: auto"></a> <br>\n'
+        filepath = (djconf.getconfig('recordingspath', datapath + 'recordings/')
+          + self.dbline.videoclip + '.jpg')
+        if path.exists(filepath):
+          with open(filepath, "rb") as f:
+            jpegdata = f.read()
+          jpegdata = cv.imdecode(
+            np.frombuffer(jpegdata, dtype=np.uint8), cv.IMREAD_UNCHANGED
+          )
+          jpegdata = do_reduction(jpegdata, 400, 400)
+          jpegdata = cv.imencode('.jpg', jpegdata)[1].tobytes()
+          self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
+          html_text += '<br>Here is the movie (click on the image to see): <br> \n' 
+          html_text += ('<a href="' + clienturl + 'schools/getbigmp4/' 
+            + str(self.dbline.id) + '/')
+          html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
+          html_text += '" target="_blank">'
+          html_text += '<img src="cid:image0" style="width: 400px; height: auto"></a> <br>\n'
+        else:
+          self.logger.error('JPG-File not found: ' + filepath)
       html_text += 'Here are the images: <br> \n'
       for item in self.mailimages:
         if item[4] == 'image':
@@ -325,13 +328,24 @@ class c_event(list):
           html_text += ('<img src="cid:image' + str(item[0]) 
             + '" style="width: 200px; height: 200px; object-fit: contain"</a> \n')
       html_text += '<br> \n'
-      smtp_send_mail(
+      smtp_conf = get_smtp_conf()
+      my_smtp = l_smtp(**smtp_conf)
+      my_msg = l_msg(
+        smtp_conf['sender_email'],
+        receiver,
         subject,
         plain_text,
-        'CAM-AI Emailer<' + djconf.getconfig('smtp_email', forcedb=False) + '>',
-        [receiver],
-        html_message = html_text,
-        logger = self.logger,
-        images = self.mailimages,
-      )  
+        html = html_text,
+      )
+      for item in self.mailimages:
+        my_msg.attach_jpeg(item[2], 'image' + str(item[0]))  
+      my_smtp.sendmail(
+        smtp_conf['sender_email'],
+        receiver,
+        my_msg,
+      )
+      if my_smtp.result_code:
+        self.logger.error('SMTP: ' + my_smtp.answer)
+        self.logger.error(str(my_smtp.last_error))
+      my_smtp.quit()
 

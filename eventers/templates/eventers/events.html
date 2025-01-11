@@ -1,6 +1,6 @@
 {% extends 'eventers/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -260,9 +260,11 @@ getimages = function() {
         $(this).attr('done', '1');
 	      SchoolDBUtilSocket.sendandwait({
 		      'command' : 'geteventframes',
+		      'count' : 0,
 		      'event' : $(this).attr('id'),
 	      })
-	      .then((framelines) => {
+	      .then((result) => {
+          framelines = result[1];
 		      for (let j=0; j<framelines.length; j++) {
             let imgElement;
             if (j == 0) {

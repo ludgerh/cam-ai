@@ -21,5 +21,4 @@ class smtp_form(forms.Form):
   password = forms.CharField(label="SMTP password", max_length=100)
   port = forms.IntegerField(label="SMTP port", min_value=1, max_value=64000) 
   email = forms.CharField(label="Sending email", max_length=100)
-  use_tls = forms.BooleanField(label="Use TLS", required=False)
   test_email = forms.CharField(label="Email for Test", max_length=100)

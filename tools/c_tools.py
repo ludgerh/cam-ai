@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@ from random import randint
 from django.db import connection
 from django.db.utils import OperationalError
 from tools.models import setting as dbsetting
+from tools.l_tools import djconf
 
 def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=None, 
   outcrypt=None):
@@ -191,30 +192,6 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
   myimage = cv.imencode('.bmp', myimage)[1].tobytes()
   async with aiofiles.open(outfile, mode="wb") as f:
     await f.write(myimage)
-    
-def protected_db(function, args = (), kwargs = {}, logger = None):
-  while True:
-    try:
-      result = function(*args, **kwargs)
-      break
-    except OperationalError:
-      if logger:
-        logger.warning('*** Protected DB access failled. Retrying...')
-      connection.close()
-      sleep(0.1)  
-  return(result) 
-    
-async def protected_dba(function, args = (), kwargs = {}, logger = None):
-  while True:
-    try:
-      result = await function(*args, **kwargs)
-      break
-    except OperationalError:
-      if logger:
-        logger.warning('*** Protected DB access failled. Retrying...')
-      connection.close()
-      sleep(0.1)
-  return(result) 
   
 def list_from_queryset(qs, logger = None):
   while True:
@@ -229,3 +206,27 @@ def list_from_queryset(qs, logger = None):
       connection.close()
       sleep(0.1)
   return(result) 
+  
+def get_smtp_conf(extended_from = True):  
+  sender_email = djconf.getconfig('smtp_email', forcedb=True)
+  if extended_from:
+    sender_email = 'CAM-AI Emailer<' + sender_email + '>'
+  return({
+  'host' : djconf.getconfig('smtp_server', forcedb=True), 
+  'port' : djconf.getconfigint('smtp_port', forcedb=True),
+  'user' : djconf.getconfig('smtp_account', forcedb=True),
+  'password' : djconf.getconfig('smtp_password', forcedb=True),
+  'sender_email' : sender_email,
+  })
+  
+async def aget_smtp_conf(extended_from = True):  
+  sender_email = await djconf.agetconfig('smtp_email', forcedb=True)
+  if extended_from:
+    sender_email = 'CAM-AI Emailer<' + sender_email + '>'
+  return({
+  'host' : await djconf.agetconfig('smtp_server', forcedb=True), 
+  'port' : await djconf.agetconfigint('smtp_port', forcedb=True),
+  'user' : await djconf.agetconfig('smtp_account', forcedb=True),
+  'password' : await djconf.agetconfig('smtp_password', forcedb=True),
+  'sender_email' : sender_email,
+  })
