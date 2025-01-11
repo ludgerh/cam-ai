@@ -65,7 +65,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
             dict_item['viewer'].pop_from_onf(dict_item['onf'])
           dict_item['log'].stop = timezone.now()
           dict_item['log'].active = False
-          await protected_dba(
+          await aprotected_db(
             dict_item['log'].asave, 
             kwargs = {'update_fields' : ["stop", "active", ], }, 
           )
