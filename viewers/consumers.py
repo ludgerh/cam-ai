@@ -26,7 +26,7 @@ from access.c_access import access
 from asgiref.sync import sync_to_async
 from startup.startup import streams
 from tools.c_redis import myredis
-from tools.l_tools import djconf, protected_dba
+from tools.l_tools import djconf, aprotected_db
 from tools.c_logger import log_ini
 from tools.tokens import checktoken
 from .models import view_log
@@ -158,7 +158,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
             user=myuser,
             active=True,
           )
-          await protected_dba(my_log_line.asave)
+          await aprotected_db(my_log_line.asave)
           self.viewer_dict[params['mode']][params['idx']]['log'] = my_log_line
           outlist['data'] = {
             'outx' : outx, 
