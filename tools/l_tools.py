@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import asyncio
 import aiofiles.os
 import numpy as np
+from time import sleep
 from os import path, getpid, scandir
 from threading import Thread
 from queue import Queue, Empty
@@ -404,6 +405,6 @@ async def aprotected_db(function, args = (), kwargs = {}, logger = None):
       if logger:
         logger.warning('*** Protected DB access failled. Retrying...')
       connection.close()
-      sleep(0.1)
+      await asyncio.sleep(0.1)
   return(result) 
 

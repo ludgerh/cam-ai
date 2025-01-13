@@ -62,9 +62,9 @@ def sigint_handler(signal, frame):
 #***************************************************************************
 
 class trainer():
-  def __init__(self, idx):
+  def __init__(self, dbline):
     self.inqueue = Queue()
-    self.id = idx
+    self.id = dbline.id
     self.outqueue = Queue()
     self.queueinfobuffers = {}
     self.mylock = Lock()
@@ -98,7 +98,7 @@ class trainer():
       while self.do_run:
         schoollines = school.objects.filter(
           active=True,
-          tf_worker=self.dbline.id,
+          trainer=self.dbline,
         )
         for item in list_from_queryset(schoollines):
           with self.mylock:
@@ -158,7 +158,10 @@ class trainer():
       setproctitle('CAM-AI-Trainer #'+str(self.dbline.id))
       self.finished = False
       self.job_queue = threadqueue()
-      Thread(target=self.job_queue_thread, name='Trainer_JobQueueThread').start()
+      Thread(
+        target=self.job_queue_thread, 
+        name='Trainer_JobQueueThread #' + str(self.id),
+      ).start()
       while self.do_run:
         self.dbline = protected_db(dbtrainer.objects.get, kwargs = {'id' : self.id, })
         timestr = ts2mysqltime(time())
@@ -175,7 +178,11 @@ class trainer():
                 myfit, 
                 self.dbline.gpu_nr,
                 self.dbline.gpu_mem_limit,
-              ))
+              ), 
+              kwargs = {
+                'trainer' : self.id,
+              }
+              )
               train_process.start()
               train_process.join()
               trainresult = (train_process.exitcode)

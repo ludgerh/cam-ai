@@ -173,7 +173,7 @@ def run():
   log_ini(logger, logname)
   try:
     for dbline in trainerdb.objects.filter(active=True):
-      trainers[dbline.id] = trainer(dbline.id)
+      trainers[dbline.id] = trainer(dbline)
       trainers[dbline.id].run()
 
     for dbline in worker.objects.filter(active=True):

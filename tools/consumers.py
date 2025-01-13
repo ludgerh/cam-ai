@@ -523,14 +523,17 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))	
         while redis.get_watch_status():
           await asleep(long_brake)
+          
       elif params['command'] == 'sendlogs':
-        smtp_conf = await aget_smtp_conf()
+        smtp_conf = await aget_smtp_conf(extended_from = False)
+        smtp_conf['sender_email'] = (
+          'Logfile-Sender' + '<' + smtp_conf['sender_email'] + '>')
         my_smtp = l_smtp(**smtp_conf)
         my_smtp.answer
         my_msg = l_msg(
           smtp_conf['sender_email'],
           'support@cam-ai.de',
-          'The Log files',
+          'The Log files from ' + smtp_conf['sender_email'],
           params['message'],
           html = params['message'].replace('\n', '<br>'),
         )
@@ -542,8 +545,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
           my_msg,
         )
         if my_smtp.result_code:
-          self.logger.error('SMTP: ' + my_smtp.answer)
-          self.logger.error(str(my_smtp.last_error))
+          logger.error('SMTP: ' + my_smtp.answer)
+          logger.error(str(my_smtp.last_error))
         my_smtp.quit()
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))

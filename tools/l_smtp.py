@@ -95,6 +95,7 @@ class l_smtp(SMTP):
         timeout = kwargs['timeout'],
       )
       self.ehlo()
+      #kwargs['debug'] = 2
       if 'debug' in kwargs:
         self.set_debuglevel(kwargs['debug'])
       if 'starttls' in self.esmtp_features:

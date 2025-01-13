@@ -1,5 +1,5 @@
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -96,7 +96,7 @@ $(document).ready(function() {
       $('#continue-button').prop('disabled', true);
       admintoolsSocket.sendandwait({
         'command' : 'sendlogs',
-        'message' : $('#message').text(),
+        'message' : $('#message').val(),
       })
       .then((result) => {
         $('#line2').removeClass("d-none");
