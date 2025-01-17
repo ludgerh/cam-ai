@@ -26,10 +26,9 @@ from access.c_access import access
 from asgiref.sync import sync_to_async
 from startup.startup import streams
 from tools.c_redis import myredis
-from tools.l_tools import djconf, aprotected_db
+from tools.l_tools import djconf
 from tools.c_logger import log_ini
 from tools.tokens import checktoken
-from .models import view_log
 
 logname = 'ws_viewers'
 logger = getLogger(logname)
@@ -54,25 +53,18 @@ class triggerConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def disconnect(self, close_code):
     try:
       for mode in self.viewer_dict:
         for idx in self.viewer_dict[mode]:
+          #print('Disconnecting', mode, idx)
           dict_item = self.viewer_dict[mode][idx]
           if dict_item['show_cam']:
             dict_item['viewer'].pop_from_onf(dict_item['onf'])
-          dict_item['log'].stop = timezone.now()
-          dict_item['log'].active = False
-          await aprotected_db(
-            dict_item['log'].asave, 
-            kwargs = {'update_fields' : ["stop", "active", ], }, 
-          )
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
-      logger.handlers.clear()
             
   @staticmethod
   def check_conditions(user, mystream):
@@ -136,6 +128,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
           myviewer.websocket = self
           myviewer.event_loop = asyncio.get_event_loop()
           outx = round(min(mystream.dbline.cam_xres, outx))
+          #print('Connecting', params['mode'], params['idx'])
           if show_cam:
             onf_index = myviewer.push_to_onf(outx, do_compress, self)
           else:
@@ -151,15 +144,6 @@ class triggerConsumer(AsyncWebsocketConsumer):
             myuser = self.scope['user'].id
           else:
             myuser = -1
-          my_log_line = view_log(v_type=params['mode'],
-            v_id=params['idx'],
-            start=timezone.now(),
-            stop=timezone.now(),
-            user=myuser,
-            active=True,
-          )
-          await aprotected_db(my_log_line.asave)
-          self.viewer_dict[params['mode']][params['idx']]['log'] = my_log_line
           outlist['data'] = {
             'outx' : outx, 
             'show_cam' : show_cam,
@@ -172,7 +156,6 @@ class triggerConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
 #*****************************************************************************
 # c_viewConsumer
@@ -190,7 +173,6 @@ class c_viewConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (c_view)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def receive(self, text_data):
     try:
@@ -215,4 +197,3 @@ class c_viewConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (c_view)')
       logger.error(format_exc())
-      logger.handlers.clear()

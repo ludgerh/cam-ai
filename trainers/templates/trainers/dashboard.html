@@ -43,16 +43,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <input class="m-2" type="number" id="trigger" size="10" min="0" step="100">
       </div>  
       <div class="col-sm-auto h4">
-        <input style="width: 24px; height: 24px;" type="checkbox" id="cbignorecheck" class="m-2">
+        <input style="width: 24px; height: 24px;" 
+          type="checkbox" id="cbignorecheck" class="m-2">
         <label class="m-2" for="cbignorecheck">Ignore check-in</label>
       </div>  
       {% if show_all_options %}
         <div class="col-sm-auto h4">
-          <input style="width: 24px; height: 24px;" type="checkbox" id="cbdonate" class="m-2">
+          <input style="width: 24px; height: 24px;" 
+            type="checkbox" id="cbdonate" class="m-2">
           <label class="m-2" for="cbdonate">Donate images and tagging</label>
         </div>  
         <div class="col-sm-auto h4">
-          <input style="width: 24px; height: 24px;" type="checkbox" id="save_new_model" class="m-2">
+          <input style="width: 24px; height: 24px;" 
+            type="checkbox" id="save_new_model" class="m-2">
           <label class="m-2" for="save_new_model">Save new Model</label>
         </div>  
       {% endif %}
@@ -73,28 +76,35 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <label class="m-2" for="model_train_type">Model Type for Training:</label>
           <select id="model_train_type">
           {% for item in model_types %}
-              <option value={{ item.name }}>{{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})</option>
+              <option value = {{ item.name }}>
+                {{ item.name }} ({{ item.x_in_default }}x{{ item.y_in_default }})
+              </option>
           {% endfor %}    
           </select>
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="image_augmentation">Image Augmentation:</label>
-          <input class="m-2" type="number" id="image_augmentation" size="10" min="0.0" max="1.0" step="0.01">
+          <input class="m-2" type="number" id="image_augmentation" size="10" 
+            min="0.0" max="1.0" step="0.01">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="weight_constraint">Weight Constraint:</label>
-          <input class="m-2" type="number" id="weight_constraint" size="10" min="0.0" max="5.0" step="0.01">
+          <input class="m-2" type="number" id="weight_constraint" size="10" 
+            min="0.0" max="5.0" step="0.01">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="weight_decay">Weight Decay:</label>
-          <input class="m-2" type="number" id="weight_decay" size="10" min="0.0" max="1.0" step="0.01">
+          <input class="m-2" type="number" id="weight_decay" size="10" 
+            min="0.0" max="1.0" step="0.01">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="dropout">Dropout:</label>
-          <input class="m-2" type="number" id="dropout" size="10" min="0.0" max="0.5" step="0.01">
+          <input class="m-2" type="number" id="dropout" size="10" 
+            min="0.0" max="0.5" step="0.01">
         </div>  
         <div class="col-sm-auto h4">
-          <input style="width: 24px; height: 24px;" type="checkbox" id="stop_overfit" class="m-2">
+          <input style="width: 24px; height: 24px;" 
+            type="checkbox" id="stop_overfit" class="m-2">
           <label class="m-2" for="stop_overfit">Stop Overfit</label>
         </div>  
       </div>  
@@ -106,15 +116,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <div class="row">
         <div class="col-sm-auto h4">
           <label class="m-2" for="minweight">Min. weight:</label>
-          <input class="m-2" type="number" id="minweight" size="10" min="0.ü" max="10.0" step="0.01">
+          <input class="m-2" type="number" id="minweight" size="10" 
+            min="0.ü" max="10.0" step="0.01">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="maxweight">Max. weight:</label>
-          <input class="m-2" type="number" id="maxweight" size="10" min="0.0" max="10.0" step="0.01">
+          <input class="m-2" type="number" id="maxweight" size="10" 
+            min="0.0" max="10.0" step="0.01">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="weightboost">Weight boost</label>
-          <input class="m-2" type="number" id="weightboost" size="10" min="0.0" max="10.0" step="0.01">
+          <input class="m-2" type="number" id="weightboost" size="10" 
+            min="0.0" max="10.0" step="0.01">
         </div>  
       </div>  
     </div>
@@ -145,15 +158,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="l_rate_patience">Patience</label>
-          <input class="m-2" type="number" id="l_rate_patience" size="10" min="3" max="1000" step="1">
+          <input class="m-2" type="number" id="l_rate_patience" size="10" 
+            min="3" max="1000" step="1">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="l_rate_delta_min">Min. Delta</label>
-          <input class="m-2" type="number" id="l_rate_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
+          <input class="m-2" type="number" id="l_rate_delta_min" size="10" 
+            min="0.0" max="0.99" step="0.00001">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="l_rate_decrement">Decrement</label>
-          <input class="m-2" type="number" id="l_rate_decrement" size="10" min="0.01" max="0.99" step="0.00001">
+          <input class="m-2" type="number" id="l_rate_decrement" size="10" 
+            min="0.01" max="0.99" step="0.00001">
         </div>  
       </div>  
     </div>
@@ -164,11 +180,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <div class="row">
         <div class="col-sm-auto h4">
           <label class="m-2" for="early_stop_patience">Patience</label>
-          <input class="m-2" type="number" id="early_stop_patience" size="10" min="3" max="1000" step="1">
+          <input class="m-2" type="number" id="early_stop_patience" size="10" 
+            min="3" max="1000" step="1">
         </div>  
         <div class="col-sm-auto h4">
           <label class="m-2" for="early_stop_delta_min">Min. Delta</label>
-          <input class="m-2" type="number" id="early_stop_delta_min" size="10" min="0.0" max="0.99" step="0.00001">
+          <input class="m-2" type="number" id="early_stop_delta_min" size="10" 
+            min="0.0" max="0.99" step="0.00001">
         </div>  
       </div>  
     </div>
@@ -297,30 +315,32 @@ function refresh_all() {
       result.forEach(function(item, index) {
         datestring = item.made;
         newaddition = '<tr>';
-        newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
-        newaddition += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
-        newaddition += '<td>'+item.model_type+'</td>';
-        newaddition += '<td>'+item.model_image_augmentation.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.model_weight_decay.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.model_weight_constraint.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.model_dropout.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.l_rate_start+'</td>';
-        newaddition += '<td>'+item.l_rate_stop+'</td>';
-        newaddition += '<td>'+item.l_rate_delta_min.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.l_rate_patience.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.l_rate_decrement.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.weight_min.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.weight_max.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.weight_boost.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.early_stop_delta_min.toPrecision(2)+'</td>';
-        newaddition += '<td>'+item.early_stop_patience.toPrecision(2)+'</td>';
-        newaddition += '<td>'+Math.round(item.minutes)+'</td>';
-        newaddition += '<td>'+item.epochs+'</td>';
-        newaddition += '<td>'+item.loss.toPrecision(3)+'</td>';
-        newaddition += '<td>'+item.binacc.toPrecision(3)+'</td>';
-        newaddition += '<td>'+item.val_loss.toPrecision(3)+'</td>';
-        newaddition += '<td>'+item.val_binacc.toPrecision(3)+'</td>';
-        newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/'+item.id+'/" target="_blank">'+item.status+'</a></td>';
+        newaddition += '<td>' + datestring.slice(8,10) + '.' + datestring.slice(5,7) 
+          + '.'+datestring.slice(0,4) + '</td>';
+        newaddition += '<td>' + (parseInt(item.nr_tr) + parseInt(item.nr_va)) + '</td>';
+        newaddition += '<td>' + item.model_type + '</td>';
+        newaddition += '<td>' + item.model_image_augmentation.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.model_weight_decay.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.model_weight_constraint.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.model_dropout.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.l_rate_start + '</td>';
+        newaddition += '<td>' + item.l_rate_stop + '</td>';
+        newaddition += '<td>' + item.l_rate_delta_min.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.l_rate_patience.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.l_rate_decrement.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.weight_min.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.weight_max.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.weight_boost.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.early_stop_delta_min.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.early_stop_patience.toPrecision(2) + '</td>';
+        newaddition += '<td>' + Math.round(item.minutes) + '</td>';
+        newaddition += '<td>' + item.epochs + '</td>';
+        newaddition += '<td>' + item.loss.toPrecision(3) + '</td>';
+        newaddition += '<td>' + item.binacc.toPrecision(3) + '</td>';
+        newaddition += '<td>' + item.val_loss.toPrecision(3) + '</td>';
+        newaddition += '<td>' + item.val_binacc.toPrecision(3) + '</td>';
+        newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/' 
+          + item.id + '/" target="_blank">' + item.status + '</a></td>';
         newaddition += '</tr>';
         $('#tablebody').append(newaddition);
         status_save = item.status;
@@ -370,7 +390,8 @@ $(document).ready(function() {
       $('#train_button').click(function() {
         new_click = true;
         $('.modal-title').text('Synchronizing the Training Data');
-        $('.modal-body').text('Depending on the amount of new data this may take some minutes...');
+        $('.modal-body').text(
+          'Depending on the amount of new data this may take some minutes...');
         $('#mymodal').modal('show');
         $('#train_button').prop("disabled",true);
         $('#train_button').addClass('btn-warning');
@@ -408,7 +429,11 @@ $(document).ready(function() {
       refresh_all();
     } else {
       $('.modal-title').text('Someone else is using the same dashboard!');
-      $('.modal-body').text('Only one writing user at a time per school. Refresh your browser to try again...');
+      $(
+        '.modal-body'
+      ).text(
+        'Only one writing user at a time per school. Refresh your browser to try again...'
+      );
       $('#mymodal').modal('show');
     };
   })

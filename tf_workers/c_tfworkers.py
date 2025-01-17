@@ -348,7 +348,6 @@ class tf_worker():
     except:
       self.logger.error('Error in process: ' + self.logname + ' (in_queue_handler)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def runner(self):
     try:
@@ -438,11 +437,9 @@ class tf_worker():
                 sleep(djconf.getconfigfloat('medium_brake', 0.1))
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-      self.logger.handlers.clear()
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def run(self):
     self.do_run = True
@@ -627,8 +624,7 @@ class tf_worker():
               break
         except:
           frame_ok = False
-          logger.error(format_exc())
-          logger.handlers.clear()      
+          logger.error(format_exc()) 
         if frames_ok:    
           npframelist = np.vstack(npframelist)
           self.check_model(schoolnr, logger, True)
@@ -694,7 +690,6 @@ class tf_worker():
     except:
       self.logger.error('Error in process: ' + self.logname + ' (out_reader_proc)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def register(self):
     self.inqueue.put(('register', ))

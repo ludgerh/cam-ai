@@ -106,7 +106,6 @@ class schooldbutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def disconnect(self, close_code):
     try:
@@ -116,7 +115,6 @@ class schooldbutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def receive(self, text_data):
     try:
@@ -606,7 +604,6 @@ class schooldbutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
-      logger.handlers.clear()	
 
 #*****************************************************************************
 # SchoolUtil
@@ -622,7 +619,6 @@ class schoolutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def disconnect(self, code):
     try:
@@ -631,7 +627,6 @@ class schoolutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def receive(self, text_data):
     try:
@@ -701,5 +696,3 @@ class schoolutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
-      logger.handlers.clear()	
-

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -28,7 +28,7 @@ from django.http import HttpResponse
 from django.core.files.storage import FileSystemStorage
 from camai.c_settings import safe_import
 from access.c_access import access
-from tools.l_tools import djconf
+from tools.l_tools import djconf, protected_db
 from tools.c_tools import c_convert
 from tools.tokens import checktoken
 from tools.l_crypt import l_crypt
@@ -37,7 +37,7 @@ from tf_workers.models import school
 from users.models import archive
 from users.userinfo import free_quota
 from eventers.models import event, event_frame
-from trainers.models import trainframe, trainer
+from trainers.models import trainframe
 
 emulatestatic = safe_import('emulatestatic') 
 
@@ -61,7 +61,6 @@ def images(request, schoolnr):
       'debug' : settings.DEBUG,
       'schoolnr' : schoolnr,
       'schoolname' : myschool.name,
-      'trainernr' : trainer.objects.get(id=myschool.trainer.id).id,
       'user' : request.user,
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
     }
@@ -122,7 +121,8 @@ def upload_file(request, schoolnr):
 def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, token=None): 
   global crypter_dict
   if mode == 0:
-    frameline = event_frame.objects.get(id = framenr)
+    frameline = protected_db(event_frame.objects.get, kwargs = {'id' : framenr, }, )
+    #frameline = event_frame.objects.get(id = framenr)
     eventline = frameline.event
     streamline = eventline.camera
     if (crypt := frameline.encrypted):
@@ -138,17 +138,20 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
     else:
       filepath = schoolframespath + frameline.name
   elif mode == 1:
-    frameline = trainframe.objects.get(id = framenr)
+    frameline = protected_db(trainframe.objects.get, kwargs = {'id' : framenr, }, )
+    #frameline = trainframe.objects.get(id = framenr)
     schoolline = school.objects.get(id = frameline.school)
     filepath = schoolline.dir + 'frames/' + frameline.name
     crypt = False
   elif mode == 2:
-    frameline = archive.objects.get(id = framenr)
+    frameline = protected_db(archive.objects.get, kwargs = {'id' : framenr, }, )
+    #frameline = archive.objects.get(id = framenr)
     filepath = archivepath + 'frames/' + frameline.name
     userset = set(dbuser.objects.filter(archive=frameline))
     crypt = False
   elif mode == 3:
-    frameline = archive.objects.get(id = framenr)
+    frameline = protected_db(archive.objects.get, kwargs = {'id' : framenr, }, )
+    #frameline = archive.objects.get(id = framenr)
     filepath = archivepath + 'videos/' + frameline.name + '.jpg'
     userset = set(dbuser.objects.filter(archive=frameline))
     crypt = False

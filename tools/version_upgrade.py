@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,8 +15,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from collections import OrderedDict
-from camai.c_settings import safe_import
 from .l_tools import version_flat, version_full
+from camai.c_settings import safe_import
 
 proc_dict = OrderedDict()
 
@@ -40,6 +40,15 @@ def temp_func():
     from tf_workers.models import worker
     worker.objects.all().update(use_websocket = False)
 proc_dict[version_flat('1.5.1')] = temp_func
+
+def temp_func():
+  from tf_workers.models import school
+  from trainers.models import trainer
+  for s_item in school.objects.filter(active = True):
+    if not s_item.trainers.all().exists():
+      for t_item in trainer.objects.filter(active = True):
+        s_item.trainers.add(t_item)
+proc_dict[version_flat('1.6.2a')] = temp_func
 
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)

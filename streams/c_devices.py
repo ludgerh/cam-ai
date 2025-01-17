@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024 - 2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -101,7 +101,6 @@ class c_device():
           raise QueueUnknownKeyword(received[0])
     except:
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def add_view_count(self):
     self.redis.inc_view_dev(self.type, self.dbline.id)

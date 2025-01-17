@@ -110,7 +110,6 @@ class c_cam(c_device):
     except:
       self.logger.error('Error in process: ' + self.logname + ' (in_queue_handler)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def run_one(self):
     if not self.do_run:
@@ -277,7 +276,6 @@ class c_cam(c_device):
             self.mydetector.myeventer.dataqueue.put(frameline)
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-      self.logger.handlers.clear()
       self.stopprocess()
       if self.wd_proc is not None:
         self.wd_proc.stop()
@@ -289,7 +287,6 @@ class c_cam(c_device):
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def try_connect(self, maxcounter):
     if self.dbline.cam_pause:
@@ -389,7 +386,6 @@ class c_cam(c_device):
       self.checkmp4busy = False
       self.logger.error('Error in process: ' + self.logname + ' (checkmp4)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def watchdog(self):
     try:
@@ -423,7 +419,6 @@ class c_cam(c_device):
     except:
       self.logger.error('Error in process: ' + self.logname + ' (watchdog)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def newprocess(self):
     inp_frame_rate = 0.0

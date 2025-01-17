@@ -51,7 +51,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (oneitem)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def disconnect(self, close_code):
     try:
@@ -81,7 +80,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (oneitem)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def safe_send(self, answer):
     try:
@@ -440,5 +438,3 @@ class oneitemConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (oneitem)')
       logger.error(format_exc())
-      logger.handlers.clear()
-

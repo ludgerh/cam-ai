@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -53,7 +53,6 @@ class c_stream():
           self.myeventer.run()
     except:
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def stop(self):
     self.redis.set('CAM-AI:KillStream:'+str(self.dbline.id), 1)
@@ -61,4 +60,3 @@ class c_stream():
     self.mydetector.stop()
     self.myeventer.stop()
     self.logger.info('Finished Process '+self.logname+'...')
-    self.logger.handlers.clear()

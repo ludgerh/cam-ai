@@ -209,11 +209,9 @@ class c_cleanup():
         #self.logger.info('Finished Process '+self.logname+'...')
         else:
           sleep(1.0)
-        self.logger.handlers.clear()
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
 
   def in_queue_thread(self):
@@ -226,7 +224,6 @@ class c_cleanup():
     except:
       self.logger.error('Error in process: ' + self.logname + ' (in_queue_thread)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
         
   def health_check(self): 

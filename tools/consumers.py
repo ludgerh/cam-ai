@@ -105,7 +105,6 @@ class health(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (health)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def receive(self, text_data):
     try:
@@ -133,7 +132,6 @@ class health(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (health)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
 
 #*****************************************************************************
@@ -189,7 +187,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (admin_tools_async)')
       logger.error(format_exc())
-      logger.handlers.clear()
     
   async def check_create_school_priv(self, user):
     # todo: Add volume quota
@@ -554,5 +551,3 @@ class admin_tools_async(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (admin_tools_async)')
       logger.error(format_exc())
-      logger.handlers.clear()
-

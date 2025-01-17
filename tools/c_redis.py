@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -133,13 +133,16 @@ class myredis(saferedis):
     self.incr(type+':'+str(idx)+':datacount')
 
   def dec_view_dev(self, type, idx):
-    self.decr(type+':'+str(idx)+':viewcount')
+    if self.view_from_dev(type, idx) > 0:
+      self.decr(type+':'+str(idx)+':viewcount')
 
   def dec_record_dev(self, type, idx):
-    self.decr(type+':'+str(idx)+':recordcount')
+    if self.record_from_dev(type, idx) > 0:
+      self.decr(type+':'+str(idx)+':recordcount')
 
   def dec_data_dev(self, type, idx):
-    self.decr(type+':'+str(idx)+':datacount')
+    if self.data_from_dev(type, idx) > 0:
+      self.decr(type+':'+str(idx)+':datacount')
 
   def set_view_dev(self, type, idx, value):
     self.set(type+':'+str(idx)+':viewcount', value)

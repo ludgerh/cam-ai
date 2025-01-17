@@ -36,6 +36,7 @@ restart_mode = 0
 streams = {}
 tf_workers = {}
 trainers = {}
+trainer_lists = {}
 
 def restartcheck_thread():
   from streams.c_streams import c_stream
@@ -175,21 +176,17 @@ def run():
     for dbline in trainerdb.objects.filter(active=True):
       trainers[dbline.id] = trainer(dbline)
       trainers[dbline.id].run()
-
     for dbline in worker.objects.filter(active=True):
       tf_workers[dbline.id] = tf_worker(dbline.id)
       tf_workers[dbline.id].run()
-    
     for dbline in stream.objects.filter(active=True):
       streams[dbline.id] = c_stream(dbline)
       streams[dbline.id].start()
-      
     my_cleanup.run()  
     check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
   except:
     logger.error('Error in process: ' + logname)
     logger.error(format_exc())
-    logger.handlers.clear()
     
 def launch():
   setproctitle('CAM-AI-Startup')

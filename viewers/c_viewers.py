@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -68,14 +68,7 @@ class c_viewer():
       if self.client_dict[client_nr]['do_compress']:
         to = 3 #jpg
       else:
-        to = 2 #bmp  
-#***
-#      if self.parent.type == 'C':
-#        if self.counter < 100:
-#          print('?????', self.counter)
-#          cv.imwrite('/home/cam_ai/temp/' + str(self.counter) + '.bmp', frame)
-#          self.counter += 1   
-#***     
+        to = 2 #bmp 
       frame = c_convert(frame, typein=1, typeout=to, 
         xout=self.client_dict[client_nr]['outx'])
       if (int(redis.get('CAM-AI:KBInt')) 

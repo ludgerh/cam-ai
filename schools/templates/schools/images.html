@@ -510,7 +510,6 @@ $(document).ready(function() {
         SchoolUtilSocket.sendandwait({
           'command' : 'delschool',
           'schoolnr' : {{ schoolnr }},
-          'trainernr' : {{ trainernr }},
         })
         .then((result) => {
           if (result.status == 'OK') {

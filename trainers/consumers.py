@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@ import aiofiles
 import aiofiles.os
 import io
 from os import path, makedirs
+from math import inf
 from time import time, sleep
 from datetime import datetime
 from logging import getLogger
@@ -33,7 +34,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from tools.l_tools import djconf, seq_to_int
+from tools.l_tools import djconf, seq_to_int, aprotected_db
 from tools.c_logger import log_ini
 from access.c_access import access
 from tools.tokens import maketoken_async
@@ -68,7 +69,6 @@ class remotetrainer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def receive(self, text_data =None, bytes_data=None):
     try:
@@ -239,8 +239,8 @@ class remotetrainer(AsyncWebsocketConsumer):
         if self.mytrainerline.t_type in {2, 3}:
           await self.ws.send_str(json.dumps(indict))
         else:
-          self.myschoolline.extra_runs = 1
-          await self.myschoolline.asave(update_fields=['extra_runs'])
+          self.myschoolline.trainer_nr = 1
+          await self.myschoolline.asave(update_fields=['trainer_nr'])
           
       elif indict['code'] == 'checkfitdone':
         if self.mytrainerline.t_type in {2, 3}:
@@ -295,7 +295,6 @@ class remotetrainer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def disconnect(self, code):
     try:
@@ -303,7 +302,6 @@ class remotetrainer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
 #*****************************************************************************
 # TrainerUtil
@@ -330,7 +328,7 @@ class trainerutil(AsyncWebsocketConsumer):
       self.didrunout = None
       self.status_string = 'Idle'
       await self.accept()
-      self.trainernr = None
+      self.trainer_nr = None
       self.query_count = 0
       self.query_working = False
       self.ws_session = None
@@ -339,19 +337,17 @@ class trainerutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def disconnect(self, code):
     try:
-      if self.trainernr is not None:
+      if self.trainer_nr is not None:
         if self.didrunout:
-          trainers[self.trainernr].stop_out(self.schoolnr)
+          trainers[self.trainer_nr].stop_out(self.schoolnr)
       if self.ws_session is not None:
         await self.ws_session.close()
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def receive(self, text_data):
     try:
@@ -404,7 +400,7 @@ class trainerutil(AsyncWebsocketConsumer):
           if 'new_click' in params and params['new_click']:
             self.new_click = True
           all_fits = fit.objects.filter(school=params['school'])
-          last_fit = await all_fits.alast()
+          last_fit = await aprotected_db(all_fits.alast)
           temp_count = await all_fits.acount()
           result = [] 
           if temp_count:
@@ -509,8 +505,25 @@ class trainerutil(AsyncWebsocketConsumer):
         if await access.check_async('S', self.schoolnr, myuser, 'R'):
           self.maywrite = await access.check_async('S', self.schoolnr, myuser, 'W')
           self.schoolline = await school.objects.aget(id=self.schoolnr)
-          self.trainerline = await dbtrainer.objects.aget(school__id=self.schoolnr)
-          self.trainernr = self.trainerline.id
+          trainerlist = []
+          async for item in self.schoolline.trainers.all():
+            trainerlist.append(item)  
+          if len(trainerlist) == 1:    
+            self.trainerline = trainerlist[0]
+          else:  
+            chosen = -1
+            length = inf
+            for item in trainerlist:   
+              trainers[item.id].run_out(self.schoolnr)
+              joblist = trainers[item.id].getqueueinfo(self.schoolnr) 
+              if len(joblist) < length:
+                length = len(joblist)
+                chosen = item.id
+              trainers[item.id].stop_out(self.schoolnr) 
+            self.trainer_nr = chosen 
+            self.trainerline = await dbtrainer.objects.aget(id = chosen) 
+          print('*****', self.trainerline, '*****')
+          self.trainer_nr = self.trainerline.id
           if self.trainerline.t_type in {2, 3}:
             if self.ws_session is None:
               import aiohttp
@@ -532,13 +545,13 @@ class trainerutil(AsyncWebsocketConsumer):
           await self.close()
           return()
         if params['dorunout']:
-          outlist['data'] = trainers[self.trainernr].run_out(self.schoolnr)
+          outlist['data'] = trainers[self.trainer_nr].run_out(self.schoolnr)
           self.didrunout = True
         else:
           outlist['data'] = 'OK'
           self.didrunout = False
         if outlist['data'] == 'Busy':
-          self.trainernr = None
+          self.trainer_nr = None
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))						
 
@@ -551,9 +564,9 @@ class trainerutil(AsyncWebsocketConsumer):
           outlist['data'] = json.loads(returned.data)['data']
         else:
           if 'school' in params:
-            joblist = trainers[self.trainernr].getqueueinfo(params['school'])
+            joblist = trainers[self.trainer_nr].getqueueinfo(params['school'])
           else:
-            joblist = trainers[self.trainernr].getqueueinfo(self.schoolnr)
+            joblist = trainers[self.trainer_nr].getqueueinfo(self.schoolnr)
           try:
             outlist['data'] = {'pos' : joblist.index(self.schoolnr) + 1, 
               'len' : len(joblist), }
@@ -565,8 +578,8 @@ class trainerutil(AsyncWebsocketConsumer):
       elif params['command'] == 'trainnow': 
         if self.maywrite:
           schoolline = await school.objects.aget(id=self.schoolnr)
-          schoolline.extra_runs = 1
-          await schoolline.asave(update_fields=['extra_runs'])
+          schoolline.trainer_nr = self.trainer_nr
+          await schoolline.asave(update_fields=['trainer_nr'])
           outlist['data'] = 'OK' 
           #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
@@ -628,5 +641,3 @@ class trainerutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())
-      logger.handlers.clear()		
-

@@ -16,7 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import gc
 from multiprocessing import Process, Queue
-from threading import Thread, Lock
+from threading import Thread, Lock as t_lock
 from queue import Queue as threadqueue, Empty
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from traceback import format_exc
@@ -25,6 +25,7 @@ from time import sleep, time
 from setproctitle import setproctitle
 from django.utils import timezone
 from django.db import connections
+from startup.startup import trainers
 from tools.c_logger import log_ini
 from tools.l_tools import protected_db, QueueUnknownKeyword, ts2mysqltime, djconf
 from tools.c_tools import list_from_queryset
@@ -55,6 +56,12 @@ def sigint_handler(signal, frame):
   #print ('TFWorkers: Interrupt is caught')
   pass
 
+    #self.queueinfobuffers[schoolnr] = None
+    #self.inqueue.put(('getqueueinfo', schoolnr, ))
+    #while self.queueinfobuffers[schoolnr] is None:
+    #  sleep(short_brake)
+    #return(self.queueinfobuffers[schoolnr])
+
 #***************************************************************************
 #
 # trainers server
@@ -62,12 +69,13 @@ def sigint_handler(signal, frame):
 #***************************************************************************
 
 class trainer():
+  
   def __init__(self, dbline):
     self.inqueue = Queue()
     self.id = dbline.id
     self.outqueue = Queue()
     self.queueinfobuffers = {}
-    self.mylock = Lock()
+    self.mylock = t_lock()
     self.job_queue_list = []
 
     #*** Client Var
@@ -91,22 +99,21 @@ class trainer():
     except:
       self.logger.error('Error in process: ' + self.logname + ' (inqueue)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def job_queue_thread(self):
     try:
       while self.do_run:
         schoollines = school.objects.filter(
-          active=True,
-          trainer=self.dbline,
+          active = True,
+          trainer_nr = self.id,
         )
         for item in list_from_queryset(schoollines):
           with self.mylock:
             if item.id not in self.job_queue_list:
               run_condition = False
-              if item.extra_runs:
-                item.extra_runs -= 1
-                item.save(update_fields=["extra_runs"])
+              if item.trainer_nr:
+                item.trainer_nr = 0
+                item.save(update_fields=["trainer_nr"])
                 run_condition=trainframe.objects.filter(school=item.id).count()
               else:
                 filterdict = {
@@ -137,11 +144,10 @@ class trainer():
     except:
       self.logger.error('Error in process: ' + self.logname + ' (job_queue_thread)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def run(self):
     self.do_run = True
-    self.run_process = Process(target=self.runner)
+    self.run_process = Process(target=self.runner, )
     connections.close_all()
     self.run_process.start()
 
@@ -180,7 +186,7 @@ class trainer():
                 self.dbline.gpu_mem_limit,
               ), 
               kwargs = {
-                'trainer' : self.id,
+                'trainer_nr' : self.id,
               }
               )
               train_process.start()
@@ -223,11 +229,9 @@ class trainer():
       #for thread in enumerate(): 
       #  print(thread)
       self.logger.info('Finished Process '+self.logname+'...')
-      self.logger.handlers.clear()
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
   
   def stop(self):
     if self.run_out_proc and self.run_out_proc.is_alive():
@@ -252,7 +256,6 @@ class trainer():
     except:
       self.logger.error('Error in process: ' + self.logname + ' (out_reader_proc)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def run_out(self, schoolnr):
     if schoolnr in self.active_schools:

@@ -18,8 +18,10 @@ c_eventer.py V2.1.0 03.03.2024
 
 import cv2 as cv
 import json
+import signal
 import numpy as np
-from os import remove, path, nice, environ
+from signal import SIGKILL
+from os import remove, path, nice, environ, kill, getpid
 from shutil import copyfile
 from traceback import format_exc
 from logging import getLogger
@@ -62,7 +64,8 @@ class c_eventer(c_device):
       self.viewer = c_viewer(self, self.logger)
     else:
       self.viewer = None
-    self.tf_worker = tf_workers[school.objects.get(id=self.dbline.eve_school.id).tf_worker.id]
+    self.tf_worker = tf_workers[school.objects.get(
+      id=self.dbline.eve_school.id).tf_worker.id]
     self.tf_worker.eventer = self
     self.dataqueue = c_buffer(block_get=True, timeout=5.0)
     if self.dbline.cam_virtual_fps:
@@ -78,7 +81,7 @@ class c_eventer(c_device):
     self.recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
 
   def runner(self):
-    try:
+    try: 
       super().runner()
       self.logname = 'eventer #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
@@ -125,8 +128,8 @@ class c_eventer(c_device):
       
       self.redis.delete('webm_queue:' + str(self.id))
       if self.do_webm:
-        self.webm_proc = Process(target=self.make_webm).start()  
-      while self.do_run:
+        self.webm_proc = Process(target=self.make_webm).start() 
+      while self.do_run: 
         if not self.redis.check_if_counts_zero('E', self.dbline.id):
           frameline = self.dataqueue.get()
         else:
@@ -135,7 +138,7 @@ class c_eventer(c_device):
           frameline = [None, 0, time()]  
         if (self.do_run and (frameline[0] is not None) 
             and self.sl.greenlight(self.period, frameline[2])):
-          self.run_one(frameline) 
+          self.run_one(frameline)
         else:
           sleep(djconf.getconfigfloat('medium_brake', 0.1))
       self.dataqueue.stop()
@@ -143,13 +146,16 @@ class c_eventer(c_device):
       self.logger.info('Finished Process '+self.logname+'...')
       self.tf_worker.stop_out(self.tf_w_index)
       self.tf_worker.unregister(self.tf_w_index)
-      self.logger.handlers.clear()
       #for thread in enumerate(): 
       #  print(thread)
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
+      self.logger.info('Restarting process...')
+      while self.redis.get_start_stream_busy(): 
+        sleep(djconf.getconfigfloat('long_brake', 1.0))
+      self.redis.set_start_stream_busy(self.id)
+      kill(getpid(), signal.SIGKILL)
 
   def in_queue_handler(self, received):
     try:
@@ -232,7 +238,6 @@ class c_eventer(c_device):
     except:
       self.logger.error('Error in process: ' + self.logname + ' (in_queue_handler)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def run_one(self, frame):
     if self.redis.check_if_counts_zero('E', self.dbline.id):
@@ -361,7 +366,7 @@ class c_eventer(c_device):
                   (item[0]+2, y0 + j * 30 * self.textheight), 
                   cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
                   self.textthickness, cv.LINE_AA)
-    self.viewer.inqueue.put(newframe)
+    self.viewer.inqueue.put(newframe)       
 
   def make_webm(self):
     try:
@@ -391,7 +396,6 @@ class c_eventer(c_device):
     except:
       self.logger.error('Error in process: ' + self.logname + ' (make_webm)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
     
   def check_events(self, i, item):
     if self.dbline.cam_virtual_fps:
@@ -564,7 +568,11 @@ class c_eventer(c_device):
     except:
       self.logger.error('Error in process: ' + self.logname + ' (inserter)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
+      self.logger.info('Restarting process...')
+      while self.redis.get_start_stream_busy(): 
+        sleep(djconf.getconfigfloat('long_brake', 1.0))
+      self.redis.set_start_stream_busy(self.id)
+      kill(getpid(), signal.SIGKILL)
 
   def set_cam_counts(self):
     if any([len(self.cond_dict[x]) for x in range(2,6)]):

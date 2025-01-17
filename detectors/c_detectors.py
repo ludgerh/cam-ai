@@ -56,7 +56,6 @@ class c_detector(c_device):
         self.viewer = None
     except:
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def in_queue_handler(self, received):
     try:
@@ -95,7 +94,6 @@ class c_detector(c_device):
     except:
       self.logger.error('Error in process: ' + self.logname + ' (in_queue_handler)')
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def run(self):
     super().run()
@@ -127,11 +125,9 @@ class c_detector(c_device):
       self.dataqueue.stop()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-      self.logger.handlers.clear()
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
 
   def run_one(self, input):
     try:
@@ -267,7 +263,6 @@ class c_detector(c_device):
       return((3, buffer1, frametime))
     except:
       self.logger.error(format_exc())
-      self.logger.handlers.clear()
       
   def get_scale_down(self): 
     result = self.dbline.det_scaledown

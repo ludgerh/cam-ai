@@ -24,8 +24,9 @@ from queue import Queue, Empty
 from subprocess import Popen
 from datetime import datetime
 from psutil import Process
+from asgiref.sync import sync_to_async
 from django.db import connection
-from django.db.utils import OperationalError
+from django.db.utils import OperationalError, DatabaseError
 from .models import setting
 
 logdict = {
@@ -391,7 +392,7 @@ def protected_db(function, args = (), kwargs = {}, logger = None):
       break
     except OperationalError:
       if logger:
-        logger.warning('*** Protected DB access failled. Retrying...')
+        logger.warning('*** Protected DB access failed. Retrying...')
       connection.close()
       sleep(0.1)  
   return(result) 
@@ -401,10 +402,10 @@ async def aprotected_db(function, args = (), kwargs = {}, logger = None):
     try:
       result = await function(*args, **kwargs)
       break
-    except OperationalError:
+    except (OperationalError, DatabaseError):
       if logger:
-        logger.warning('*** Protected DB access failled. Retrying...')
-      connection.close()
+        logger.warning('*** Protected DB access failed. Retrying...')
+      await sync_to_async(connection.close)()
       await asyncio.sleep(0.1)
   return(result) 
 

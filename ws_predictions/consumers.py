@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -58,7 +58,6 @@ class predictionsConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def disconnect(self, close_code):
     try:
@@ -68,7 +67,6 @@ class predictionsConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def checkschooldata(self, myschool):
     if not('schooldata' in self.mydatacache):
@@ -239,4 +237,3 @@ class predictionsConsumer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())
-      logger.handlers.clear()

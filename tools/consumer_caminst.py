@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -69,7 +69,6 @@ class acaminst(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (acaminst)')
       logger.error(format_exc())
-      logger.handlers.clear()
 
   async def receive(self, text_data):
     try:
@@ -209,4 +208,3 @@ class acaminst(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (acaminst)')
       logger.error(format_exc())
-      logger.handlers.clear()
