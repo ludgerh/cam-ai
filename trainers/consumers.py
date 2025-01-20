@@ -34,6 +34,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from camai.version import version
 from tools.l_tools import djconf, seq_to_int, aprotected_db, version_newer_or_equal
 from tools.c_logger import log_ini
 from access.c_access import access
@@ -56,7 +57,7 @@ async def get_trainer_nr(school_line):
   async for item in school_line.trainers.all():
     trainerlist.append(item)  
   if len(trainerlist) == 1:    
-    trainerlist[0].id
+    result = trainerlist[0].id
   else:  
     result = -1
     length = inf
@@ -162,7 +163,8 @@ class remotetrainer(AsyncWebsocketConsumer):
       
       if indict['code'] == 'auth':
         self.myschoolline = await school.objects.aget(id=indict['school'])
-        self.mytrainerline = await dbtrainer.objects.aget(school__id=indict['school'])
+        t_query = self.myschoolline.trainers.filter(active = True)
+        self.mytrainerline = await t_query.afirst()
         if self.mytrainerline.t_type in {2, 3}:
           if self.ws_session is None:
             import aiohttp
@@ -177,7 +179,8 @@ class remotetrainer(AsyncWebsocketConsumer):
         else:
           self.user = await User.objects.aget(username=indict['name'])
           if self.user.check_password(indict['pass']):
-            logger.info('Successfull login:' + indict['name'])
+            logger.info('Successfull login:' + indict['name'] + ' - Software v' 
+                + indict['version'])
             self.authed = True
           if not self.authed:
             logger.info('Login failure: ' + indict['name'])
@@ -222,7 +225,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           result = json.loads(result.data)
           await self.send(json.dumps(result))
         else:
-          if 'version' in indict and version_newer_or_equal(version['version'], '1.6.2b'):
+          if 'version' in indict and version_newer_or_equal(indict['version'], '1.6.2b'):
             self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
           else:
             self.trainer_nr = 1  
@@ -539,8 +542,9 @@ class trainerutil(AsyncWebsocketConsumer):
             temp['data']['pass']=self.trainerline.wspass
             await self.ws.send_str(json.dumps(temp))
             returned = await self.ws.receive() 
-            if json.loads(returned.data)['data'] == 'OK':
-              outlist['data'] = json.loads(returned.data)['data']  
+            result = json.loads(returned.data)['data']
+            if result == 'OK' or ('status' in result and result['status'] == 'OK'):
+              outlist['data'] = result  
             else:
               await self.close()	
               return()

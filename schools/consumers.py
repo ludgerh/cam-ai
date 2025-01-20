@@ -643,7 +643,8 @@ class schoolutil(AsyncWebsocketConsumer):
           if not self.user.is_authenticated:
             self.user = await dbuser.objects.aget(username=params['name'])
             if self.user.check_password(params['pass']):
-              logger.info('Successfull login:' + params['name'])
+              logger.info('Successfull login:' + params['name'] + ' - Software v' 
+                + await agetconfig('version', '?'))
               self.authed = True
             if not self.authed:
               logger.info('Login failure: ' + params['name'])

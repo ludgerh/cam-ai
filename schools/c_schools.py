@@ -26,11 +26,9 @@ class school():
   def __init__(self, idx):
     self.lock = m_lock()
 
-print('Hello School!!!')
 school_dict = {}
 for item in db_school.objects.all():
   school_dict[item.id] = school(item.id)
-print(school_dict)
 
 def get_taglist(myschoolnr):
   while True:

@@ -68,6 +68,7 @@ class train_once_remote():
       'name' : self.wsname,
       'pass' : self.wspass,
       'school' : self.myschool.e_school,
+      'version' : version,
     }
     while True:
       try:

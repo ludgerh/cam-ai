@@ -248,7 +248,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
               resultdict = json.loads(message.data)['data']
         else:
           resultdict = {'status' : 'OK', 'school' : schoolline.id}      
-        if trainerline.t_type in {1, 2} and resultdict['status'] == 'OK':
+        if trainerline.t_type in {1, 2, 3} and resultdict['status'] == 'OK':
           if await afree_quota(userline):
             for ext in ('.keras', '.tflite'):
               filename = model_type + ext
