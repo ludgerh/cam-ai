@@ -148,6 +148,7 @@ def run():
   djconf.setconfig('smtp_server', smtp_server)
   djconf.setconfigint('smtp_port', smtp_port)
   djconf.setconfig('smtp_email', smtp_email)
+  import schools.c_schools
   from tf_workers.models import worker
   from tf_workers.c_tfworkers import tf_worker
   from trainers.models import trainer as trainerdb

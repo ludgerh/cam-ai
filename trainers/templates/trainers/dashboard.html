@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endif %}
 <main>
   <div class="h2">Training dashboard for school: {{ school.name }}</div>
+  <div class="h2">Using Trainer #<span id="trainer_used">0</span> of 
+    <span id="trainer_count">1</span></div>
   <div class="h2">Queue Position: <span id="queue_pos">?</span></div>
   <div class="h2">Job Status: <span id="job_status">Idle</span></div>
   {% if may_write %}
@@ -229,6 +231,8 @@ let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let new_click = false;
 let status_save;
 let training_done = true;
+let trainer_used = 0;
+let trainer_count = 1;
 
 let model_types_dict = {
 {% for item in model_types %}
@@ -371,12 +375,15 @@ $(document).ready(function() {
     trainerutilSocket = result;
     return(trainerutilSocket.sendandwait({
       'command' : 'connecttrainer',
+      'version' : '{{ version }}',
       'school' : {{ school.id }},
       'dorunout' : true,
     }));
   })
   .then((result) => {
-    if (result == 'OK') {
+    if (result.status == 'OK') {
+      $('#trainer_used').text(result.trainer);
+      $('#trainer_count').text(result.count);
 {% if may_write %}
       trainerutilSocket.sendandwait({
         'command' : 'getavailmodels',
@@ -428,11 +435,11 @@ $(document).ready(function() {
 {% endif %}
       refresh_all();
     } else {
-      $('.modal-title').text('Someone else is using the same dashboard!');
+      $('.modal-title').text('Something went wrong while connecting to the trainer.');
       $(
         '.modal-body'
       ).text(
-        'Only one writing user at a time per school. Refresh your browser to try again...'
+        'Refresh your browser to try again...'
       );
       $('#mymodal').modal('show');
     };

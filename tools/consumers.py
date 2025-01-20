@@ -48,7 +48,7 @@ from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
 from access.c_access import access
-from users.models import userinfo
+from schools.c_schools import school_dict, school as school_class
 from users.userinfo import afree_quota
 from .health import totaldiscspace, freediscspace
 
@@ -255,17 +255,16 @@ class admin_tools_async(AsyncWebsocketConsumer):
                   schoolline.dir + 'model/' + filename)
           else:
             resultdict = {'status' : 'nomorequota', 'domain' : myserver}
-        if trainerline.t_type in {2, 3}:
-          if resultdict['status'] == 'OK':
+        if resultdict['status'] == 'OK':
+          if trainerline.t_type in {2, 3}:
             schoolline.e_school = resultdict['school']
             resultdict['school'] = schoolline.id
             await schoolline.asave(update_fields=('e_school', ))
-        else:
-          if resultdict['status'] == 'OK':
+          else:
             resultdict['quota'] = (quota[0] + 1, quota[1])
             schoolline.model_type = model_type
             await schoolline.asave(update_fields=('model_type', ))
-        if resultdict['status'] == 'OK':
+          school_dict[schoolline.id] = school_class(id)
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'

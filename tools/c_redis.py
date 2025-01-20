@@ -107,7 +107,8 @@ class saferedis(Redis):
     else:  
       return(super().llen(key))
 
-class myredis(saferedis):
+class myredis(saferedis): 
+#Should be replaced by app-specific classes, like already done in Trainer
 
   def zero_to_dev(self, type, idx):
     self.set(type+':'+str(idx)+':viewcount', 0)

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -14,10 +14,23 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+from multiprocessing import Lock as m_lock
 from tools.djangodbasync import filterlinesdict
 from django.db import connection
 from django.db.utils import OperationalError
 from .models import tag
+from tf_workers.models import school as db_school
+
+class school():
+
+  def __init__(self, idx):
+    self.lock = m_lock()
+
+print('Hello School!!!')
+school_dict = {}
+for item in db_school.objects.all():
+  school_dict[item.id] = school(item.id)
+print(school_dict)
 
 def get_taglist(myschoolnr):
   while True:

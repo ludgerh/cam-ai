@@ -27,16 +27,24 @@ from django.utils import timezone
 from django.db import connections
 from startup.startup import trainers
 from tools.c_logger import log_ini
-from tools.l_tools import protected_db, QueueUnknownKeyword, ts2mysqltime, djconf
+from tools.l_tools import (
+  protected_db, 
+  protect_list_db, 
+  QueueUnknownKeyword, 
+  ts2mysqltime, 
+  djconf,
+)
 from tools.c_tools import list_from_queryset
 from tf_workers.models import school
 from users.models import userinfo
 from users.userinfo import free_quota
+from schools.c_schools import school_dict
 from .models import trainer as dbtrainer, trainframe, fit, epoch
 if djconf.getconfigbool('local_trainer', False):
   if djconf.getconfigbool('local_gpu', False):
     from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
 from .train_worker_remote import train_once_remote
+from .redis import my_redis
 
 #from threading import enumerate
 
@@ -56,12 +64,6 @@ def sigint_handler(signal, frame):
   #print ('TFWorkers: Interrupt is caught')
   pass
 
-    #self.queueinfobuffers[schoolnr] = None
-    #self.inqueue.put(('getqueueinfo', schoolnr, ))
-    #while self.queueinfobuffers[schoolnr] is None:
-    #  sleep(short_brake)
-    #return(self.queueinfobuffers[schoolnr])
-
 #***************************************************************************
 #
 # trainers server
@@ -73,14 +75,9 @@ class trainer():
   def __init__(self, dbline):
     self.inqueue = Queue()
     self.id = dbline.id
-    self.outqueue = Queue()
-    self.queueinfobuffers = {}
     self.mylock = t_lock()
+    my_redis.set_trainerqueue(self.id, [])
     self.job_queue_list = []
-
-    #*** Client Var
-    self.active_schools = set()
-    self.run_out_proc = None
 
   def in_queue_thread(self):
     try:
@@ -92,8 +89,6 @@ class trainer():
           while not self.inqueue.empty():
             received = self.inqueue.get()
           break
-        elif (received[0] == 'getqueueinfo'):
-          self.outqueue.put(('getqueueinfo', received[1], self.job_queue_list))
         else:
           raise QueueUnknownKeyword(received[0])
     except:
@@ -105,40 +100,40 @@ class trainer():
       while self.do_run:
         schoollines = school.objects.filter(
           active = True,
-          trainer_nr = self.id,
+          trainers = self.id,
         )
-        for item in list_from_queryset(schoollines):
-          with self.mylock:
-            if item.id not in self.job_queue_list:
-              run_condition = False
-              if item.trainer_nr:
+        protect_list_db(schoollines)
+        for item in schoollines:
+          with school_dict[item.id].lock:
+            go_on = True
+            for t_item in trainers:
+              if item.id in trainers[t_item].getqueueinfo():
+                go_on = False
+                break
+            if go_on:
+              filterdict = {
+                'school' : item.id,
+                'train_status' : 0,}
+              if not item.ignore_checked:
+                filterdict['checked'] = True
+              undone = trainframe.objects.filter(**filterdict)
+              if item.trainer_nr == self.id:
+                run_condition = trainframe.objects.filter(school=item.id).count()
+              else:
+                run_condition = (undone.count() >= item.trigger 
+                  and not self.job_queue_list)
+              if run_condition:
+                undone.update(train_status=1)
                 item.trainer_nr = 0
                 item.save(update_fields=["trainer_nr"])
-                run_condition=trainframe.objects.filter(school=item.id).count()
-              else:
-                filterdict = {
-                  'school' : item.id,
-                  'train_status__lt' : 2,}
-                if not item.ignore_checked:
-                  filterdict['checked'] = True
-                undone = trainframe.objects.filter(**filterdict)
-                count = len(list_from_queryset(undone))
-                if count:
-                  undone.update(train_status=1)
-                  alllines = 1
-                else:
-                  alllines = len(list_from_queryset(trainframe.objects.filter(school=item.id)))
-                run_condition = (count >= item.trigger) and alllines
-              if run_condition:
                 myfit = fit(made=timezone.now(), 
                   school = item.id, 
                   status = 'Queuing',
                 )
                 myfit.save() 
-                myfit.made = timezone.now()
-                myfit.status = 'Queuing'
-                myfit.save()
-                self.job_queue_list.append(item.id)
+                with self.mylock:
+                  self.job_queue_list.append(item.id)
+                my_redis.set_trainerqueue(self.id, self.job_queue_list)
                 self.job_queue.put((item, myfit)) 
         sleep(10.0)
     except:
@@ -213,7 +208,6 @@ class trainer():
                 trainframe.objects.filter(**filterdict).update, 
                 kwargs = {'train_status' : 2}
               )
-              trainframe.objects.filter(**filterdict).update(train_status=2)
               myschool.l_rate_start = '1e-6'
               myschool.save(update_fields=['l_rate_start'])
               #myuserinfo = userinfo.objects.get(user=myschool.creator)
@@ -221,6 +215,7 @@ class trainer():
               #myuserinfo.save(update_fields=['pay_tokens'])
             with self.mylock:
               self.job_queue_list.remove(myschool.id)
+            my_redis.set_trainerqueue(self.id, self.job_queue_list)
             gc.collect()
           except Empty:
             pass
@@ -234,9 +229,6 @@ class trainer():
       self.logger.error(format_exc())
   
   def stop(self):
-    if self.run_out_proc and self.run_out_proc.is_alive():
-      self.outqueue.put(('stop',))
-      self.run_out_proc.join()
     self.inqueue.put(('stop',))
     self.run_process.join()
 
@@ -246,39 +238,5 @@ class trainer():
 #
 #***************************************************************************
 
-  def out_reader_proc(self):
-    try:
-      while (received := self.outqueue.get())[0] != 'stop':
-        if (received[0] == 'getqueueinfo'):
-          self.queueinfobuffers[received[1]] = received[2]
-        else:
-          raise QueueUnknownKeyword(received[0])
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (out_reader_proc)')
-      self.logger.error(format_exc())
-
-  def run_out(self, schoolnr):
-    if schoolnr in self.active_schools:
-      return('Busy')
-    else:
-      if not self.active_schools:
-        self.run_out_proc = Thread(
-          target=self.out_reader_proc, 
-          name='RunOutThread'+str(schoolnr), 
-          )
-        self.run_out_proc.start()
-      self.active_schools.add(schoolnr)
-      return('OK')
-
-  def stop_out(self, schoolnr):
-    self.active_schools.remove(schoolnr)
-    if not self.active_schools:
-      self.outqueue.put(('stop',))
-      self.run_out_proc.join()
-
-  def getqueueinfo(self, schoolnr):
-    self.queueinfobuffers[schoolnr] = None
-    self.inqueue.put(('getqueueinfo', schoolnr, ))
-    while self.queueinfobuffers[schoolnr] is None:
-      sleep(short_brake)
-    return(self.queueinfobuffers[schoolnr])
+  def getqueueinfo(self):
+    return(my_redis.get_trainerqueue(self.id))

@@ -34,7 +34,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from tools.l_tools import djconf, seq_to_int, aprotected_db
+from tools.l_tools import djconf, seq_to_int, aprotected_db, version_newer_or_equal
 from tools.c_logger import log_ini
 from access.c_access import access
 from tools.tokens import maketoken_async
@@ -50,6 +50,25 @@ logger = getLogger(logname)
 log_ini(logger, logname)
 default_modeltype = djconf.getconfig('default_modeltype', 'efficientnetv2-b0')
 medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
+
+async def get_trainer_nr(school_line):
+  trainerlist = []
+  async for item in school_line.trainers.all():
+    trainerlist.append(item)  
+  if len(trainerlist) == 1:    
+    trainerlist[0].id
+  else:  
+    result = -1
+    length = inf
+    for item in trainerlist:   
+      joblist = trainers[item.id].getqueueinfo() 
+      if school_line.id in joblist:
+        result = item.id
+        break
+      if len(joblist) < length:
+        length = len(joblist)
+        result = item.id
+  return((result, len(trainerlist)))
 
 #*****************************************************************************
 # RemoteTrainer
@@ -122,7 +141,7 @@ class remotetrainer(AsyncWebsocketConsumer):
                     c4 = jsondata[4], c5 = jsondata[5], c6 = jsondata[6], c7 = jsondata[7],
                     c8 = jsondata[8], c9 = jsondata[9],
                     checked = 1,
-                    train_status = 1,
+                    train_status = 0,
                   )
                   await frameline.asave()
                 try:
@@ -203,6 +222,10 @@ class remotetrainer(AsyncWebsocketConsumer):
           result = json.loads(result.data)
           await self.send(json.dumps(result))
         else:
+          if 'version' in indict and version_newer_or_equal(version['version'], '1.6.2b'):
+            self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
+          else:
+            self.trainer_nr = 1  
           creator = await sync_to_async(lambda: self.myschoolline.creator)()
           if await afree_quota(creator):
             result = {
@@ -239,7 +262,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         if self.mytrainerline.t_type in {2, 3}:
           await self.ws.send_str(json.dumps(indict))
         else:
-          self.myschoolline.trainer_nr = 1
+          self.myschoolline.trainer_nr = self.trainer_nr
           await self.myschoolline.asave(update_fields=['trainer_nr'])
           
       elif indict['code'] == 'checkfitdone':
@@ -325,7 +348,6 @@ class trainerutil(AsyncWebsocketConsumer):
   async def connect(self):
     try:
       self.ws_ts = None
-      self.didrunout = None
       self.status_string = 'Idle'
       await self.accept()
       self.trainer_nr = None
@@ -340,9 +362,6 @@ class trainerutil(AsyncWebsocketConsumer):
 
   async def disconnect(self, code):
     try:
-      if self.trainer_nr is not None:
-        if self.didrunout:
-          trainers[self.trainer_nr].stop_out(self.schoolnr)
       if self.ws_session is not None:
         await self.ws_session.close()
     except:
@@ -505,25 +524,8 @@ class trainerutil(AsyncWebsocketConsumer):
         if await access.check_async('S', self.schoolnr, myuser, 'R'):
           self.maywrite = await access.check_async('S', self.schoolnr, myuser, 'W')
           self.schoolline = await school.objects.aget(id=self.schoolnr)
-          trainerlist = []
-          async for item in self.schoolline.trainers.all():
-            trainerlist.append(item)  
-          if len(trainerlist) == 1:    
-            self.trainerline = trainerlist[0]
-          else:  
-            chosen = -1
-            length = inf
-            for item in trainerlist:   
-              trainers[item.id].run_out(self.schoolnr)
-              joblist = trainers[item.id].getqueueinfo(self.schoolnr) 
-              if len(joblist) < length:
-                length = len(joblist)
-                chosen = item.id
-              trainers[item.id].stop_out(self.schoolnr) 
-            self.trainer_nr = chosen 
-            self.trainerline = await dbtrainer.objects.aget(id = chosen) 
-          print('*****', self.trainerline, '*****')
-          self.trainer_nr = self.trainerline.id
+          self.trainer_nr, count = await get_trainer_nr(self.schoolline)
+          self.trainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
           if self.trainerline.t_type in {2, 3}:
             if self.ws_session is None:
               import aiohttp
@@ -535,23 +537,27 @@ class trainerutil(AsyncWebsocketConsumer):
             temp['data']['school']=self.schoolline.e_school
             temp['data']['name']=self.trainerline.wsname
             temp['data']['pass']=self.trainerline.wspass
-            temp['data']['dorunout']=params['dorunout']
             await self.ws.send_str(json.dumps(temp))
             returned = await self.ws.receive() 
-            if json.loads(returned.data)['data'] != 'OK':
+            if json.loads(returned.data)['data'] == 'OK':
+              outlist['data'] = json.loads(returned.data)['data']  
+            else:
               await self.close()	
               return()
+          else:  
+            if ('version' in params 
+              and version_newer_or_equal(params['version'], '1.6.2b')):
+              outlist['data'] = {
+                'status' : 'OK',
+                'trainer' : self.trainer_nr,
+                'count' : count,
+              }
+            else:  
+              self.trainer_nr = 1
+              outlist['data'] = 'OK'  
         else: #Proper error description to both consoles!!!
           await self.close()
           return()
-        if params['dorunout']:
-          outlist['data'] = trainers[self.trainer_nr].run_out(self.schoolnr)
-          self.didrunout = True
-        else:
-          outlist['data'] = 'OK'
-          self.didrunout = False
-        if outlist['data'] == 'Busy':
-          self.trainer_nr = None
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))						
 
@@ -563,10 +569,7 @@ class trainerutil(AsyncWebsocketConsumer):
           returned = await self.ws.receive()
           outlist['data'] = json.loads(returned.data)['data']
         else:
-          if 'school' in params:
-            joblist = trainers[self.trainer_nr].getqueueinfo(params['school'])
-          else:
-            joblist = trainers[self.trainer_nr].getqueueinfo(self.schoolnr)
+          joblist = trainers[self.trainer_nr].getqueueinfo()
           try:
             outlist['data'] = {'pos' : joblist.index(self.schoolnr) + 1, 
               'len' : len(joblist), }

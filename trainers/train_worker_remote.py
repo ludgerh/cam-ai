@@ -1,16 +1,18 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 import json
 import requests
@@ -21,10 +23,12 @@ from time import sleep, time
 from multitimer import MultiTimer
 from zipfile import ZipFile, ZIP_DEFLATED
 from django.utils import timezone
+from camai.version import version
 from tools.l_tools import djconf, seq_to_int
 from tools.c_tools import list_from_queryset
 from users.userinfo import afree_quota
 from .models import trainframe
+from camai.version import version
 
 class train_once_remote():
 
@@ -77,6 +81,7 @@ class train_once_remote():
     outdict = {
       'code' : 'init_trainer',
       'school' : self.myschool.e_school,
+      'version' : version,
     } 
     self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
     result = json.loads(self.ws.recv())

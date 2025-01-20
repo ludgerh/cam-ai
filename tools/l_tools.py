@@ -372,6 +372,12 @@ def version_full(int_in):
     int_in //= 100000 
   return(result)  
   
+def version_newer(first, second):
+  return version_flat(first) > version_flat(second)  
+  
+def version_newer_or_equal(first, second):
+  return version_flat(first) >= version_flat(second)  
+  
 def get_dir_size(path='.'):
   total = 0
   try:
@@ -396,6 +402,17 @@ def protected_db(function, args = (), kwargs = {}, logger = None):
       connection.close()
       sleep(0.1)  
   return(result) 
+  
+def protect_list_db(mylist, logger = None): 
+  while True:
+    try:
+      dummy = mylist[0]
+      break
+    except OperationalError:
+      if logger:
+        logger.warning('*** Protected DB access failed. Retrying...')
+      connection.close()
+      sleep(0.1)  
     
 async def aprotected_db(function, args = (), kwargs = {}, logger = None):
   while True:

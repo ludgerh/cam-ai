@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -25,6 +25,9 @@ if plugin_shelly_ok:
 plugin_hue_ok = os.path.exists('plugins/cam_ai_hue')
 if plugin_hue_ok:
   from plugins.cam_ai_hue.hue import hue_alarm
+plugin_taposwitch_ok = os.path.exists('plugins/cam_ai_taposwitch')
+if plugin_taposwitch_ok:
+  from plugins.cam_ai_taposwitch.taposwitch import taposwitch123_alarm
   
 mylogger = None 
 alarm_list = None
