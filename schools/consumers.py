@@ -637,7 +637,8 @@ class schoolutil(AsyncWebsocketConsumer):
       if params['command'] == 'delschool':
         if not self.authed:
           self.schoolline = await school.objects.aget(id=params['schoolnr'])
-          self.trainerline = await trainer.objects.aget(school__id=params['schoolnr'])
+          t_query = self.schoolline.trainers.filter(active = True)
+          trainerline = await t_query.afirst()
           self.user = self.scope['user']
           if not self.user.is_authenticated:
             self.user = await dbuser.objects.aget(username=params['name'])
@@ -658,14 +659,14 @@ class schoolutil(AsyncWebsocketConsumer):
               'domain' : myserver,
             }
           else:  
-            if self.trainerline.t_type in {2, 3}:
+            if trainerline.t_type in {2, 3}:
               from aiohttp import ClientSession
               async with ClientSession() as session:
-                async with session.ws_connect(self.trainerline.wsserver + 'ws/schoolutil/') as ws:
+                async with session.ws_connect(trainerline.wsserver + 'ws/schoolutil/') as ws:
                   temp = json.loads(text_data)
                   temp['data']['schoolnr']=self.schoolline.e_school
-                  temp['data']['name']=self.trainerline.wsname
-                  temp['data']['pass']=self.trainerline.wspass
+                  temp['data']['name']=trainerline.wsname
+                  temp['data']['pass']=trainerline.wspass
                   await ws.send_str(json.dumps(temp))
                   returned = await ws.receive() 
               outlist['data'] = json.loads(returned.data)['data']    

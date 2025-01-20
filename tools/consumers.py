@@ -22,6 +22,7 @@ import aiofiles.os
 import aiohttp
 import aioshutil
 import io
+from asgiref.sync import sync_to_async
 from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
@@ -48,7 +49,6 @@ from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
 from access.c_access import access
-from schools.c_schools import school_dict, school as school_class
 from users.userinfo import afree_quota
 from .health import totaldiscspace, freediscspace
 
@@ -222,12 +222,14 @@ class admin_tools_async(AsyncWebsocketConsumer):
           outlist['data'] = {'status' : 'nomoreschools', 'quota' : quota, 'domain' : myserver}
           await self.send(json.dumps(outlist))
           return()
-        trainerline = await trainer.objects.aget(id=params['trainer_nr']) 
         schoolline = school()
         schoolline.name = params['name']
         schoolline.creator = userline
-        schoolline.trainer = trainerline
         await schoolline.asave() 
+        t_query = trainer.objects.filter(active = True)
+        async for t_item in t_query:
+          await sync_to_async(schoolline.trainers.add)(t_item)
+        trainerline = await t_query.afirst()
         schoolline.dir = schoolsdir + 'model' + str(schoolline.id) + '/'
         await schoolline.asave(update_fields=('dir', ))
         await aiofiles.os.makedirs(schoolline.dir+'frames', exist_ok=True)
@@ -264,7 +266,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
             resultdict['quota'] = (quota[0] + 1, quota[1])
             schoolline.model_type = model_type
             await schoolline.asave(update_fields=('model_type', ))
-          school_dict[schoolline.id] = school_class(id)
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'

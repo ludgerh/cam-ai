@@ -38,7 +38,7 @@ from tools.c_tools import list_from_queryset
 from tf_workers.models import school
 from users.models import userinfo
 from users.userinfo import free_quota
-from schools.c_schools import school_dict
+from schools.c_schools import school_dict, school as school_class
 from .models import trainer as dbtrainer, trainframe, fit, epoch
 if djconf.getconfigbool('local_trainer', False):
   if djconf.getconfigbool('local_gpu', False):
@@ -104,6 +104,8 @@ class trainer():
         )
         protect_list_db(schoollines)
         for item in schoollines:
+          if item.id not in school_dict:
+            school_dict[item.id] = school_class(item.id)
           with school_dict[item.id].lock:
             go_on = True
             for t_item in trainers:
