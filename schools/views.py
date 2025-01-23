@@ -139,19 +139,19 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
       filepath = schoolframespath + frameline.name
   elif mode == 1:
     frameline = protected_db(trainframe.objects.get, kwargs = {'id' : framenr, }, )
-    #frameline = trainframe.objects.get(id = framenr)
     schoolline = school.objects.get(id = frameline.school)
     filepath = schoolline.dir + 'frames/' + frameline.name
+    if not os.path.exists(filepath):
+      filepath = schoolline.dir + 'coded/' + '224x224/' + frameline.name[:-3] + 'cod'
+      filepath = filepath[:-3]+'cod'
     crypt = False
   elif mode == 2:
     frameline = protected_db(archive.objects.get, kwargs = {'id' : framenr, }, )
-    #frameline = archive.objects.get(id = framenr)
     filepath = archivepath + 'frames/' + frameline.name
     userset = set(dbuser.objects.filter(archive=frameline))
     crypt = False
   elif mode == 3:
     frameline = protected_db(archive.objects.get, kwargs = {'id' : framenr, }, )
-    #frameline = archive.objects.get(id = framenr)
     filepath = archivepath + 'videos/' + frameline.name + '.jpg'
     userset = set(dbuser.objects.filter(archive=frameline))
     crypt = False

@@ -230,6 +230,7 @@ let trainerutilSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let new_click = false;
 let status_save;
+let not_started = false;
 let training_done = true;
 let trainer_used = 0;
 let trainer_count = 1;
@@ -306,6 +307,9 @@ function refresh_all() {
     result = result_all[0];
     remove = result_all[1];
     new_epoch = result_all[2];
+    if (not_started) {
+      not_started = (result_all[3] == 'Idle') || (result_all[3] == 'Preparing');
+    };
     $('#job_status').text(result_all[3]);
     if (result_all[3] == 'Preparing') {
       $('#train_button').prop("disabled",true);
@@ -313,7 +317,7 @@ function refresh_all() {
     if (remove) {
       $('#tablebody tr:last').remove();
     };
-    if (!result.length) {
+    if (!result.length && {{ delegation_level }} == 1 && !not_started) {
       $('#train_button').prop("disabled",false);
     } else {
       result.forEach(function(item, index) {
@@ -353,7 +357,7 @@ function refresh_all() {
         $(document).scrollTop($(document).height()); 
       };  
       if (status_save == 'Done' || status_save == 'Stopped') {
-        if (training_done) {
+        if (training_done && {{ delegation_level }} == 1 && !not_started) {
           $('#train_button').prop("disabled",false);
           training_done = false;
         };  
@@ -395,6 +399,7 @@ $(document).ready(function() {
       })
       $('#train_button').click(function() {
         new_click = true;
+        not_started = true;
         $('.modal-title').text('Synchronizing the Training Data');
         $('.modal-body').text(
           'Depending on the amount of new data this may take some minutes...');

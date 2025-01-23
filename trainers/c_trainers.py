@@ -34,7 +34,6 @@ from tools.l_tools import (
   ts2mysqltime, 
   djconf,
 )
-from tools.c_tools import list_from_queryset
 from tf_workers.models import school
 from users.models import userinfo
 from users.userinfo import free_quota
@@ -103,40 +102,38 @@ class trainer():
           trainers = self.id,
         )
         protect_list_db(schoollines)
-        for item in schoollines:
-          if item.id not in school_dict:
-            school_dict[item.id] = school_class(item.id)
-          with school_dict[item.id].lock:
-            go_on = True
+        for s_item in schoollines:
+          if s_item.id not in school_dict:
+            school_dict[s_item.id] = school_class(s_item.id)
+          with school_dict[s_item.id].lock:
             for t_item in trainers:
-              if item.id in trainers[t_item].getqueueinfo():
-                go_on = False
+              if s_item.id in trainers[t_item].getqueueinfo():
                 break
-            if go_on:
-              filterdict = {
-                'school' : item.id,
-                'train_status' : 0,}
-              if not item.ignore_checked:
-                filterdict['checked'] = True
-              undone = trainframe.objects.filter(**filterdict)
-              if item.trainer_nr == self.id:
-                run_condition = trainframe.objects.filter(school=item.id).count()
-              else:
-                run_condition = (undone.count() >= item.trigger 
-                  and not self.job_queue_list)
-              if run_condition:
-                undone.update(train_status=1)
-                item.trainer_nr = 0
-                item.save(update_fields=["trainer_nr"])
-                myfit = fit(made=timezone.now(), 
-                  school = item.id, 
-                  status = 'Queuing',
-                )
-                myfit.save() 
-                with self.mylock:
-                  self.job_queue_list.append(item.id)
-                my_redis.set_trainerqueue(self.id, self.job_queue_list)
-                self.job_queue.put((item, myfit)) 
+            filterdict = {
+              'school' : s_item.id,
+              'train_status' : 0,}
+            if not s_item.ignore_checked:
+              filterdict['checked'] = True
+            undone = trainframe.objects.filter(**filterdict)
+            if s_item.trainer_nr == self.id:
+              run_condition = trainframe.objects.filter(school=s_item.id).count()
+            else:
+              run_condition = (protected_db(undone.count) >= s_item.trigger 
+                and not self.job_queue_list
+                and s_item.delegation_level == 1)
+            if run_condition:
+              undone.update(train_status=1)
+              s_item.trainer_nr = 0
+              s_item.save(update_fields=["trainer_nr"])
+              myfit = fit(made=timezone.now(), 
+                school = s_item.id, 
+                status = 'Queuing',
+              )
+              myfit.save() 
+              with self.mylock:
+                self.job_queue_list.append(s_item.id)
+              my_redis.set_trainerqueue(self.id, self.job_queue_list)
+              self.job_queue.put((s_item, myfit)) 
         sleep(10.0)
     except:
       self.logger.error('Error in process: ' + self.logname + ' (job_queue_thread)')

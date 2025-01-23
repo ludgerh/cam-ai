@@ -49,6 +49,7 @@ class school(models.Model):
   remote_creator = models.ForeignKey(settings.AUTH_USER_MODEL, 
     on_delete=models.SET_DEFAULT, default=1, related_name='remotely_created_schools')
   storage_quota = models.BigIntegerField(default=1)
+  delegation_level = models.IntegerField(default=1)
   encrypted = models.BooleanField(default=True)
   dir = models.CharField(max_length=256, default='data/schools/model1/')
   trigger = models.IntegerField(default=500)

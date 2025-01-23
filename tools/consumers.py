@@ -243,6 +243,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
               outdict['data']['pass'] = trainerline.wspass
               outdict['data']['user'] = trainerline.wsid
               outdict['data']['trainer_nr'] = 1
+              outdict['data']['delegation_level'] += 1
               await ws.send_str(json.dumps(outdict))
               message = await ws.receive()
               resultdict = json.loads(message.data)['data']
@@ -258,14 +259,16 @@ class admin_tools_async(AsyncWebsocketConsumer):
           else:
             resultdict = {'status' : 'nomorequota', 'domain' : myserver}
         if resultdict['status'] == 'OK':
+          schoolline.delegation_level = params['delegation_level']
+          await schoolline.asave(update_fields = ('delegation_level', ))
           if trainerline.t_type in {2, 3}:
             schoolline.e_school = resultdict['school']
             resultdict['school'] = schoolline.id
-            await schoolline.asave(update_fields=('e_school', ))
+            await schoolline.asave(update_fields = ('e_school', ))
           else:
             resultdict['quota'] = (quota[0] + 1, quota[1])
             schoolline.model_type = model_type
-            await schoolline.asave(update_fields=('model_type', ))
+            await schoolline.asave(update_fields = ('model_type', ))
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'

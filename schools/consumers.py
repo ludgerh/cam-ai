@@ -239,6 +239,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       elif params['command'] == 'getpredictions':
         if await access.check_async('S', params['school'], self.scope['user'], 'R'):
           imglist = []
+          found_images = True
           for item in params['idxs']:
             try:
               if params['is_school']:
@@ -263,21 +264,26 @@ class schooldbutil(AsyncWebsocketConsumer):
               myimage = cv.cvtColor(myimage, cv.COLOR_BGR2RGB)
               imglist.append(myimage)
             except FileNotFoundError:
-              logger.error('***File not found: ' + imagepath)
+              if params['is_school']:
+                logger.error('***File not found: ' + imagepath)
+              else:  
+                found_images = False
             except AIOCancelledError:
               logger.warning('** getpredictions was cancelled')
-              return()
-          self.tf_worker.ask_pred(
-            params['school'], 
-            imglist, 
-            self.tf_w_index,
-          )
-          predictions = np.empty((0, len(classes_list)), np.float32)
-          while predictions.shape[0] < len(imglist):
-            predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
-            
+              return()   
+          if found_images:    
+            self.tf_worker.ask_pred(
+              params['school'], 
+              imglist, 
+              self.tf_w_index,
+            )
+            predictions = np.empty((0, len(classes_list)), np.float32)
+            while predictions.shape[0] < len(imglist):
+              predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
+          else:    
+            predictions = np.zeros((len(params['idxs']), len(classes_list)), np.float32)
           outlist['data'] = (params['counts'], params['idxs'], predictions.tolist())
-          logger.debug('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))
 
       elif params['command'] == 'checktrainframe':
