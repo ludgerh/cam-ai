@@ -212,7 +212,7 @@ class acaminst(AsyncWebsocketConsumer):
                     + '.0/24')
           except ValueError:
             pass
-        if '/' in mydomain:
+        if '/' in mydomain and '.' in mydomain and self.scope['user'].is_superuser:
           checklist = mydomain.split('/')
           try:
             if (len(checklist) == 2
