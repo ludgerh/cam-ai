@@ -24,13 +24,16 @@ from django.views.generic.edit import FormView
 from django.conf import settings
 from django.core.mail import send_mail
 from django.core.mail.backends.smtp import EmailBackend
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
+from django.shortcuts import redirect
 from camai.c_settings import safe_import
 from tools.l_tools import djconf
 from tools.l_smtp import l_smtp, l_msg
 from access.c_access import access
 from streams.models import stream
 from tf_workers.models import school
+from schools.c_schools import get_taglist
+from schools.models import tag as dbtag
 from .forms import smtp_form
 
 emulatestatic = safe_import('emulatestatic') 
@@ -86,7 +89,7 @@ class config(myTemplateView):
       context.update({
         'open' : '', 
         'info' : '', 
-      })
+      }) 
     return context
 
 class smtp(myFormView):
@@ -219,3 +222,57 @@ class smtp(myFormView):
 
 class tags(myTemplateView):
   template_name = 'config/tags.html'
+  
+  def __init__(self, *args, **kwargs):
+    self.default_list = get_taglist(1)
+    super().__init__(*args, **kwargs)
+    
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    school_list = []
+    for item in access.filter_items(
+      school.objects.filter(active=True), 'S', self.request.user, 'W'
+    ):
+      if item.id > 1:
+        s_item = {'school': item, }
+        tag_list = get_taglist(item.id)
+        t_list = []
+        for i in range(10):
+          t_item = {
+            'idx' : i + 1, 
+            'tag' : tag_list[i], 
+            'default' : self.default_list[i], 
+          }
+          t_list.append(t_item)
+        s_item['tags'] = t_list  
+        school_list.append(s_item)
+    
+    context.update({
+      'school_list' : school_list,  
+      'defaults' : self.default_list,
+    })
+    return context
+  
+  def post(self, request, *args, **kwargs):
+    school_nr = int(request.POST['school_id'])
+    if access.check('S', school_nr, request.user, 'W'):
+      i = 1
+      non_standard_list = []
+      while (index := 'Item ' + str(i)) in request.POST:
+        if request.POST[index] != self.default_list[i-1].description:
+          new_name = request.POST[index].lower().replace('(s)', '')[:10]
+          new_description = request.POST[index][:20]
+          non_standard_list.append((i, new_name, new_description)) 
+        i += 1
+      dbtag.objects.filter(school = school_nr).delete()
+      for item in non_standard_list:
+        new_line = dbtag(
+          name = item[1],
+          description = item[2],
+          school = school_nr,
+          replaces = item[0],
+        )
+        new_line.save()
+      return redirect('/config/config/tags/none/')
+    else:
+      return(HttpResponse('No Access'))

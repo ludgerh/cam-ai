@@ -22,3 +22,4 @@ class smtp_form(forms.Form):
   port = forms.IntegerField(label="SMTP port", min_value=1, max_value=64000) 
   email = forms.CharField(label="Sending email", max_length=100)
   test_email = forms.CharField(label="Email for Test", max_length=100)
+  

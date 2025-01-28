@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -83,7 +83,11 @@ class search_executor(ThreadPoolExecutor):
     self.uname = uname
     self.upass = upass
     if self.url:
-      self.iplist = [url, ]
+      if '/' in url and '.' in url:
+        self.iplist = ip_network(url).hosts()
+        self.url = ''
+      else:
+        self.iplist = [url, ]
     else:  
       self.iplist = self.net.hosts()
     self.all_results = []

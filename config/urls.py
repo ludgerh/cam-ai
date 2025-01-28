@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -25,6 +25,7 @@ urlpatterns = [
 	path('config/', views.config.as_view(), name='config'),
 	path('smtp/<str:info>/', views.smtp.as_view(), name='smtp'),
 	path('smtp/', views.smtp.as_view(), name='smtp'),
+	path('tags/<str:info>/', views.tags.as_view(), name='tags'),
 	path('tags/', views.tags.as_view(), name='tags'),
 ]
 

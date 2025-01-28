@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -78,8 +78,15 @@ $(document).ready(function() {
     $('#panels-collapse-smtp').collapse('show');
   {% endif %}
   $('#tags_item').on('show.bs.collapse', function () {
-    $('#tags-body').load("/config/tags/");
+    {% if info %}
+      $('#tags-body').load("/config/tags/{{ info }}/");
+    {% else %}
+      $('#tags-body').load("/config/tags/");
+    {% endif %}
   });
+  {% if open == 'tags' %}
+    $('#panels-collapse-tags').collapse('show');
+  {% endif %}
 });
 </script>
 

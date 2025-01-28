@@ -22,7 +22,6 @@ from traceback import format_exc
 from ipaddress import ip_network
 from validators.domain import domain
 from validators.ip_address import ipv4, ipv6
-#from tools.djangodbasync import filterlinesdict, savedbline, getonelinedict, countfilter
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.c_redis import myredis
@@ -72,7 +71,7 @@ class acaminst(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.debug('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
       
@@ -194,9 +193,37 @@ class acaminst(AsyncWebsocketConsumer):
         mydomain = params['domain']
         if '//' in mydomain:
           mydomain = mydomain.split('//')[1]
+        if '.' in mydomain:
+          checklist = mydomain.split('.')
+          try:
+            if 0 <= int(checklist[0]) <= 255:
+              if 0 <= int(checklist[1]) <= 255:
+                if len(checklist) == 3 and checklist[2] and not checklist[2].isdecimal():
+                  mydomain = checklist[0] + '.' + checklist[1] + '.0.0/16'
+                elif (
+                    len(checklist) == 4 
+                    and checklist[3] 
+                    and not checklist[3].isdecimal() 
+                    and not '/' in checklist[3]
+                    ):
+                  mydomain = (checklist[0] 
+                    + '.' + checklist[1] 
+                    + '.' + checklist[2] 
+                    + '.0/24')
+          except ValueError:
+            pass
         if '/' in mydomain:
-          mydomain = mydomain.split('/')[0]  
-        if (mydomain == '') and self.scope['user'].is_superuser and self.mynet:
+          checklist = mydomain.split('/')
+          try:
+            if (len(checklist) == 2
+              and ipv4(checklist[0])
+              and 16 <= int(checklist[1]) <= 32):
+              result = True
+            else:  
+              result = False
+          except ValueError:
+            result = False
+        elif (mydomain == '') and self.scope['user'].is_superuser and self.mynet:
           result = True #Admin may scan the network
         elif domain(mydomain) or ipv4(mydomain) or ipv6(mydomain): 
           result = True #Anyone may check an external domain or IP
@@ -205,6 +232,7 @@ class acaminst(AsyncWebsocketConsumer):
         outlist['data'] = {'result' : result, 'domain' : mydomain, } 
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
+        
     except:
       logger.error('Error in consumer: ' + logname + ' (acaminst)')
       logger.error(format_exc())

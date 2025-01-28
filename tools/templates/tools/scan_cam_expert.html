@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -26,27 +26,27 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endif %}
 <main>
   <div class="h2 m-2">
-    Welcome! This is your expert installation assistant.<br>
+    Welcome! This is your expert camera installation assistant.<br>
     Use this if you know what you are doing...
   </div>
   {% if not is_public %}
     <div class="h2 m-2">
-      My Network:
+      Your local Network:
       <span id="network">?</span>
     </div>
     <div class="h2 m-2">
-      My IP address:
+      Your IP address:
       <span id="ipaddress">?</span>
     </div>
   {% endif %}
   <div class="h2 m-2">
     <div class="h2 m-2">
-      Camera address:
+      Search target:
       <input class="mb-3 m-2" type="text" id="camaddress" size="30">
     </div>
     <div class="h2 m-2">
       Explanation: This is the place in the internet, where we can find your camera (IP or domain). 
-      Examples: '123.45.67.98', 'mydomain.com'...<br>
+      Examples: '123.45.67.0/24', '123.45.67.98', 'mydomain.com'...<br>
       {% if is_public %}
         Your current IP address is <span id="client_ip">?</span>. 
         If your camera is connected via the same router, this will be the right IP to select.<br>
@@ -97,7 +97,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   </div>
   <div class="h2 m-2">
     Explanation: Cameras in the internet or local network are accessed via port. 
-    80, 443, 554, 1935 and 8000 are the most commen ones.
+    80, 443, 554, 1935 and 8000 are the most common ones.
     Please select the ports you want to check. 
   </div>
   <div>

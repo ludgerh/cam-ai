@@ -71,11 +71,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               $('#status').text('Error: No more volume quota on this server: ' + result.domain);
             };
           })
-          .catch(err => {console.log(err);});
         });
-
       })  
-      .catch(err => {console.log(err);});
     });
     </script>
   {% else %}

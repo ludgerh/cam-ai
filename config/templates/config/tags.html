@@ -1,5 +1,5 @@
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -13,4 +13,54 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
-tags.html
+
+<div class="container-fluid float-left">
+  <div class="row" id="menulist">
+  {% for s_item in school_list %}
+  <div class="card m-2" style="width: 380px; height: 570px;">
+    <div class="h3">School: {{ s_item.school.name }}</div>
+    <form action="/config/tags/" method="post">
+      {% csrf_token %}
+      <table class="h6">
+        <tr>
+          <th>Nr</th>
+          <th>Default</th>
+          <th>Name</th>
+        </tr>
+      {% for t_item in s_item.tags %}
+        <tr>
+          <td>{{ t_item.idx }}</td>
+          <td>{{ t_item.default.name }}</td>  
+          <td>
+            <input type="text" class="form-control" 
+              id="desc{{ s_item.school.id }}-{{ t_item.idx }}" 
+              name="Item {{ t_item.idx }}"
+              value="{{ t_item.tag.description }}"/>
+          </td>  
+        </tr>
+      {% endfor %}
+      </table>
+      <input type="hidden" name="school_id" value="{{ s_item.school.id }}"/>
+      <input class="btn btn-primary m-2" type="submit" value="Submit" 
+        style="width: 120px"/>
+      <button class="btn btn-primary m-2 default-button" school="{{ s_item.school.id }}" 
+        type="button" style="width: 120px">Defaults</button>
+    </form>
+  </div>
+{% endfor %}
+  </div>
+</div>
+
+<script>
+$(document).ready(function() {
+   
+  $('.default-button').click(function() {
+    school = $(this).attr('school');
+    i = 1
+    {% for d_item in defaults %}
+      $('#desc' + school + '-' + i).val('{{ d_item.description }}');
+      i++
+    {% endfor %}
+  });
+});
+</script>
