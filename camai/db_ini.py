@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -59,6 +59,10 @@ if not  camurl.objects.filter(type='Novus NVIP-4VE-6501'):
     reduce_latence = False,
   )
   newcam.save()
+if not  camurl.objects.filter(type='Novus NVR-34XX'):
+  newcam = camurl(type='Novus NVR-34XX', 
+    url='rtsp://{user}:{pass}@{address}:{port}/H264?ch=1&subtype=0')
+  newcam.save()
 if not  camurl.objects.filter(type='Reolink RLC-410W'):
   newcam = camurl(type='Reolink RLC-410W', 
     url='rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}')
@@ -92,6 +96,20 @@ if not alarm_device_type.objects.filter(name='hue'):
   new_type = alarm_device_type(
     name='hue', 
     mendef='[["s", "IP", "1.2.3.4"], ["s", "User", "user"]]', 
+  )
+  new_type.save()
+  
+if not alarm_device_type.objects.filter(name='taposwitch123'):
+  new_type = alarm_device_type(
+    name='taposwitch123', 
+    mendef='[["s", "IP", "1.2.3.4"]]', 
+  )
+  new_type.save()
+  
+if not alarm_device_type.objects.filter(name='proxy-gpio'):
+  new_type = alarm_device_type(
+    name='proxy-gpio', 
+    mendef='[["s", "IP", "1.2.3.4"], ["i", "channel", 1]]', 
   )
   new_type.save()
   

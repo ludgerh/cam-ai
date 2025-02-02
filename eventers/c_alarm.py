@@ -28,6 +28,9 @@ if plugin_hue_ok:
 plugin_taposwitch_ok = os.path.exists('plugins/cam_ai_taposwitch')
 if plugin_taposwitch_ok:
   from plugins.cam_ai_taposwitch.taposwitch import taposwitch123_alarm
+plugin_proxy_ok = os.path.exists('plugins/cam_ai_proxy')
+if plugin_proxy_ok:
+  from plugins.cam_ai_proxy.proxy import proxy_gpio_alarm
   
 mylogger = None 
 alarm_list = None
@@ -51,6 +54,18 @@ def alarm_init(logger, idx):
         alarm_list.append(hue_alarm(item, mylogger))
       else:
         mylogger.warning('***** For alarm device phillips hue we need the hue-plugin, '
+          + 'ignoring this alarm.') 
+    elif item.mydevice.device_type.name == 'taposwitch123':
+      if plugin_taposwitch_ok:  
+        alarm_list.append(taposwitch123_alarm(item, mylogger))
+      else:
+        mylogger.warning('***** For alarm device taposwitch123 we need the hue-plugin, '
+          + 'ignoring this alarm.') 
+    elif item.mydevice.device_type.name == 'proxy-gpio':
+      if plugin_proxy_ok:  
+        alarm_list.append(proxy_gpio_alarm(item, mylogger))
+      else:
+        mylogger.warning('***** For alarm device proxy-gpio we need the proxy-plugin, '
           + 'ignoring this alarm.') 
 
 class console_alarm(alarm_base):

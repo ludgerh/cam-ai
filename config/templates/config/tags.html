@@ -17,7 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <div class="container-fluid float-left">
   <div class="row" id="menulist">
   {% for s_item in school_list %}
-  <div class="card m-2" style="width: 380px; height: 570px;">
+  <div class="card m-2" style="width: 380px; height: 600px;">
     <div class="h3">School: {{ s_item.school.name }}</div>
     <form action="/config/tags/" method="post">
       {% csrf_token %}
