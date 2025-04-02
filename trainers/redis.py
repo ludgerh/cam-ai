@@ -18,18 +18,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import json
 from tools.c_redis import saferedis
 
-class trainers_redis(saferedis):
+class redis(saferedis):
+  
+  stringbase = 'cam-ai.trainers.queue:'
 
   def set_trainerqueue(self, idx, value):
-    #print('+++++ setting', idx, value)
-    self.set('trainers.queue.'+str(idx)+':', str(json.dumps(value)))
+    self.set(self.stringbase + str(idx)+':', str(json.dumps(value)))
     
   def get_trainerqueue(self, idx):
-    result = self.get('trainers.queue.'+str(idx)+':')
+    result = self.get(self.stringbase + str(idx)+':')
     if result:
-      #print('----- getting', idx, json.loads(result))
       return(json.loads(result))
     else:
       return(None) 
       
-my_redis = trainers_redis()      
+my_redis = redis()      

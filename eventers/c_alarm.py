@@ -15,8 +15,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import os
+import asyncio
+from time import sleep
 from .models import alarm as dbalarm
-from .alarm_base import alarm_base
+from .alarm_base import alarm_base, init_failed_exception
 
 #check which plugins are present:
 plugin_shelly_ok = os.path.exists('plugins/cam_ai_shelly')
@@ -33,14 +35,13 @@ if plugin_proxy_ok:
   from plugins.cam_ai_proxy.proxy import proxy_gpio_alarm
   
 mylogger = None 
-alarm_list = None
+alarm_list = []
   
-def alarm_init(logger, idx):
+async def alarm_init(logger, idx):
   global mylogger
   global alarm_list
   mylogger = logger  
-  alarm_list = []
-  for item in dbalarm.objects.filter(active=True, mystream__id=idx):
+  async for item in dbalarm.objects.filter(active=True, mystream__id=idx):
     if item.mydevice.device_type.name == 'console':
       alarm_list.append(console_alarm(item, mylogger))
     elif item.mydevice.device_type.name == 'shelly123':
@@ -63,7 +64,12 @@ def alarm_init(logger, idx):
           + 'ignoring this alarm.') 
     elif item.mydevice.device_type.name == 'proxy-gpio':
       if plugin_proxy_ok:  
-        alarm_list.append(proxy_gpio_alarm(item, mylogger))
+        while True:
+          try:
+            alarm_list.append(proxy_gpio_alarm(item, mylogger))
+            break
+          except init_failed_exception as e:
+            mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
       else:
         mylogger.warning('***** For alarm device proxy-gpio we need the proxy-plugin, '
           + 'ignoring this alarm.') 
@@ -74,11 +80,11 @@ class console_alarm(alarm_base):
     super().__init__(dbline, logger)
     self.notice_line = self.params[0]
     
-  def action(self, pred): 
-    super().action(pred=pred)
+  async def action(self, pred): 
+    await super().action(pred=pred)
     self.logger.info(self.notice_line + ' ' + self.stream.name + '(' + str(self.stream.id) 
       + ') : ' + self.classes_list[self.maxpos+1].name +  ' Sebi testet die Konsole')
 
-def alarm(stream_id, pred):
-  for item in alarm_list:
-    item.action(pred=pred)
+async def alarm(stream_id, pred):
+  tasks = [item.action(pred=pred) for item in alarm_list]
+  await asyncio.gather(*tasks)

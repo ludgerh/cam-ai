@@ -12,56 +12,42 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+v1.6.6 01.03.25
 """
 
-import gc
-from multiprocessing import Process, Queue
-from threading import Thread, Lock as t_lock
-from queue import Queue as threadqueue, Empty
-from signal import signal, SIGINT, SIGTERM, SIGHUP
-from traceback import format_exc
+import asyncio
+from threading import Lock as t_lock
 from logging import getLogger
-from time import sleep, time
+from time import time
+from traceback import format_exc
 from setproctitle import setproctitle
-from django.utils import timezone
-from django.db import connections
-from startup.startup import trainers
-from tools.c_logger import log_ini
-from tools.l_tools import (
-  protected_db, 
-  protect_list_db, 
-  QueueUnknownKeyword, 
-  ts2mysqltime, 
-  djconf,
-)
-from tf_workers.models import school
-from users.models import userinfo
-from users.userinfo import free_quota
-from schools.c_schools import school_dict, school as school_class
-from .models import trainer as dbtrainer, trainframe, fit, epoch
-if djconf.getconfigbool('local_trainer', False):
-  if djconf.getconfigbool('local_gpu', False):
-    from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
-from .train_worker_remote import train_once_remote
-from .redis import my_redis
+#from .models import trainer as dbtrainer, fit
+#import gc
+#from multiprocessing import Process, Queue as p_queue
+#from logging import getLogger
+#from time import sleep, time
+#from setproctitle import setproctitle
+#from django.utils import timezone
+#from tools.l_tools import (
+#  QueueUnknownKeyword, 
+#  ts2mysqltime, 
+#  djconf,
+#)
+#from tools.l_break import a_break_time
+#from tf_workers.models import school(
+#from users.models import userinfo
+#from users.userinfo import free_quota
+#from .models import trainer as dbtrainer, trainframe, fit, epoch
+#from .train_worker_remote import train_once_remote
 
-#from threading import enumerate
+#from threading import enumerate 
 
-short_brake = djconf.getconfigfloat('short_brake', 0.01)
-long_brake = djconf.getconfigfloat('long_brake', 1.0)
-      
-      
-fitstochange = fit.objects.filter(status='Queuing')
-fitstochange = fitstochange | fit.objects.filter(status='Working')
-for fititem in fitstochange:
-  fititem.status = 'Stopped'
-  fititem.save(update_fields=['status', ])
-                    
-                    
-
-def sigint_handler(signal, frame):
-  #print ('TFWorkers: Interrupt is caught')
-  pass
+async def clean_fits():
+  from .models import fit
+  async for item in fit.objects.all():
+    if item.status == 'Queuing' or item.status == 'Working':
+      item.status = 'Stopped'
+      await item.asave(update_fields=['status', ])
 
 #***************************************************************************
 #
@@ -69,167 +55,154 @@ def sigint_handler(signal, frame):
 #
 #***************************************************************************
 
-class trainer():
-  
-  def __init__(self, dbline):
-    self.inqueue = Queue()
-    self.id = dbline.id
-    self.mylock = t_lock()
-    my_redis.set_trainerqueue(self.id, [])
-    self.job_queue_list = []
+from tools.c_spawn import spawn_process
 
-  def in_queue_thread(self):
+class trainer(spawn_process):
+  def __init__(self, idx, ):
+    self.id = idx
+    super().__init__()
+
+  async def async_runner(self): 
     try:
-      while True:
-        received = self.inqueue.get()
-        #print('Trainer:', received)
-        if (received[0] == 'stop'):
-          self.do_run = False
-          while not self.inqueue.empty():
-            received = self.inqueue.get()
-          break
-        else:
-          raise QueueUnknownKeyword(received[0])
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (inqueue)')
-      self.logger.error(format_exc())
-
-  def job_queue_thread(self):
-    try:
-      while self.do_run:
-        schoollines = school.objects.filter(
-          active = True,
-          trainers = self.id,
-        )
-        protect_list_db(schoollines)
-        for s_item in schoollines:
-          if s_item.id not in school_dict:
-            school_dict[s_item.id] = school_class(s_item.id)
-          with school_dict[s_item.id].lock:
-            for t_item in trainers:
-              if s_item.id in trainers[t_item].getqueueinfo():
-                break
-            filterdict = {
-              'school' : s_item.id,
-              'train_status' : 0,}
-            if not s_item.ignore_checked:
-              filterdict['checked'] = True
-            undone = trainframe.objects.filter(**filterdict)
-            if s_item.trainer_nr == self.id:
-              run_condition = trainframe.objects.filter(school=s_item.id).count()
-            else:
-              run_condition = (protected_db(undone.count) >= s_item.trigger 
-                and not self.job_queue_list
-                and s_item.delegation_level == 1)
-            if run_condition:
-              undone.update(train_status=1)
-              s_item.trainer_nr = 0
-              s_item.save(update_fields=["trainer_nr"])
-              myfit = fit(made=timezone.now(), 
-                school = s_item.id, 
-                status = 'Queuing',
-              )
-              myfit.save() 
-              with self.mylock:
-                self.job_queue_list.append(s_item.id)
-              my_redis.set_trainerqueue(self.id, self.job_queue_list)
-              self.job_queue.put((s_item, myfit)) 
-        sleep(10.0)
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (job_queue_thread)')
-      self.logger.error(format_exc())
-
-  def run(self):
-    self.do_run = True
-    self.run_process = Process(target=self.runner, )
-    connections.close_all()
-    self.run_process.start()
-
-  def runner(self):
-    try:
-      self.dbline = dbtrainer.objects.get(id=self.id)
-      Thread(target=self.in_queue_thread, name='Trainer_InQueueThread').start()
-      signal(SIGINT, sigint_handler)
-      signal(SIGTERM, sigint_handler)
-      signal(SIGHUP, sigint_handler)
+      #import django
+      #django.setup()
+      from tools.c_logger import alog_ini
+      from tools.l_tools import ts2mysqltime
+      from tools.l_break import a_break_time
+      from .models import trainer as dbtrainer
+      from .redis import my_redis
+      self.dbline = await dbtrainer.objects.aget(id = self.id)
+      setproctitle('CAM-AI-Trainer #'+str(self.id))
+      self.do_run = True
+      self.mylock = t_lock()
+      my_redis.set_trainerqueue(self.id, [])
+      self.job_queue_list = []
+      train_once_gpu = None
       self.logname = 'trainer #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
-      log_ini(self.logger, self.logname)
-      setproctitle('CAM-AI-Trainer #'+str(self.dbline.id))
+      await alog_ini(self.logger, self.logname)
       self.finished = False
-      self.job_queue = threadqueue()
-      Thread(
-        target=self.job_queue_thread, 
-        name='Trainer_JobQueueThread #' + str(self.id),
-      ).start()
+      self.job_queue = asyncio.Queue()
+      asyncio.create_task(self.job_queue_thread(), name = 'job_queue_thread')
+      print('Launch: trainer')
+      await super().async_runner() 
       while self.do_run:
-        self.dbline = protected_db(dbtrainer.objects.get, kwargs = {'id' : self.id, })
         timestr = ts2mysqltime(time())
         if((self.dbline.startworking < timestr) 
             and (self.dbline.stopworking > timestr)
             and self.dbline.running):
-          try:
-            tempread = self.job_queue.get(timeout=1.0)
-            myschool = tempread[0]
-            myfit = tempread[1]
-            if self.dbline.t_type == 1:
-              train_process = Process(target = train_once_gpu, args = (
+          try:  
+            myschool, myfit = await asyncio.wait_for(self.job_queue.get(), timeout = 1.0)
+          except asyncio.TimeoutError:
+            continue  
+          if self.dbline.t_type == 1:
+            if train_once_gpu is None:
+              from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
+            train_process = Worker(
+              target = train_once_gpu, 
+              args = (
                 myschool, 
                 myfit, 
                 self.dbline.gpu_nr,
                 self.dbline.gpu_mem_limit,
               ), 
-              kwargs = {
-                'trainer_nr' : self.id,
-              }
-              )
-              train_process.start()
-              train_process.join()
-              trainresult = (train_process.exitcode)
-            elif (self.dbline.t_type in {2, 3}):
-              my_tor = train_once_remote(
+              kwargs = {'trainer_nr' : self.id, }, 
+            )
+            train_process.start()
+            trainresult = await train_process.join()
+          elif self.dbline.t_type in {2, 3}:
+            train_process = Worker(
+              target  = train_once_remote,
+              args = (
                 myschool, 
                 myfit, 
                 self.dbline,
                 self.logger,
-              )
-              train_process = Process(target = my_tor.run)
-              train_process.start()
-              trainresult = 0
-            if not trainresult:
-              filterdict = {
-                'school' : myschool.id,
-                'train_status' : 1,
-              }
-              if not myschool.ignore_checked:
-                filterdict['checked'] = True
-              protected_db(
-                trainframe.objects.filter(**filterdict).update, 
-                kwargs = {'train_status' : 2}
-              )
-              myschool.l_rate_start = '1e-6'
-              myschool.save(update_fields=['l_rate_start'])
-              #myuserinfo = userinfo.objects.get(user=myschool.creator)
-              #myuserinfo.pay_tokens -= 1
-              #myuserinfo.save(update_fields=['pay_tokens'])
-            with self.mylock:
-              self.job_queue_list.remove(myschool.id)
-            my_redis.set_trainerqueue(self.id, self.job_queue_list)
-            gc.collect()
-          except Empty:
-            pass
-        sleep(10.0)
+              ), 
+            )
+            train_process.start()
+            await train_process.join()
+            trainresult = 0
+          if not trainresult:
+            filterdict = {
+              'school' : myschool.id,
+              'train_status' : 1,
+            }
+            if not myschool.ignore_checked:
+              filterdict['checked'] = True
+            await trainframe.objects.filter(**filterdict).aupdate(train_status = 2)
+            myschool.l_rate_divisor = 10000.0
+            await myschool.save(update_fields=['l_rate_divisor'])
+          with self.mylock:
+            self.job_queue_list.remove(myschool.id)
+          my_redis.set_trainerqueue(self.id, self.job_queue_list)
+          await asyncio.to_thread(gc.collect)
+        await a_break_time(10.0)
       self.finished = True
-      #for thread in enumerate(): 
-      #  print(thread)
       self.logger.info('Finished Process '+self.logname+'...')
     except:
       self.logger.error('Error in process: ' + self.logname)
+      self.logger.error(format_exc()) 
+
+  async def job_queue_thread(self):
+    try:
+      from tools.l_break import a_break_time
+      from globals.c_globals import trainers
+      from tf_workers.models import school
+      from .models import trainframe
+      while self.do_run:
+        #if trainers is None:
+        #  await a_break_time(10.0)
+        #  continue
+        schoollines = school.objects.filter(
+          active = True,
+          trainers = self.id,
+        )
+        async for s_item in schoollines:
+          await s_item.arefresh_from_db()
+          do_continue = False
+          for t_item in trainers:
+            if s_item.id in trainers[t_item].getqueueinfo():
+              self.logger.warning(
+                '!!!!! School #' + str(s_item.id) 
+                + ' not inserted into Trainer Queue because already in.')
+              do_continue = True
+              break
+          if do_continue:
+            continue    
+          filterdict = {
+            'school' : s_item.id,
+            'train_status' : 0,}
+          if not s_item.ignore_checked:
+            filterdict['checked'] = True
+          undone = trainframe.objects.filter(**filterdict)
+          if s_item.trainer_nr == self.id:
+            run_condition = await trainframe.objects.filter(school=s_item.id).acount()
+          else:
+            run_condition = (await undone.acount() >= s_item.trigger 
+              and not self.job_queue_list
+              and s_item.delegation_level == 1)
+          if run_condition:
+            await undone.aupdate(train_status=1)
+            s_item.trainer_nr = 0
+            s_item.save(update_fields=["trainer_nr"])
+            myfit = fit(made=timezone.now(), 
+              school = s_item.id, 
+              status = 'Queuing',
+            )
+            await myfit.asave() 
+            with self.mylock:
+              self.job_queue_list.append(s_item.id)
+            my_redis.set_trainerqueue(self.id, self.job_queue_list)
+            await self.job_queue.put((s_item, myfit)) 
+        try:
+          await a_break_time(10.0)
+        except  asyncio.exceptions.CancelledError:
+          pass  
+    except:
+      from traceback import format_exc
+      self.logger.error('Error in process: ' + self.logname + ' (job_queue_thread)')
       self.logger.error(format_exc())
-  
-  def stop(self):
-    self.inqueue.put(('stop',))
-    self.run_process.join()
 
 #***************************************************************************
 #

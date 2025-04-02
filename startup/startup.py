@@ -13,30 +13,99 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
-from time import sleep
-import sys
-import os
-from setproctitle import setproctitle
-from threading import Thread
-from traceback import format_exc
-from logging import getLogger
-from signal import signal, SIGINT, SIGTERM, SIGHUP
-from django.apps import apps as django_apps
-from camai.c_settings import safe_import
-from tools.l_sysinfo import system_info
-print(system_info)
+
+
+import asyncio
+from signal import signal, SIGINT
+from .redis import my_redis as startup_redis
+from tools.l_tools import djconf, kill_all_processes
+#from django.apps import apps as django_apps
+#from time import sleep
+#import os
+#from traceback import format_exc
+#from aiomultiprocess import set_start_method
+#from camai.c_settings import safe_import
+#import schools.c_schools
+#from tf_workers.c_tfworkers import tf_workers
+#from tools.health import stop as stophealth
+#from tools.version_upgrade import version_upgrade
+#from cleanup.c_cleanup import my_cleanup, c_cleanup
+#from streams.c_streams import streams
+#data_path = safe_import('data_path') 
+#db_database = safe_import('db_database') 
 
 #from threading import enumerate
 
-do_run = True
-redis = None
-stophealth = None
-my_cleanup = None
-restart_mode = 0
-streams = {}
-tf_workers = {}
-trainers = {}
-trainer_lists = {}
+glob_startup = None
+    
+
+class startup_class(): 
+
+  async def run(self):
+    from logging import getLogger
+    from asgiref.sync import sync_to_async
+    from tools.c_logger import alog_ini
+    from tools.version_upgrade import version_upgrade
+    from cleanup.c_cleanup import c_cleanup
+    from camai.db_ini import db_ini
+    from camai.version import version as software_version
+    from camai.passwords import (
+      smtp_account,
+      smtp_password,
+      smtp_server,
+      smtp_port,
+      smtp_email,
+    )
+    from globals.c_globals import trainers, tf_workers, viewables
+    from tools.l_break import a_break_type, BR_LONG
+    from camai.c_settings import safe_import
+    data_path = safe_import('data_path') 
+    db_database = safe_import('db_database') 
+    from trainers.c_trainers import clean_fits
+    from django.apps import apps
+    try:
+      while not apps.ready:
+        await a_break_type(BR_LONG)
+      logname = 'startup'
+      logger = getLogger(logname)
+      await alog_ini(logger, logname)
+      self.do_run = True
+      await db_ini()
+      print('***** Software-Version: ', software_version, '*****')
+      old_version = await djconf.agetconfig('version', '0.0.0')
+      await djconf.asetconfig('version', software_version)
+      print('***** DataPath: ', data_path, '*****')
+      await djconf.asetconfig('datapath', data_path)
+      print('***** Database: ', db_database, '*****')
+      await djconf.asetconfig('smtp_account', smtp_account)
+      await djconf.asetconfig('smtp_password', smtp_password)
+      await djconf.asetconfig('smtp_server', smtp_server)
+      await djconf.asetconfigint('smtp_port', smtp_port)
+      await djconf.asetconfig('smtp_email', smtp_email)
+      self.restart_mode = 0
+      startup_redis.set_start_trainer_busy(0)
+      startup_redis.set_start_worker_busy(0)
+      startup_redis.set_start_stream_busy(0)
+      startup_redis.set_shutdown_command(0)
+      await sync_to_async(version_upgrade)(old_version, software_version)
+      await clean_fits()
+      for item in trainers:
+        trainers[item].start()
+      for item in tf_workers:
+        tf_workers[item].start()
+      for item in viewables:
+        await viewables[item]['stream'].run()
+      while self.do_run:  
+        await asyncio.sleep(1.0)
+      return()  
+      self.cleanup = c_cleanup()
+      my_cleanup.run()  
+      check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
+    except:
+      from traceback import format_exc
+      logger.error('Error in process: ' + logname)
+      logger.error(format_exc())  
+      kill_all_processes()
 
 def restartcheck_thread():
   from streams.c_streams import c_stream
@@ -45,150 +114,94 @@ def restartcheck_thread():
   from trainers.c_trainers import trainer
   global restart_mode
   while do_run:
-    if (command := redis.get_shutdown_command()):
-      redis.set_shutdown_command(0)
+    if (command := startup_redis.get_shutdown_command()):
+      startup_redis.set_shutdown_command(0)
       if command == 1:
         restart_mode = 1
       elif command == 2:  
         restart_mode = 2
       os.kill(os.getpid(), SIGINT)
       return()
-    if (item := redis.get_start_trainer_busy()):
+    if (item := startup_redis.get_start_trainer_busy()):
       if (item in trainers) and trainers[item].do_run:
         trainers[item].stop()
       trainers[item] = trainer(item)
       trainers[item].run()
-      redis.set_start_trainer_busy(0)
-    if (item := redis.get_start_worker_busy()):
+      startup_redis.set_start_trainer_busy(0)
+    if (item := startup_redis.get_start_worker_busy()):
       if (item in tf_workers) and tf_workers[item].do_run:
         tf_workers[item].stop()
       tf_workers[item] = tf_worker(item)
       tf_workers[item].run()
-      redis.set_start_worker_busy(0)
-    if (item := redis.get_start_stream_busy()):
+      startup_redis.set_start_worker_busy(0)
+    if (item := startup_redis.get_start_stream_busy()):
       dbline = stream.objects.get(id=item)
-      if item in streams:
-        streams[item].stop()
-      streams[item] = c_stream(dbline)
-      streams[item].start()
-      redis.set_start_stream_busy(0)    
+      if item in viewables:
+        viewables[item]['stream'].stop()
+      viewables[item]['stream'] = c_stream(dbline)
+      viewables[item]['stream'].start()
+      startup_redis.set_start_stream_busy(0)    
     sleep(10.0)
-
-def newexit(*args):
-  global do_run
-  redis.set('CAM-AI:KBInt', 1) #Signal for onf in views/consumers
+    
+    
+def launch():
+        
+  def startup_thread():
+    loop = asyncio.new_event_loop() 
+    asyncio.set_event_loop(loop)  
+    loop.run_until_complete(glob_startup.run())
+    loop.close() 
+    
+  from threading import Thread
+  global glob_startup
+  glob_startup = startup_class()
+  signal(SIGINT, handle_signal)
+  if startup_redis.get_running():
+    print('Startup.Launch: Return because busy')
+    return()
+  startup_redis.set_running(True) 
+  thread = Thread(target=startup_thread)
+  thread.start()
+    
+async def newexit():
+  from globals.c_globals import trainers, tf_workers, viewables
+  global glob_startup
+  startup_redis.set_running(False) 
   print ('Caught KeyboardInterrupt...')
-  do_run = False
-  sleep(5.0)
-  stophealth()
-  my_cleanup.stop()
-  for i in streams:
+  glob_startup.do_run = False
+  #sleep(5.0)
+  #stophealth()
+  #my_cleanup.stop()
+  for i in viewables:
     print('Closing stream #', i)
-    streams[i].stop()
+    await viewables[i]['stream'].stop()
   for i in tf_workers:
     print('Closing tf_worker #', i)
-    tf_workers[i].stop()
+    await tf_workers[i].stop()
   for i in trainers:
     print('Closing trainer #', i)
-    trainers[i].stop()  
-  #print('*** restart_mode', restart_mode)  
-  if restart_mode == 0:
-    redis.set_watch_status(0) 
+    await trainers[i].stop()  
+  if glob_startup.restart_mode == 0:
+    startup_redis.set_watch_status(0) 
     #for thread in enumerate(): 
     #  print(thread)
-    sys.exit(0)
-  elif restart_mode == 1:
-    redis.set_watch_status(0) 
+    kill_all_processes()
+  elif startup.restart_mode == 1:
+    startup_redis.set_watch_status(0) 
     #for thread in enumerate(): 
     #  print(thread)
     os.system('sudo shutdown now')
-    sys.exit(0)
-  elif restart_mode == 2:
-    redis.set_watch_status(2) 
+    kill_all_processes()
+  elif startup.restart_mode == 2:
+    startup_redis.set_watch_status(2) 
     #for thread in enumerate(): 
     #  print(thread)
-    os._exit(0)
-
-signal(SIGINT, newexit)
-signal(SIGTERM, newexit)
-signal(SIGHUP, newexit)
+  exit(0) 
     
-def run():
-  global do_run
-  global redis
-  global stophealth
-  global my_cleanup
-  global streams
-  global tf_workers
-  global trainers
-  while not (app_status := django_apps.ready):
-    sleep(1.0)
-  from tools.c_logger import log_ini
-  from tools.l_tools import djconf
-  from tools.c_redis import myredis
-  from camai.version import version as software_version
-  print('***** Software-Version: ', software_version, '*****')
-  old_version = djconf.getconfig('version', '0.0.0')
-  djconf.setconfig('version', software_version)
-  data_path = safe_import('data_path') 
-  db_database = safe_import('db_database') 
-  print('***** DataPath: ', data_path, '*****')
-  djconf.setconfig('datapath', data_path)
-  print('***** Database: ', db_database, '*****')
-  from camai.db_ini import db_ini
-  from camai.passwords import (
-    smtp_account,
-    smtp_password,
-    smtp_server,
-    smtp_port,
-    smtp_email,
-  )
-  djconf.setconfig('smtp_account', smtp_account)
-  djconf.setconfig('smtp_password', smtp_password)
-  djconf.setconfig('smtp_server', smtp_server)
-  djconf.setconfigint('smtp_port', smtp_port)
-  djconf.setconfig('smtp_email', smtp_email)
-  import schools.c_schools
-  from tf_workers.models import worker
-  from tf_workers.c_tfworkers import tf_worker
-  from trainers.models import trainer as trainerdb
-  from trainers.c_trainers import trainer
-  from tools.health import stop as stophealth
-  from tools.version_upgrade import version_upgrade
-  from cleanup.c_cleanup import my_cleanup
-  from streams.models import stream
-  from streams.c_streams import c_stream
+def handle_signal(signum, frame):
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(newexit())
+    except RuntimeError:
+        asyncio.run(newexit())
   
-  restart_mode = 0
-  redis = myredis()
-  cleanup = None
-  redis.set_start_trainer_busy(0)
-  redis.set_start_worker_busy(0)
-  redis.set_start_stream_busy(0)
-  redis.set_shutdown_command(0)
-  redis.set('CAM-AI:KBInt', 0)
-
-  version_upgrade(old_version, software_version)
-
-  logname = 'startup'
-  logger = getLogger(logname)
-  log_ini(logger, logname)
-  try:
-    for dbline in trainerdb.objects.filter(active=True):
-      trainers[dbline.id] = trainer(dbline)
-      trainers[dbline.id].run()
-    for dbline in worker.objects.filter(active=True):
-      tf_workers[dbline.id] = tf_worker(dbline.id)
-      tf_workers[dbline.id].run()
-    for dbline in stream.objects.filter(active=True):
-      streams[dbline.id] = c_stream(dbline)
-      streams[dbline.id].start()
-    my_cleanup.run()  
-    check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
-  except:
-    logger.error('Error in process: ' + logname)
-    logger.error(format_exc())
-    
-def launch():
-  setproctitle('CAM-AI-Startup')
-  Thread(target=run, name='StartupThreadThread').start()

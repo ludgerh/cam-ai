@@ -1,6 +1,6 @@
 {% extends 'schools/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -99,7 +99,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <thead>
         <tr>
           <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>Loss</th>
-          <<th>BinAcc</th><th>val_Loss</th><th>val_BinAcc</th><th>Status</th>
+          <th>BinAcc</th><th>AUC</th><th>val_Loss</th><th>val_BinAcc</th><th>val_AUC</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -120,30 +121,23 @@ let graph_data = {
   labels: graph_labels,
   datasets: [
     {
-    label: 'BinAcc',
+    label: 'val_BinAcc',
     backgroundColor: 'rgb(200, 0, 0)',
     borderColor: 'rgb(200, 0, 0)',
     yAxisID: 'A',
     data: [],
     },
     {
-    label: 'val_BinAcc',
+    label: 'val_AUC',
     backgroundColor: 'rgb(0, 155, 0)',
     borderColor: 'rgb(0, 155, 0)',
     yAxisID: 'A',
     data: [],
     },
     {
-    label: 'Loss',
+    label: 'val_Loss',
     backgroundColor: 'rgb(0, 0, 155)',
     borderColor: 'rgb(0, 0, 155)',
-    yAxisID: 'B',
-    data: [],
-    },
-    {
-    label: 'val_Loss',
-    backgroundColor: 'rgb(200, 155, 0)',
-    borderColor: 'rgb(200, 155, 0)',
     yAxisID: 'B',
     data: [],
     },
@@ -204,15 +198,15 @@ function refresh_all() {
       graph_labels.length = 0;
       graph_data.datasets[0].data.length = 0;
       graph_data.datasets[1].data.length = 0;
+      graph_data.datasets[2].data.length = 0;
       newaddition = '';
       result.forEach(function(item, index) {
         datestring = item.made;
         if (item.status == 'Done') {
           graph_labels.push(datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4));
-          graph_data.datasets[0].data.push(item.binacc);
-          graph_data.datasets[1].data.push(item.val_binacc);
-          graph_data.datasets[2].data.push(item.loss);
-          graph_data.datasets[3].data.push(item.val_loss);
+          graph_data.datasets[0].data.push(item.val_binacc);
+          graph_data.datasets[1].data.push(item.val_auc);
+          graph_data.datasets[2].data.push(item.val_loss);
         };
         newaddition += '<tr>';
         newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
@@ -221,8 +215,10 @@ function refresh_all() {
         newaddition += '<td>'+item.epochs+'</td>';
         newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.auc.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_auc.toPrecision(4)+'</td>';
         newaddition += '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.id+'/">'+item.status+'</a></td>';
         newaddition += '</tr>';
         $('#tablebody').empty();

@@ -35,14 +35,14 @@ from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from camai.version import version
-from tools.l_tools import djconf, seq_to_int, aprotected_db, version_newer_or_equal
+from tools.l_tools import djconf, seq_to_int, version_newer_or_equal
 from tools.c_logger import log_ini
 from access.c_access import access
 from tools.tokens import maketoken_async
 from tf_workers.models import school
 from users.userinfo import afree_quota
-from startup.startup import trainers
 from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
+from globals.c_globals import trainers
 
 from random import randint
 
@@ -54,7 +54,7 @@ medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
 
 async def get_trainer_nr(school_line):
   trainerlist = []
-  async for item in school_line.trainers.all():
+  async for item in school_line.trainers.filter(active = True):
     trainerlist.append(item)  
   if len(trainerlist) == 1:    
     result = trainerlist[0].id
@@ -210,10 +210,12 @@ class remotetrainer(AsyncWebsocketConsumer):
             sizeline = img_size(x=self.myschoolline.model_xin,
               y=self.myschoolline.model_yin)
             await sizeline.asave()
-          query_list = await database_sync_to_async(list)(trainframe.objects.filter(
-            school=indict['school'],
-            deleted=False,
-          ))
+          query_list = await sync_to_async(list, thread_sensitive=True, )(
+            trainframe.objects.filter(
+              school=indict['school'],
+              deleted=False,
+            )
+          )
           for item in query_list:
             result = (item.name, seq_to_int((item.c0, item.c1, item.c2, item.c3, 
               item.c4, item.c5, item.c6, item.c7, item.c8, item.c9)),
@@ -233,7 +235,10 @@ class remotetrainer(AsyncWebsocketConsumer):
             self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
           else:
             self.trainer_nr = 1  
-          creator = await sync_to_async(lambda: self.myschoolline.creator)()
+          creator = await sync_to_async(
+            lambda: self.myschoolline.creator, 
+            thread_sensitive=True, 
+          )()
           if await afree_quota(creator):
             result = {
               'status' : 'OK',
@@ -425,8 +430,7 @@ class trainerutil(AsyncWebsocketConsumer):
         else:
           if 'new_click' in params and params['new_click']:
             self.new_click = True
-          all_fits = fit.objects.filter(school=params['school'])
-          last_fit = await aprotected_db(all_fits.alast)
+          last_fit = await fit.objects.filter(school=params['school']).alast()
           temp_count = await all_fits.acount()
           result = [] 
           if temp_count:
@@ -451,19 +455,30 @@ class trainerutil(AsyncWebsocketConsumer):
               self.query_working = False
             async for item in query_set:
               result.append({
-                'id':item.id, 'made':item.made.strftime("%Y-%m-%d"), 
-                'nr_tr':item.nr_tr, 'nr_va':item.nr_va, 'minutes':item.minutes, 
-                'epochs':item.epochs, 'loss':item.loss, 'binacc':item.binacc, 
-                'val_loss':item.val_loss, 'val_binacc':item.val_binacc, 
-                'status':item.status, 'model_type':item.model_type, 
+                'id':item.id, 
+                'made':item.made.strftime("%Y-%m-%d"), 
+                'nr_tr':item.nr_tr, 
+                'nr_va':item.nr_va, 
+                'minutes':item.minutes, 
+                'epochs':item.epochs, 
+                'loss':item.loss, 
+                'binacc':item.binacc, 
+                'auc':item.auc, 
+                'val_loss':item.val_loss, 
+                'val_binacc':item.val_binacc, 
+                'val_auc':item.val_auc, 
+                'status':item.status, 
+                'model_type':item.model_type, 
                 'model_image_augmentation':item.model_image_augmentation, 
                 'model_weight_decay':item.model_weight_decay,
                 'model_weight_constraint':item.model_weight_constraint, 
-                'model_dropout':item.model_dropout, 'l_rate_start':item.l_rate_start, 
-                'l_rate_stop':item.l_rate_stop, 'l_rate_delta_min':item.l_rate_delta_min, 
-                'l_rate_patience':item.l_rate_patience, 
-                'l_rate_decrement':item.l_rate_decrement, 'weight_min':item.weight_min, 
-                'weight_max':item.weight_max, 'weight_boost':item.weight_boost, 
+                'model_dropout':item.model_dropout, 
+                'l_rate_start':item.l_rate_start, 
+                'l_rate_stop':item.l_rate_stop, 
+                'l_rate_divisor':item.l_rate_divisor, 
+                'weight_min':item.weight_min, 
+                'weight_max':item.weight_max, 
+                'weight_boost':item.weight_boost, 
                 'early_stop_delta_min':item.early_stop_delta_min, 
                 'early_stop_patience':item.early_stop_patience,
               })
@@ -484,8 +499,13 @@ class trainerutil(AsyncWebsocketConsumer):
           result = []
           async for item in epoch.objects.filter(fit=params['fitnr']):
             result.append({
-              'loss':item.loss, 'binacc':item.binacc, 'val_loss':item.val_loss, 
-              'val_binacc':item.val_binacc, 'seconds':item.seconds, 
+              'loss':item.loss, 
+              'binacc':item.binacc, 
+              'auc':item.auc, 
+              'val_loss':item.val_loss, 
+              'val_binacc':item.val_binacc, 
+              'val_auc':item.val_auc, 
+              'seconds':item.seconds, 
               'learning_rate':item.learning_rate,
             })
           outlist['data'] = result
@@ -505,11 +525,13 @@ class trainerutil(AsyncWebsocketConsumer):
             'model_image_augmentation':line.model_image_augmentation, 
             'model_weight_decay':line.model_weight_decay, 
             'model_weight_constraint':line.model_weight_constraint, 
-            'model_dropout':line.model_dropout, 'l_rate_start':line.l_rate_start, 
-            'l_rate_stop':line.l_rate_stop, 'l_rate_delta_min':line.l_rate_delta_min, 
-            'l_rate_patience':line.l_rate_patience, 
-            'l_rate_decrement':line.l_rate_decrement, 'weight_min':line.weight_min, 
-            'weight_max':line.weight_max, 'weight_boost':line.weight_boost, 
+            'model_dropout':line.model_dropout, 
+            'l_rate_start':line.l_rate_start, 
+            'l_rate_stop':line.l_rate_stop, 
+            'l_rate_divisor':line.l_rate_divisor, 
+            'weight_min':line.weight_min, 
+            'weight_max':line.weight_max, 
+            'weight_boost':line.weight_boost, 
             'early_stop_delta_min':line.early_stop_delta_min, 
             'early_stop_patience':line.early_stop_patience,
           } 
@@ -524,7 +546,9 @@ class trainerutil(AsyncWebsocketConsumer):
           myuser = self.scope['user']
         else:
           myuser = await User.objects.aget(username=params['name'])
-          if await sync_to_async(myuser.check_password)(params['pass']):
+          if await sync_to_async(myuser.check_password, 
+            thread_sensitive=True, 
+          )(params['pass']):
             self.authed = True
           if not self.authed:
             await self.close() 

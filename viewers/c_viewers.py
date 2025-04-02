@@ -16,44 +16,57 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import cv2 as cv
 import asyncio
-from threading import Lock, Event
+from threading import Event
+from multiprocessing import Lock as p_lock
 from time import time
-from l_buffer.l_buffer import c_buffer
-from tools.c_tools import c_convert
-from tools.c_redis import myredis
+from globals.c_globals import viewables
+from tools.c_tools import c_convert, c_buffer
+from startup.redis import my_redis as startup_redis
+from streams.redis import my_redis as streams_redis
 from drawpad.drawpad import drawpad
 
 #from threading import enumerate
 
-redis = myredis()
-
 class c_viewer():
 
-  def __init__(self, parent, logger):
+  def __init__(self, type, idx, xdim, ydim, scaledown, logger):
     self.logger = logger
-    self.parent = parent
-    self.inqueue = c_buffer(call=self.callback, timeout=5.0)
-    self.client_dict_lock = Lock()
+    self.type = type
+    self.id = idx
+    self.xdim = xdim
+    self.ydim = ydim
+    self.scaledown = scaledown
+    self.inqueue = c_buffer(
+      block_put = False, 
+      block_get = False, 
+      call = self.callback,
+    )
+    self.inqueue.display_qinfo('Init 1: ')
+    self.client_dict_lock = p_lock()
     self.client_dict = {}
     self.event_loop = None #see consumers
-    if self.parent.type in {'C', 'D'}:
+    if self.type == 'E':
+      self.drawpad = None
+    else:  
       self.drawpad = drawpad(self, self.logger)
-    self.framebuffer = None  
-    
-#    self.counter = 0
+      self.drawpad.mtype = self.type
+      self.drawpad.myid = self.id
+    self.framebuffer = None 
           
-  async def onf(self, client_nr):  
+  async def onf(self, client_nr):
+    if self.drawpad and not self.drawpad.mask_set:
+      await self.drawpad.set_mask()
     if not self.client_dict[client_nr]['busy'].is_set():
       self.client_dict[client_nr]['busy'].set()
       self.client_dict[client_nr]['lat_ts'] = time()
       ts = time()
-      frame = self.inqueue.get()[1]
-      if self.parent.type == 'D':
+      frame = (await self.inqueue.get())[1]
+      if self.type == 'D':
         if (self.drawpad.show_mask 
             and (self.drawpad.mask is not None)):
           frame = cv.addWeighted(frame, 1, 
             (255-self.drawpad.mask), 0.3, 0)
-      elif self.parent.type == 'C':
+      elif self.type == 'C':
         if (self.drawpad.show_mask 
             and (self.drawpad.mask is not None)):
           frame = cv.addWeighted(frame, 1, 
@@ -71,31 +84,29 @@ class c_viewer():
         to = 2 #bmp 
       frame = c_convert(frame, typein=1, typeout=to, 
         xout=self.client_dict[client_nr]['outx'])
-      if (int(redis.get('CAM-AI:KBInt')) 
-          or int(redis.get('CAM-AI:KillStream:' + str(self.parent.id)))):
+      if not startup_redis.get_running() or streams_redis.get_killing_stream(self.id):  
         return()  
       try:
         await self.client_dict[client_nr]['socket'].send(bytes_data = (
           self.client_dict[client_nr]['index'].encode()+frame
         ))
       except Disconnected:
-        logger.warning('*** Could not send Frame, socket closed...')    
+        logger.warning('*** Could not send Frame, socket closed...')
 
-  def callback(self):   
-    with self.client_dict_lock:
+  async def callback(self):  
+    with self.client_dict_lock: 
       for item in self.client_dict:
-        self.onf(item)
-        asyncio.run_coroutine_threadsafe(self.onf(item), self.event_loop)
+        await self.onf(item)
         
 
   def push_to_onf(self, outx, do_compress, websocket):
-    self.parent.add_view_count()
+    viewables[self.id][self.type].add_view_count()
     count = 0
     with self.client_dict_lock:
       while count in self.client_dict:
         count += 1
       client_info = {
-        'index' : self.parent.type + str(self.parent.id).zfill(6) + str(count).zfill(6),
+        'index' : self.type + str(self.id).zfill(6) + str(count).zfill(6),
         'busy' : Event(),
         'outx' : outx,
         'socket' : websocket,
@@ -110,7 +121,7 @@ class c_viewer():
   def pop_from_onf(self, client_nr):
     with self.client_dict_lock:
       del self.client_dict[client_nr]
-    self.parent.take_view_count()
+    viewables[self.id][self.type].take_view_count()
       
   def clear_busy(self, client_nr):
     if self.client_dict[client_nr]['lat_ts']:

@@ -14,15 +14,25 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+import asyncio
 from multiprocessing import Process, Queue
 from threading import Thread
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from traceback import format_exc
-from django.db import connections
+from logging import getLogger
+from setproctitle import setproctitle
+from asgiref.sync import sync_to_async
 from tools.l_tools import QueueUnknownKeyword
 from tools.c_redis import myredis
 from tools.c_tools import speedlimit, speedometer
+from tools.c_logger import log_ini
 from .models import stream
+
+proc_name_str = {
+  'C' : 'camera',
+  'D' : 'detector',
+  'E' : 'eventer',
+}
 
 def sigint_handler(signal, frame):
   #print ('Devices: Interrupt is caught')
@@ -41,7 +51,11 @@ class c_device():
     self.redis.fps_to_dev(self.type, self.dbline.id, 0.0)
     self.logger = logger
     self.do_run = False
-    self.viewer = None
+    self.viewer = None  
+  
+  @classmethod
+  async def init(cls, dbline, logger, detector=None):
+    return(cls(dbline, logger, detector))
 
   def run(self):
     if self.type == 'C':
@@ -60,18 +74,25 @@ class c_device():
     self.sl = speedlimit()
     self.som = speedometer()
     self.do_run = True
-    self.run_process = Process(target=self.runner)
-    connections.close_all()
+      
+    self.run_process = Process(target=self.s_run)
     self.run_process.start()
+    
+  def s_run():
+    self.logname = proc_name_str[self.type] + ' #' + str(self.id)
+    self.logger = getLogger(self.logname)
+    log_ini(self.logger, self.logname)
+    setproctitle('CAM-AI-' + proc_name_str[self.type].capitalize() 
+      + ' #'+str(self.id))
+    asyncio.run(self.a_runner())
 
-  def runner(self):
-    self.dbline = stream.objects.get(id=self.id)
-    Thread(target=self.in_queue_thread, name='InQueueThread').start()
+  async def a_runner(self):
+    asyncio.create_task(self.in_queue_thread())
     signal(SIGINT, sigint_handler)
     signal(SIGTERM, sigint_handler)
     signal(SIGHUP, sigint_handler)
 
-  def in_queue_handler(self, received):
+  async def in_queue_handler(self, received):
     if (received[0] == 'set_mask'):
       if self.viewer:
         mydrawpad = self.viewer.drawpad
@@ -87,11 +108,11 @@ class c_device():
       return(False)
     return(True)
 
-  def in_queue_thread(self):
+  async def in_queue_thread(self):
     try:
       while True:
-        received = self.inqueue.get()
-        #print(self.type+str(self.dbline.id)+' in_queue_thread:', self.type, self.dbline.id, received)
+        received = await sync_to_async(self.inqueue.get)()
+        print(self.type+str(self.dbline.id)+' in_queue_thread:', self.type, self.dbline.id, received)
         if (received[0] == 'stop'):
           self.do_run = False
           while not self.inqueue.empty():
@@ -120,7 +141,7 @@ class c_device():
       self.redis.set_record_dev('E', self.dbline.id, 1)
     else:
       change = True
-      self.redis.inc_record_dev(self.type, self.dbline.id)
+      self.redis.inc_record_dev(self.type, self.dbline.id)88
     #print('Rec+', self.type, self.dbline.id, self.redis.record_from_dev(self.type, self.dbline.id))
     if (self.type != 'C') and change:
       self.parent.add_record_count()

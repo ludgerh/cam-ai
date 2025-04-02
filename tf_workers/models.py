@@ -14,7 +14,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from math import sqrt
+#rom math import sqrt
 from django.db import models
 from django.utils import timezone
 from datetime import datetime
@@ -25,7 +25,7 @@ class worker(models.Model):
   active = models.BooleanField(default=True)
   name = models.CharField(max_length=100, default='New TF-Worker')
   maxblock = models.IntegerField(default=8)
-  timeout = models.FloatField(default=1.0)
+  timeout = models.FloatField(default=0.1)
   max_nr_models = models.IntegerField(default=64)
   gpu_sim_loading = models.FloatField(default=0.0)
   gpu_sim = models.FloatField(default=-1.0)
@@ -72,11 +72,9 @@ class school(models.Model):
   model_weight_constraint = models.FloatField(default=0.0)
   model_dropout = models.FloatField(default=0.0)
   model_stop_overfit = models.BooleanField(default=True)
-  l_rate_start = models.CharField(max_length=20, default='1e-4')
-  l_rate_stop = models.CharField(max_length=20, default='1e-7')
-  l_rate_delta_min = models.FloatField(default=0.0001)
-  l_rate_patience = models.IntegerField(default=3)
-  l_rate_decrement = models.FloatField(default=sqrt(0.1))
+  l_rate_start = models.CharField(max_length=20, default='0')
+  l_rate_stop = models.CharField(max_length=20, default='0')
+  l_rate_divisor = models.FloatField(default=1000.0) #learning rate = val_loss / this
   weight_min = models.FloatField(default=1.0)
   weight_max = models.FloatField(default=2.0)
   weight_boost = models.FloatField(default=8.0)

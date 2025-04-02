@@ -141,6 +141,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="col-sm-auto h4">
           <label class="m-2" for="start_lr">Starting Rate:</label>
           <select id="start_lr" value="1e-6">
+            <option value="0">0.0</option>
             <option value="1e-3">1e-3 (0.001)</option>
             <option value="1e-4">1e-4 (0.0001)</option>
             <option value="1e-5">1e-5 (0.00001)</option>
@@ -151,6 +152,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="col-sm-auto h4">
           <label class="m-2" for="stop_lr">Stopping Rate:</label>
           <select id="stop_lr" value="1e-6">
+            <option value="0">No limit</option>
             <option value="1e-3">1e-3 (0.001)</option>
             <option value="1e-4">1e-4 (0.0001)</option>
             <option value="1e-5">1e-5 (0.00001)</option>
@@ -159,19 +161,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           </select>
         </div>  
         <div class="col-sm-auto h4">
-          <label class="m-2" for="l_rate_patience">Patience</label>
-          <input class="m-2" type="number" id="l_rate_patience" size="10" 
-            min="3" max="1000" step="1">
-        </div>  
-        <div class="col-sm-auto h4">
-          <label class="m-2" for="l_rate_delta_min">Min. Delta</label>
-          <input class="m-2" type="number" id="l_rate_delta_min" size="10" 
-            min="0.0" max="0.99" step="0.00001">
-        </div>  
-        <div class="col-sm-auto h4">
-          <label class="m-2" for="l_rate_decrement">Decrement</label>
-          <input class="m-2" type="number" id="l_rate_decrement" size="10" 
-            min="0.01" max="0.99" step="0.00001">
+          <label class="m-2" for="l_rate_divisor">VL/LR Ratio</label>
+          <input class="m-2" type="number" id="l_rate_divisor" size="10" 
+            min="100" step="100">
         </div>  
       </div>  
     </div>
@@ -210,11 +202,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <table class="table">
       <thead>
         <tr>
-          <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>MWD</th><th>MWC</th>
-          <th>MDr</th><th>LR0</th><th>LR1</th><th>LDM</th><th>LPa</th><th>LDe</th>
-          <th>WMi</th><th>WMa</th><th>WBo</th><th>ESD</th><th>ESP</th><th>Min</th>
-          <th>Epochs</th><th>Loss</th><th>BinAcc</th><th>val_L</th><th>val_BinAcc</th>
-          <th>Status</th>
+          <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>LR0</th><th>LR1</th>
+          <th>LRa</th><th>WMi</th><th>WMa</th><th>WBo</th><th>ESD</th><th>ESP</th>
+          <th>Min</th><th>Epochs</th><th>Loss</th><th>BinAcc</th><th>AUC</th>
+          <th>val_L</th><th>val_BinAcc</th><th>val_AUC</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -328,14 +319,9 @@ function refresh_all() {
         newaddition += '<td>' + (parseInt(item.nr_tr) + parseInt(item.nr_va)) + '</td>';
         newaddition += '<td>' + item.model_type + '</td>';
         newaddition += '<td>' + item.model_image_augmentation.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.model_weight_decay.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.model_weight_constraint.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.model_dropout.toPrecision(2) + '</td>';
         newaddition += '<td>' + item.l_rate_start + '</td>';
         newaddition += '<td>' + item.l_rate_stop + '</td>';
-        newaddition += '<td>' + item.l_rate_delta_min.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.l_rate_patience.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.l_rate_decrement.toPrecision(2) + '</td>';
+        newaddition += '<td>' + item.l_rate_divisor.toPrecision(2) + '</td>';
         newaddition += '<td>' + item.weight_min.toPrecision(2) + '</td>';
         newaddition += '<td>' + item.weight_max.toPrecision(2) + '</td>';
         newaddition += '<td>' + item.weight_boost.toPrecision(2) + '</td>';
@@ -343,10 +329,12 @@ function refresh_all() {
         newaddition += '<td>' + item.early_stop_patience.toPrecision(2) + '</td>';
         newaddition += '<td>' + Math.round(item.minutes) + '</td>';
         newaddition += '<td>' + item.epochs + '</td>';
-        newaddition += '<td>' + item.loss.toPrecision(3) + '</td>';
-        newaddition += '<td>' + item.binacc.toPrecision(3) + '</td>';
-        newaddition += '<td>' + item.val_loss.toPrecision(3) + '</td>';
-        newaddition += '<td>' + item.val_binacc.toPrecision(3) + '</td>';
+        newaddition += '<td>' + item.loss.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.binacc.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.auc.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.val_loss.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.val_auc.toPrecision(4) + '</td>';
         newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/' 
           + item.id + '/" target="_blank">' + item.status + '</a></td>';
         newaddition += '</tr>';
@@ -431,9 +419,7 @@ $(document).ready(function() {
       init_var('#weightboost', 'weight_boost');
       init_var('#start_lr', 'l_rate_start');
       init_var('#stop_lr', 'l_rate_stop');
-      init_var('#l_rate_patience', 'l_rate_patience');
-      init_var('#l_rate_delta_min', 'l_rate_delta_min');
-      init_var('#l_rate_decrement', 'l_rate_decrement');
+      init_var('#l_rate_divisor', 'l_rate_divisor');
       init_var('#early_stop_patience', 'early_stop_patience');
       init_var('#early_stop_delta_min', 'early_stop_delta_min');
 {% endif %}

@@ -28,7 +28,7 @@ from django.http import HttpResponse
 from django.core.files.storage import FileSystemStorage
 from camai.c_settings import safe_import
 from access.c_access import access
-from tools.l_tools import djconf, protected_db
+from tools.l_tools import djconf
 from tools.c_tools import c_convert
 from tools.tokens import checktoken
 from tools.l_crypt import l_crypt
@@ -121,8 +121,7 @@ def upload_file(request, schoolnr):
 def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, token=None): 
   global crypter_dict
   if mode == 0:
-    frameline = protected_db(event_frame.objects.get, kwargs = {'id' : framenr, }, )
-    #frameline = event_frame.objects.get(id = framenr)
+    frameline = event_frame.objects.get(id = framenr)
     eventline = frameline.event
     streamline = eventline.camera
     if (crypt := frameline.encrypted):
@@ -138,7 +137,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
     else:
       filepath = schoolframespath + frameline.name
   elif mode == 1:
-    frameline = protected_db(trainframe.objects.get, kwargs = {'id' : framenr, }, )
+    frameline = trainframe.objects.get(id = framenr)
     schoolline = school.objects.get(id = frameline.school)
     filepath = schoolline.dir + 'frames/' + frameline.name
     if not os.path.exists(filepath):
@@ -146,12 +145,12 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
       filepath = filepath[:-3]+'cod'
     crypt = False
   elif mode == 2:
-    frameline = protected_db(archive.objects.get, kwargs = {'id' : framenr, }, )
+    frameline = archive.objects.get(id = framenr)
     filepath = archivepath + 'frames/' + frameline.name
     userset = set(dbuser.objects.filter(archive=frameline))
     crypt = False
   elif mode == 3:
-    frameline = protected_db(archive.objects.get, kwargs = {'id' : framenr, }, )
+    frameline = archive.objects.get(id = framenr)
     filepath = archivepath + 'videos/' + frameline.name + '.jpg'
     userset = set(dbuser.objects.filter(archive=frameline))
     crypt = False

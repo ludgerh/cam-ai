@@ -41,7 +41,7 @@ from tools.l_tools import djconf, displaybytes
 from tools.l_smtp import l_smtp, l_msg
 from camai.c_settings import safe_import
 from tools.c_logger import log_ini
-from tools.c_redis import myredis
+from startup.redis import my_redis as startup_redis
 from tools.c_tools import aget_smtp_conf
 from tf_workers.models import school, worker
 from trainers.models import trainer
@@ -50,6 +50,7 @@ from users.models import userinfo
 from access.models import access_control
 from access.c_access import access
 from users.userinfo import afree_quota
+from .redis import my_redis as tools_redis
 from .health import totaldiscspace, freediscspace
 
 db_password = safe_import('db_password') 
@@ -71,8 +72,6 @@ if school.objects.count():
   model_type = school.objects.first().model_type
 else:
   model_type = 'NotDefined'
-
-redis = myredis()
 
 logname = 'ws_tools'
 logger = getLogger(logname)
@@ -138,7 +137,7 @@ class health(AsyncWebsocketConsumer):
 # tools_async
 #*****************************************************************************
         
-def compress_backup(redis_key):
+def compress_backup(count):
   setproctitle('CAM-AI-Backup-Compression')
   nice(19)
   basepath = getcwd() 
@@ -146,7 +145,7 @@ def compress_backup(redis_key):
   if ospath.exists('temp/backup'):
     rmtree('temp/backup')
   makedirs('temp/backup') 
-  redis.set(redis_key, 'Compressing Database...')
+  tools_redis.set_zip_info(count, 'Compressing Database...')
   cmd = 'mariadb-dump --password=' + db_password + ' '
   cmd += '--user=CAM-AI --host=localhost --all-databases '
   cmd += '> temp/backup/db.sql'
@@ -173,7 +172,7 @@ def compress_backup(redis_key):
       zip_file.write(entry, entry.relative_to(dirpath))
       percentage = (count / total * 100)
       if percentage >= transmitted + 0.1:
-        redis.set(redis_key, str(round(percentage, 1)) + '% compressed')
+        tools_redis.set_zip_info(count, str(round(percentage, 1)) + '% compressed')
         transmitted = percentage
   chdir(basepath)
   
@@ -320,9 +319,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 'wspass',
                 'wsid',
               ))
-              while redis.get_start_worker_busy():
+              while startup_redis.get_start_worker_busy():
                 sleep(long_brake)
-              redis.set_start_worker_busy(params['item_nr'])
+              startup_redis.set_start_worker_busy(params['item_nr'])
               myschools = school.objects.filter(tf_worker=params['item_nr'])
               streamlist = []
               async for item1 in myschools:
@@ -330,9 +329,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 async for item2 in mystreams:
                   streamlist.append(item2.id)
               for i in streamlist:
-                while redis.get_start_stream_busy(): 
+                while startup_redis.get_start_stream_busy(): 
                   sleep(long_brake)
-                redis.set_start_stream_busy(i)
+                startup_redis.set_start_stream_busy(i)
           elif params['type'] == 't': #Trainer
             if resultdict['data']['status'] == 'new': 
               mytrainer = await trainer.objects.aget(id=params['item_nr'])
@@ -346,9 +345,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 'wspass',
                 'wsid',
               ))
-              while redis.get_start_trainer_busy():
+              while startup_redis.get_start_trainer_busy():
                 sleep(long_brake)
-              redis.set_start_trainer_busy(mytrainer.id)
+              startup_redis.set_start_trainer_busy(mytrainer.id)
           outlist['data'] = resultdict['data']['status'] 
         else:
           if params['type'] == 'w': #Worker 
@@ -397,17 +396,14 @@ class admin_tools_async(AsyncWebsocketConsumer):
           count = 0
           while count in self.backup_proc_dict:
             count += 1 
-          redis_key = 'CAM-AI.backup.zip'+str(count)
-          if redis.exists(redis_key):
-            redis.delete(redis_key)
-          self.backup_proc_dict[count] = Process(target=compress_backup, args=[redis_key])
+          tools_redis.purge_zip_info(count) 
+          self.backup_proc_dict[count] = Process(target=compress_backup, args=[count])
           self.backup_proc_dict[count].start()
           while self.backup_proc_dict[count].is_alive():
-            if redis.exists(redis_key):
-              outlist['data'] = redis.get(redis_key).decode("utf-8")
+            if (my_info := tools_redis.get_zip_info(count)):
+              outlist['data'] = my_info.decode("utf-8")
               outlist['callback'] = True
               await self.send(json.dumps(outlist))	
-              redis.delete(redis_key)
             else:  
               await asleep(long_brake) 
           outlist['data'] = 'OK'
@@ -449,8 +445,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'shutdown':
         if not self.scope['user'].is_superuser:
           await self.close()
-        redis.set_shutdown_command(1)
-        while redis.get_watch_status():
+        startup_redis.set_shutdown_command(1)
+        while startup_redis.get_watch_status():
           await asleep(long_brake) 
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
@@ -517,11 +513,11 @@ class admin_tools_async(AsyncWebsocketConsumer):
         output, _ = await p.communicate()
         for line in output.decode().split('\n'):
           logger.info(line);
-        redis.set_shutdown_command(2)
+        startup_redis.set_shutdown_command(2)
         outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
-        while redis.get_watch_status():
+        while startup_redis.get_watch_status():
           await asleep(long_brake)
           
       elif params['command'] == 'sendlogs':

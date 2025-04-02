@@ -15,6 +15,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import json
+import asyncio
 import xml.etree.ElementTree as ET
 from socket import (socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, gethostbyaddr, herror, 
   timeout, gaierror)
@@ -26,7 +27,7 @@ from urllib.parse import urlparse
 from psutil import net_if_addrs
 from onvif import ONVIFCamera, exceptions, init_log
 from subprocess import Popen, PIPE
-from tools.c_redis import myredis
+from .redis import my_redis as stream_redis
 
 # Constants:
 # stream type
@@ -367,7 +368,7 @@ class ptz_base():
     response = rput(url, headers=self.headers, auth=self.auth, data= xml.encode('utf-8'))
     if response.status_code == 200:
       self.abs_pos =(x, y, z)
-      self.redis.set_ptz_pos(self.id, self.abs_pos)
+      stream_redis.set_ptz_pos(self.id, self.abs_pos)
       return(True)
     else:
       return(None)
@@ -397,7 +398,7 @@ class ptz_base():
     response = rput(url, headers=self.headers, auth=self.auth, data= xml.encode('utf-8'))
     if response.status_code == 200:
       self.abs_pos =(x, y, z)
-      self.redis.set_ptz_pos(self.id, self.abs_pos)
+      stream_redis.set_ptz_pos(self.id, self.abs_pos)
       return(True)
     else:
       return(None)
@@ -409,7 +410,6 @@ class ptz_onvif(ptz_base):
   pass        
 
 class c_camera():
-  
   def __init__(self, idx, control_mode=0, control_ip=None, control_port=None, control_user=None, control_pass=None, 
       profilenr=0, url=None, logger=None):
     self.id = idx  
@@ -420,8 +420,8 @@ class c_camera():
     self.control_user = control_user
     self.control_pass = control_pass
     self.url = url
-    self.redis = myredis()
     self.ptz = {}
+    #control_mode = 99
     if control_mode == 0:
       self.myptz = {}
     if control_mode == 1:
@@ -467,7 +467,7 @@ class c_camera():
         self.ptz['zoom']['max'] = int(ggchild.text) 
         self.myptz = ptz_isapi(
           self.id,
-          self.redis,
+          stream_redis,
           self.control_ip, 
           self.control_port, 
           self.control_user, 
@@ -505,8 +505,8 @@ class c_camera():
       if self.status == 'OK':
         self.urlscheme = urlstart.replace('://', '://{user}:{pass}@')
         self.adminurl = urlstart.replace('://', '://' + self.control_user + ':'
-          + self.control_pass+'@')
-    self.redis.set_ptz(self.id, self.ptz)
+          + self.control_pass+'@')   
+    stream_redis.set_ptz(self.id, self.ptz)
           
   def create_users(self, name, passwd, level=USER):
     params = self.myonvif.devicemgmt.create_type('CreateUsers')
@@ -528,13 +528,17 @@ class c_camera():
         return(item)
     return(None)
       
-  def ffprobe(self):
+  async def ffprobe(self):
     cmds = ['ffprobe', '-v', 'fatal']
     if self.url[:4].upper() == 'RTSP':
       cmds += ['-rtsp_transport',  'tcp']
     cmds += ['-print_format', 'json', '-show_streams', self.url]
-    p = Popen(cmds, stdout=PIPE)
-    output, _ = p.communicate()
+    process = await asyncio.create_subprocess_exec(
+      *cmds,
+      stdout=asyncio.subprocess.PIPE,
+      stderr=asyncio.subprocess.PIPE
+    )
+    output, _ = await process.communicate()
     self.probe = json.loads(output)
     if len(self.probe) > 0:
       self.online = True

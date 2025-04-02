@@ -25,21 +25,27 @@ from .l_tools import djconf
 from .l_smtp import l_smtp, l_msg
 from .c_tools import list_from_queryset, get_smtp_conf
 
-logname = 'health'
-logger = getLogger(logname)
-log_ini(logger, logname)
-datapath = djconf.getconfig('datapath', 'data/')
-schoolframespath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
-recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
+
+schoolframespath = None
+recordingspath = None
 
 totaldiscspace = 1
 freediscspace = 1
 useddiscspace = 1
 
 def setdiscspace():
+  global schoolframespath
+  global recordingspath
   global totaldiscspace
   global freediscspace
   global useddiscspace
+  if schoolframespath is None:
+    logname = 'health'
+    logger = getLogger(logname)
+    log_ini(logger, logname)
+    datapath = djconf.getconfig('datapath', 'data/')
+    schoolframespath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
+    recordingspath = djconf.getconfig('recordingspath', datapath + 'recordings/')
   totaldiscspace, useddiscspace, freediscspace = disk_usage("/")
   if useddiscspace > totaldiscspace * 0.95:
     for userline in list_from_queryset(
@@ -92,8 +98,6 @@ def setdiscspace():
       if userline.mail_flag_discspace95:
         userline.mail_flag_discspace95 = False 
         userline.save(update_fields = ['mail_flag_discspace95', ]) 
-
-setdiscspace()
 
 def healthcheck():
   setdiscspace()

@@ -26,7 +26,6 @@ from setproctitle import setproctitle
 from logging import getLogger
 from datetime import datetime
 from django.utils import timezone
-from django.db import connections
 from tools.l_tools import djconf, get_dir_size
 from tools.l_smtp import l_smtp, l_msg
 from tools.c_tools import list_from_queryset, get_smtp_conf
@@ -40,19 +39,12 @@ from trainers.models import model_type
 from users.models import archive, userinfo
 from .models import (status_line_event, status_line_video, status_line_school,
  files_to_delete)
-
-datapath = djconf.getconfig('datapath', 'data/')
-recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
-if not recordingspath.exists():
-  makedirs(recordingspath)
-schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
-archivepath = Path(djconf.getconfig('archivepath', datapath + 'archive/'))
-schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
-
 check_interval = 5
 health_check_interval = 3600
 
 myredis = saferedis()
+
+my_cleanup = None   
 
 def sigint_handler(signal, frame):
   #print ('Devices: Interrupt is caught')
@@ -94,6 +86,7 @@ def len_from_redis_queue(name, idx):
   
 class c_cleanup():
   def __init__(self, *args, **kwargs):
+    self.recordingspath = None
     self.inqueue = Queue()
     self.model_dims = {}
     for schoolline in school.objects.filter(active = True):
@@ -107,11 +100,18 @@ class c_cleanup():
 
   def run(self):
     self.run_process = Process(target=self.runner)
-    connections.close_all()
     self.run_process.start()
 
   def runner(self):
     try:
+      if self.recordingspath is None:
+        datapath = djconf.getconfig('datapath', 'data/')
+        self.recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
+        if not self.recordingspath.exists():
+          makedirs(self.recordingspath)
+        self.schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
+        self.archivepath = Path(djconf.getconfig('archivepath', datapath + 'archive/'))
+        self.schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
       self.logname = 'cleanup'
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
@@ -150,7 +150,7 @@ class c_cleanup():
                 event_frame.objects.filter(deleted = True)
               ):
               #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
-              del_path = schoolframespath / frameline.name
+              del_path = self.schoolframespath / frameline.name
               if del_path.exists():
                 del_path.unlink()
               frameline.delete()
@@ -163,13 +163,13 @@ class c_cleanup():
               #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
               framelines = event_frame.objects.filter(event__id = eventline.id)
               for frameline in framelines:
-                del_path = schoolframespath / frameline.name
+                del_path = self.schoolframespath / frameline.name
                 if del_path.exists():
                   del_path.unlink()
                 frameline.delete()
               if (video_name := eventline.videoclip):
                 for ext in ['.jpg', '.mp4', '.webm']:
-                  delpath = recordingspath / (video_name + ext)
+                  delpath = self.recordingspath / (video_name + ext)
                   if delpath.exists():
                     delpath.unlink() 
               eventline.delete()  
@@ -271,8 +271,8 @@ class c_cleanup():
       )
 # ***** checking eventframes vs files
       framefileset = {
-        item.relative_to(schoolframespath).as_posix() 
-        for item in (schoolframespath / str(streamline.id)).rglob('*.bmp')
+        item.relative_to(self.schoolframespath).as_posix() 
+        for item in (self.schoolframespath / str(streamline.id)).rglob('*.bmp')
       }
       framedbquery = list_from_queryset(
         event_frame.objects.filter(deleted = False, event__camera = streamline.id)
@@ -292,10 +292,10 @@ class c_cleanup():
     files_to_delete_set = {
       '/'.join(item.split('/')[1:]) 
       for item in files_to_delete_list 
-      if item.startswith(recordingspath.as_posix() + '/')
+      if item.startswith(self.recordingspath.as_posix() + '/')
     }
     my_status_videos = status_line_video(made = timestamp)
-    filelist = list(recordingspath.iterdir())
+    filelist = list(self.recordingspath.iterdir())
     videos_temp = [item.name for item in filelist if (
       item.name[0] == 'C' 
       and item.suffix == '.mp4'
@@ -418,22 +418,22 @@ class c_cleanup():
       my_status_schools.save()
     #self.logger.info('Cleanup: Getting stream file sizes') 
     for streamline in list_from_queryset(stream.objects.all()): 
-      result = get_dir_size(schoolframespath / str(streamline.id))
+      result = get_dir_size(self.schoolframespath / str(streamline.id))
       for eventline in event.objects.filter(camera = streamline, double = False):
         if eventline.videoclip:
           for ext in ('.mp4', '.webm', '.jpg'):
-            if (recordingspath / eventline.videoclip).with_suffix(ext).exists():
+            if (self.recordingspath / eventline.videoclip).with_suffix(ext).exists():
               result += (
-                (recordingspath / eventline.videoclip).with_suffix(ext).stat().st_size
+                (self.recordingspath / eventline.videoclip).with_suffix(ext).stat().st_size
               )
       for archiveline in archive.objects.filter(stream = streamline):
         if archiveline.typecode == 0:
-          filepath = archivepath / 'frames' / archiveline.name
+          filepath = self.archivepath / 'frames' / archiveline.name
           if filepath.exists():
             result += filepath.stat().st_size
         elif archiveline.typecode == 1:
           for ext in ('.mp4', '.webm', '.jpg'):
-            filepath = (archivepath / 'videos' / archiveline.name).with_suffix(ext)
+            filepath = (self.archivepath / 'videos' / archiveline.name).with_suffix(ext)
             if filepath.exists():
               result += filepath.stat().st_size
       streamline.storage_quota = result
@@ -531,5 +531,3 @@ class c_cleanup():
   def stop(self):
     self.inqueue.put(('stop',))
     self.run_process.join()
-    
-my_cleanup = c_cleanup()    

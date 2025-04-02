@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -14,17 +14,13 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+import aiofiles
 from logging import DEBUG, FileHandler as LogFileHandler, StreamHandler as LogStreamHandler, Formatter
 from tools.l_tools import djconf, logdict
 from os import path, makedirs
 
-def log_ini(logger, logname):
+def do_log_ini(logger, logname, logpath, loglevelstring):
   logger.setLevel(DEBUG)
-  datapath = djconf.getconfig('datapath', 'data/')
-  logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
-  if not path.exists(logpath):
-    makedirs(logpath)
-  loglevelstring = djconf.getconfig('loglevel', default='INFO')
   fh = LogFileHandler(logpath+logname+'.log')
   fh.setLevel(logdict[loglevelstring])
   ch = LogStreamHandler()
@@ -36,3 +32,19 @@ def log_ini(logger, logname):
   logger.addHandler(ch)
   logger.addHandler(fh)
   logger.info('Started log for process '+logname+'...')
+
+def log_ini(logger, logname):
+  datapath = djconf.getconfig('datapath', 'data/')
+  logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
+  if not path.exists(logpath):
+    makedirs(logpath)
+  loglevelstring = djconf.getconfig('loglevel', default='INFO')
+  do_log_ini(logger, logname, logpath, loglevelstring)
+
+async def alog_ini(logger, logname):
+  datapath = await djconf.agetconfig('datapath', 'data/')
+  logpath = await djconf.agetconfig('logdir', default = datapath + 'logs/')
+  if not await aiofiles.os.path.exists(logpath):
+    await aiofiles.os.makedirs(logpath)
+  loglevelstring = await djconf.agetconfig('loglevel', default='INFO')
+  do_log_ini(logger, logname, logpath, loglevelstring)

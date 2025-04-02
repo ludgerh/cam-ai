@@ -38,14 +38,13 @@ from django.contrib.auth.hashers import check_password
 from camai.c_settings import safe_import
 from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
-from tools.djangodbasync import savedbline, getonelinedict, filterlinesdict
 from tools.c_logger import log_ini
 from tools.l_crypt import l_crypt
 from access.c_access import access
 from access.models import access_control
+from globals.c_globals import tf_workers
 from cleanup.models import status_line_school
 from schools.c_schools import get_taglist, check_extratags_async
-from startup.startup import tf_workers
 from tf_workers.models import school, worker
 from eventers.models import event, event_frame
 from trainers.models import trainframe, trainer
@@ -176,7 +175,10 @@ class schooldbutil(AsyncWebsocketConsumer):
       if params['command'] == 'gettrainimages' :
         lines = []
         async for line in await self.gettrainobjectlist(params['page_nr']):
-          made_by_nr = await sync_to_async(lambda: line.made_by)()
+          made_by_nr = await sync_to_async(
+            lambda: line.made_by, 
+            thread_sensitive=True, 
+          )()
           if made_by_nr is None:
             made_by = ''
           else:
@@ -247,13 +249,13 @@ class schooldbutil(AsyncWebsocketConsumer):
                 imagepath = schoolframespath + frameline.name
                 if self.schoolinfo is None:
                   schoolline = await school.objects.aget(id=params['school'])
-                  xytemp = self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
+                  xytemp = await self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
                   self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], }
               else:
                 frameline = await trainframe.objects.aget(id=item,)
                 if self.schoolinfo is None:
                   schoolline = await school.objects.aget(id=frameline.school)
-                  xytemp = self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
+                  xytemp = await self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
                   self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schoolline, }
                 imagepath = self.schoolinfo['schooldict'].dir + 'frames/' + frameline.name
               async with aiofiles.open(imagepath, mode = "rb") as f:
@@ -272,14 +274,17 @@ class schooldbutil(AsyncWebsocketConsumer):
               logger.warning('** getpredictions was cancelled')
               return()   
           if found_images:    
-            self.tf_worker.ask_pred(
+            await self.tf_worker.ask_pred(
               params['school'], 
               imglist, 
               self.tf_w_index,
             )
             predictions = np.empty((0, len(classes_list)), np.float32)
             while predictions.shape[0] < len(imglist):
-              predictions = np.vstack((predictions, self.tf_worker.get_from_outqueue(self.tf_w_index)))
+              predictions = np.vstack((
+                predictions, 
+                await self.tf_worker.get_from_outqueue(self.tf_w_index)
+              ))
           else:    
             predictions = np.zeros((len(params['idxs']), len(classes_list)), np.float32)
           outlist['data'] = (params['counts'], params['idxs'], predictions.tolist())
@@ -378,12 +383,12 @@ class schooldbutil(AsyncWebsocketConsumer):
             else:
               filterdict = None
           if filterdict is not None:
-            schooldictin = await getonelinedict(school, {'id' : params['school'], }, ['dir'])
-            sourcepath = schooldictin['dir']
-            schooldictout = await getonelinedict(school, {'id' : 1, }, ['dir'])
-            destpath = schooldictout['dir']
-            list_for_copy = await filterlinesdict(trainframe, filterdict)
-            for item in list_for_copy:
+            school_line = await school.objects.aget(id = params['school'])
+            sourcepath = school_line.dir
+            school_line = await school.objects.aget(id = 1)
+            destpath = school_line.dir
+            query_for_copy = await trainframe.objects.filter(**filterdict)
+            async for item in query_for_copy:
               if not (await check_extratags_async(params['school'], item)):
                 destfilename = uniquename(destpath, path.splitext(item['name'])[0], 'bmp')  
                 await aioshutil.copy(sourcepath + 'frames/' + item['name'], destpath + 'frames/' + destfilename)
@@ -397,7 +402,7 @@ class schooldbutil(AsyncWebsocketConsumer):
                   checked = False, made_by_id = item['made_by'],
                   img_sizes = item['img_sizes'],
                 )
-                await savedbline(newitem)
+                await newitem.asave()
           outlist['data'] = 'OK'
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))

@@ -24,8 +24,8 @@ from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
 from access.c_access import access
 from asgiref.sync import sync_to_async
-from startup.startup import streams
-from tools.c_redis import myredis
+from globals.c_globals import viewables, viewers
+from streams.redis import my_redis as streams_redis
 from tools.l_tools import djconf
 from tools.c_logger import log_ini
 from tools.tokens import checktoken
@@ -33,8 +33,6 @@ from tools.tokens import checktoken
 logname = 'ws_viewers'
 logger = getLogger(logname)
 log_ini(logger, logname)
-
-redis = myredis()
 
 longbreak = djconf.getconfigfloat('long_brake', 1.0)
 is_public_server = djconf.getconfigbool('is_public_server', False)
@@ -77,7 +75,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.debug('<-- ' + str(text_data))
+      #logger.info('<-- ' + str(text_data))
       if text_data[0] in {'C', 'D', 'E'}:
         mode = text_data[0]
         idx = int(text_data[1:7])
@@ -91,8 +89,13 @@ class triggerConsumer(AsyncWebsocketConsumer):
           do_compress = params['do_compress']
         else:
           do_compress = True  
-        mystream = streams[params['idx']]
-        show_cam = await sync_to_async(self.check_conditions)(self.scope['user'], mystream)
+        while not (params['idx'] in viewables and 'stream' in viewables[params['idx']]):
+          await asyncio.sleep(longbreak)
+        mystream = viewables[params['idx']]['stream']
+        show_cam = await sync_to_async(
+          self.check_conditions, 
+          thread_sensitive=True, 
+        )(self.scope['user'], mystream)
         if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
           outx = params['width']
           if params['mode'] == 'C':
@@ -103,9 +106,9 @@ class triggerConsumer(AsyncWebsocketConsumer):
                 outx = min(mystream.dbline.cam_max_x_view, outx)
             while not hasattr(mystream, 'mycam'):
               await asyncio.sleep(longbreak)
-            myviewer = mystream.mycam.viewer
+            myviewer = viewers[params['idx']][params['mode']]
           elif params['mode'] == 'D':
-            mydetector = mystream.mydetector
+            mydetector = viewables[params['idx']]['D']
             while mydetector.scaledown is None:
               await asyncio.sleep(longbreak)
             if outx > mystream.dbline.det_min_x_view:
@@ -115,20 +118,19 @@ class triggerConsumer(AsyncWebsocketConsumer):
                 outx = min(mystream.dbline.det_max_x_view, outx)
               if mydetector.scaledown > 1:
                 outx = min(outx, mystream.dbline.cam_xres / mydetector.scaledown)
-            myviewer = mydetector.viewer
+            myviewer = viewers[params['idx']][params['mode']]
           elif params['mode'] == 'E':
-            myeventer = mystream.myeventer
+            myeventer = viewables[params['idx']]['E']
             myeventer.inqueue.put(('setdscrwidth', outx, ))
             if outx > mystream.dbline.eve_min_x_view:
               outx *= mystream.dbline.eve_scale_x_view
               outx = max(mystream.dbline.eve_min_x_view, outx)
               if mystream.dbline.eve_max_x_view:
                 outx = min(mystream.dbline.eve_max_x_view, outx)
-            myviewer = myeventer.viewer
+            myviewer = viewers[params['idx']][params['mode']]
           myviewer.websocket = self
           myviewer.event_loop = asyncio.get_event_loop()
           outx = round(min(mystream.dbline.cam_xres, outx))
-          #print('Connecting', params['mode'], params['idx'])
           if show_cam:
             onf_index = myviewer.push_to_onf(outx, do_compress, self)
           else:
@@ -176,7 +178,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.debug('<-- ' + str(text_data))
+      #logger.info('<-- ' + str(text_data))
       params = json.loads(text_data)['data']
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
@@ -184,9 +186,8 @@ class c_viewConsumer(AsyncWebsocketConsumer):
         go_on = await access.check_async(params['mode'], params['idx'], self.scope['user'], 'R')
         if go_on:
           outlist['data'] = {}
-          outlist['data']['fps'] = round(redis.fps_from_dev(params['mode'], 
-            params['idx']), 2)
-          outlist['data']['viewers'] = redis.view_from_dev(params['mode'], params['idx'])
+          outlist['data']['fps'] = round(streams_redis.fps_from_dev(params['mode'], params['idx'], ), 2, )
+          outlist['data']['viewers'] = streams_redis.view_from_dev(params['mode'], params['idx'], )
           logger.debug('--> ' + str(outlist))
           try:
             await self.send(json.dumps(outlist))	

@@ -22,13 +22,11 @@ from logging import getLogger
 from traceback import format_exc
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
-from django.db import connection
-from django.db.utils import OperationalError
 from channels.generic.websocket import AsyncWebsocketConsumer
+from globals.c_globals import tf_workers
 from tools.c_logger import log_ini
 from tools.l_tools import djconf
 from access.c_access import access
-from startup.startup import tf_workers
 from tf_workers.models import worker
 from schools.c_schools import get_taglist
 
@@ -79,18 +77,13 @@ class predictionsConsumer(AsyncWebsocketConsumer):
         if 'tf_w_index' in self.mydatacache:
           return(xytemp)
     self.mydatacache['schooldata'][myschool] = {}
-    while True:
-      try:
-        tf_worker_object = await worker.objects.aget(school__id=myschool) 
-        break
-      except OperationalError:
-        connection.close() 
+    tf_worker_object = await worker.objects.aget(school__id=myschool) 
     self.mydatacache['workernr'] = tf_worker_object.id
     self.mydatacache['tf_w_index'] = (
       tf_workers[self.mydatacache['workernr']].register())
     tf_workers[self.mydatacache['workernr']].run_out(
       self.mydatacache['tf_w_index'])
-    xytemp = tf_workers[self.mydatacache['workernr']].get_xy(
+    xytemp = await tf_workers[self.mydatacache['workernr']].get_xy(
       myschool, self.mydatacache['tf_w_index'])
     self.mydatacache['schooldata'][myschool]['xdim'] = xytemp[0]
     self.mydatacache['schooldata'][myschool]['ydim'] = xytemp[1]
@@ -111,8 +104,10 @@ class predictionsConsumer(AsyncWebsocketConsumer):
           except User.DoesNotExist:
             self.user = None  
             
-          print('#####', self.user, indict['pass'])
-          if self.user and await sync_to_async(self.user.check_password)(indict['pass']):
+          if self.user and await sync_to_async(
+            self.user.check_password, 
+            thread_sensitive=True, 
+          )(indict['pass']):
             logger.debug('Success!')
             if not (indict['ws_id'] in self.datacache):
               self.datacache[indict['ws_id']] = {}
@@ -125,7 +120,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
             if 'tf_w_index' in self.mydatacache:
               tf_workers[self.mydatacache['workernr']].stop_out(
                 self.mydatacache['tf_w_index'])
-              tf_workers[self.mydatacache['workernr']].unregister(
+              await tf_workers[self.mydatacache['workernr']].unregister(
                 self.mydatacache['tf_w_index'])
               del self.mydatacache['tf_w_index']
             logger.info('Successful websocket-login: WS-ID: ' 
@@ -184,7 +179,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
           await self.checkschooldata(myschool)
           if ('imglist' in self.mydatacache['schooldata'][myschool]):
             if self.mydatacache['schooldata'][myschool]['imglist'] is not None:
-              tf_workers[self.mydatacache['workernr']].ask_pred(
+              await tf_workers[self.mydatacache['workernr']].ask_pred(
                 myschool, 
                 self.mydatacache['schooldata'][myschool]['imglist'], 
                 self.mydatacache['tf_w_index'],
@@ -197,7 +192,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
                     or my_worker.outqueue_empty(self.mydatacache['tf_w_index'])):
                   await asleep(medium_brake)
                 predictions = np.vstack((predictions, 
-                  my_worker.get_from_outqueue(self.mydatacache['tf_w_index'])))
+                  await my_worker.get_from_outqueue(self.mydatacache['tf_w_index'])))
               predictions = predictions.tolist()
             else:
               logger.warning('Defective image in ws_predictions / consumers') 
@@ -229,6 +224,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
               frame = cv.resize(frame, (
                 self.mydatacache['schooldata'][myschool]['ydim'], 
                 self.mydatacache['schooldata'][myschool]['xdim']))
+            frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)  
             self.mydatacache['schooldata'][myschool]['imglist'].append(frame)
           except KeyError:
             logger.warning('KeyError while adding image data')

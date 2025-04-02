@@ -50,6 +50,11 @@ def temp_func():
         s_item.trainers.add(t_item)
 proc_dict[version_flat('1.6.2a')] = temp_func
 
+def temp_func():
+  from tf_workers.models import worker
+  worker.objects.all().update(timeout = 0.1)
+proc_dict[version_flat('1.6.6a')] = temp_func
+
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)
   newflat = version_flat(new_str)

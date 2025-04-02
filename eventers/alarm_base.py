@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,6 +17,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import json
 from schools.c_schools import get_taglist
 
+class init_failed_exception(Exception):
+  def __init__(self, details):
+    super().__init__(details)
+    self.details = details
+    
+
 class alarm_base():
   def __init__(self, dbline, logger):
     self.params = json.loads(dbline.mendef)
@@ -24,7 +30,7 @@ class alarm_base():
     self.classes_list = get_taglist(dbline.mystream.eve_school.id)
     self.logger = logger
     
-  def action(self, pred):
+  async def action(self, pred):
     mylist = list(pred)[1:]
     self.maxpos = mylist.index(max(mylist))
 

@@ -24,12 +24,12 @@ from validators.domain import domain
 from validators.ip_address import ipv4, ipv6
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
-from tools.c_redis import myredis
+from startup.redis import my_redis as startup_redis
 from tools.l_tools import djconf
 from streams.c_camera import get_ip_address, get_ip_network, search_executor
-from startup.startup import streams
 from tf_workers.models import school
 from streams.models import stream as dbstream
+from globals.c_globals import viewables
 from users.models import userinfo
 from access.models import access_control
 from access.c_access import access
@@ -38,8 +38,6 @@ from access.c_access import access
 logname = 'ws_caminst'
 logger = getLogger(logname)
 log_ini(logger, logname)
-
-redis = myredis()
 
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 is_public_server = djconf.getconfigbool('is_public_server', False)
@@ -112,10 +110,10 @@ class acaminst(AsyncWebsocketConsumer):
           myaccess.r_w = 'W'
           await myaccess.asave()
           await access.read_list_async()
-        while redis.get_start_stream_busy():
+        while startup_redis.get_start_stream_busy():
           await asyncio.sleep(long_brake)
-        redis.set_start_stream_busy(newstream.id)
-        while (not (newstream.id in streams)):
+        startup_redis.set_start_stream_busy(newstream.id)
+        while (not (newstream.id in viewables and 'stream' in viewables[newstream.id])):
           await asyncio.sleep(long_brake)
         outlist['data'] = {'id' : newstream.id, } 
         logger.debug('--> ' + str(outlist)) 

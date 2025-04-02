@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,16 +15,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from django.apps import AppConfig
-from sys import argv
 
 class StartupConfig(AppConfig):
   default_auto_field = 'django.db.models.BigAutoField'
   name = 'startup'
-    
-  def ready(self):
-    if (argv[0].endswith('manage.py') and 'runserver' not in argv) and (not argv[0].endswith('gunicorn')):
-      print('Streams: Not starting extra threads here.')
-      return
-    from .startup import launch
-    launch()
-          

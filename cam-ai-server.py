@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -20,7 +20,7 @@ import sys
 from sys import argv
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from setproctitle import setproctitle
-from tools.c_redis import myredis
+from startup.redis import my_redis as startup_redis
 from time import sleep, time
 
 ctrl_c_count = 2
@@ -50,11 +50,10 @@ basepath = os.getcwd()
 print('***** CAM-AI server is running *****')
 print('Calling: python ' + ' '.join(argv[1:]))
 print()
-redis = myredis()
-redis.set_watch_status(2)
-while(redis.get_watch_status()):
-  if redis.get_watch_status() == 2:
-    redis.set_watch_status(1)
+startup_redis.set_watch_status(2)
+while(startup_redis.get_watch_status()):
+  if startup_redis.get_watch_status() == 2:
+    startup_redis.set_watch_status(1)
     call_pars = argv
     call_pars[0] = 'python'
     os.chdir(basepath)

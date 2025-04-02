@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -21,7 +21,7 @@ from django.contrib.auth.decorators import login_required
 from camai.c_settings import safe_import
 from access.c_access import access
 from streams.models import stream
-from startup.startup import streams
+from globals.c_globals import viewables
 from tools.l_tools import djconf
 from tools.tokens import checktoken
 from tf_workers.models import school
@@ -43,7 +43,7 @@ def onecam(request, camnr, tokennr=0, token=None):
   if not go_on:
     return(HttpResponse('No Access!'))
   dbline = stream.objects.get(id=camnr)
-  mycam = streams[camnr].mycam
+  mycam = viewables[camnr]['C']
   myurl = '/oneitem/cam/'
   if request.method == 'POST':
     form = CamForm(request.POST)
@@ -124,20 +124,20 @@ def onedetector(request, detectornr, tokennr=0, token=None):
   if not go_on:
     return(HttpResponse('No Access!'))
   dbline = stream.objects.get(id=detectornr)
-  mydetector = streams[detectornr].mydetector
+  mydetector = viewables[detectornr]['D']
   myurl = '/oneitem/detector/'
   if request.method == 'POST':
     form = DetectorForm(request.POST)
     if form.is_valid():
-      streams[detectornr].dbline.det_fpslimit = form.cleaned_data['det_fpslimit']
-      streams[detectornr].dbline.det_threshold = form.cleaned_data['det_threshold']
-      streams[detectornr].dbline.det_backgr_delay = form.cleaned_data['det_backgr_delay']
-      streams[detectornr].dbline.det_dilation = form.cleaned_data['det_dilation']
-      streams[detectornr].dbline.det_erosion = form.cleaned_data['det_erosion']
-      streams[detectornr].dbline.det_max_size = form.cleaned_data['det_max_size']
-      streams[detectornr].dbline.det_max_rect = form.cleaned_data['det_max_rect']
-      streams[detectornr].dbline.det_scaledown = form.cleaned_data['det_scaledown']
-      streams[detectornr].dbline.save(update_fields=[
+      mydetector.dbline.det_fpslimit = form.cleaned_data['det_fpslimit']
+      mydetector.dbline.det_threshold = form.cleaned_data['det_threshold']
+      mydetector.dbline.det_backgr_delay = form.cleaned_data['det_backgr_delay']
+      mydetector.dbline.det_dilation = form.cleaned_data['det_dilation']
+      mydetector.dbline.det_erosion = form.cleaned_data['det_erosion']
+      mydetector.dbline.det_max_size = form.cleaned_data['det_max_size']
+      mydetector.dbline.det_max_rect = form.cleaned_data['det_max_rect']
+      mydetector.dbline.det_scaledown = form.cleaned_data['det_scaledown']
+      mydetector.dbline.save(update_fields=[
         'det_fpslimit', 
         'det_threshold',
         'det_backgr_delay',
@@ -208,19 +208,19 @@ def oneeventer(request, eventernr, tokennr=0, token=None):
   if not go_on:
     return(HttpResponse('No Access!'))
   dbline = stream.objects.get(id=eventernr)
-  myeventer = streams[eventernr].mydetector.myeventer
+  myeventer = viewables[eventernr]['E']
   myurl = '/oneitem/eventer/'
   if request.method == 'POST':
     form = EventerForm(request.POST)
     if form.is_valid():
-      streams[eventernr].dbline.eve_fpslimit = form.cleaned_data['eve_fpslimit']
-      streams[eventernr].dbline.eve_margin = form.cleaned_data['eve_margin']
-      streams[eventernr].dbline.eve_event_time_gap = form.cleaned_data['eve_event_time_gap']
-      streams[eventernr].dbline.eve_shrink_factor = form.cleaned_data['eve_shrink_factor']
-      streams[eventernr].dbline.eve_sync_factor = form.cleaned_data['eve_sync_factor']
-      streams[eventernr].dbline.eve_school = form.cleaned_data['eve_school']
-      streams[eventernr].dbline.eve_alarm_email = form.cleaned_data['eve_alarm_email']
-      streams[eventernr].dbline.save(update_fields=[
+      myeventer.dbline.eve_fpslimit = form.cleaned_data['eve_fpslimit']
+      myeventer.dbline.eve_margin = form.cleaned_data['eve_margin']
+      myeventer.dbline.eve_event_time_gap = form.cleaned_data['eve_event_time_gap']
+      myeventer.dbline.eve_shrink_factor = form.cleaned_data['eve_shrink_factor']
+      myeventer.dbline.eve_sync_factor = form.cleaned_data['eve_sync_factor']
+      myeventer.dbline.eve_school = form.cleaned_data['eve_school']
+      myeventer.dbline.eve_alarm_email = form.cleaned_data['eve_alarm_email']
+      myeventer.dbline.save(update_fields=[
         'eve_fpslimit', 
         'eve_margin',
         'eve_event_time_gap',

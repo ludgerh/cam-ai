@@ -31,10 +31,10 @@ from django.views.generic.base import TemplateView
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from camai.c_settings import safe_import
-from startup.startup import streams
 from tools.l_tools import djconf
-from tools.c_redis import myredis
+from startup.redis import my_redis as startup_redis
 from streams.models import stream
+from globals.c_globals import viewables
 from users.models import userinfo
 from access.c_access import access
 from tf_workers.models import school, worker
@@ -43,8 +43,6 @@ from .models import camurl
 
 #from .forms import UploadFileForm
 #from pprint import pprint
-
-redis = myredis()
 
 emulatestatic = safe_import('emulatestatic') 
 datapath = djconf.getconfig('datapath', 'data/')
@@ -167,10 +165,10 @@ class inst_virt_cam(cam_inst_view):
       myaccess.r_w = 'W'
       myaccess.save()
       access.read_list_async()
-    while redis.get_start_stream_busy():
+    while startup_redis.get_start_stream_busy():
       sleep(long_brake)
-    redis.set_start_stream_busy(newstream.id)
-    while (not (newstream.id in streams)):
+    startup_redis.set_start_stream_busy(newstream.id)
+    while (not (newstream.id in viewables and 'stream' in viewables[newstream.id])):
       sleep(long_brake)
     return redirect('/')
     

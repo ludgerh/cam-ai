@@ -14,29 +14,14 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from multiprocessing import Lock as m_lock
-from tools.djangodbasync import filterlinesdict
+from multiprocessing import Lock as p_lock
 from django.db import connection
 from django.db.utils import OperationalError
 from .models import tag
 from tf_workers.models import school as db_school
 
-class school():
-
-  def __init__(self, idx):
-    self.lock = m_lock()
-
-school_dict = {}
-for item in db_school.objects.all():
-  school_dict[item.id] = school(item.id)
-
 def get_taglist(myschoolnr):
-  while True:
-    try:
-      taglist = list(tag.objects.filter(school = 1))
-      break
-    except OperationalError:
-      connection.close()
+  taglist = list(tag.objects.filter(school = 1))
   count = 0
   for item in taglist:
     item.id = count
@@ -66,9 +51,9 @@ def check_extratags(myschoolnr, mytrainframe):
   return(False)
 
 async def check_extratags_async(myschoolnr, mytrainframe):
-  extralist = await filterlinesdict(tag, {'school' : myschoolnr, }, ['replaces'])
-  for item in extralist:
+  extra_query = await tag.objects.filter(school = myschoolnr)
+  for item in extra_query:
     for i in range(10):
-      if ((item['replaces'] == i) and mytrainframe['c'+str(i)]):
+      if ((item.replaces == i) and mytrainframe['c'+str(i)]):
         return(True)
   return(False)

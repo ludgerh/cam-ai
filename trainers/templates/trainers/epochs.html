@@ -1,5 +1,5 @@
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -51,7 +51,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <thead>
       <tr>
         <th>#</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>BinAcc</th>
-        <th>val_Loss</th><th>val_BinAcc</th>
+        <th>AUC</th><th>val_Loss</th><th>val_BinAcc</th><th>val_AUC</th>
       </tr>
     </thead>
     <tbody>
@@ -109,14 +109,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       Stopping Rate: <span id="l_rate_stop">?</span>
     </div>  
     <div class="col-sm-auto h4">
-      Patience: <span id="l_rate_patience">?</span>
-    </div>  
-    <div class="col-sm-auto h4">
-      Min. Delta: <span id="l_rate_delta_min">?</span>
-    </div>  
-    <div class="col-sm-auto h4">
-      Decrement: <span id="l_rate_decrement">?</span>
-    </div>  
+      VL/LR Ratio: <span id="l_rate_divisor">?</span>
+    </div> 
   </div>  
 </div>
 <div class="h2">
@@ -143,30 +137,23 @@ let graph_data = {
   labels: graph_labels,
   datasets: [
     {
-    label: 'BinAcc',
+    label: 'val_BinAcc',
     backgroundColor: 'rgb(200, 0, 0)',
     borderColor: 'rgb(200, 0, 0)',
     yAxisID: 'A',
     data: [],
     },
     {
-    label: 'val_BinAcc',
+    label: 'val_AUC',
     backgroundColor: 'rgb(0, 155, 0)',
     borderColor: 'rgb(0, 155, 0)',
     yAxisID: 'A',
     data: [],
     },
     {
-    label: 'loss',
+    label: 'val_Loss',
     backgroundColor: 'rgb(0, 0, 155)',
     borderColor: 'rgb(0, 0, 155)',
-    yAxisID: 'B',
-    data: [],
-    },
-    {
-    label: 'val_Loss',
-    backgroundColor: 'rgb(200, 155, 0)',
-    borderColor: 'rgb(200, 155, 0)',
     yAxisID: 'B',
     data: [],
     },
@@ -205,24 +192,24 @@ function refresh_all() {
       graph_data.datasets[0].data.length = 0;
       graph_data.datasets[1].data.length = 0;
       graph_data.datasets[2].data.length = 0;
-      graph_data.datasets[3].data.length = 0;
       newaddition = '';
       counter = 0;
       result.forEach(function(item, index) {
         counter += 1;
         graph_labels.push(counter);
-        graph_data.datasets[0].data.push(item.binacc);
-        graph_data.datasets[1].data.push(item.val_binacc);
-        graph_data.datasets[2].data.push(item.loss);
-        graph_data.datasets[3].data.push(item.val_loss);
+        graph_data.datasets[0].data.push(item.val_binacc);
+        graph_data.datasets[1].data.push(item.val_auc);
+        graph_data.datasets[2].data.push(item.val_loss);
         newaddition += '<tr>';
         newaddition += '<td>'+counter+'</td>';
         newaddition += '<td>'+Math.round(item.seconds)+'</td>';
         newaddition += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.auc.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_auc.toPrecision(4)+'</td>';
         newaddition += '</tr>';
         $('#tablebody').empty();
         $('#tablebody').append(newaddition);

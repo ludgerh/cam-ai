@@ -16,6 +16,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import asyncio
 import aiofiles.os
+import os
+import psutil
 import numpy as np
 from time import sleep
 from os import path, getpid, scandir
@@ -63,8 +65,8 @@ class djconfig():
         self.myredis.set('djconfig:'+item.setting, item.value)
     else:
       self.mycache = {}
-      for item in setting.objects.all():
-        self.mycache[item.setting] = item.value
+      #for item in setting.objects.all():
+      #  self.mycache[item.setting] = item.value
         
   def setconfig(self, param, value):
     try:
@@ -77,6 +79,18 @@ class djconfig():
     else:
       self.mycache[param] = value
     line.save()
+        
+  async def asetconfig(self, param, value):
+    try:
+      line = await setting.objects.aget(setting=param)
+      line.value = value
+    except setting.DoesNotExist:
+      line = setting(setting=param, value=value, comment='No Comment')
+    if self.redis:
+      self.myredis.set('djconfig:'+param, value)
+    else:
+      self.mycache[param] = value
+    await line.asave()
 
   def getconfig(self, param, default=None, forcedb=False):
     if self.redis:
@@ -86,7 +100,7 @@ class djconfig():
       if (not forcedb) and (param in self.mycache):
         return(self.mycache[param])   
     try:
-      result = protected_db(setting.objects.get, kwargs = {'setting' : param, }).value
+      result = setting.objects.get(setting = param).value
     except setting.DoesNotExist:
       result = default
     if self.redis:
@@ -103,10 +117,7 @@ class djconfig():
       if (not forcedb) and (param in self.mycache):
         return(self.mycache[param])   
     try:
-      result = (await aprotected_db(
-        setting.objects.aget, 
-        kwargs = {'setting' : param, },
-      )).value
+      result = (await setting.objects.aget(setting = param)).value
     except setting.DoesNotExist:
       result = default
     if self.redis:
@@ -124,6 +135,9 @@ class djconfig():
 
   def setconfigint(self, param, value):
     self.setconfig(param, str(value))
+
+  async def asetconfigint(self, param, value):
+    await self.asetconfig(param, str(value))
 
   def getconfigint(self, param, default=None, forcedb=False):
     temp = self.getconfig(param, forcedb=forcedb)
@@ -390,39 +404,14 @@ def get_dir_size(path='.'):
   except FileNotFoundError:
     total = 0        
   return total
-    
-def protected_db(function, args = (), kwargs = {}, logger = None):
-  while True:
-    try:
-      result = function(*args, **kwargs)
-      break
-    except OperationalError:
-      if logger:
-        logger.warning('*** Protected DB access failed. Retrying...')
-      connection.close()
-      sleep(0.1)  
-  return(result) 
   
-def protect_list_db(mylist, logger = None): 
-  while True:
-    try:
-      dummy = mylist[0]
-      break
-    except OperationalError:
-      if logger:
-        logger.warning('*** Protected DB access failed. Retrying...')
-      connection.close()
-      sleep(0.1)  
-    
-async def aprotected_db(function, args = (), kwargs = {}, logger = None):
-  while True:
-    try:
-      result = await function(*args, **kwargs)
-      break
-    except (OperationalError, DatabaseError):
-      if logger:
-        logger.warning('*** Protected DB access failed. Retrying...')
-      await sync_to_async(connection.close)()
-      await asyncio.sleep(0.1)
-  return(result) 
+def kill_all_processes():
+  parent = psutil.Process(os.getpid())
+  for child in parent.children(recursive=True):
+    child.terminate()
+  gone, still_alive = psutil.wait_procs(parent.children(), timeout=3)
+  if still_alive:
+    for child in still_alive:
+      child.kill()
+  os._exit(0)
 

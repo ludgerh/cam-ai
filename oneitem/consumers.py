@@ -22,20 +22,17 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
 from access.c_access import access
-#from tools.djangodbasync import deletefilter
 from tools.c_logger import log_ini
-from tools.c_redis import myredis
 from tf_workers.models import school
 from streams.models import stream
+from streams.redis import my_redis as streams_redis
+from globals.c_globals import viewers, viewables
 from eventers.models import evt_condition
-from startup.startup import streams
 from drawpad.models import mask
 
 logname = 'ws_oneitem'
 logger = getLogger(logname)
 log_ini(logger, logname)
-
-redis = myredis()
 
 class oneitemConsumer(AsyncWebsocketConsumer):
 
@@ -62,7 +59,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         self.mydetectordrawpad.make_screen()
         self.mydetectordrawpad.reduce_rings_size()
         self.mydetectordrawpad.mask_from_polygons()
-        self.myitem.mydetector.inqueue.put((
+        viewables[self.idx]['D'].inqueue.put((
           'set_mask', 
           self.mydetectordrawpad.ringlist
         ))
@@ -97,16 +94,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         if await access.check_async(params['mode'], params['itemid'], self.scope['user'], 'R'):
           self.mode = params['mode']
           self.idx = params['itemid']
-          self.mycamitem = streams[params['itemid']].mycam
-          if self.mode == 'C':
-            self.myitem = streams[params['itemid']].mycam
-            self.mydrawpad = self.myitem.viewer.drawpad
-            self.mydetectordrawpad = self.myitem.mydetector.viewer.drawpad
-          elif self.mode == 'D':
-            self.myitem = streams[params['itemid']].mydetector
-            self.mydrawpad = self.myitem.viewer.drawpad
-          elif self.mode == 'E':
-            self.myitem = streams[params['itemid']].mydetector.myeventer
+          self.mycamitem = viewables[params['itemid']]['C']
+          self.myitem = viewables[params['itemid']][self.mode]
+          if self.mode in {'C', 'D'}:
+            self.mydrawpad = viewers[params['itemid']][self.mode].drawpad
+            if self.mode == 'C':
+              self.mydetectordrawpad = viewers[params['itemid']]['D'].drawpad
           self.may_write = await access.check_async(
             params['mode'], 
             int(params['itemid']), 
@@ -114,9 +107,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           )
           self.scaling = params['scaling']
           outlist['data'] = {}
-          if (redis_data := redis.get_ptz(self.idx)):
+          if (redis_data := streams_redis.get_ptz(self.idx)):
             outlist['data']['ptz'] = redis_data
-          logger.debug('--> ' + str(outlist))
+          logger.info('--> ' + str(outlist))
           await self.safe_send(outlist)
         else:
           await self.close()
@@ -189,10 +182,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       elif params['command'] == 'setcbstatus':
         if self.may_write:
           if 'ch_show' in params:
-            if self.mydrawpad.mtype == 'C':
-              self.myitem.viewer.drawpad.show_mask = params['ch_show']
+            if self.mydrawpad.mtype in ('C', 'D'):
+              viewers[self.idx][self.mode].drawpad.show_mask = params['ch_show']
           if 'ch_edit' in params:
-            self.myitem.viewer.drawpad.edit_active = params['ch_edit']
+            viewers[self.idx][self.mode].drawpad.edit_active = params['ch_edit']
           if 'ch_apply' in params:
             myline = await stream.objects.aget(id = self.myitem.dbline.id)
             if self.mode == 'C':
@@ -317,7 +310,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         await self.safe_send(outlist)	
 
       elif params['command'] == 'getptz':
-        outlist['data'] = redis.get_ptz_pos(self.idx)
+        outlist['data'] = streams_redis.get_ptz_pos(self.idx)
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
 
@@ -425,8 +418,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
       elif params['command'] == 'delete_cam':
         if self.may_write:
-          if params['itemid'] in streams:
-            streams[params['itemid']].stop()
+          if params['itemid'] in viewables and 'stream' in viewables[params['itemid']]:
+            viewables[params['itemid']]['stream'].stop()
           streamline = await stream.objects.aget(id=params['itemid'])
           streamline.active = False
           await streamline.asave(update_fields=(("active"), ))

@@ -13,50 +13,77 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
-
+ 
+import asyncio                
 from logging import getLogger
 from traceback import format_exc
 from logging import getLogger
+from multiprocessing import SimpleQueue
+from asgiref.sync import sync_to_async
 from tools.c_logger import log_ini
-from tools.c_redis import myredis
+from globals.c_globals import add_viewer, add_viewable, tf_workers
 from detectors.c_detectors import c_detector
 from eventers.c_eventers import c_eventer
+from .redis import my_redis
 from .c_cams import c_cam
+from .models import stream as dbstream
+
+from globals.c_globals import viewables
 
 class c_stream():
-  def __init__(self, dbline):
-    self.dbline = dbline
-
-  def start(self):
+  def __init__(self, idx):
+    self.id = idx
+    
+  async def run(self): 
     try:
-      self.logname = 'stream #'+str(self.dbline.id)
+      self.dbline = await dbstream.objects.aget(id = self.id)
+      self.logname = 'stream #'+str(self.id)
       self.logger = getLogger(self.logname)
       log_ini(self.logger, self.logname)
-      self.redis = myredis()
-      self.redis.set('CAM-AI:KillStream:'+str(self.dbline.id), 0)
-      self.redis.name_to_stream(self.dbline.id, self.dbline.name)
+      my_redis.set_killing_stream(self.id, False)
       if self.dbline.eve_mode_flag:
-        self.myeventer = c_eventer(self.dbline, self.logger)
+        eve_school = await sync_to_async(lambda: self.dbline.eve_school)() 
+        tf_worker_db = await sync_to_async(lambda: eve_school.tf_worker)()
+        my_worker = tf_workers[tf_worker_db.id] 
+        self.myeventer = c_eventer(
+          self.dbline, 
+          my_worker.inqueue,
+          my_worker.registerqueue,
+          my_worker.id,
+          self.logger,
+        )
+        add_viewable(self.myeventer)
       if self.dbline.det_mode_flag:
-        self.mydetector = c_detector(self.dbline, self.logger)
-      self.mycam = c_cam(self.dbline, self.logger, self.mydetector)
-      if self.dbline.eve_mode_flag:
-        self.myeventer.parent = self.mydetector
-        self.mydetector.myeventer = self.myeventer
-      if self.dbline.det_mode_flag:
-        self.mydetector.parent = self.mycam
+        self.mydetector = c_detector(
+          self.dbline, 
+          self.myeventer.detectorqueue,
+          self.logger,
+        )
+        add_viewable(self.mydetector)
+      self.mycam = c_cam(
+        self.dbline, 
+        self.mydetector.dataqueue,
+        self.myeventer.dataqueue,
+        self.myeventer.inqueue,
+        self.logger,
+      )
+      add_viewable(self.mycam)
       if self.dbline.cam_mode_flag == 2:
-        self.mycam.run() 
-        if self.mydetector.dbline.det_mode_flag == 2:
-          self.mydetector.run()
-        if self.myeventer.dbline.eve_mode_flag == 2:
-          self.myeventer.run()
+        self.mycam.start() 
+        await self.mycam.run_here()
+        if self.dbline.det_mode_flag == 2:
+          self.mydetector.start()
+          await self.mydetector.run_here()
+        if self.dbline.eve_mode_flag == 2:
+          self.myeventer.start()
+          await self.myeventer.run_here()
     except:
-      self.logger.error(format_exc())
+      self.logger.error('Error in process: ' + self.logname)
+      self.logger.error(format_exc()) 
 
-  def stop(self):
-    self.redis.set('CAM-AI:KillStream:'+str(self.dbline.id), 1)
-    self.mycam.stop()
+  async def stop(self):
+    my_redis.set_killing_stream(self.dbline.id, True)
+    await self.mycam.stop()
     self.mydetector.stop()
     self.myeventer.stop()
     self.logger.info('Finished Process '+self.logname+'...')

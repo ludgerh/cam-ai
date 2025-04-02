@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -23,11 +23,15 @@ from django.contrib.auth.models import User
 from tools.c_logger import log_ini
 from access.c_access import access
 from streams.models import stream
-from startup.startup import streams
+from globals.c_globals import viewables
 
-logname = 'dyndns'
-logger = getLogger(logname)
-log_ini(logger, logname)
+logger = None
+
+def initialize():
+  global logger
+  logname = 'dyndns'
+  logger = getLogger(logname)
+  log_ini(logger, logname)
 
 def update(request, new_ip, task_url):
   user = None
@@ -68,7 +72,7 @@ def update(request, new_ip, task_url):
         else:
           streamline.cam_control_ip = new_ip
           streamline.save(update_fields=['cam_control_ip'])
-          streams[stream_nr].mycam.inqueue.put(('reset_cam', ))
+          viewables[stream_nr]['C'].inqueue.put(('reset_cam', ))
           logger.info('DynDNS Update: User ' + name + ' changed stream #'+str(stream_nr) + ' to ' + new_ip)
     return('good')  
   else:  

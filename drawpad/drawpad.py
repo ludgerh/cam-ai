@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -16,38 +16,42 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import numpy as np
 import cv2 as cv
+from globals.c_globals import viewables
 from json import dumps, loads
 from shapely.geometry import Point, LinearRing
+from asgiref.sync import sync_to_async
 from .models import mask
 
 class drawpad():
-
   def __init__(self, parent, logger):
     self.logger = logger
     self.parent = parent
-    self.myid = self.parent.parent.dbline.id
     self.edit_active = False
     self.show_mask = False
     self.edit_mask = False
-    if self.parent.parent.type == 'C':
+    if self.parent.type == 'C':
       self.whitemarks = False
-      self.scaledown = 1
-    elif self.parent.parent.type == 'D':
+    elif self.parent.type == 'D':
       self.whitemarks = True
-      self.scaledown = self.parent.parent.scaledown
+    self.scaledown = self.parent.scaledown
     self.backgr = (255,255,255)
     self.foregr = (0,0,0)
     self.radius = 20
-    self.xdim = self.parent.parent.dbline.cam_xres
-    self.ydim = self.parent.parent.dbline.cam_yres
-    self.mtype = 'C'
+    self.xdim = self.parent.xdim
+    self.ydim = self.parent.ydim
     self.ringlist = []
-    for item in mask.objects.filter(stream_id=self.myid, mtype=self.parent.parent.type):
+    self.mask_set = False
+    self.mypoint = None
+    
+  async def set_mask(self): 
+    self.mask_set = True
+    items = await sync_to_async(list)(mask.objects.filter(stream_id=self.myid, mtype=self.mtype))
+    for item in items:
       self.ringlist.append(loads(item.definition))
-    self.parent.parent.inqueue.put(('set_mask', self.ringlist))
+    viewables[self.myid][self.mtype].inqueue.put(('set_mask', self.ringlist))
     self.make_screen()
     self.mask_from_polygons()
-    self.mypoint = None
+    
     
   async def load_ringlist(self):
     self.ringlist = []

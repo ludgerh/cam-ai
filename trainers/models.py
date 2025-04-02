@@ -80,8 +80,10 @@ class fit(models.Model):
   nr_va = models.IntegerField(default=0)
   loss = models.FloatField(default=0)
   binacc = models.FloatField(default=0)
+  auc = models.FloatField(default=0)
   val_loss = models.FloatField(default=0)
   val_binacc = models.FloatField(default=0)
+  val_auc = models.FloatField(default=0)
   model_type = models.CharField(max_length=50, default='')
   model_image_augmentation = models.FloatField(default=0.0)
   model_weight_decay = models.FloatField(default=0.0)
@@ -90,9 +92,7 @@ class fit(models.Model):
   model_stop_overfit = models.BooleanField(default=True)
   l_rate_start = models.CharField(max_length=20, default='0')
   l_rate_stop = models.CharField(max_length=20, default='0')
-  l_rate_delta_min = models.FloatField(default=0.0)
-  l_rate_patience = models.IntegerField(default=0)
-  l_rate_decrement = models.FloatField(default=0.0)
+  l_rate_divisor = models.FloatField(default=0.0) #learning rate = val_loss / this
   weight_min = models.FloatField(default=0.0)
   weight_max = models.FloatField(default=0.0)
   weight_boost = models.FloatField(default=0.0)
@@ -110,6 +110,8 @@ class epoch(models.Model):
   val_loss = models.FloatField(default=0)
   binacc = models.FloatField(default=0)
   val_binacc = models.FloatField(default=0)
+  auc = models.FloatField(default=0)
+  val_auc = models.FloatField(default=0)
   learning_rate = models.FloatField(default=0)
 
   def __str__(self):

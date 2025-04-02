@@ -20,6 +20,12 @@ from django.contrib.auth.models import User as dbuser
 from channels.db import database_sync_to_async
 from .models import access_control
 
+access = None
+
+def initialize():
+  global access
+  access = c_access()
+  
 
 @receiver(post_save, sender=access_control)
 def create_user_api_key(sender, **kwargs):
@@ -93,5 +99,3 @@ class c_access():
       if self.check(type, item.id, user, mode):
         output.append(item)
     return(output)
-
-access = c_access()

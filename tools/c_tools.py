@@ -21,6 +21,7 @@ from time import time, sleep
 from random import randint
 from django.db import connection
 from django.db.utils import OperationalError
+from l_buffer.l_buffer import l_buffer
 from tools.models import setting as dbsetting
 from tools.l_tools import djconf
 
@@ -194,17 +195,9 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
     await f.write(myimage)
   
 def list_from_queryset(qs, logger = None):
-  while True:
-    result = [] 
-    try:
-      for item in qs:
-        result.append(item)
-      break  
-    except OperationalError:
-      if logger:
-        logger.warning('*** Protected DB access failled. Retrying...')
-      connection.close()
-      sleep(0.1)
+  result = [] 
+  for item in qs:
+    result.append(item)
   return(result) 
   
 def get_smtp_conf(extended_from = True):  
@@ -230,3 +223,37 @@ async def aget_smtp_conf(extended_from = True):
   'password' : await djconf.agetconfig('smtp_password', forcedb=True),
   'sender_email' : sender_email,
   })
+
+"""
+struct = coded list of transferred data blocks:
+  O --> Python object
+  L --> Large Python Object, going through shared memory
+  B --> Bytes, variable length
+  N --> Numpy array
+  
+m_proc: Use multiprocessing queues (default = True)
+q_len: Length of data queue (default = 1), None: no queue (only if not m_proc)
+block_put: Block put() until the previous data was read (default = True)
+block_get: Block get() until new data (default = True)
+put_timeout: Return after x seconds if blocked (default = None)
+get_timeout: Return after x seconds if blocked (default = None)
+call: Callback on the get side (default = None)
+debug: Debug level (default = 0 (no debug output))
+"""
+     
+class c_buffer(l_buffer):
+  def __init__(self, **kwargs):
+    return super().__init__(('NO'), **kwargs)
+  
+  async def put(self, frame):
+    objects = [frame[0]] + frame[2:]
+    await super().put((frame[1], objects, ))
+    
+  async def get(self, **kwargs):
+    if (result := await super().get(**kwargs)):
+      frame = [result[1][0], result[0]] + result[1][1:]
+    else:
+      frame = None  
+    return(frame)
+
+        
