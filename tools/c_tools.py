@@ -61,7 +61,10 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=N
   if typeout == 2:
     frame = cv.imencode('.bmp', frame)[1].tostring()
   elif typeout == 3:
+    #encode_param = [int(cv.IMWRITE_JPEG_QUALITY), 100]
+    #frame = cv.imencode('.jpg', frame, encode_param)[1].tostring()
     frame = cv.imencode('.jpg', frame)[1].tostring()
+  #print('*****', len(frame))  
   return(frame)
 
 

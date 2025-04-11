@@ -29,7 +29,8 @@ from traceback import format_exc
 from time import time
 from globals.c_globals import viewers
 from tools.c_spawn import viewable
-from streams.redis import my_redis as streams_redis
+from tools.l_break import a_break_time, a_break_type, BR_MEDIUM, BR_LONG
+from .redis import my_redis as streams_redis
 from .c_camera import c_camera
 
 from multiprocessing import SimpleQueue
@@ -44,22 +45,6 @@ class c_cam(viewable):
     self.eventer_inq = eventer_inq
     self.mycam = None
     super().__init__(logger, )
-    if self.dbline.cam_virtual_fps:
-      self.wd_ts = 0.0
-      self.wd_interval = 1.0
-    else:
-      self.mycam = c_camera(
-        self.id,
-        control_mode = self.dbline.cam_control_mode,
-        control_ip=self.dbline.cam_control_ip, 
-        control_port=self.dbline.cam_control_port, 
-        control_user=self.dbline.cam_control_user, 
-        control_pass=self.dbline.cam_control_passwd, 
-        url=self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
-      )
-      self.mp4timestamp = 0.0
-      self.wd_ts = time()
-      self.wd_interval = 10.0 
 
   async def async_runner(self):
     import django
@@ -71,6 +56,22 @@ class c_cam(viewable):
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Camera #'+str(self.id))
+      if self.dbline.cam_virtual_fps:
+        self.wd_ts = 0.0
+        self.wd_interval = 1.0
+      else:
+        self.mycam = c_camera(
+          self.id,
+          control_mode = self.dbline.cam_control_mode,
+          control_ip=self.dbline.cam_control_ip, 
+          control_port=self.dbline.cam_control_port, 
+          control_user=self.dbline.cam_control_user, 
+          control_pass=self.dbline.cam_control_passwd, 
+          url=self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
+        )
+        self.mp4timestamp = 0.0
+        self.wd_ts = time()
+        self.wd_interval = 10.0 
       await super().async_runner() 
       self.viewer.drawpad.mask = None
       self.mode_flag = self.dbline.cam_mode_flag
@@ -201,7 +202,6 @@ class c_cam(viewable):
     return(result)
       
   async def run_one(self):
-    from tools.l_break import a_break_time, a_break_type, BR_MEDIUM
     if not self.do_run:
       return(None)     
     if self.dbline.cam_virtual_fps:
@@ -371,7 +371,6 @@ class c_cam(viewable):
       self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
 
   async def checkmp4(self):
-    from tools.l_break import a_break_type, BR_LONG
     try:
       while True:
         try:
@@ -418,7 +417,6 @@ class c_cam(viewable):
       self.logger.error(format_exc())
 
   async def watchdog(self):
-    from tools.l_break import a_break_time
     try:
       while True:
         try:

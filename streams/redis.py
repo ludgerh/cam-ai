@@ -91,7 +91,11 @@ class new_redis(saferedis):
     self.set(self.stringbase + 'fps:' + type + ':' + str(idx) + ':', str(value))
 
   def fps_from_dev(self, type, idx):
-    return(float(self.get(self.stringbase + 'fps:' + type + ':' + str(idx) + ':')))
+    result = self.get(self.stringbase + 'fps:' + type + ':' + str(idx) + ':')
+    if result:
+      return(float(result))
+    else:
+      return(0.0)  
 
   def x_y_res_to_cam(self, idx, xres, yres):
     self.set(self.stringbase + 'xres:'+str(idx)+':', xres)

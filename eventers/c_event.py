@@ -116,7 +116,7 @@ class c_event(list):
       self.savename = ''
       self.schoolnr = eventer_dbl.eve_school.id
       self.dbline = event()
-      self.dbline.camera = eventer_dbl
+      self.dbline.stream_line = eventer_dbl
       self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
       self.start = frame[2]
       self.end = frame[2]
@@ -131,22 +131,21 @@ class c_event(list):
       self.shrink_factor = eventer_dbl.eve_shrink_factor
       self.focus_max = np.max(frame[5][1:])
       self.focus_time = frame[2]
-      self.dbline.camera = eventer_dbl
       self.check_out_ts = None
-      if c_event.crypt is None:
-        if self.dbline.camera.encrypted:
-          if self.dbline.camera.crypt_key:
-            c_event.crypt = l_crypt(key=self.dbline.camera.crypt_key)
-          else:
-            c_event.crypt = l_crypt()
-            self.dbline.camera.crypt_key = c_event.crypt.key
-            self.dbline.camera.save(update_fields=['crypt_key'])
   
   @classmethod  
   async def create(cls, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
       idx, logger):
     instance = cls(tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
       idx, logger)
+    if c_event.crypt is None:
+      if instance.dbline.stream_line.encrypted:
+        if instance.dbline.stream_line.crypt_key:
+          c_event.crypt = l_crypt(key=instance.dbline.stream_line.crypt_key)
+        else:
+          c_event.crypt = l_crypt()
+          instance.dbline.stream_line.crypt_key = c_event.crypt.key
+          await instance.dbline.stream_line.asave(update_fields=['crypt_key'])
     await instance.a_init()   
     return instance 
     

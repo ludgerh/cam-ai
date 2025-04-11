@@ -59,7 +59,9 @@ class c_eventer(viewable):
     self.dbline = dbline
     self.id = dbline.id
     self.dataqueue = c_buffer()
-    self.detectorqueue = l_buffer('ONOOB', debug = 0, )
+    self.detectorqueue = l_buffer('ONOOB', 
+      #debug = self.type + str(self.id),
+    )
     self.worker_in = worker_inqueue
     self.worker_reg = worker_registerqueue
     self.tf_worker_id = worker_id
@@ -312,7 +314,6 @@ class c_eventer(viewable):
       display_list = [
         item for item in self.eventdict.values() if item.check_out_ts is None
       ]
-      #print('*** len(display_list):', len(display_list))
     if (display_list 
         and self.display_deque[0][2] > self.last_insert_ts + self.dbline.eve_sync_factor):
       return()
@@ -499,7 +500,6 @@ class c_eventer(viewable):
         test_ts = time() 
         tasks = [self.check_event(i, item) for i, item in self.eventdict.items()]
         await asyncio.gather(*tasks)
-        #print('*** Time for CheckEvents', time() - test_ts) 
     except:
       self.logger.error('Error in process: ' + self.logname + ' (check_events)')
       self.logger.error(format_exc())
@@ -546,6 +546,7 @@ class c_eventer(viewable):
             imglist, 
             self.tf_w_index,
           )
+          ts = time()
           predictions = []
           for frame in detector_buffer:
             if len(predictions) == 0:
@@ -553,7 +554,6 @@ class c_eventer(viewable):
             prediction = predictions[0]
             predictions = predictions[1:]
             frame = frame + [prediction]
-            print('*** Time for Predictions:', time() - ts)
             found = None
             margin = self.dbline.eve_margin
             for j, item in list(self.eventdict.items()):

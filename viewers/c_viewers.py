@@ -40,6 +40,7 @@ class c_viewer():
       block_put = False, 
       block_get = False, 
       call = self.callback,
+      #debug = '*** Viewer: ' + self.type + str(self.id),
     )
     self.inqueue.display_qinfo('Init 1: ')
     self.client_dict_lock = p_lock()

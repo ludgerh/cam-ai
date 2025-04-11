@@ -63,13 +63,13 @@ class model_buffer(deque):
 
   def append(self, initem):
     # structure of initem:
-    # initem[0] = userindex, initem[1] = np.image, initem[2] = np.image...
+    # initem[0] = userindex, schoolnr, initem[1] = np.image, initem[2] = np.image...
     # structure of outitem:
     # outitem[0] = np.image, outitem[1] = userindex
     if self.pause:
       break_type(BR_LONG)
       return()
-    for frame in initem[1:]:
+    for frame in initem[2:]:
       if self.websocket:
         if frame.shape[1] * frame.shape[0] > self.xdim * self.ydim:
           frame = cv.resize(frame, (self.xdim, self.ydim))
@@ -162,14 +162,14 @@ class tf_worker(spawn_process):
     elif (received[0] == 'get_is_ready'):
       await self.my_output.put(received[1], ('put_is_ready', self.is_ready))
     elif (received[0] == 'get_xy'):
-      await self.check_model(received[1], self.logger, True)
-      while not 'xdim' in self.models[received[1]]:
+      await self.check_model(received[2], self.logger, True)
+      while not 'xdim' in self.models[received[2]]:
         await a_break_type(BR_LONG)
-      xdim = self.models[received[1]]['xdim']
-      ydim = self.models[received[1]]['ydim']
-      await self.my_output.put(received[2], ('put_xy', (xdim, ydim)))
+      xdim = self.models[received[2]]['xdim']
+      ydim = self.models[received[2]]['ydim']
+      await self.my_output.put(received[1], ('put_xy', (xdim, ydim)))
     elif (received[0] == 'ask_pred'):
-      schoolnr = received[1]
+      schoolnr = received[2]
       await self.check_model(schoolnr, self.logger, True)
       while not 'xdim' in self.models[schoolnr]:
         await a_break_type(BR_LONG)
@@ -180,13 +180,13 @@ class tf_worker(spawn_process):
           self.dbline.use_websocket,
         )
       self.model_buffers[schoolnr].pause = False
-      self.model_buffers[schoolnr].append(received[2:])
+      self.model_buffers[schoolnr].append(received[1:])
     elif (received[0] == 'register'):
       myuser = tf_user()
       self.users[myuser.id] = myuser
       self.registerqueue.put(myuser.id)
     elif (received[0] == 'checkmod'):
-      await self.check_model(received[1], self.logger, True)
+      await self.check_model(received[2], self.logger, True)
     else:
       result = False  
     return(result)
@@ -606,6 +606,7 @@ class tf_worker(spawn_process):
         for item in framelist:
           np.copyto(self.models[schoolnr]['int_input'](), item)
           await asyncio.to_thread(self.models[schoolnr]['model'].invoke)
+          #self.models[schoolnr]['model'].invoke()
           line=np.zeros((1, self.len_taglist), np.float32)
           np.copyto(line, self.models[schoolnr]['int_output']())
           predictions = np.vstack((predictions, line))
@@ -699,7 +700,7 @@ class tf_worker_client():
       self.logger.error(format_exc())
 
   async def register(self, worker_id):
-    await self.inqueue.put(('register', ))
+    await self.inqueue.put(('register', 0, ))
     self.tf_w_index = await asyncio.to_thread(self.registerqueue.get)
     self.id = worker_id
     self.my_output = output_dist(self.id)
@@ -713,34 +714,35 @@ class tf_worker_client():
     )
     return(self.tf_w_index)
 
-  async def unregister(self, index):
-    await self.inqueue.put(('unregister', index, ))
+  async def unregister(self, tf_w_index):
+    await self.inqueue.put(('unregister', tf_w_index, ))
 
-  async def check_ready(self, index):
+  async def check_ready(self, tf_w_index):
     if not self.is_ready:
       self.is_ready = None
-      await self.inqueue.put(('get_is_ready', index))
+      await self.inqueue.put(('get_is_ready', tf_w_index))
       while self.is_ready is None:
         await self.auto_break.wait()    
       self.auto_break.reset()  
     return(self.is_ready)
 
-  async def get_xy(self, school, index):
+  async def get_xy(self, school, tf_w_index):
     self.xy = None
-    await self.inqueue.put(('get_xy', school, index))
+    await self.inqueue.put(('get_xy', tf_w_index, school))
     while self.xy is None:
       await self.auto_break.wait()   
     self.auto_break.reset()  
     return(self.xy)
 
-  async def ask_pred(self, school, image_list, userindex):
-    command_line = ['ask_pred', school, userindex, ]
+  async def ask_pred(self, school, image_list, tf_w_index):
+    command_line = ['ask_pred', tf_w_index, school, ]
     command_line += image_list
     await self.inqueue.put(command_line)
 
-  async def client_check_model(self, schoolnr, test_pred = False):
+  async def client_check_model(self, tf_w_index, schoolnr, test_pred = False):
     await self.inqueue.put((
       'checkmod', 
+      tf_w_index, 
       schoolnr, 
       test_pred,
     ))

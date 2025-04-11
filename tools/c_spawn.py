@@ -37,7 +37,7 @@ class spawn_process(Process):
   def __init__(self, buffer_code = None):
     if buffer_code:
       self.use_buffer = True
-      self.inqueue = l_buffer(buffer_code, debug = 0)
+      self.inqueue = l_buffer(buffer_code, q_len = 10, multi_in = 1, )
     else:
       self.use_buffer = False
       self.inqueue = s_queue()
@@ -78,7 +78,7 @@ class spawn_process(Process):
     if self.is_alive():
       self.do_run = False
       if self.use_buffer:
-        await self.inqueue.put(('stop',))
+        await self.inqueue.put(('stop', 0, ))
       else:  
         self.inqueue.put(('stop',))
     
