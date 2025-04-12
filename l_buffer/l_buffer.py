@@ -126,32 +126,18 @@ class l_buffer():
     if self.debug and self.m_proc:
       print(info + f'{os.getpid()} is using queue with ID {self.data_queue._reader.fileno()} {self.data_queue._writer.fileno()}')
     
-  #async def on_sync_loop(self, data): 
-  #  self.shm_dict[data].close()
-  #  self.shm_dict[data].unlink()
-  #  del self.shm_dict[data] 
-    
-  #async def sync_loop_runner(self):
-  #  while self.do_run:
-  #    try:
-  #      data = await asyncio.to_thread(self.sync_queue.get)
-  #    except Empty:
-  #      data = '' 
-  #    if data:
-  #      await self.on_sync_loop(data)  
-    
   async def put_to_shelf(self, data): 
-      while self.do_run:
-        self.lock.acquire()
-        if not self.block_put or self.shelf == False: 
-          self.shelf = data
-          self.lock.release()
-          self.new_data = True
-          if data is not None and data != 'stop' and self.call is not None:
-            await self.call()  
-          return()  
-        else:
-          self.lock.release()
+    while self.do_run:
+      self.lock.acquire()
+      if not self.block_put or self.shelf is False: 
+        self.shelf = data
+        self.lock.release()
+        self.new_data = True
+        if data is not None and data != 'stop' and self.call is not None:
+          await self.call()  
+        return()  
+      else:
+        self.lock.release()
         await asyncio.sleep(self.brake_time) 
     
   async def data_loop_runner(self):
@@ -187,7 +173,7 @@ class l_buffer():
         ts = time()
       while self.do_run:
         with self.lock:
-          if not self.block_put or self.shelf == False: 
+          if not self.block_put or self.shelf is False: 
             if data != 'stop':
               data = enumerate(data) 
             self.shelf = data
@@ -211,17 +197,19 @@ class l_buffer():
       if self.debug:
         print(self.debug, '--- Put:', debug_display(data)) 
       return()
-    #if self.m_proc and self.sync_loop_task is None:
-    #  self.sync_loop_task = asyncio.create_task(self.sync_loop_runner()) 
     while len(data) > len(self.struct):
       self.struct += self.struct[-1]
       if self.m_proc: 
-        #self.sm_count = count_sm(self.struct)
         self.put_storage.append(deepcopy(PUT_STORAGE_ITEM))
     data_for_send = []
-    while (self.shm_deque 
-        and self.shm_deque[0][0] < self.put_count - self.data_queue.qsize() * 2):
-      print('-----', self.shm_deque.popleft())
+    while self.shm_deque:
+      age = self.put_count - self.shm_deque[0][0]
+      if age < 0:
+        age += 0xFFFF
+      if age > self.q_len + 2:
+        self.shm_deque.popleft()
+      else:
+        break  
     for i, item in enumerate(data):
       if not self.m_proc or  self.struct[i] == 'O':
         processed_item = item
@@ -244,9 +232,7 @@ class l_buffer():
           storage['last_size'] = data_length
           if data_length > storage['max_size']:
             storage['shm'] = sm.SharedMemory(create=True, size=data_length)
-            print('+++++', (self.put_count, storage['shm']))
             self.shm_deque.append((self.put_count, storage['shm']))
-            #self.shm_dict[storage['shm'].name] = storage['shm']
             processed_item['name'] = storage['shm'].name
             storage['max_size'] = data_length
         while storage['shm'].buf is None:
@@ -254,7 +240,7 @@ class l_buffer():
         storage['shm'].buf[:data_length] = data_bytes
       data_for_send.append((i, processed_item))
     if self.m_proc:  
-      if self.put_count < 1000000:
+      if self.put_count < 0xFFFF:
         self.put_count += 1
       else:
         self.put_count = 0  
@@ -263,7 +249,7 @@ class l_buffer():
         self.data_queue.put, 
         (data_for_send), 
         True, 
-        self.put_timeout,
+        self.put_timeout, #???
       )   
     except Empty:
       raise Empty
@@ -314,7 +300,9 @@ class l_buffer():
             storage_idx = data_in[self.multi_in]
           if storage_idx not in self.get_struct:
             self.get_struct[storage_idx] = self.struct
-            self.get_storage[storage_idx] = [deepcopy(GET_STORAGE_ITEM) for _ in self.struct]  
+            self.get_storage[storage_idx] = [
+              deepcopy(GET_STORAGE_ITEM) for _ in self.struct
+            ]  
         while len(data_in) > len(self.get_struct[storage_idx]):
           self.get_struct[storage_idx] += self.get_struct[storage_idx][-1]
           if self.m_proc:
@@ -368,15 +356,10 @@ class l_buffer():
       if self.m_proc:
         while not self.data_queue.empty():
           await asyncio.sleep(self.brake_time) 
-        #while not self.sync_queue.empty():
-        #  await asyncio.sleep(self.brake_time) 
-        #if self.sync_loop_task is not None:
-        #  self.sync_loop_task.cancel()
         for item in self.shm_deque:
           print('00000', item)
           item[1].close()
           item[1].unlink()
-        #self.sync_queue.put('stop')
     else:   
       while not self.data_queue.empty():
         await asyncio.sleep(self.brake_time) 

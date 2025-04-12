@@ -30,6 +30,7 @@ from time import time
 from globals.c_globals import viewers
 from tools.c_spawn import viewable
 from tools.l_break import a_break_time, a_break_type, BR_MEDIUM, BR_LONG
+from tools.l_sysinfo import is_raspi
 from .redis import my_redis as streams_redis
 from .c_camera import c_camera
 
@@ -491,6 +492,8 @@ class c_cam(viewable):
     outparams1 += ' pipe:1'
     inparams = ' -i "' + source_string + '"'
     generalparams = ' -v fatal'
+    if is_raspi():
+      generalparams += ' -threads 1'
     if not self.dbline.cam_virtual_fps:
       if source_string[:4].upper() == 'RTSP':
         generalparams += ' -rtsp_transport tcp'

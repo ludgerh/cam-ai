@@ -32,7 +32,10 @@ class c_detector(viewable):
     self.type = 'D'
     self.dbline = dbline
     self.id = dbline.id
-    self.dataqueue = c_buffer(block_put = False, debug = 0)
+    self.dataqueue = c_buffer(
+      block_put = False, 
+      #debug = 'Det' + str(self.id), 
+    )
     self.ev_detectorq = ev_detectorq
     self.scaledown = self.get_scale_down()
     super().__init__(logger, )
@@ -199,31 +202,23 @@ class c_detector(viewable):
                 rectb = self.rect_atob(recta)
                 rect_list.append(rectb)
                 recta = self.rect_btoa(rectb)
-      #print('++++++++++++++++++++ Detector ', self.id)
       if rect_list:          
         rect_list = self.merge_rects(rect_list)
         with self.ev_detectorq.multi_put_lock:
           for rect in rect_list[:self.dbline.det_max_rect]:
-            #print('00000 Detector ', self.id)
             recta = self.rect_btoa(rect)
             cv.rectangle(buffer1, recta, (200), self.linewidth)
             if ((recta[2]<=objectmaxsize) and (recta[3]<=objectmaxsize)):
               if not streams_redis.check_if_counts_zero('E', self.id):
-                #print('11111 Detector ', self.id)
                 if self.scaledown > 1:
                   rect = [item * self.scaledown for item in rect]
-                #print('22222 Detector ', self.id)
                 aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
-                #print('33333 Detector ', self.id)
                 await self.ev_detectorq.put((
                   3, aoi, frametime, rect, cv.imencode('.bmp', aoi)[1],
                 ))  
-                #print('44444 Detector ', self.id)
             else:
               self.background = np.float32(frame)
-          #print('55555 Detector ', self.id)
           await self.ev_detectorq.put('stop') 
-      #print('-------------------- Detector ', self.id)
       if self.dbline.det_backgr_delay == 0:
         self.buffer = frame
       else:

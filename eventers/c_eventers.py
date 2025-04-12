@@ -58,7 +58,10 @@ class c_eventer(viewable):
     self.type = 'E'
     self.dbline = dbline
     self.id = dbline.id
-    self.dataqueue = c_buffer()
+    self.dataqueue = c_buffer(
+      block_put = False, 
+      #debug = 'Eve' + str(self.id), 
+    )
     self.detectorqueue = l_buffer('ONOOB', 
       #debug = self.type + str(self.id),
     )
