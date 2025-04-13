@@ -55,6 +55,16 @@ def temp_func():
   worker.objects.all().update(timeout = 0.1)
 proc_dict[version_flat('1.6.6a')] = temp_func
 
+def temp_func():
+  from .l_sysinfo import is_raspi
+  from streams.models import stream 
+  stream.objects.all().update(
+    cam_fpslimit = 0,
+    det_fpslimit = 2.0,
+    eve_fpslimit = 0,
+  )
+proc_dict[version_flat('1.6.6d')] = temp_func
+
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)
   newflat = version_flat(new_str)
@@ -67,3 +77,4 @@ def version_upgrade(old_str, new_str):
       print(version_full(lastflat), '>', version_full(item))
       proc_dict[item]()
       lastflat = item
+  del procdict    
