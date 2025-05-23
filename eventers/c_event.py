@@ -16,9 +16,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import numpy as np
 import cv2 as cv
+import asyncio
 import aiofiles
 import aiofiles.os
-from asgiref.sync import sync_to_async
 from datetime import datetime
 from random import randint
 from os import path, makedirs
@@ -27,13 +27,17 @@ from collections import OrderedDict
 from threading import Lock as t_lock
 from django.conf import settings
 from django.utils import timezone
-from tools.l_tools import ts2filename, uniquename, np_mov_avg, djconf
+from channels.db import database_sync_to_async
+from tools.l_tools import ts2filename, uniquename_async, np_mov_avg, djconf
 from tools.l_crypt import l_crypt
 from tools.l_smtp import l_smtp, l_msg
-from tools.c_tools import do_reduction, get_smtp_conf
-from tools.tokens import maketoken
+from tools.c_tools import do_reduction, aget_smtp_conf
+from tools.tokens import maketoken_async
 from schools.c_schools import get_taglist
+from streams.models import stream as db_stream
 from .models import event, event_frame
+
+import os
 
 def resolve_rules(conditions, predictions):
   if predictions is None:
@@ -116,7 +120,7 @@ class c_event(list):
       self.savename = ''
       self.schoolnr = eventer_dbl.eve_school.id
       self.dbline = event()
-      self.dbline.stream_line = eventer_dbl
+      self.dbline.camera = eventer_dbl
       self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
       self.start = frame[2]
       self.end = frame[2]
@@ -132,31 +136,36 @@ class c_event(list):
       self.focus_max = np.max(frame[5][1:])
       self.focus_time = frame[2]
       self.check_out_ts = None
+      self.dirs_checked = False
   
   @classmethod  
   async def create(cls, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
       idx, logger):
     instance = cls(tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
       idx, logger)
+    instance.stream_creator = await database_sync_to_async(lambda: instance.dbline.camera.creator)()
     if c_event.crypt is None:
-      if instance.dbline.stream_line.encrypted:
-        if instance.dbline.stream_line.crypt_key:
-          c_event.crypt = l_crypt(key=instance.dbline.stream_line.crypt_key)
+      if instance.dbline.camera.encrypted:
+        if instance.dbline.camera.crypt_key:
+          c_event.crypt = l_crypt(key=instance.dbline.camera.crypt_key)
         else:
-          c_event.crypt = l_crypt()
-          instance.dbline.stream_line.crypt_key = c_event.crypt.key
-          await instance.dbline.stream_line.asave(update_fields=['crypt_key'])
+          c_event.crypt = l_crypt().key
+          instance.dbline.camera.crypt_key = c_event.crypt
+          await instance.dbline.camera.asave(update_fields=['crypt_key'])
     await instance.a_init()   
     return instance 
     
   async def a_init(self): 
-    self.datapath = await djconf.agetconfig('datapath', 'data/')
-    self.schoolpath = await djconf.agetconfig('schoolframespath', self.datapath + 'schoolframes/')
-    self.clienturl = settings.CLIENT_URL
-    if not await aiofiles.os.path.exists(self.schoolpath):
-      await aiofiles.os.makedirs(self.schoolpath)
-    self.number_of_frames = await djconf.agetconfigint('frames_event', 32) 
-    self.tag_list = await sync_to_async(get_taglist, thread_sensitive=True, )(self.schoolnr)
+    if not self.dirs_checked:
+      self.dirs_checked = True
+      self.datapath = await djconf.agetconfig('datapath', 'data/')
+      self.schoolpath = await djconf.agetconfig('schoolframespath', self.datapath + 'schoolframes/')
+      self.clienturl = settings.CLIENT_URL
+      for i in range(100):
+        pathadd = str(self.dbline.camera.id) + '/' + str(i)
+        await aiofiles.os.makedirs(self.schoolpath + pathadd, exist_ok=True)
+      self.number_of_frames = await djconf.agetconfigint('frames_event', 32) 
+    self.tag_list = await database_sync_to_async(get_taglist)(self.schoolnr)
 
   def add_frame(self, frame):
     with self.event_lock:
@@ -224,18 +233,44 @@ class c_event(list):
 
   def frames_filter(self, outlength, cond_dict):  
     sortindex = [x for x in self.frames if (
-      resolve_rules(cond_dict[2],  self.frames[x][7])
-        or resolve_rules(cond_dict[3], self.frames[x][7])
-        or resolve_rules(cond_dict[4],  self.frames[x][7])
+      resolve_rules(cond_dict[2],  self.frames[x][5])
+        or resolve_rules(cond_dict[3], self.frames[x][5])
+        or resolve_rules(cond_dict[4],  self.frames[x][5])
     )] 
     if len(sortindex) > outlength:
-      sortindex.sort(key=lambda x: np.max(self.frames[x][7][1:]), reverse=True) #prediction
+      sortindex.sort(key=lambda x: np.max(self.frames[x][5][1:]), reverse=True) #prediction
       sortindex = sortindex[:outlength]
       sortindex.sort(key=lambda x: self.frames[x][2]) #timestamp
     self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
+    
+  async def process_frame(self, frame):
+    pathadd = str(self.dbline.camera.id) + '/' + str(randint(0,99))
+    filename = await uniquename_async(
+      self.schoolpath, 
+      pathadd + '/' + ts2filename(frame[2], noblank=True), 
+      'bmp', 
+    )
+    bmp_data =  frame[4]
+    if c_event.crypt is not None:
+      bmp_data = c_event.crypt.encrypt(bmp_data)
+    async with aiofiles.open(self.schoolpath+filename, "wb") as f:
+      await f.write(bmp_data)
+    frameline = event_frame(
+      time = timezone.make_aware(datetime.fromtimestamp(frame[2])),
+      name = filename,
+      encrypted = c_event.crypt is not None,
+      x1 = frame[3][0],
+      x2 = frame[3][1],
+      y1 = frame[3][2],
+      y2 = frame[3][3],
+      event = self.dbline,
+    )
+    if self.to_email:
+      frame.append(frameline.id)
+    await frameline.asave() 
 
   async def save(self, cond_dict):
-    print('*** Saving Event:', self.id)
+    #print('*** Saving Event:', self.id)
     self.frames_filter(self.number_of_frames, cond_dict)
     frames_to_save = self.frames.values()
     self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
@@ -249,45 +284,23 @@ class c_event(list):
     self.dbline.numframes=len(frames_to_save)
     self.dbline.done = not self.goes_to_school
     await self.dbline.asave()
-    self.mailimages = []
-    for frame in frames_to_save:
-      pathadd = str(self.dbline.camera.id)+'/'+str(randint(0,99))
-      if not await aiofiles.os.path.exists(self.schoolpath+pathadd):
-        await aiofiles.os.makedirs(self.schoolpath+pathadd)
-      filename = uniquename(self.schoolpath, pathadd+'/'+ts2filename(frame[2], 
-        noblank=True), 'bmp')
-      bmp_data =  frame[8]
-      if c_event.crypt is not None:
-        bmp_data = c_event.crypt.encrypt(bmp_data)
-      async with aiofiles.open(self.schoolpath+filename, "wb") as f:
-        await f.write(bmp_data)
-      frameline = event_frame(
-        time = timezone.make_aware(datetime.fromtimestamp(frame[2])),
-        name = filename,
-        encrypted = c_event.crypt is not None,
-        x1 = frame[3],
-        x2 = frame[4],
-        y1 = frame[5],
-        y2 = frame[6],
-        event = self.dbline,
-      )
-      await frameline.asave()
-      if self.to_email:
+    await asyncio.gather(*(self.process_frame(frame) for frame in frames_to_save))
+    if self.to_email:
+      self.mailimages = []
+      for frame in frames_to_save:
         imagedata = cv.imdecode(
-          np.frombuffer(frame[8], dtype=np.uint8), cv.IMREAD_UNCHANGED
+          np.frombuffer(frame[4], dtype=np.uint8), cv.IMREAD_UNCHANGED
         )
         imagedata = do_reduction(imagedata, 200, 200)
         imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
-        self.mailimages.append([frameline.id, frame[2], imagedata, 'jpg', 'image'])
-      else:
-        self.mailimages.append([frameline.id])
-    if self.to_email:
-      self.send_emails()
+        self.mailimages.append([frame[6], frame[2], imagedata, 'jpg', 'image'])
+      await self.send_emails()
 
-  def send_emails(self):
+  async def send_emails(self):
+    print('Sending Email:', self.to_email)
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
-      mytoken = maketoken('EVR', self.dbline.id, receiver)
+      mytoken = await maketoken_async('EVR', self.id, receiver)
       subject = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
         + self.p_string())
       to_email = receiver
@@ -295,7 +308,7 @@ class c_event(list):
       plain_text += 'We had some movement.\n'  
       if self.savename:
         plain_text += 'Here is the movie: \n' 
-        plain_text += self.clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
+        plain_text += self.clienturl + 'schools/getbigmp4/' + str(self.id) + '/'
         plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
       plain_text += 'Here are the images: \n'  
       for item in self.mailimages:
@@ -317,7 +330,7 @@ class c_event(list):
           self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
           html_text += '<br>Here is the movie (click on the image to see): <br> \n' 
           html_text += ('<a href="' + self.clienturl + 'schools/getbigmp4/' 
-            + str(self.dbline.id) + '/')
+            + str(self.id) + '/')
           html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
           html_text += '" target="_blank">'
           html_text += '<img src="cid:image0" style="width: 400px; height: auto"></a> <br>\n'
@@ -332,8 +345,9 @@ class c_event(list):
           html_text += ('<img src="cid:image' + str(item[0]) 
             + '" style="width: 200px; height: 200px; object-fit: contain"</a> \n')
       html_text += '<br> \n'
-      smtp_conf = get_smtp_conf()
+      smtp_conf = await aget_smtp_conf()
       my_smtp = l_smtp(**smtp_conf)
+      await my_smtp.async_init()
       my_msg = l_msg(
         smtp_conf['sender_email'],
         receiver,
@@ -343,13 +357,14 @@ class c_event(list):
       )
       for item in self.mailimages:
         my_msg.attach_jpeg(item[2], 'image' + str(item[0]))  
-      my_smtp.sendmail(
+      await my_smtp.sendmail(
         smtp_conf['sender_email'],
         receiver,
         my_msg,
       )
       if my_smtp.result_code:
+        print('*****', my_smtp.result_code, my_smtp.answer, my_smtp.last_error)
         self.logger.error('SMTP: ' + my_smtp.answer)
         self.logger.error(str(my_smtp.last_error))
-      my_smtp.quit()
+      await my_smtp.quit()
 

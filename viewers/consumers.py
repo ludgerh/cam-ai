@@ -23,9 +23,9 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
 from access.c_access import access
-from asgiref.sync import sync_to_async
 from globals.c_globals import viewables, viewers
 from streams.redis import my_redis as streams_redis
+from streams.models import stream
 from tools.l_tools import djconf
 from tools.c_logger import log_ini
 from tools.tokens import checktoken
@@ -92,10 +92,11 @@ class triggerConsumer(AsyncWebsocketConsumer):
         while not (params['idx'] in viewables and 'stream' in viewables[params['idx']]):
           await asyncio.sleep(longbreak)
         mystream = viewables[params['idx']]['stream']
-        show_cam = await sync_to_async(
-          self.check_conditions, 
-          thread_sensitive=True, 
-        )(self.scope['user'], mystream)
+        mystream.dbline = await stream.objects.aget(id = params['idx'])
+        show_cam = await database_sync_to_async(self.check_conditions)(
+          self.scope['user'], 
+          mystream,
+        )
         if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
           outx = params['width']
           if params['mode'] == 'C':
@@ -164,10 +165,6 @@ class triggerConsumer(AsyncWebsocketConsumer):
 #*****************************************************************************
 
 class c_viewConsumer(AsyncWebsocketConsumer):
-
-  @database_sync_to_async
-  def mychecktoken(self, *args):
-    return(checktoken(*args))
 
   async def connect(self):
     try:

@@ -19,20 +19,8 @@ import asyncio
 from signal import signal, SIGINT
 from .redis import my_redis as startup_redis
 from tools.l_tools import djconf, kill_all_processes
-#from django.apps import apps as django_apps
-#from time import sleep
-#import os
-#from traceback import format_exc
-#from aiomultiprocess import set_start_method
-#from camai.c_settings import safe_import
-#import schools.c_schools
-#from tf_workers.c_tfworkers import tf_workers
-#from tools.health import stop as stophealth
-#from tools.version_upgrade import version_upgrade
-#from cleanup.c_cleanup import my_cleanup, c_cleanup
-#from streams.c_streams import streams
-#data_path = safe_import('data_path') 
-#db_database = safe_import('db_database') 
+from tools.l_break import a_break_type, a_break_time, BR_LONG
+from tools.health import my_health_runner
 
 #from threading import enumerate
 
@@ -57,7 +45,6 @@ class startup_class():
       smtp_email,
     )
     from globals.c_globals import trainers, tf_workers, viewables
-    from tools.l_break import a_break_type, BR_LONG
     from camai.c_settings import safe_import
     data_path = safe_import('data_path') 
     db_database = safe_import('db_database') 
@@ -95,53 +82,55 @@ class startup_class():
         tf_workers[item].start()
       for item in viewables:
         await viewables[item]['stream'].run()
+      asyncio.create_task(self.restartcheck_thread())
+      asyncio.create_task(my_health_runner.health_task())  
+      self.cleanup = c_cleanup()
+      self.cleanup.run()  
       while self.do_run:  
         await asyncio.sleep(1.0)
-      return()  
-      self.cleanup = c_cleanup()
-      my_cleanup.run()  
-      check_thread = Thread(target = restartcheck_thread, name='RestartCheckThread').start()
     except:
       from traceback import format_exc
       logger.error('Error in process: ' + logname)
       logger.error(format_exc())  
       kill_all_processes()
 
-def restartcheck_thread():
-  from streams.c_streams import c_stream
-  from streams.models import stream
-  from tf_workers.c_tfworkers import tf_worker
-  from trainers.c_trainers import trainer
-  global restart_mode
-  while do_run:
-    if (command := startup_redis.get_shutdown_command()):
-      startup_redis.set_shutdown_command(0)
-      if command == 1:
-        restart_mode = 1
-      elif command == 2:  
-        restart_mode = 2
-      os.kill(os.getpid(), SIGINT)
-      return()
-    if (item := startup_redis.get_start_trainer_busy()):
-      if (item in trainers) and trainers[item].do_run:
-        trainers[item].stop()
-      trainers[item] = trainer(item)
-      trainers[item].run()
-      startup_redis.set_start_trainer_busy(0)
-    if (item := startup_redis.get_start_worker_busy()):
-      if (item in tf_workers) and tf_workers[item].do_run:
-        tf_workers[item].stop()
-      tf_workers[item] = tf_worker(item)
-      tf_workers[item].run()
-      startup_redis.set_start_worker_busy(0)
-    if (item := startup_redis.get_start_stream_busy()):
-      dbline = stream.objects.get(id=item)
-      if item in viewables:
-        viewables[item]['stream'].stop()
-      viewables[item]['stream'] = c_stream(dbline)
-      viewables[item]['stream'].start()
-      startup_redis.set_start_stream_busy(0)    
-    sleep(10.0)
+  async def restartcheck_thread(self):
+    from globals.c_globals import trainers, tf_workers, viewables
+    from streams.c_streams import c_stream
+    from streams.models import stream
+    from tf_workers.c_tf_workers import tf_worker
+    from trainers.c_trainers import trainer
+    global restart_mode
+    while self.do_run:
+      if (command := startup_redis.get_shutdown_command()):
+        startup_redis.set_shutdown_command(0)
+        if command == 1:
+          restart_mode = 1
+        elif command == 2:  
+          restart_mode = 2
+        os.kill(os.getpid(), SIGINT)
+        return() 
+      if (item := startup_redis.get_start_trainer_busy()):
+        if (item in trainers) and trainers[item].do_run:
+          trainers[item].stop()
+        trainers[item] = trainer(item)
+        trainers[item].run()
+        startup_redis.set_start_trainer_busy(0)
+      if (item := startup_redis.get_start_worker_busy()):
+        if (item in tf_workers) and tf_workers[item].do_run:
+          tf_workers[item].stop()
+        tf_workers[item] = tf_worker(item)
+        tf_workers[item].run()
+        startup_redis.set_start_worker_busy(0)
+      if (item := startup_redis.get_start_stream_busy()):
+        if item in viewables:
+          await viewables[item]['stream'].stop()
+        else:
+          viewables[item] = {} 
+        viewables[item]['stream'] = c_stream(item)
+        await viewables[item]['stream'].run()
+        startup_redis.set_start_stream_busy(0)  
+      await a_break_time(10.0)  
     
     
 def launch():
@@ -169,9 +158,8 @@ async def newexit():
   startup_redis.set_running(False) 
   print ('Caught KeyboardInterrupt...')
   glob_startup.do_run = False
-  #sleep(5.0)
-  #stophealth()
-  #my_cleanup.stop()
+  my_health_runner.stop()
+  glob_startup.cleanup.stop()
   for i in viewables:
     print('Closing stream #', i)
     await viewables[i]['stream'].stop()
@@ -183,19 +171,13 @@ async def newexit():
     await trainers[i].stop()  
   if glob_startup.restart_mode == 0:
     startup_redis.set_watch_status(0) 
-    #for thread in enumerate(): 
-    #  print(thread)
     kill_all_processes()
   elif startup.restart_mode == 1:
     startup_redis.set_watch_status(0) 
-    #for thread in enumerate(): 
-    #  print(thread)
     os.system('sudo shutdown now')
     kill_all_processes()
   elif startup.restart_mode == 2:
     startup_redis.set_watch_status(2) 
-    #for thread in enumerate(): 
-    #  print(thread)
   exit(0) 
     
 def handle_signal(signum, frame):

@@ -35,5 +35,35 @@ class new_redis(saferedis):
   def set_zip_info(self, idx, info):  
     self.set(self.stringbase + str(idx) + ':', info) 
     
+  def get_totaldiscspace(self):
+    result = self.get('cam-ai.tools.totaldiscspace:')
+    if result is None:
+      return(0)
+    else:
+      return(int(result))
+      
+  def set_totaldiscspace(self, value): 
+    self.set('cam-ai.tools.totaldiscspace:', value)   
+    
+  def get_freediscspace(self):
+    result = self.get('cam-ai.tools.freediscspace:')
+    if result is None:
+      return(0)
+    else:
+      return(int(result))
+      
+  def set_freediscspace(self, value): 
+    self.set('cam-ai.tools.freediscspace:', value)   
+    
+  def get_useddiscspace(self):
+    result = self.get('cam-ai.tools.useddiscspace:')
+    if result is None:
+      return(0)
+    else:
+      return(int(result))
+      
+  def set_useddiscspace(self, value): 
+    self.set('cam-ai.tools.useddiscspace:', value)   
+    
     
 my_redis = new_redis()      

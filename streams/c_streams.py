@@ -19,7 +19,7 @@ from logging import getLogger
 from traceback import format_exc
 from logging import getLogger
 from multiprocessing import SimpleQueue
-from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
 from tools.c_logger import log_ini
 from globals.c_globals import add_viewer, add_viewable, tf_workers
 from detectors.c_detectors import c_detector
@@ -42,8 +42,8 @@ class c_stream():
       log_ini(self.logger, self.logname)
       my_redis.set_killing_stream(self.id, False)
       if self.dbline.eve_mode_flag:
-        eve_school = await sync_to_async(lambda: self.dbline.eve_school)() 
-        tf_worker_db = await sync_to_async(lambda: eve_school.tf_worker)()
+        eve_school = await database_sync_to_async(lambda: self.dbline.eve_school)() 
+        tf_worker_db = await database_sync_to_async(lambda: eve_school.tf_worker)()
         my_worker = tf_workers[tf_worker_db.id] 
         self.myeventer = c_eventer(
           self.dbline, 

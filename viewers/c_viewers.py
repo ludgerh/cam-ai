@@ -20,7 +20,7 @@ from threading import Event
 from multiprocessing import Lock as p_lock
 from time import time
 from globals.c_globals import viewables
-from tools.c_tools import c_convert, c_buffer
+from tools.c_tools import c_convert, c_buffer, add_view_count, take_view_count
 from startup.redis import my_redis as startup_redis
 from streams.redis import my_redis as streams_redis
 from drawpad.drawpad import drawpad
@@ -101,7 +101,7 @@ class c_viewer():
         
 
   def push_to_onf(self, outx, do_compress, websocket):
-    viewables[self.id][self.type].add_view_count()
+    add_view_count(self.type, self.id)
     count = 0
     with self.client_dict_lock:
       while count in self.client_dict:
@@ -122,7 +122,7 @@ class c_viewer():
   def pop_from_onf(self, client_nr):
     with self.client_dict_lock:
       del self.client_dict[client_nr]
-    viewables[self.id][self.type].take_view_count()
+    take_view_count(self.type, self.id)
       
   def clear_busy(self, client_nr):
     if self.client_dict[client_nr]['lat_ts']:

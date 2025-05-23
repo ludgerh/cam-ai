@@ -26,8 +26,10 @@ from tools.l_tools import djconf
 from tf_workers.models import school
 from trainers.models import trainframe
 from eventers.models import event, event_frame
-from cleanup.c_cleanup import my_cleanup, get_from_redis, get_from_redis_queue, len_from_redis_queue
-from cleanup.models import files_to_delete
+from .c_cleanup import my_cleanup
+from .redis import my_redis as cleanup_redis
+#from .redis import get_from_redis, get_from_redis_queue, len_from_redis_queue
+from .models import files_to_delete
 
 logname = 'ws_cleanup'
 logger = getLogger(logname)

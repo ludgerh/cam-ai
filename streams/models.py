@@ -18,6 +18,7 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from tf_workers.models import school
+from multiprocessing import Lock as p_lock
 
 class stream(models.Model):
   active = models.BooleanField(default=True)
@@ -29,7 +30,6 @@ class stream(models.Model):
   storage_quota = models.BigIntegerField(default=0)
   encrypted = models.BooleanField(default=True)
   crypt_key = models.BinaryField(max_length=256, default=b'')
-
   cam_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
   cam_view = models.BooleanField(default=True)
@@ -37,7 +37,7 @@ class stream(models.Model):
   cam_virtual_fps = models.FloatField(default=0.0) #0.0: Not virtual
   cam_xres = models.IntegerField(default=0)
   cam_yres = models.IntegerField(default=0)
-  cam_fpslimit = models.FloatField("Image FPS limit", default=2.0)
+  cam_fpslimit = models.FloatField("Image FPS limit", default=0.0)
   cam_fpsactual = models.FloatField(default=0)
   cam_min_x_view = models.IntegerField(default=0)
   cam_max_x_view = models.IntegerField(default=0)
@@ -81,7 +81,7 @@ class stream(models.Model):
   eve_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
   eve_view = models.BooleanField(default=True)
-  eve_fpslimit = models.FloatField("FPS limit", default=2.0)
+  eve_fpslimit = models.FloatField("FPS limit", default=0.0)
   eve_fpsactual = models.FloatField(default=0)
   eve_min_x_view = models.IntegerField(default=0)
   eve_max_x_view = models.IntegerField(default=0)
@@ -92,7 +92,13 @@ class stream(models.Model):
   eve_event_time_gap = models.IntegerField("new event gap", default=60)
   eve_margin = models.IntegerField("frame margin", default=20)
   eve_school = models.ForeignKey(school, on_delete=models.SET_DEFAULT, default=1)
-  eve_gpu_nr_cv = models.IntegerField(default=0)
+  eve_gpu_nr_cv = models.IntegerField(default=0) 
+  eve_webm_doit = models.BooleanField(default=False)
+  eve_webm_width = models.IntegerField(default=500) 
+  eve_webm_crf = models.IntegerField(default=51) 
+  eve_webm_fps = models.IntegerField(default=5) 
+  eve_webm_threads = models.IntegerField(default=1) 
+  eve_webm_procnum_limit = models.IntegerField(default=1) 
 
   def __str__(self):
     return('Stream model, name: '+self.name)

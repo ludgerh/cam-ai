@@ -27,7 +27,6 @@ from time import time, sleep
 from datetime import datetime
 from logging import getLogger
 from traceback import format_exc
-from asgiref.sync import sync_to_async
 from zipfile import ZipFile
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -210,7 +209,7 @@ class remotetrainer(AsyncWebsocketConsumer):
             sizeline = img_size(x=self.myschoolline.model_xin,
               y=self.myschoolline.model_yin)
             await sizeline.asave()
-          query_list = await sync_to_async(list, thread_sensitive=True, )(
+          query_list = await database_sync_to_async(list)(
             trainframe.objects.filter(
               school=indict['school'],
               deleted=False,
@@ -235,10 +234,7 @@ class remotetrainer(AsyncWebsocketConsumer):
             self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
           else:
             self.trainer_nr = 1  
-          creator = await sync_to_async(
-            lambda: self.myschoolline.creator, 
-            thread_sensitive=True, 
-          )()
+          creator = await database_sync_to_async(lambda: self.myschoolline.creator)()
           if await afree_quota(creator):
             result = {
               'status' : 'OK',
@@ -430,6 +426,7 @@ class trainerutil(AsyncWebsocketConsumer):
         else:
           if 'new_click' in params and params['new_click']:
             self.new_click = True
+          all_fits = fit.objects.filter(school=params['school'])
           last_fit = await fit.objects.filter(school=params['school']).alast()
           temp_count = await all_fits.acount()
           result = [] 
@@ -546,9 +543,7 @@ class trainerutil(AsyncWebsocketConsumer):
           myuser = self.scope['user']
         else:
           myuser = await User.objects.aget(username=params['name'])
-          if await sync_to_async(myuser.check_password, 
-            thread_sensitive=True, 
-          )(params['pass']):
+          if await database_sync_to_async(myuser.check_password)(params['pass']):
             self.authed = True
           if not self.authed:
             await self.close() 

@@ -37,7 +37,11 @@ class spawn_process(Process):
   def __init__(self, buffer_code = None):
     if buffer_code:
       self.use_buffer = True
-      self.inqueue = l_buffer(buffer_code, multi_in = 1, )
+      self.inqueue = l_buffer(
+        buffer_code, 
+        multi_in = 1, 
+        #debug = 'TF-Worker-In:',
+      )
     else:
       self.use_buffer = False
       self.inqueue = s_queue()
@@ -66,7 +70,7 @@ class spawn_process(Process):
           received = await asyncio.to_thread(self.inqueue.get)
         if (received[0] == 'stop'): 
           self.do_run = False
-          break
+          break 
         else:  
           if not await self.process_received(received):
             raise QueueUnknownKeyword(received[0])
@@ -98,6 +102,8 @@ class viewable(spawn_process):
     )))
     self.viewer = my_viewer
     self.viewer_queue = my_viewer.inqueue
+    streams_redis.zero_to_dev(self.type, self.id)
+    streams_redis.fps_to_dev(self.type, self.id, 0.0)
     super().__init__()
   
   async def run_here(self): #Run on the original (=Main-) Process 
@@ -109,83 +115,19 @@ class viewable(spawn_process):
   async def async_runner(self):
     from tools.c_tools import speedlimit, speedometer
     from streams.models import stream as dbstream
-    self.period = 0.0
-    self.sl = speedlimit()
-    self.som = speedometer()
-    streams_redis.zero_to_dev(self.type, self.id)
-    streams_redis.fps_to_dev(self.type, self.id, 0.0)
     self.dbline = await dbstream.objects.aget(id = self.id)
+    if self.type in ['D', 'E']:
+      if self.dbline.cam_virtual_fps:
+        self.sl = speedlimit(period = 0.0)
+      else:  
+        if self.type == 'D':
+          limit = self.dbline.det_fpslimit
+        elif self.type == 'E':
+          limit = self.dbline.eve_fpslimit  
+        if limit:  
+          self.sl = speedlimit(period = 1.0 / limit)
+        else:  
+          self.sl = speedlimit(period = 0.0)
+    self.som = speedometer()
     await super().async_runner()   
-
-  def add_view_count(self):
-    streams_redis.inc_view_dev(self.type, self.id)
-    #print('Vie+', self.type, self.id, streams_redis.view_from_dev(self.type, self.id))
-    if self.type == 'D':
-      viewables[self.id]['C'].add_data_count()
-    if self.type == 'E':
-      viewables[self.id]['D'].add_data_count()
-
-  def take_view_count(self):
-    streams_redis.dec_view_dev(self.type, self.id)
-    #print('Vie-', self.type, self.id, streams_redis.view_from_dev(self.type, self.id))
-    if self.type == 'D':
-      viewables[self.id]['C'].take_data_count()
-    if self.type == 'E':
-      viewables[self.id]['D'].take_data_count()
-
-  def add_record_count(self):
-    if self.type == 'E':
-      change = (streams_redis.record_from_dev('E', self.id) == 0)
-      streams_redis.set_record_dev('E', self.id, 1)
-    else:
-      change = True
-      streams_redis.inc_record_dev(self.type, self.id)
-    #print('Rec+', self.type, self.id, streams_redis.record_from_dev(self.type, self.id))
-    if change:  
-      if self.type == 'D':
-        viewables[self.id]['C'].add_record_count()
-      if self.type == 'E':
-        viewables[self.id]['D'].add_record_count()
-
-  def take_record_count(self):
-    if self.type == 'E':
-      change = (streams_redis.record_from_dev('E', self.id) == 1)
-      streams_redis.set_record_dev('E', self.id, 0)
-    else:
-      change = True
-      streams_redis.dec_record_dev(self.type, self.id)
-    #print('Rec-', self.type, self.id, streams_redis.record_from_dev(self.type, self.id))
-    if change:  
-      if self.type == 'D':
-        viewables[self.id]['C'].take_record_count()
-      if self.type == 'E':
-        viewables[self.id]['D'].take_record_count()
-
-  def add_data_count(self):
-    if self.type == 'E':
-      change = (streams_redis.data_from_dev('E', self.id) == 0)
-      streams_redis.set_data_dev('E', self.id, 1)
-    else:
-      change = True
-      streams_redis.inc_data_dev(self.type, self.id)
-    #print('Dat+', self.type, self.id, streams_redis.data_from_dev(self.type, self.id))
-    if change:  
-      if self.type == 'D':
-        viewables[self.id]['C'].add_data_count()
-      if self.type == 'E':
-        viewables[self.id]['D'].add_data_count()
-
-  def take_data_count(self):
-    if self.type == 'E':
-      change = (streams_redis.data_from_dev('E', self.id) == 1)
-      streams_redis.set_data_dev('E', self.id, 0)
-    else:
-      change = True
-      streams_redis.dec_data_dev(self.type, self.id)
-    #print('Dat-', self.type, self.id, streams_redis.data_from_dev(self.type, self.id))
-    if change:  
-      if self.type == 'D':
-        viewables[self.id]['C'].take_data_count()
-      if self.type == 'E':
-        viewables[self.id]['D'].take_data_count()
-          
+    

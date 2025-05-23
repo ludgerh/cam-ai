@@ -32,10 +32,13 @@ class c_detector(viewable):
     self.type = 'D'
     self.dbline = dbline
     self.id = dbline.id
-    self.dataqueue = c_buffer(
-      block_put = False, 
-      #debug = 'Det' + str(self.id), 
-    )
+    if self.dbline.cam_virtual_fps:
+      self.dataqueue = c_buffer()
+    else:  
+      self.dataqueue = c_buffer(
+        block_put = False, 
+        #debug = 'Det' + str(self.id), 
+      )
     self.ev_detectorq = ev_detectorq
     self.scaledown = self.get_scale_down()
     super().__init__(logger, )
@@ -70,15 +73,15 @@ class c_detector(viewable):
         environ["CUDA_VISIBLE_DEVICES"] = ''
       else:  
         environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.det_gpu_nr_cv)
-      self.logger.info('**** Detector #' + str(self.dbline.id)+' running GPU #' 
+      self.logger.info('**** Detector #' + str(self.id)+' running GPU #' 
         + str(self.dbline.det_gpu_nr_cv))
       self.do_run = True
       self.warning_done = False
-      print('Launch: detector')
+      #print('Launch: detector')
       while self.do_run:
         frameline = await self.run_one(await self.dataqueue.get())
         if frameline:
-          if self.dbline.det_view and streams_redis.view_from_dev('D', self.dbline.id):
+          if self.dbline.det_view and streams_redis.view_from_dev('D', self.id):
             await self.viewer.inqueue.put(frameline)
       self.dataqueue.stop()
       self.finished = True
@@ -92,9 +95,9 @@ class c_detector(viewable):
     if (received[0] == 'set_fpslimit'):
       self.dbline.det_fpslimit = received[1]
       if received[1] == 0:
-        self.period = 0.0
+        self.sl.period = 0.0
       else:
-        self.period = 1.0 / received[1]
+        self.sl.period = 1.0 / received[1]
     elif (received[0] == 'set_mask'):
       mydrawpad = self.viewer.drawpad
       mydrawpad.ringlist = received[1]
@@ -118,7 +121,7 @@ class c_detector(viewable):
       while self.run_lock:
         await break_type(BR_MEDIUM)
       self.run_lock = True  
-      self.dbline.refresh_from_db()
+      await self.dbline.arefresh_from_db()
       self.scaledown = self.get_scale_down()
       self.firstdetect = True
       self.run_lock = False
@@ -131,7 +134,7 @@ class c_detector(viewable):
       if input is None or input[2] == 0.0:
         return(None)
       frametime = input[2]
-      if not (self.do_run and self.sl.greenlight(self.period, frametime)):
+      if not (self.do_run and self.sl.greenlight(frametime)):
         return(None)
       if self.run_lock and not self.dbline.cam_virtual_fps: 
         return(None)
@@ -214,11 +217,12 @@ class c_detector(viewable):
                   rect = [item * self.scaledown for item in rect]
                 aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
                 await self.ev_detectorq.put((
-                  3, aoi, frametime, rect, cv.imencode('.bmp', aoi)[1],
+                  3, aoi, frametime, rect, cv.imencode('.bmp', aoi)[1].tobytes(),
                 ))  
             else:
               self.background = np.float32(frame)
-          await self.ev_detectorq.put('stop') 
+          if not streams_redis.check_if_counts_zero('E', self.id):
+            await self.ev_detectorq.put('stop') 
       if self.dbline.det_backgr_delay == 0:
         self.buffer = frame
       else:
@@ -232,7 +236,7 @@ class c_detector(viewable):
       if fps:
         self.dbline.det_fpsactual = fps
         await self.dbline.asave(update_fields = ['det_fpsactual', ])
-        streams_redis.fps_to_dev(self.type, self.dbline.id, fps)
+        streams_redis.fps_to_dev(self.type, self.id, fps)
       self.run_lock = False
       return([3, buffer1, frametime])
     except:

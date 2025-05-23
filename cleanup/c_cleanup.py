@@ -26,11 +26,13 @@ from setproctitle import setproctitle
 from logging import getLogger
 from datetime import datetime
 from django.utils import timezone
-from tools.l_tools import djconf, get_dir_size
 from tools.l_smtp import l_smtp, l_msg
+from tools.c_redis import saferedis
+import django
+django.setup()
+from tools.l_tools import djconf, get_dir_size
 from tools.c_tools import list_from_queryset, get_smtp_conf
 from tools.c_logger import log_ini
-from tools.c_redis import saferedis
 from eventers.models import event, event_frame
 from trainers.models import trainframe
 from tf_workers.models import school
@@ -38,65 +40,22 @@ from streams.models import stream
 from trainers.models import model_type
 from users.models import archive, userinfo
 from .models import (status_line_event, status_line_video, status_line_school,
- files_to_delete)
+  files_to_delete)
+from .redis import my_redis as cleanup_redis
+
 check_interval = 5
 health_check_interval = 3600
-
-myredis = saferedis()
 
 my_cleanup = None   
 
 def sigint_handler(signal, frame):
   #print ('Devices: Interrupt is caught')
   pass
- 
-def clean_redis(name, idx=0): 
-  mytag = 'cleanup:' + name + ':' + str(idx)
-  myredis.delete(mytag)
-   
-def add_to_redis(name, idx, myvalue):
-  myredis.set('cleanup:' + name + ':' + str(idx), myvalue)
-   
-def get_from_redis(name, idx):
-  mytag = 'cleanup:' + name + ':' + str(idx)
-  while (not myredis.exists(mytag)):
-    sleep(djconf.getconfigfloat('medium_brake', 0.1))
-  return(int(myredis.get(mytag)))
-   
-def add_to_redis_queue(name, idx, myset):
-  mytag = 'cleanup:' + name + ':' + str(idx)
-  myredis.delete(mytag)
-  for item in myset:
-    myredis.lpush(mytag, item)
-  
-def get_from_redis_queue(name, idx):
-  mytag = 'cleanup:' + name + ':' + str(idx)
-  result = []  
-  if myredis.exists(mytag):
-    while (rline := myredis.rpop(mytag)):
-      result.append(rline) 
-  return(result)  
-  
-def len_from_redis_queue(name, idx):
-  mytag = 'cleanup:' + name + ':' + str(idx)  
-  if myredis.exists(mytag):
-    return(myredis.llen(mytag))  
-  else:
-    return(0)  
   
 class c_cleanup():
   def __init__(self, *args, **kwargs):
     self.recordingspath = None
     self.inqueue = Queue()
-    self.model_dims = {}
-    for schoolline in school.objects.filter(active = True):
-      myschooldir = schoolline.dir
-      self.model_dims[schoolline.id] = []
-      for item in model_type.objects.all():
-        dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
-        if ((Path(myschooldir) / 'coded' / dim_code).exists()
-            and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
-          self.model_dims[schoolline.id].append(dim_code)
 
   def run(self):
     self.run_process = Process(target=self.runner)
@@ -104,6 +63,15 @@ class c_cleanup():
 
   def runner(self):
     try:
+      self.model_dims = {}
+      for schoolline in school.objects.filter(active = True):
+        myschooldir = schoolline.dir
+        self.model_dims[schoolline.id] = []
+        for item in model_type.objects.all():
+          dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
+          if ((Path(myschooldir) / 'coded' / dim_code).exists()
+              and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
+            self.model_dims[schoolline.id].append(dim_code)
       if self.recordingspath is None:
         datapath = djconf.getconfig('datapath', 'data/')
         self.recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
@@ -123,23 +91,23 @@ class c_cleanup():
       self.do_run = True
       nice(19)
       ts = 0.0
-      clean_redis('videos_correct')
-      clean_redis('videos_temp')
-      clean_redis('videos_missingdb')
-      clean_redis('videos_missingfiles')
-      clean_redis('videos_mp4')
-      clean_redis('videos_webm')
-      clean_redis('videos_jpg')
+      cleanup_redis.clean_redis('videos_correct')
+      cleanup_redis.clean_redis('videos_temp')
+      cleanup_redis.clean_redis('videos_missingdb')
+      cleanup_redis.clean_redis('videos_missingfiles')
+      cleanup_redis.clean_redis('videos_mp4')
+      cleanup_redis.clean_redis('videos_webm')
+      cleanup_redis.clean_redis('videos_jpg')
       for streamline in list_from_queryset(stream.objects.filter(active = True)):
-        clean_redis('events_frames_correct', streamline.id)
-        clean_redis('events_frames_missingframes', streamline.id)
-        clean_redis('eframes_correct', streamline.id)
-        clean_redis('eframes_missingdb', streamline.id)
-        clean_redis('eframes_missingfiles', streamline.id)
+        cleanup_redis.clean_redis('events_frames_correct', streamline.id)
+        cleanup_redis.clean_redis('events_frames_missingframes', streamline.id)
+        cleanup_redis.clean_redis('eframes_correct', streamline.id)
+        cleanup_redis.clean_redis('eframes_missingdb', streamline.id)
+        cleanup_redis.clean_redis('eframes_missingfiles', streamline.id)
       for schoolline in school.objects.filter(active = True):
-        clean_redis('schools_correct', schoolline.id)
-        clean_redis('schools_missingdb', schoolline.id)
-        clean_redis('schools_missingfiles', schoolline.id)
+        cleanup_redis.clean_redis('schools_correct', schoolline.id)
+        cleanup_redis.clean_redis('schools_missingdb', schoolline.id)
+        cleanup_redis.clean_redis('schools_missingfiles', schoolline.id)
       while self.do_run:
         if self.do_run and time() - ts >= health_check_interval:
           ts =  time() 
@@ -206,7 +174,7 @@ class c_cleanup():
             if not self.do_run:
               break
             sleep(1.0)
-        #self.logger.info('Finished Process '+self.logname+'...')
+          self.logger.info('Finished Process '+self.logname+'...')
         else:
           sleep(1.0)
     except:
@@ -241,7 +209,7 @@ class c_cleanup():
       events_temp = {item.id for item in eventquery 
         if datetime.timestamp(item.start) < time() - 300.0}
       my_status_events.events_temp = len(events_temp)
-      add_to_redis_queue('events_temp', streamline.id, events_temp)
+      cleanup_redis.add_to_redis_queue('events_temp', streamline.id, events_temp)
 # ***** checking eventframes vs events
       eventframequery = list_from_queryset(
         event_frame.objects.filter(deleted = False, event__camera = streamline.id)
@@ -261,10 +229,10 @@ class c_cleanup():
       eventset = {item.id for item in eventquery}
       events_frames_correct = eventset & (eventframeset | eventvideoset)
       my_status_events.events_frames_correct = len(events_frames_correct)
-      add_to_redis('events_frames_correct', streamline.id, len(events_frames_correct))
+      cleanup_redis.add_to_redis('events_frames_correct', streamline.id, len(events_frames_correct))
       events_frames_missingframes = eventset - (eventframeset | eventvideoset)
       my_status_events.events_frames_missingframes = len(events_frames_missingframes)
-      add_to_redis_queue(
+      cleanup_redis.add_to_redis_queue(
         'events_frames_missingframes', 
         streamline.id, 
         events_frames_missingframes, 
@@ -280,13 +248,13 @@ class c_cleanup():
       framedbset = {item.name for item in framedbquery}
       eframes_correct = framefileset & framedbset
       my_status_events.eframes_correct = len(eframes_correct)
-      add_to_redis('eframes_correct', streamline.id, len(eframes_correct))
+      cleanup_redis.add_to_redis('eframes_correct', streamline.id, len(eframes_correct))
       eframes_missingdb = framefileset - framedbset
       my_status_events.eframes_missingdb = len(eframes_missingdb)
-      add_to_redis_queue('eframes_missingdb', streamline.id, eframes_missingdb)
+      cleanup_redis.add_to_redis_queue('eframes_missingdb', streamline.id, eframes_missingdb)
       eframes_missingfiles = framedbset - framefileset
       my_status_events.eframes_missingfiles = len(eframes_missingfiles)
-      add_to_redis_queue('eframes_missingfiles', streamline.id, eframes_missingfiles)
+      cleanup_redis.add_to_redis_queue('eframes_missingfiles', streamline.id, eframes_missingfiles)
       my_status_events.save()
 # ***** checking videos vs files
     files_to_delete_set = {
@@ -303,22 +271,22 @@ class c_cleanup():
       and item.stat().st_mtime < (time() - 1800)
     )]
     my_status_videos.videos_temp = len(videos_temp)
-    add_to_redis_queue('videos_temp', 0, videos_temp)
+    cleanup_redis.add_to_redis_queue('videos_temp', 0, videos_temp)
     videos_jpg = {item.stem for item in filelist if (item.name[:2] == 'E_') 
       and (item.suffix == '.jpg')
     } - files_to_delete_set
     my_status_videos.videos_jpg = len(videos_jpg)
-    add_to_redis('videos_jpg', 0, len(videos_jpg))
+    cleanup_redis.add_to_redis('videos_jpg', 0, len(videos_jpg))
     videos_mp4 = {item.stem for item in filelist if (item.name[:2] == 'E_') 
       and (item.suffix == '.mp4')
     } - files_to_delete_set
     my_status_videos.videos_mp4 = len(videos_mp4)
-    add_to_redis('videos_mp4', 0, len(videos_mp4))
+    cleanup_redis.add_to_redis('videos_mp4', 0, len(videos_mp4))
     videos_webm = {item.stem for item in filelist if (item.name[:2] == 'E_') 
       and (item.suffix == '.webm')
     } - files_to_delete_set
     my_status_videos.videos_webm = len(videos_webm)
-    add_to_redis('videos_webm', 0, len(videos_webm))
+    cleanup_redis.add_to_redis('videos_webm', 0, len(videos_webm))
     fileset = videos_jpg & videos_mp4
     fileset_all = videos_jpg | videos_mp4 | videos_webm
     mydbset = list_from_queryset(
@@ -330,14 +298,14 @@ class c_cleanup():
       dbset.add(item.videoclip)
     videos_correct = fileset & dbset
     my_status_videos.videos_correct = len(videos_correct)
-    add_to_redis('videos_correct', 0, len(videos_correct))
+    cleanup_redis.add_to_redis('videos_correct', 0, len(videos_correct))
     videos_missingdb = fileset_all - dbset
     my_status_videos.videos_correct = len(videos_correct)
     videos_missingfiles = dbset - fileset
     my_status_videos.videos_missingfiles = len(videos_missingfiles)
-    add_to_redis_queue('videos_temp', 0, videos_temp)
-    add_to_redis_queue('videos_missingdb', 0, videos_missingdb)
-    add_to_redis_queue('videos_missingfiles', 0, videos_missingfiles)
+    cleanup_redis.add_to_redis_queue('videos_temp', 0, videos_temp)
+    cleanup_redis.add_to_redis_queue('videos_missingdb', 0, videos_missingdb)
+    cleanup_redis.add_to_redis_queue('videos_missingfiles', 0, videos_missingfiles)
     my_status_videos.save()
 # ***** checking trainframesdb vs files
     for schoolline in list_from_queryset(school.objects.filter(active = True)):
@@ -412,9 +380,9 @@ class c_cleanup():
       my_status_schools.schools_missingdb = len(schools_missingdb)
       schools_missingfiles = dbset - fileset
       my_status_schools.schools_missingfiles = len(schools_missingfiles)
-      add_to_redis('schools_correct', schoolline.id, len(schools_correct))
-      add_to_redis_queue('schools_missingdb', schoolline.id, schools_missingdb)
-      add_to_redis_queue('schools_missingfiles', schoolline.id, schools_missingfiles)
+      cleanup_redis.add_to_redis('schools_correct', schoolline.id, len(schools_correct))
+      cleanup_redis.add_to_redis_queue('schools_missingdb', schoolline.id, schools_missingdb)
+      cleanup_redis.add_to_redis_queue('schools_missingfiles', schoolline.id, schools_missingfiles)
       my_status_schools.save()
     #self.logger.info('Cleanup: Getting stream file sizes') 
     for streamline in list_from_queryset(stream.objects.all()): 
@@ -452,6 +420,7 @@ class c_cleanup():
       for schoolline in school.objects.filter(creator = userline.user):
         result += schoolline.storage_quota
       userline.storage_used = result  
+      cleanup_redis.set_user_used_quota(userline.id, result)
       if result < userline.storage_quota:  
         userline.mail_flag_quota100 = False
         if result < userline.storage_quota * 0.75:

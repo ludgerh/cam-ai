@@ -51,13 +51,22 @@ class new_redis(saferedis):
     self.set('cam-ai.startup.shutdown:', value) 
     
   def get_start_worker_busy(self):
-    return(int(self.get('cam-ai.startup.worker_busy')))  
+    if (result := self.get('cam-ai.startup.worker_busy')) is None:
+      return(0)
+    else:  
+      return(int(result))  
     
   def get_start_stream_busy(self):
-    return(int(self.get('cam-ai.startup.stream_busy:'))) 
+    if (result := self.get('cam-ai.startup.stream_busy:')) is None:
+      return(0)
+    else:  
+      return(int(result))  
     
   def get_start_trainer_busy(self):
-    return(int(self.get('cam-ai.startup.trainer_busy:'))) 
+    if (result := self.get('cam-ai.startup.trainer_busy:')) is None:
+      return(0)
+    else:  
+      return(int(result))  
     
   def get_watch_status(self):  #0 : finish, 1 : wait, 2 : restart
     while (result := self.get('cam-ai.startup.watch_status:')) is None:

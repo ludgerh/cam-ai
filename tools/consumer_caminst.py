@@ -22,6 +22,7 @@ from traceback import format_exc
 from ipaddress import ip_network
 from validators.domain import domain
 from validators.ip_address import ipv4, ipv6
+from django.forms.models import model_to_dict
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from startup.redis import my_redis as startup_redis
@@ -29,6 +30,7 @@ from tools.l_tools import djconf
 from streams.c_camera import get_ip_address, get_ip_network, search_executor
 from tf_workers.models import school
 from streams.models import stream as dbstream
+from eventers.models import evt_condition
 from globals.c_globals import viewables
 from users.models import userinfo
 from access.models import access_control
@@ -46,6 +48,7 @@ video_fps_limit = djconf.getconfigfloat('video_fps_limit', 0.0)
 
 #*****************************************************************************
 # async_caminst
+from django.forms.models import model_to_dict
 #*****************************************************************************
 
 class acaminst(AsyncWebsocketConsumer):
@@ -115,8 +118,13 @@ class acaminst(AsyncWebsocketConsumer):
         startup_redis.set_start_stream_busy(newstream.id)
         while (not (newstream.id in viewables and 'stream' in viewables[newstream.id])):
           await asyncio.sleep(long_brake)
+        await evt_condition.objects.filter(eventer = newstream).adelete()
+        new_condition = evt_condition(reaction = 1, eventer = newstream, y = 1)
+        my_eventer = viewables[newstream.id]['E']
+        my_eventer.inqueue.put(('new_condition', 1, model_to_dict(new_condition)))
+        await new_condition.asave()
         outlist['data'] = {'id' : newstream.id, } 
-        logger.debug('--> ' + str(outlist)) 
+        #logger.info('--> ' + str(outlist)) 
         await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'getnetandip':

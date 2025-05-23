@@ -20,6 +20,9 @@ viewables = {}
 viewers = {}
 
 def initialize():
+  from sys import argv
+  if not((argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith('gunicorn'))):
+    return()
   import django
   django.setup()
   from multiprocessing import SimpleQueue
@@ -41,7 +44,6 @@ def initialize():
   access_initialize()
   from dyndns.views import initialize as dyndns_initialize
   dyndns_initialize()
-  return()
   
 def add_viewer(viewer):
   if viewer.id not in viewers:

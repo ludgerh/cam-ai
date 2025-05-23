@@ -19,7 +19,7 @@ import cv2 as cv
 from globals.c_globals import viewables
 from json import dumps, loads
 from shapely.geometry import Point, LinearRing
-from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
 from .models import mask
 
 class drawpad():
@@ -45,7 +45,9 @@ class drawpad():
     
   async def set_mask(self): 
     self.mask_set = True
-    items = await sync_to_async(list)(mask.objects.filter(stream_id=self.myid, mtype=self.mtype))
+    items = await database_sync_to_async(list)(
+      mask.objects.filter(stream_id=self.myid, mtype=self.mtype), 
+    )
     for item in items:
       self.ringlist.append(loads(item.definition))
     viewables[self.myid][self.mtype].inqueue.put(('set_mask', self.ringlist))

@@ -22,7 +22,6 @@ import aiofiles.os
 import aiohttp
 import aioshutil
 import io
-from asgiref.sync import sync_to_async
 from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
@@ -37,6 +36,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
 from tools.l_tools import djconf, displaybytes
 from tools.l_smtp import l_smtp, l_msg
 from camai.c_settings import safe_import
@@ -51,7 +51,7 @@ from access.models import access_control
 from access.c_access import access
 from users.userinfo import afree_quota
 from .redis import my_redis as tools_redis
-from .health import totaldiscspace, freediscspace
+from .health import my_health_runner
 
 db_password = safe_import('db_password') 
 hw_type = safe_import('hw_type') 
@@ -107,14 +107,14 @@ class health(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.debug('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
       if params['command'] == 'getdiscinfo':
         if self.scope['user'].is_superuser:
-          avaible = freediscspace
-          total = totaldiscspace
+          avaible = my_health_runner.freediscspace
+          total = my_health_runner.totaldiscspace
         else:  
           infoline = await userinfo.objects.aget(user = self.scope['user'])
           avaible = max(0, infoline.storage_quota - infoline.storage_used)
@@ -125,7 +125,7 @@ class health(AsyncWebsocketConsumer):
           'totalstr' : displaybytes(total),
           'freestr' : displaybytes(avaible),
         }
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
 
     except:
@@ -227,7 +227,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await schoolline.asave() 
         t_query = trainer.objects.filter(active = True)
         async for t_item in t_query:
-          await sync_to_async(schoolline.trainers.add)(t_item)
+          await database_sync_to_async(schoolline.trainers.add)(t_item)
         trainerline = await t_query.afirst()
         schoolline.dir = schoolsdir + 'model' + str(schoolline.id) + '/'
         await schoolline.asave(update_fields=('dir', ))

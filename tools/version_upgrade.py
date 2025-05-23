@@ -77,4 +77,3 @@ def version_upgrade(old_str, new_str):
       print(version_full(lastflat), '>', version_full(item))
       proc_dict[item]()
       lastflat = item
-  del procdict    

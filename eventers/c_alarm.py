@@ -37,32 +37,33 @@ if plugin_proxy_ok:
 mylogger = None 
 alarm_list = []
   
-async def alarm_init(logger, idx):
+def alarm_init(logger, idx):
   global mylogger
   global alarm_list
   mylogger = logger  
-  async for item in dbalarm.objects.filter(active=True, mystream__id=idx):
-    if item.mydevice.device_type.name == 'console':
+  for item in dbalarm.objects.filter(active=True, mystream__id=idx):
+    device_type_name = item.mydevice.device_type.name
+    if device_type_name == 'console':
       alarm_list.append(console_alarm(item, mylogger))
-    elif item.mydevice.device_type.name == 'shelly123':
+    elif device_type_name == 'shelly123':
       if plugin_shelly_ok:  
         alarm_list.append(shelly123_alarm(item, mylogger))
       else:
         mylogger.warning('***** For alarm device shelly123 we need the shelly-plugin, '
           + 'ignoring this alarm.')   
-    elif item.mydevice.device_type.name == 'hue':
+    elif device_type_name == 'hue':
       if plugin_hue_ok:  
         alarm_list.append(hue_alarm(item, mylogger))
       else:
         mylogger.warning('***** For alarm device phillips hue we need the hue-plugin, '
           + 'ignoring this alarm.') 
-    elif item.mydevice.device_type.name == 'taposwitch123':
+    elif device_type_name == 'taposwitch123':
       if plugin_taposwitch_ok:  
         alarm_list.append(taposwitch123_alarm(item, mylogger))
       else:
         mylogger.warning('***** For alarm device taposwitch123 we need the hue-plugin, '
           + 'ignoring this alarm.') 
-    elif item.mydevice.device_type.name == 'proxy-gpio':
+    elif device_type_name == 'proxy-gpio':
       if plugin_proxy_ok:  
         while True:
           try:
@@ -83,7 +84,7 @@ class console_alarm(alarm_base):
   async def action(self, pred): 
     await super().action(pred=pred)
     self.logger.info(self.notice_line + ' ' + self.stream.name + '(' + str(self.stream.id) 
-      + ') : ' + self.classes_list[self.maxpos+1].name +  ' Sebi testet die Konsole')
+      + ') : ' + self.classes_list[self.maxpos+1].name)
 
 async def alarm(stream_id, pred):
   tasks = [item.action(pred=pred) for item in alarm_list]

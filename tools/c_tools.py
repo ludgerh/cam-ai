@@ -19,11 +19,13 @@ import numpy as np
 import aiofiles
 from time import time, sleep
 from random import randint
+from collections import deque
 from django.db import connection
 from django.db.utils import OperationalError
 from l_buffer.l_buffer import l_buffer
 from tools.models import setting as dbsetting
 from tools.l_tools import djconf
+from streams.redis import my_redis as streams_redis
 
 def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=None, 
   outcrypt=None):
@@ -69,47 +71,35 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=N
 
 
 class speedlimit:
-  def __init__(self):
-    self.ts2 = 0.0
+  def __init__(self, period = 1.0):
+    self.ts = 0.0
     self.rest = 0.0
+    self.period = period
 
-  def greenlight(self, time_span, frame_time):
-    if time_span == 0.0:
+  def greenlight(self, frame_time):
+    if not self.period:
+      return(True)
+    difference = self.rest + frame_time - self.ts
+    if difference >= self.period:
+      self.ts = frame_time
+      self.rest = difference % self.period
       return(True)
     else:
-      self.ts1 = self.ts2
-      self.ts2 = frame_time
-      self.rest = self.rest + time_span + self.ts1 - self.ts2
-      if self.rest < 0.0:
-        self.rest = 0.0
-      if self.rest >= time_span:
-        self.rest -= time_span
-        return(False)
-      else:
-        return(True)
+      return(False)  
 
 class speedometer:
-  def __init__(self):
-    self.ts1 = 0
+  def __init__(self, count = 10):
+    self.count = count
+    self.times_deque = deque()
     self.ts2 = time()
-    self.counter = 0
-    self.timeadd = 0.0
 
   def gettime(self):
-    if self.ts1 == 0:
-      result = 0.0
-    else:
-      self.counter += 1
-      self.timeadd += (self.ts2 - self.ts1)
-      if self.timeadd >= 10:
-        result = (self.counter / self.timeadd)
-        self.counter = 0
-        self.timeadd = 0.0
-      else:
-        result = None
     self.ts1 = self.ts2
     self.ts2 = time()
-    return(result)
+    if len(self.times_deque) >= self.count:
+      self.times_deque.popleft()
+    self.times_deque.append(self.ts2 - self.ts1)
+    return(len(self.times_deque) / sum(self.times_deque))
 
 def rect_atob(rect):
 	# Rectangle notation B: (x1, x2, y1, y2)
@@ -258,5 +248,86 @@ class c_buffer(l_buffer):
     else:
       frame = None  
     return(frame)
+    
+debug = False    
+
+def add_view_count(type, idx):
+  streams_redis.inc_view_dev(type, idx)
+  if debug:
+    print('Vie+', type, idx, streams_redis.view_from_dev(type, idx))
+  if type == 'D':
+    add_data_count('C', idx)
+  if type == 'E':
+    add_data_count('D', idx)
+
+def take_view_count(type, idx):
+  streams_redis.dec_view_dev(type, idx)
+  if debug:
+    print('Vie-', type, idx, streams_redis.view_from_dev(type, idx))
+  if type == 'D':
+    take_data_count('C', idx)
+  if type == 'E':
+    take_data_count('D', idx)
+
+def add_record_count(type, idx):
+  if type == 'E':
+    change = (streams_redis.record_from_dev('E', idx) == 0)
+    streams_redis.set_record_dev('E', idx, 1)
+  else:
+    change = True
+    streams_redis.inc_record_dev(type, idx)
+  if debug:
+    print('Rec+', type, idx, streams_redis.record_from_dev(type, idx))
+  if change:  
+    if type == 'D':
+      add_record_count('C', idx)
+    if type == 'E':
+      add_record_count('D', idx)
+
+def take_record_count(type, idx):
+  if type == 'E':
+    change = (streams_redis.record_from_dev('E', idx) == 1)
+    streams_redis.set_record_dev('E', idx, 0)
+  else:
+    change = True
+    streams_redis.dec_record_dev(type, idx)
+  if debug:
+    print('Rec-', type, idx, streams_redis.record_from_dev(type, idx))
+  if change:  
+    if type == 'D':
+      take_record_count('C', idx)
+    if type == 'E':
+      take_record_count('D', idx)
+
+def add_data_count(type, idx):
+  if type == 'E':
+    change = (streams_redis.data_from_dev('E', idx) == 0)
+    streams_redis.set_data_dev('E', idx, 1)
+  else:
+    change = True
+    streams_redis.inc_data_dev(type, idx)
+  if debug:
+    print('Dat+', type, idx, streams_redis.data_from_dev(type, idx))
+  if change:  
+    if type == 'D':
+      add_data_count('C', idx)
+    if type == 'E':
+      add_data_count('D', idx)
+
+def take_data_count(type, idx):
+  if type == 'E':
+    change = (streams_redis.data_from_dev('E', idx) == 1)
+    streams_redis.set_data_dev('E', idx, 0)
+  else:
+    change = True
+    streams_redis.dec_data_dev(type, idx)
+  if debug:
+    print('Dat-', type, idx, streams_redis.data_from_dev(type, idx))
+  if change:  
+    if type == 'D':
+      take_data_count('C', idx)
+    if type == 'E':
+      take_data_count('D', idx)
+        
 
         

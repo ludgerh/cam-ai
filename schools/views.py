@@ -181,7 +181,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
           xout=x, yout=y)
       else:  
         myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, 
-          xout=x, yout=y, incrypt=crypter_dict[streamline.id])  
+          xout=x, yout=y, incrypt=crypter_dict[streamline.id]) 
     else:
       myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, 
         xout=x, yout=y)  

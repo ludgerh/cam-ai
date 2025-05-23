@@ -16,29 +16,16 @@ v1.6.6 01.03.25
 """
 
 import asyncio
+from multiprocessing import Process
 from threading import Lock as t_lock
 from logging import getLogger
 from time import time
 from traceback import format_exc
 from setproctitle import setproctitle
-#from .models import trainer as dbtrainer, fit
-#import gc
-#from multiprocessing import Process, Queue as p_queue
-#from logging import getLogger
-#from time import sleep, time
-#from setproctitle import setproctitle
-#from django.utils import timezone
-#from tools.l_tools import (
-#  QueueUnknownKeyword, 
-#  ts2mysqltime, 
-#  djconf,
-#)
-#from tools.l_break import a_break_time
-#from tf_workers.models import school(
-#from users.models import userinfo
-#from users.userinfo import free_quota
-#from .models import trainer as dbtrainer, trainframe, fit, epoch
-#from .train_worker_remote import train_once_remote
+import gc
+from django.utils import timezone
+#from .models import trainframe, fit
+from .redis import my_redis
 
 #from threading import enumerate 
 
@@ -64,13 +51,10 @@ class trainer(spawn_process):
 
   async def async_runner(self): 
     try:
-      #import django
-      #django.setup()
       from tools.c_logger import alog_ini
       from tools.l_tools import ts2mysqltime
       from tools.l_break import a_break_time
-      from .models import trainer as dbtrainer
-      from .redis import my_redis
+      from .models import trainer as dbtrainer, trainframe
       self.dbline = await dbtrainer.objects.aget(id = self.id)
       setproctitle('CAM-AI-Trainer #'+str(self.id))
       self.do_run = True
@@ -78,13 +62,14 @@ class trainer(spawn_process):
       my_redis.set_trainerqueue(self.id, [])
       self.job_queue_list = []
       train_once_gpu = None
+      train_once_remote = None
       self.logname = 'trainer #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       self.finished = False
       self.job_queue = asyncio.Queue()
       asyncio.create_task(self.job_queue_thread(), name = 'job_queue_thread')
-      print('Launch: trainer')
+      #print('Launch: trainer')
       await super().async_runner() 
       while self.do_run:
         timestr = ts2mysqltime(time())
@@ -98,19 +83,22 @@ class trainer(spawn_process):
           if self.dbline.t_type == 1:
             if train_once_gpu is None:
               from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
-            train_process = Worker(
-              target = train_once_gpu, 
-              args = (
-                myschool, 
-                myfit, 
-                self.dbline.gpu_nr,
-                self.dbline.gpu_mem_limit,
-              ), 
-              kwargs = {'trainer_nr' : self.id, }, 
+            train_process = Process(target = train_once_gpu, args = (
+              myschool, 
+              myfit, 
+              self.dbline.gpu_nr,
+              self.dbline.gpu_mem_limit,
+            ), 
+            kwargs = {
+              'trainer_nr' : self.id,
+            }
             )
             train_process.start()
-            trainresult = await train_process.join()
+            train_process.join()
+            trainresult = (train_process.exitcode)
           elif self.dbline.t_type in {2, 3}:
+            if train_once_remote is None:
+              from .train_worker_remote import train_once_remote
             train_process = Worker(
               target  = train_once_remote,
               args = (
@@ -132,7 +120,7 @@ class trainer(spawn_process):
               filterdict['checked'] = True
             await trainframe.objects.filter(**filterdict).aupdate(train_status = 2)
             myschool.l_rate_divisor = 10000.0
-            await myschool.save(update_fields=['l_rate_divisor'])
+            await myschool.asave(update_fields=['l_rate_divisor'])
           with self.mylock:
             self.job_queue_list.remove(myschool.id)
           my_redis.set_trainerqueue(self.id, self.job_queue_list)
@@ -149,7 +137,7 @@ class trainer(spawn_process):
       from tools.l_break import a_break_time
       from globals.c_globals import trainers
       from tf_workers.models import school
-      from .models import trainframe
+      from .models import trainframe, fit
       while self.do_run:
         #if trainers is None:
         #  await a_break_time(10.0)
@@ -185,7 +173,7 @@ class trainer(spawn_process):
           if run_condition:
             await undone.aupdate(train_status=1)
             s_item.trainer_nr = 0
-            s_item.save(update_fields=["trainer_nr"])
+            await s_item.asave(update_fields=["trainer_nr"])
             myfit = fit(made=timezone.now(), 
               school = s_item.id, 
               status = 'Queuing',

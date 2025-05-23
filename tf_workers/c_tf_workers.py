@@ -29,6 +29,7 @@ from threading import Thread, Lock as t_lock
 from random import random
 from logging import getLogger
 from signal import signal, SIGINT
+from channels.db import database_sync_to_async
 from setproctitle import setproctitle
 from tools.l_sysinfo import sysinfo
 from tools.l_break import (a_break_time, a_break_type, break_type, a_break_auto, 
@@ -155,7 +156,7 @@ class tf_worker(spawn_process):
     
   async def process_received(self, received):  
     result = True
-    #print('§§§§§ Server-Inqueue', received)
+    #print('TF-Worker-Inqueue received:', received[:3])
     if (received[0] == 'unregister'):
       if received[1] in self.users:
         del self.users[received[1]]
@@ -179,8 +180,12 @@ class tf_worker(spawn_process):
           self.models[schoolnr]['ydim'],
           self.dbline.use_websocket,
         )
-      self.model_buffers[schoolnr].pause = False
-      self.model_buffers[schoolnr].append(received[1:])
+      if len(self.model_buffers[schoolnr]) < self.dbline.maxblock:
+        await self.my_output.put(received[1], ('ask_pred_ok', True))
+        self.model_buffers[schoolnr].pause = False
+        self.model_buffers[schoolnr].append(received[1:])
+      else:
+        await self.my_output.put(received[1], ('ask_pred_ok', False))
     elif (received[0] == 'register'):
       myuser = tf_user()
       self.users[myuser.id] = myuser
@@ -247,7 +252,7 @@ class tf_worker(spawn_process):
       self.model_check_lock = t_lock()
       self.ws_ts = None
       signal(SIGINT, sigint_handler)
-      self.len_taglist = len(await asyncio.to_thread(get_taglist, 1))
+      self.len_taglist = len(await database_sync_to_async(get_taglist)(1, ))
       self.users = {}
       self.logname = 'tf_worker #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
@@ -291,7 +296,7 @@ class tf_worker(spawn_process):
           self.load_model = load_model
       self.is_ready = True
       schoolnr = 0
-      print('Launch: tf_worker')
+      #print('Launch: tf_worker')
       await super().async_runner() 
       while self.do_run and not self.model_buffers:
         if self.dbline.use_websocket:
@@ -676,7 +681,7 @@ class tf_worker_client():
     try:
       while True:
         received = await self.my_output.get(index)
-        #print('##### Out_Reader:', received)
+        #print('Out_Reader received:', received)
         if (received[0] == 'stop'):
           break
         elif (received[0] == 'put_is_ready'):
@@ -692,7 +697,9 @@ class tf_worker_client():
                 self.pred_out_dict[received[2]] = received[1]
                 self.auto_break.reset()
                 break
-            await self.auto_break.wait()   
+            await self.auto_break.wait() 
+        elif (received[0] == 'ask_pred_ok'):
+          self.ask_pred_ok = received[1]
         else:
           raise QueueUnknownKeyword(received[0])
     except:
@@ -730,14 +737,19 @@ class tf_worker_client():
     self.xy = None
     await self.inqueue.put(('get_xy', tf_w_index, school))
     while self.xy is None:
-      await self.auto_break.wait()   
+      await self.auto_break.wait() 
     self.auto_break.reset()  
     return(self.xy)
 
   async def ask_pred(self, school, image_list, tf_w_index):
+    self.ask_pred_ok = None
     command_line = ['ask_pred', tf_w_index, school, ]
     command_line += image_list
     await self.inqueue.put(command_line)
+    while self.ask_pred_ok is None:
+      await self.auto_break.wait() 
+    self.auto_break.reset()  
+    return(self.ask_pred_ok)
 
   async def client_check_model(self, tf_w_index, schoolnr, test_pred = False):
     await self.inqueue.put((
@@ -765,4 +777,4 @@ class tf_worker_client():
 
   async def stop_out(self, index):
     await self.my_output.put(index, ('stop',))
-    self.run_out_procs[index].join()
+    await self.run_out_procs[index]

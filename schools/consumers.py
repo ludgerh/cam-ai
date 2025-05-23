@@ -31,7 +31,6 @@ from datetime import datetime
 from django.utils import timezone
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
-from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.hashers import check_password
@@ -46,6 +45,7 @@ from globals.c_globals import tf_workers
 from cleanup.models import status_line_school
 from schools.c_schools import get_taglist, check_extratags_async
 from tf_workers.models import school, worker
+from tf_workers.c_tf_workers import tf_worker_client
 from eventers.models import event, event_frame
 from trainers.models import trainframe, trainer
 from users.models import userinfo
@@ -109,8 +109,8 @@ class schooldbutil(AsyncWebsocketConsumer):
   async def disconnect(self, close_code):
     try:
       if self.tf_w_index is not None:
-        self.tf_worker.stop_out(self.tf_w_index)
-        self.tf_worker.unregister(self.tf_w_index) 
+        await self.tf_worker.stop_out(self.tf_w_index)
+        await self.tf_worker.unregister(self.tf_w_index) 
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -175,10 +175,8 @@ class schooldbutil(AsyncWebsocketConsumer):
       if params['command'] == 'gettrainimages' :
         lines = []
         async for line in await self.gettrainobjectlist(params['page_nr']):
-          made_by_nr = await sync_to_async(
-            lambda: line.made_by, 
-            thread_sensitive=True, 
-          )()
+          made_by_nr = await database_sync_to_async(
+            lambda: line.made_by)()
           if made_by_nr is None:
             made_by = ''
           else:
@@ -248,8 +246,7 @@ class schooldbutil(AsyncWebsocketConsumer):
                 frameline = await event_frame.objects.aget(id=item)
                 imagepath = schoolframespath + frameline.name
                 if self.schoolinfo is None:
-                  schoolline = await school.objects.aget(id=params['school'])
-                  xytemp = await self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
+                  xytemp = await self.tf_worker.get_xy(params['school'], self.tf_w_index)
                   self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], }
               else:
                 frameline = await trainframe.objects.aget(id=item,)
@@ -273,7 +270,7 @@ class schooldbutil(AsyncWebsocketConsumer):
             except AIOCancelledError:
               logger.warning('** getpredictions was cancelled')
               return()   
-          if found_images:    
+          if found_images:   
             await self.tf_worker.ask_pred(
               params['school'], 
               imglist, 
@@ -415,14 +412,17 @@ class schooldbutil(AsyncWebsocketConsumer):
           schoolline = await school.objects.aget(id=self.myschool)
           workerline = await worker.objects.aget(school__id=schoolline.id)
           self.tf_worker = tf_workers[workerline.id]
-          self.tf_w_index = self.tf_worker.register()
-          self.tf_worker.run_out(self.tf_w_index)
+          self.tf_worker = tf_worker_client(self.tf_worker.inqueue, self.tf_worker.registerqueue, )
+          self.tf_w_index = await self.tf_worker.register(workerline.id)
+          await self.tf_worker.run_out(self.tf_w_index)
         outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'geteventframes':
-        framelines = event_frame.objects.filter(event__id=params['event'])
+        framelines = (
+          event_frame.objects.filter(event__id=params['event']).order_by('time', 'id')
+        )
         result = []
         async for item in framelines:
           result.append(item.id)
@@ -437,21 +437,27 @@ class schooldbutil(AsyncWebsocketConsumer):
         else:
           self.crypt = None  
         outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'settags':
         schoolline = await school.objects.aget(id=params['school'])
         modelpath = schoolline.dir
         if await access.check_async('S', params['school'], self.scope['user'], 'W'):
-          eventline = await event.objects.aget(id=params['event']) 
-          framelines = event_frame.objects.filter(event=eventline)
+          for i in range(100):
+            pathadd = str(i) + '/'
+            await aiofiles.os.makedirs(modelpath + 'frames/' + pathadd, exist_ok=True)
+          eventline = await event.objects.aget(id=params['event'])
+          framelines = event_frame.objects.filter(event=eventline).order_by('time', 'id') 
           i = 0
           async for item in framelines:
-            pathadd = str(randint(0,99))+'/'
-            await aiofiles.os.makedirs(modelpath + 'frames/' + pathadd, exist_ok=True)
+            pathadd = str(randint(0,99)) + '/'
             ts = datetime.timestamp(item.time)
-            newname = await uniquename_async(modelpath + 'frames/', pathadd+ts2filename(ts, noblank=True), 'bmp')
+            newname = await uniquename_async(
+              modelpath + 'frames/', 
+              pathadd + ts2filename(ts, noblank=True), 
+              'bmp', 
+            )
             if eventline.done:
               t = await trainframe.objects.aget(id=item.trainframe)
               updatelist = []

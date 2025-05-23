@@ -77,6 +77,7 @@ def debug_display(input):
   return(result)
   
 def count_sm(struct):
+  print('#####', struct, struct.count('L') + struct.count('B') + struct.count('N'))
   return(struct.count('L') + struct.count('B') + struct.count('N'))
 
 class l_buffer():
@@ -96,14 +97,16 @@ class l_buffer():
     self.debug = debug  
     self.new_data = False
     if self.m_proc:
+      #self.sm_count = count_sm(struct)
       self.data_queue = mp_queue(maxsize = self.q_len)
-      #self.put_storage = [deepcopy(PUT_STORAGE_ITEM) for _ in self.struct]
-      self.put_struct = {}
-      self.put_storage = {}
+      #self.sync_queue = mp_queue()
+      self.put_storage = [deepcopy(PUT_STORAGE_ITEM) for _ in self.struct]
       self.get_struct = {}
       self.get_storage = {}
+      #self.shm_dict = {}
       self.put_count = 0
       self.shm_deque = deque()
+      #self.sync_loop_task = None
     else:
       if self.q_len is not None:
         self.data_queue = mt_queue(maxsize = self.q_len)
@@ -140,63 +143,15 @@ class l_buffer():
   async def data_loop_runner(self):
     while self.do_run:
       try:
-        data_in = await asyncio.to_thread(self.data_queue.get)
         if self.debug:
-          print(self.debug, '+++ Loop', debug_display(data_in)) 
-        if data_in == 'stop' or data_in is None:
-          data_out = data_in
-        else:  
-          data_out = [] 
-          if self.q_len is not None:
-            if self.m_proc:
-              if self.multi_in is None:
-                storage_idx = 0
-              else:  
-                storage_idx = data_in[self.multi_in][1]
-              if storage_idx not in self.get_struct:
-                self.get_struct[storage_idx] = self.struct
-                self.get_storage[storage_idx] = [
-                  deepcopy(GET_STORAGE_ITEM) for _ in self.struct
-                ]  
-            while len(data_in) > len(self.get_struct[storage_idx]):
-              self.get_struct[storage_idx] += self.get_struct[storage_idx][-1]
-              if self.m_proc:
-                self.get_storage[storage_idx].append(deepcopy(GET_STORAGE_ITEM))
-          for item in data_in:  
-            i, data = item
-            if not self.m_proc or self.get_struct[storage_idx][i] == 'O':
-              data_out.append(data)
-            else:
-              storage = self.get_storage[storage_idx][i]
-              if 'len' in data:
-                storage['last_size'] = data['len']
-              if 'name' in data:
-                if data['name'] != storage['name']:
-                  storage['shm'] = sm.SharedMemory(name=data['name'])
-                  storage['name'] = data['name']
-              if self.get_struct[storage_idx][i] == 'N':
-                if 'shape' in data:
-                  storage['shape'] = data['shape']
-                if 'dtype' in data:
-                  storage['dtype'] = data['dtype']
-              in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
-              storage['shm'].buf[0] = 0
-              if self.get_struct[storage_idx][i] == 'L':
-                data_out.append(pickle.loads(in_bytes))
-              elif self.get_struct[storage_idx][i] == 'B':
-                data_out.append(in_bytes)
-              elif self.get_struct[storage_idx][i] == 'N':
-                data_out.append(np.ndarray(
-                  storage['shape'], 
-                  dtype=storage['dtype'], 
-                  buffer=in_bytes,
-                )) 
+          print(self.debug, '+++ Loop') 
+        data = await asyncio.to_thread(self.data_queue.get)
       except Empty:
-        data_out = ''  
-      if data_out:
-        await self.put_to_shelf(data_out) 
+        data = ''  
+      if data:
+        await self.put_to_shelf(data) 
         if self.debug:
-          print(self.debug, '--- Loop:', debug_display(data_out)) 
+          print(self.debug, '--- Loop:', debug_display(data)) 
         
   async def multi_put(self, data): #not tested
     i = 0
@@ -212,7 +167,7 @@ class l_buffer():
     
   async def put(self, data):
     if self.debug:
-      print(self.debug, '+++ Put', debug_display(data)) 
+      print(self.debug, '+++ Put') 
     if self.q_len is None: 
       if self.put_timeout:
         ts = time()
@@ -242,21 +197,10 @@ class l_buffer():
       if self.debug:
         print(self.debug, '--- Put:', debug_display(data)) 
       return()
-    if self.q_len is not None:
-      if self.m_proc:
-        if self.multi_in is None:
-          storage_idx = 0
-        else:  
-          storage_idx = data[self.multi_in]
-        if storage_idx not in self.put_struct:
-          self.put_struct[storage_idx] = self.struct
-          self.put_storage[storage_idx] = [
-            deepcopy(PUT_STORAGE_ITEM) for _ in self.struct
-          ]  
-    while len(data) > len(self.put_struct[storage_idx]):
-      self.put_struct[storage_idx] += self.put_struct[storage_idx][-1]
-      if self.m_proc:
-        self.put_storage[storage_idx].append(deepcopy(PUT_STORAGE_ITEM))
+    while len(data) > len(self.struct):
+      self.struct += self.struct[-1]
+      if self.m_proc: 
+        self.put_storage.append(deepcopy(PUT_STORAGE_ITEM))
     data_for_send = []
     while self.shm_deque:
       age = self.put_count - self.shm_deque[0][0]
@@ -267,19 +211,20 @@ class l_buffer():
       else:
         break  
     for i, item in enumerate(data):
-      if not self.m_proc or  self.put_struct[storage_idx][i] == 'O':
+      if not self.m_proc or  self.struct[i] == 'O':
         processed_item = item
       else:
-        if self.put_struct[storage_idx][i] == 'L':
+        if self.struct[i] == 'L':
           data_bytes = pickle.dumps(item)
-        elif self.put_struct[storage_idx][i] == 'B':
+        elif self.struct[i] == 'B':
+          print('In:', len(item), item[:30], item[-30:])
           data_bytes = item 
-        elif self.put_struct[storage_idx][i] == 'N':
+        elif self.struct[i] == 'N':
           data_bytes = item.tobytes()  
         data_length = len(data_bytes)
-        storage = self.put_storage[storage_idx][i]
+        storage = self.put_storage[i]
         processed_item = {}
-        if self.put_struct[storage_idx][i] == 'N' and (item.shape != storage['shape'] 
+        if self.struct[i] == 'N' and (item.shape != storage['shape'] 
             or item.dtype != storage['dtype']):
           processed_item.update({'shape': item.shape, 'dtype': item.dtype})
           storage.update({'shape': item.shape, 'dtype': item.dtype})
@@ -296,6 +241,10 @@ class l_buffer():
           await asyncio.sleep(0.01)
         storage['shm'].buf[0] = 1 # busy
         storage['shm'].buf[1:data_length + 1] = data_bytes
+        
+        if self.struct[i] == 'B':
+          print('In:', storage['shm'].name)
+          
       data_for_send.append((i, processed_item))
     if self.m_proc:  
       if self.put_count < 0xFFFF:
@@ -305,7 +254,7 @@ class l_buffer():
     try:    
       await asyncio.to_thread(
         self.data_queue.put, 
-        data_for_send, 
+        (data_for_send), 
         True, 
         self.put_timeout, #???
       )   
@@ -314,7 +263,7 @@ class l_buffer():
     except Full:
       raise Full
     if self.debug:
-      print(self.debug, '--- Put:', debug_display(data_for_send)) 
+      print(self.debug, '--- Put:', debug_display(data)) 
       
   def start_data_loop(self):   
     if self.q_len is not None and self.data_loop_task is None:
@@ -332,8 +281,6 @@ class l_buffer():
           result.extend(item)      
 
   async def get(self):
-    if self.debug:
-      print(self.debug, '+++ Get:')
     self.start_data_loop()
     while self.do_run:
       with self.lock:
@@ -347,8 +294,60 @@ class l_buffer():
     if not self.do_run:
       return()
     if self.debug:
-      print(self.debug, '--- Get:', debug_display(data_in))
-    return(data_in)
+      print(self.debug, '+++ Get', debug_display(data_in)) 
+    if data_in == 'stop' or data_in is None:
+      result = data_in
+    else:  
+      result = [] 
+      if self.q_len is not None:
+        if self.m_proc:
+          if self.multi_in is None:
+            storage_idx = 0
+          else:  
+            storage_idx = data_in[self.multi_in]
+          if storage_idx not in self.get_struct:
+            self.get_struct[storage_idx] = self.struct
+            self.get_storage[storage_idx] = [
+              deepcopy(GET_STORAGE_ITEM) for _ in self.struct
+            ]  
+        while len(data_in) > len(self.get_struct[storage_idx]):
+          self.get_struct[storage_idx] += self.get_struct[storage_idx][-1]
+          if self.m_proc:
+            self.get_storage[storage_idx].append(deepcopy(GET_STORAGE_ITEM))
+      for item in data_in:  
+        i, data = item
+        if not self.m_proc or self.get_struct[storage_idx][i] == 'O':
+          result.append(data)
+        else:
+          storage = self.get_storage[storage_idx][i]
+          if 'len' in data:
+            storage['last_size'] = data['len']
+          if 'name' in data:
+            if data['name'] != storage['name']:
+              storage['shm'] = sm.SharedMemory(name=data['name'])
+              storage['name'] = data['name']
+          if self.get_struct[storage_idx][i] == 'N':
+            if 'shape' in data:
+              storage['shape'] = data['shape']
+            if 'dtype' in data:
+              storage['dtype'] = data['dtype']
+          in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
+          storage['shm'].buf[0] = 0
+          if self.get_struct[storage_idx][i] == 'L':
+            result.append(pickle.loads(in_bytes))
+          elif self.get_struct[storage_idx][i] == 'B':
+            print('Out:', len(in_bytes), in_bytes[:30], in_bytes[-30:])
+            print('Out:', storage['shm'].name)
+            result.append(in_bytes)
+          elif self.get_struct[storage_idx][i] == 'N':
+            result.append(np.ndarray(
+              storage['shape'], 
+              dtype=storage['dtype'], 
+              buffer=in_bytes,
+            ))
+    if self.debug:
+      print(self.debug, '--- Get:', debug_display(result)) 
+    return(result)
       
   async def empty(self): #might cause problems if block_put is False
     with self.lock:
@@ -366,6 +365,7 @@ class l_buffer():
         while not self.data_queue.empty():
           await asyncio.sleep(self.brake_time) 
         for item in self.shm_deque:
+          print('00000', item)
           item[1].close()
           item[1].unlink()
     else:   

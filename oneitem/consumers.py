@@ -19,7 +19,6 @@ from logging import getLogger
 from traceback import format_exc
 from django.forms.models import model_to_dict
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
 from autobahn.exception import Disconnected
 from access.c_access import access
 from tools.c_logger import log_ini
@@ -35,10 +34,6 @@ logger = getLogger(logname)
 log_ini(logger, logname)
 
 class oneitemConsumer(AsyncWebsocketConsumer):
-
-  @database_sync_to_async
-  def read_conditions(self):
-    self.myitem.read_conditions()
 
   async def connect(self):
     try:
@@ -109,7 +104,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           outlist['data'] = {}
           if (redis_data := streams_redis.get_ptz(self.idx)):
             outlist['data']['ptz'] = redis_data
-          logger.info('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           await self.safe_send(outlist)
         else:
           await self.close()
@@ -118,7 +113,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         if self.may_write:
           if params['pname'] == 'cam_pause':
             self.myitem.dbline.cam_pause = params['value']
-            self.myitem.set_pause(params['value'])
+            await self.myitem.set_pause(params['value'])
           elif params['pname'] == 'cam_fpslimit':
             self.myitem.dbline.cam_fpslimit = float(params['value'])
           elif params['pname'] == 'cam_feed_type':
@@ -346,7 +341,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         await self.safe_send(outlist)		
 
       elif params['command'] == 'get_all_conditions':
-        await self.read_conditions()
+        await self.myitem.read_conditions()
         outlist['data'] = self.myitem.cond_dict
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)		
@@ -419,14 +414,14 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       elif params['command'] == 'delete_cam':
         if self.may_write:
           if params['itemid'] in viewables and 'stream' in viewables[params['itemid']]:
-            viewables[params['itemid']]['stream'].stop()
+            await viewables[params['itemid']]['stream'].stop()
           streamline = await stream.objects.aget(id=params['itemid'])
           streamline.active = False
           await streamline.asave(update_fields=(("active"), ))
           outlist['data'] = 'OK'
         else:
           outlist['data'] = 'No Access'
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.safe_send(outlist)	
     except:
       logger.error('Error in consumer: ' + logname + ' (oneitem)')

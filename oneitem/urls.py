@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,13 +15,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from django.urls import path
-from .views import onecam , onedetector, oneeventer
+from . import views
 
 urlpatterns = [
-  path('cam/<int:camnr>/', onecam, name='onecam'),
-  path('cam/<int:camnr>/<int:tokennr>/<str:token>/', onecam, name='onecamtoken'),
-  path('detector/<int:detectornr>/', onedetector, name='onedetector'),
-  path('detector/<int:detectornr>/<int:tokennr>/<str:token>/', onedetector, name='onedetectortoken'),
-  path('eventer/<int:eventernr>/', oneeventer, name='oneeventer'),
-  path('eventer/<int:eventernr>/<int:tokennr>/<str:token>/', oneeventer, name='oneeventertoken'),
+  path('cam/<int:camnr>/', views.OneCamView.as_view(), name='onecam'),
+  path('cam/<int:camnr>/<int:tokennr>/<str:token>/', views.OneCamView.as_view(), name='onecamtoken'),
+  path('detector/<int:detnr>/', views.OneDetView.as_view(), name='onedetector'),
+  path('detector/<int:detnr>/<int:tokennr>/<str:token>/', views.OneDetView.as_view(), name='onedetectortoken'),
+  path('eventer/<int:evenr>/', views.OneEveView.as_view(), name='oneeventer'),
+  path('eventer/<int:evenr>/<int:tokennr>/<str:token>/', views.OneEveView.as_view(), name='oneeventertoken'),
 ]

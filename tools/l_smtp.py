@@ -15,7 +15,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from socket import gaierror
-from smtplib import (
+from aiosmtplib import (
   SMTP,
   SMTPAuthenticationError, 
   SMTPServerDisconnected,
@@ -62,8 +62,7 @@ class l_msg(MIMEMultipart):
     self.attach(mime_image)
     
   def get_size(self):
-    return len(self.as_string()) 
-    
+    return len(self.as_string())    
 
 class l_smtp(SMTP):
 
@@ -87,26 +86,39 @@ class l_smtp(SMTP):
       self.password = kwargs['password']
     else:
       self.password = ''  
+    super().__init__(
+      hostname = kwargs['host'],
+      port = kwargs['port'],
+      timeout = kwargs['timeout'],
+      start_tls=False,
+    )
+    self._kwargs = kwargs
+    
+  async def async_init(self):
+    kwargs = self._kwargs  
     try: 
-    #if True:
-      super().__init__(
-        host = kwargs['host'],
-        port = kwargs['port'],
-        timeout = kwargs['timeout'],
-      )
-      self.ehlo()
-      #kwargs['debug'] = 2
-      if 'debug' in kwargs:
-        self.set_debuglevel(kwargs['debug'])
-      if 'starttls' in self.esmtp_features:
-        self.starttls()
-        self.ehlo()
+      await self.connect()
+      code, response = await self.ehlo()
+      self.connect_code = code
+      if isinstance(response, bytes):
+        response_lines = response.decode().splitlines()
+      else:
+        response_lines = str(response).splitlines()
+      self.greeting = response_lines[0]  
+      self.esmtp_features = {}
+      for line in response_lines[1:]:
+        parts = line.strip().split()
+        if parts:
+          key = parts[0].upper()
+          val = " ".join(parts[1:]) if len(parts) > 1 else ""
+          self.esmtp_features[key] = val
+      if 'STARTTLS' in self.esmtp_features:
+        await self.starttls()
       if 'user' in kwargs: 
         if 'password' in kwargs: 
-          self.login(kwargs['user'], kwargs['password'])  
+          await self.login(kwargs['user'], kwargs['password'])  
         else:  
-          self.login(kwargs['user'], '') 
-      #print('**** SMTP Features', self.esmtp_features)   
+          await self.login(kwargs['user'], '')   
       self.allowed_size = int(self.esmtp_features['size'])
     except gaierror as e:
       self.answer = 'Domain is not reachable. Spelling?'
@@ -143,9 +155,7 @@ class l_smtp(SMTP):
     self.answer = 'OK'
     self.last_error = (0, 'OK')
     try:
-    #if True:
       return super().sendmail(*args[:2], msg.as_string()) 
-    #"""  
     except SMTPRecipientsRefused as e:
       self.answer = 'Server refused to take the mail. Wrong username? Wrong password? Wrong testing email?'
       self.last_error = e.args
@@ -159,16 +169,15 @@ class l_smtp(SMTP):
       self.last_error = e.args 
       self.result_code = 11001
       return({'Server-Error' : 'Other error', })
-    #"""
  
-  def is_connected(self):
+  async def is_connected(self):
     try:
-      self.noop()
+      await self.noop()
       return(True)
     except SMTPServerDisconnected:
       return(False)
       
-  def quit(self):
-    if self.is_connected():
-      super().quit()
+  async def quit(self):
+    if await self.is_connected():
+      await super().quit()
       

@@ -20,36 +20,36 @@ import cv2 as cv
 import json
 import numpy as np
 import asyncio
-#import aioshutil
-#import aiofiles
+import aiofiles
+import aiofiles.os
+import aioshutil
+from aiopath import AsyncPath
 from logging import getLogger
 from signal import SIGKILL
-#from os import remove, path, nice, environ, kill, getpid
 from os import environ, kill, getpid
 from traceback import format_exc
 from setproctitle import setproctitle
 from collections import deque
 from time import time
 from threading import Lock as t_lock
-#from queue import SimpleQueue
-#from multiprocessing import Process
-#from subprocess import run
+from multiprocessing import Process
 from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
 from django.forms.models import model_to_dict
-from startup.redis import my_redis as startup_redis
-from streams.redis import my_redis as streams_redis
 from tools.l_break import a_break_type, break_type, a_break_time, BR_MEDIUM, BR_LONG
-#from viewers.c_viewers import c_viewer
-#from tf_workers.models import school
-#from users.userinfo import afree_quota
-#from .c_event import c_event, resolve_rules
-from .redis import my_redis as eventer_redis
-
-#from threading import enumerate
-#import psutil
-#from pympler.asizeof import asizeof
-
 from tools.c_spawn import viewable
+from tools.c_tools import (
+  add_record_count, 
+  take_record_count, 
+  add_data_count, 
+  take_data_count, 
+)
+from tf_workers.models import school
+from startup.redis import my_redis as startup_redis
+from schools.c_schools import get_taglist
+from streams.redis import my_redis as streams_redis
+from users.userinfo import afree_quota
+from .c_alarm import alarm, alarm_init
 
 class c_eventer(viewable):
   def __init__(self, dbline, worker_inqueue, worker_registerqueue, worker_id, logger, ):
@@ -58,12 +58,16 @@ class c_eventer(viewable):
     self.type = 'E'
     self.dbline = dbline
     self.id = dbline.id
-    self.dataqueue = c_buffer(
-      block_put = False, 
-      #debug = 'Eve' + str(self.id), 
-    )
-    self.detectorqueue = l_buffer('ONOOB', 
-      #debug = self.type + str(self.id),
+    if self.dbline.cam_virtual_fps:
+      self.dataqueue = c_buffer()
+    else:  
+      self.dataqueue = c_buffer(
+        block_put = False, 
+        #debug = 'Eve' + str(self.id), 
+      )
+    self.detectorqueue = l_buffer(
+      'ONOOB', 
+      #debug = '?????' + self.type + str(self.id),
     )
     self.worker_in = worker_inqueue
     self.worker_reg = worker_registerqueue
@@ -73,41 +77,47 @@ class c_eventer(viewable):
     
   async def process_received(self, received):  
     result = True
-    #print('*** process_received:', received)
+    #print('*** Eventer-Inqueue received:', received)
     if (received[0] == 'new_video'):
       with self.vid_deque_lock:
         self.vid_deque.append(received[1:])
         while True:
-          if self.vid_deque and (time() - self.vid_deque[0][2]) > 300:
+          if self.vid_deque and (time() - self.vid_deque[0][2]) > 180.0:
             listitem = self.vid_deque.popleft()
             try:
-              remove(self.recordingspath + listitem[1])
+              await aiofiles.os.remove(self.recordingspath + listitem[1])
             except FileNotFoundError:
               self.logger.warning('c_eventers.py:new_video - Delete did not find: '
-                + self.recordingspath + listitem[1])
+                + self.recordingspath + listitem[1])# Liste der zu löschenden Schlüssel
+            keys_to_delete = [item 
+              for item in self.vid_str_dict 
+              if item == str(listitem[0]) or item.endswith('_' + str(listitem[0]))]
+            for key in keys_to_delete:
+                del self.vid_str_dict[key]
           else:
             break
     elif (received[0] == 'purge_videos'):
       with self.vid_deque_lock:
         for item in self.vid_deque.copy():
           try:
-            remove(self.recordingspath + item[1])
+            await aiofiles.os.remove(self.recordingspath + item[1])
           except FileNotFoundError:
-            self.logger.warning('c_eventers.py\:purge_videos - Delete did not find: '
+            self.logger.warning('c_eventers.py:purge_videos - Delete did not find: '
               + self.recordingspath + item[1])
         self.vid_deque.clear()
     elif (received[0] == 'set_fpslimit'):
       self.dbline.eve_fpslimit = received[1]
       if received[1] == 0:
-        self.period = 0.0
+        self.sl.period = 0.0
       else:
-        self.period = 1.0 / received[1]
+        self.sl.period = 1.0 / received[1]
     elif (received[0] == 'set_margin'):
       self.dbline.eve_margin = received[1]
     elif (received[0] == 'set_event_time_gap'):
       self.dbline.eve_event_time_gap = received[1]
     elif (received[0] == 'set_school'):
-      self.dbline.eve_school = school.objects.get(id=received[1])
+      self.school_line = await school.objects.aget(id=received[1])
+      self.dbline.eve_school = self.school_line
     elif (received[0] == 'set_alarm_email'):
       self.dbline.eve_alarm_email = received[1]
     elif (received[0] == 'cond_open'):
@@ -138,7 +148,7 @@ class c_eventer(viewable):
       self.scrwidth = received[1]
       self.scaling = None
     elif (received[0] == 'reset'):
-      self.dbline.refresh_from_db()
+      await self.dbline.arefresh_from_db()
     else:
       result = False  
     return(result)
@@ -158,7 +168,6 @@ class c_eventer(viewable):
     from tf_workers.c_tf_workers import tf_worker_client
     from .c_event import resolve_rules
     self.resolve_rules = resolve_rules
-    from .c_alarm import alarm, alarm_init
     self.stream = stream
     try: 
       self.logname = 'eventer #'+str(self.id)
@@ -170,14 +179,15 @@ class c_eventer(viewable):
       self.display_ts = 0
       self.nr_of_cond_ed = 0
       await self.read_conditions()
-      eve_school = await sync_to_async(lambda: self.dbline.eve_school)() 
+      eve_school = await database_sync_to_async(lambda: self.dbline.eve_school)() 
       self.tag_list_active = eve_school.id
       self.tag_list = await asyncio.to_thread(get_taglist, self.tag_list_active)
       datapath = await djconf.agetconfig('datapath', 'data/')
       self.recordingspath = await djconf.agetconfig(
         'recordingspath', datapath + 'recordings/', 
       )
-      await alarm_init(self.logger, self.id)
+      
+      await database_sync_to_async(alarm_init)(self.logger, self.id)
       environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
       if self.dbline.eve_gpu_nr_cv== -1:
         environ["CUDA_VISIBLE_DEVICES"] = ''
@@ -196,16 +206,12 @@ class c_eventer(viewable):
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg, )
       self.tf_w_index = await self.tf_worker.register(self.tf_worker_id)
       await self.tf_worker.run_out(self.tf_w_index)
-      self.school_line = await sync_to_async(
-        lambda: self.dbline.eve_school, 
-        thread_sensitive=True, 
-      )()
+      self.school_line = await database_sync_to_async(lambda: self.dbline.eve_school)()
       self.xdim, self.ydim = await self.tf_worker.get_xy(
         self.school_line.id,
         self.tf_w_index
       )
       self.finished = False
-      self.do_webm = await djconf.agetconfigbool('do_webm', False)
       self.scaling = None
       self.scrwidth = None 
       self.motion_frame = [0,0,0.0]
@@ -214,19 +220,17 @@ class c_eventer(viewable):
       asyncio.create_task(self.check_events())
       asyncio.create_task(self.tags_refresh())
       asyncio.create_task(self.inserter())
-      eventer_redis.delete('webm_queue:' + str(self.id))
-      if self.do_webm:
-        self.webm_proc = Process(target=self.make_webm).start() 
-      print('Launch: eventer')
+      if self.dbline.eve_webm_doit:
+        asyncio.create_task(self.make_webm())
+      #print('Launch: eventer')
       while self.do_run:
-        if not streams_redis.check_if_counts_zero('E', self.id):
-          frameline = await self.dataqueue.get()
-        else:
-          frameline = None
-        if frameline is None:  
-          frameline = [None, 0, time()] 
-        if (self.do_run and frameline[0] is not None 
-            and self.sl.greenlight(self.period, frameline[2])):
+        if streams_redis.check_if_counts_zero('E', self.id):
+          await a_break_type(BR_LONG)
+        frameline = await self.dataqueue.get()
+        if not self.do_run:
+          break  
+        if (frameline is not None and frameline[0] is not None 
+            and self.sl.greenlight(frameline[2])):
           if self.run_one_task is None or self.run_one_task.done():  
             self.run_one_task = asyncio.create_task(self.run_one(frameline))
         else:
@@ -253,7 +257,7 @@ class c_eventer(viewable):
     if streams_redis.check_if_counts_zero('E', self.id):
       await a_break_type(BR_LONG)
       return()
-    if streams_redis.view_from_dev('E', self.dbline.id):
+    if streams_redis.view_from_dev('E', self.id):
       while self.scrwidth is None:
         await a_break_type(BR_LONG)
       if self.do_run and frame[0]:
@@ -270,16 +274,15 @@ class c_eventer(viewable):
       fps = self.som.gettime()
       if fps:
         self.dbline.eve_fpsactual = fps
-        await sync_to_async(
-            self.stream.objects.filter(id=self.dbline.id).update, 
-            thread_sensitive=True, 
+        await database_sync_to_async(
+          self.stream.objects.filter(id=self.id).update
         )(eve_fpsactual = fps)
-        streams_redis.fps_to_dev('E', self.dbline.id, fps)
+        streams_redis.fps_to_dev('E', self.id, fps)
 
   async def read_conditions(self):
     from .models import evt_condition
     self.cond_dict = {1:[], 2:[], 3:[], 4:[], 5:[]}
-    condition_lines = evt_condition.objects.filter(eventer_id=self.dbline.id)
+    condition_lines = evt_condition.objects.filter(eventer_id=self.id)
     async for item in condition_lines:
       self.cond_dict[item.reaction].append(model_to_dict(item))
 
@@ -350,34 +353,33 @@ class c_eventer(viewable):
     await self.viewer.inqueue.put(newframe)
     del newframe  
 
-  def make_webm(self):
-    try:
-      setproctitle('CAM-AI-Eventer(WEBM) #'+str(self.dbline.id))
-      nice(19)
-      while True:
-        while not eventer_redis.exists(self.id):
-          break_type(BR_LONG)
-        if eventer_redis.webm_queue_qsize(self.id):
-          savepath = (eventer_redis.webm_queue_get(self.id))
-          if savepath == 'stop':
-            break
-          myts = time()
-          run([
-            'ffmpeg', 
-            '-v', 'fatal', 
-            '-i', savepath, 
-            '-crf', '51', #0 = lossless, 51 = very bad
-            '-vf', 'scale=500:-1',
-            savepath[:-4]+'.webm'
-          ])
-          self.logger.info('WEBM-Conversion: E' + str(self.id) + ' ' 
-            + str(round(time() - myts)) + ' sec (Q: ' 
-            + str(eventer_redis.webm_queue_qsize(self.id)) + ')')
-        else:
-          break_time(5.0)
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (make_webm)')
-      self.logger.error(format_exc())
+  async def make_webm(self):
+    while self.do_run:
+      path = AsyncPath(self.recordingspath)
+      async for mp4_file in path.glob('E_????????????.mp4'):
+        mp4_file = str(mp4_file)
+        webm_file = mp4_file[:-4] + '.webm'
+        if not await aiofiles.os.path.exists(webm_file):
+          if self.dbline.eve_webm_procnum_limit:
+            descriptor = ['taskset', '-c', '0', ]
+          else:
+            descriptor = [] 
+          descriptor += ['ffmpeg', ]
+          descriptor += ['-v', 'fatal', ]
+          if self.dbline.eve_webm_fps:
+            descriptor += ['-r', str(self.dbline.eve_webm_fps), ]
+          if self.dbline.eve_webm_threads:
+            descriptor += ['-threads', str(self.dbline.eve_webm_threads), ]
+          descriptor += ['-i', mp4_file, ]
+          if self.dbline.eve_webm_crf:
+            descriptor += ['-crf', str(self.dbline.eve_webm_crf), ]
+          if self.dbline.eve_webm_width:
+            descriptor += ['-vf', 'scale=' + str(self.dbline.eve_webm_width)+':-1', ]
+          descriptor += [webm_file, ]
+          #print(descriptor)
+          process = await asyncio.create_subprocess_exec(*descriptor)
+          await process.wait()
+      await a_break_time(10.0)
     
   async def check_event(self, i, item):
     if self.dbline.cam_virtual_fps:
@@ -385,7 +387,8 @@ class c_eventer(viewable):
     else:
       newtime = time()  
     if (item.end < newtime - self.dbline.eve_event_time_gap 
-        or item.end > item.start + 120.0):
+        or item.end > item.start + 20.0):
+        #or item.end > item.start + 120.0):
       item.check_out_ts = item.end
     if self.cond_dict[5]:
       predictions = item.pred_read(max=1.0)
@@ -408,28 +411,20 @@ class c_eventer(viewable):
         item.to_email = ''
       is_ready = True
       if item.goes_to_school or item.isrecording or item.to_email:
-        user_line = await sync_to_async(
-          lambda: item.dbline.camera.creator, 
-          thread_sensitive=True, 
-        )()
-        if await afree_quota(item.dbline.camera.creator):
+        if await afree_quota(item.stream_creator):
           if item.isrecording:
             with self.vid_deque_lock:
-              checkbool = self.vid_deque and item.check_out_ts <= self.vid_deque[-1][2]
+              if (checkbool := (self.vid_deque 
+                  and item.check_out_ts <= self.vid_deque[-1][2])):
+                my_vid_list = [v_item for v_item in self.vid_deque 
+                  if item.start <= v_item[2] and item.end >= v_item[2] - 10.5]   
+                #10 seconds video length plus average trigger delay from checkmp4
+                #print(my_vid_list)
+                my_vid_start = my_vid_list[0][2]
             if checkbool:
-              my_vid_list = []
-              my_vid_str = ''
-              my_vid_start = None
-              for v_item in self.vid_deque:
-                if (item.start <= v_item[2]):
-                  if not my_vid_start:
-                    #10 seconds video length plus average trigger delay from checkmp4
-                    my_vid_start = (v_item[2] - 10.5)
-                  my_vid_end = v_item[2]
-                  my_vid_list.append(v_item[1])
-                  my_vid_str += str(v_item[0])
               vid_offset = item.focus_time - my_vid_start
               vid_offset = max(vid_offset, 0.0)
+              my_vid_str = '_'.join([str(sublist[0]) for sublist in my_vid_list])
               if my_vid_str in self.vid_str_dict:
                 item.savename=self.vid_str_dict[my_vid_str]
                 isdouble = True
@@ -438,21 +433,22 @@ class c_eventer(viewable):
                 item.savename = ('E_'
                   +str(item.dbline.id).zfill(12)+'.mp4')
                 savepath = (self.recordingspath + item.savename)
+                temppath = (self.recordingspath + 'temp_' + item.savename)
                 if len(my_vid_list) == 1: 
                   await aioshutil.copyfile(
-                    self.recordingspath + my_vid_list[0], 
+                    self.recordingspath + my_vid_list[0][1], 
                     savepath
                   )
                 else:
-                  tempfilename = (self.recordingspath + 'T_'
+                  listfilename = (self.recordingspath + 'T_'
                     + str(item.dbline.id).zfill(12)+'.temp')
-                  tempfilename = await aiofiles.os.path.abspath(tempfilename)
+                  listfilename = await aiofiles.os.path.abspath(listfilename)
                   savepath = await aiofiles.os.path.abspath(savepath)
-                  async with aiofiles.open(tempfilename, 'w') as f1:
+                  async with aiofiles.open(listfilename, 'w') as f1:
                     for line in my_vid_list:
                       await f1.write(
                         'file ' 
-                        + await aiofiles.os.path.abspath(self.recordingspath + line) 
+                        + await aiofiles.os.path.abspath(self.recordingspath + line[1]) 
                         + '\n'
                       )
                   process = await asyncio.create_subprocess_exec(
@@ -460,19 +456,20 @@ class c_eventer(viewable):
                     '-f', 'concat', 
                     '-safe', '0', 
                     '-v', 'fatal', 
-                    '-i', tempfilename, 
+                    '-i', listfilename, 
                     '-codec', 'copy', 
-                    savepath
+                    temppath,
                   )
                   await process.wait()
-                  await aiofiles.os.remove(tempfilename)
+                  await aiofiles.os.remove(listfilename)
+                  await aioshutil.move(temppath, savepath)
                 self.vid_str_dict[my_vid_str] = item.savename
                 isdouble = False
               item.dbline.videoclip = item.savename[:-4]
               item.dbline.double = isdouble
               await item.dbline.asave()
               if not isdouble:
-                process = await asyncio.create_subprocess_exec(
+                await asyncio.create_subprocess_exec(
                   'ffmpeg', 
                   '-ss', str(vid_offset), 
                   '-v', 'fatal', 
@@ -481,9 +478,6 @@ class c_eventer(viewable):
                   '-q:v', '2', 
                   savepath[:-4]+'.jpg'
                 )
-                await process.wait()
-                if self.do_webm:
-                  eventer_redis.webm_queue_put(self.id, savepath)
             else:  
               is_ready = False
           if is_ready:
@@ -500,9 +494,12 @@ class c_eventer(viewable):
     try:
       while self.do_run:
         await(a_break_type(BR_LONG))
-        test_ts = time() 
-        tasks = [self.check_event(i, item) for i, item in self.eventdict.items()]
-        await asyncio.gather(*tasks)
+        for i in list(self.eventdict.keys()):
+          try:
+            item = self.eventdict[i]
+            await(self.check_event(i, item))
+          except KeyError:
+            pass 
     except:
       self.logger.error('Error in process: ' + self.logname + ' (check_events)')
       self.logger.error(format_exc())
@@ -511,16 +508,10 @@ class c_eventer(viewable):
     try:
       while self.do_run:
         await(a_break_time(60.0))
-        await sync_to_async(
-          self.school_line.refresh_from_db, 
-          thread_sensitive=True, 
-        )()
+        await database_sync_to_async(self.school_line.refresh_from_db)()
         if self.tag_list_active != self.dbline.eve_school.id:
           self.tag_list_active = self.dbline.eve_school.id
-          self.taglist = await sync_to_async(
-            get_taglist, 
-            thread_sensitive=True, 
-          )(self.tag_list_active) 
+          self.taglist = await database_sync_to_async(get_taglist)(self.tag_list_active) 
     except:
       self.logger.error('Error in process: ' + self.logname + ' (tags_refresh)')
       self.logger.error(format_exc())
@@ -544,11 +535,13 @@ class c_eventer(viewable):
           ]
           del frame
           ts = time()
-          await self.tf_worker.ask_pred(
+          if not await self.tf_worker.ask_pred(
             self.school_line.id, 
             imglist, 
             self.tf_w_index,
-          )
+          ):
+            await a_break_type(BR_MEDIUM)
+            continue
           ts = time()
           predictions = []
           for frame in detector_buffer:
@@ -590,13 +583,13 @@ class c_eventer(viewable):
 
   def set_cam_counts(self):
     if any([len(self.cond_dict[x]) for x in range(2,6)]):
-      self.add_data_count() #just switch 0 or 1
+      add_data_count(self.type, self.id) #just switch 0 or 1
     else:
-      self.take_data_count()
+      take_data_count(self.type, self.id)
     if self.cond_dict[3]:
-      self.add_record_count()
+      add_record_count(self.type, self.id)
     else:
-      self.take_record_count()
+      take_record_count(self.type, self.id)
 
   def build_string(self, i):
     if i['c_type'] == 1:
@@ -618,7 +611,6 @@ class c_eventer(viewable):
     self.inqueue.put(('reset', ))
 
   def stop(self):
-    eventer_redis.webm_queue_put(self.id, 'stop')
     self.dataqueue.stop()
     super().stop()
     

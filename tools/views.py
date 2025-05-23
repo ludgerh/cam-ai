@@ -30,11 +30,13 @@ from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
+from django.forms.models import model_to_dict
+from globals.c_globals import viewables
 from camai.c_settings import safe_import
 from tools.l_tools import djconf
 from startup.redis import my_redis as startup_redis
 from streams.models import stream
-from globals.c_globals import viewables
+from eventers.models import evt_condition
 from users.models import userinfo
 from access.c_access import access
 from tf_workers.models import school, worker
@@ -170,6 +172,11 @@ class inst_virt_cam(cam_inst_view):
     startup_redis.set_start_stream_busy(newstream.id)
     while (not (newstream.id in viewables and 'stream' in viewables[newstream.id])):
       sleep(long_brake)
+    evt_condition.objects.filter(eventer = newstream).delete()
+    new_condition = evt_condition(reaction = 1, eventer = newstream, y = 1)
+    my_eventer = viewables[newstream.id]['E']
+    my_eventer.inqueue.put(('new_condition', 1, model_to_dict(new_condition)))
+    new_condition.save()
     return redirect('/')
     
 class virt_cam_error(cam_inst_view):

@@ -13,7 +13,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
-
+import shlex
 import asyncio
 import aiofiles.os
 import aioshutil
@@ -22,19 +22,18 @@ import cv2 as cv
 import numpy as np
 from aiopath import AsyncPath
 from psutil import Process
-from signal import SIGKILL, SIGTERM
+from signal import SIGINT, SIGKILL, SIGTERM
 from setproctitle import setproctitle
 from logging import getLogger
 from traceback import format_exc
 from time import time
-from globals.c_globals import viewers
+from globals.c_globals import viewers, viewables
 from tools.c_spawn import viewable
 from tools.l_break import a_break_time, a_break_type, BR_MEDIUM, BR_LONG
+from tools.l_tools import djconf, ts2filename
 from tools.l_sysinfo import is_raspi
 from .redis import my_redis as streams_redis
 from .c_camera import c_camera
-
-from multiprocessing import SimpleQueue
 
 class c_cam(viewable):
   def __init__(self, dbline, detector_dataq, eventer_dataq, eventer_inq, logger, ):
@@ -51,7 +50,6 @@ class c_cam(viewable):
     import django
     django.setup()
     from tools.c_logger import alog_ini
-    from tools.l_tools import djconf
     try:
       self.logname = 'camera #' + str(self.id)
       self.logger = getLogger(self.logname)
@@ -83,6 +81,7 @@ class c_cam(viewable):
       self.wd_proc = None
       self.finished = False
       self.framewait = 0.0
+      self.reset_buffer = False
       datapath = await djconf.agetconfig('datapath', 'data/')
       if self.dbline.cam_virtual_fps:
         self.virt_cam_path = await djconf.agetconfig(
@@ -109,11 +108,11 @@ class c_cam(viewable):
         if not await aiofiles.os.path.exists(self.recordingspath):
           await aiofiles.os.makedirs(self.recordingspath)
         path = AsyncPath(self.recordingspath)
-        async for file in path.glob(f'C{str(self.dbline.id).zfill(4)}_????????.mp4'):
+        async for file in path.glob(f'C{str(self.id).zfill(4)}_????????.mp4'):
           try:
-            await asyncio.to_thread(os.remove, file),
-          except:
-            self.logger.warning('Cam-Task failed to delete: ' + file)
+            await asyncio.to_thread(os.remove, file)
+          except Exception as e:
+            self.logger.warning(f'Cam-Task failed to delete: {file}: {e}')
       self.wd_proc = asyncio.create_task(self.watchdog())
       if not self.dbline.cam_virtual_fps:
         self.mp4_proc = asyncio.create_task(self.checkmp4())
@@ -136,19 +135,21 @@ class c_cam(viewable):
             while self.do_run and (counter > 0):
               counter -= 1
               await a_break_type(BR_LONG)
-      print('Launch: cam')
+      #print('Launch: cam')
       while self.do_run:
         frameline = await self.run_one()
-        if frameline is not None:
+        if frameline is None:
+          await a_break_type(BR_LONG)
+        else:
           if (self.dbline.cam_view 
               and streams_redis.view_from_dev('C', self.id)):
             await self.viewer_queue.put(frameline)
           if (self.dbline.det_mode_flag 
-              and (streams_redis.view_from_dev('D', self.dbline.id) 
-              or streams_redis.data_from_dev('D', self.dbline.id))): 
+              and (streams_redis.view_from_dev('D', self.id) 
+              or streams_redis.data_from_dev('D', self.id))): 
             await self.detector_dataq.put(frameline) 
           if (self.dbline.eve_mode_flag 
-              and (not streams_redis.check_if_counts_zero('E', self.dbline.id))):
+              and (not streams_redis.check_if_counts_zero('E', self.id))):
             await self.eventer_dataq.put(frameline)
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
@@ -172,6 +173,7 @@ class c_cam(viewable):
     
   async def process_received(self, received):  
     result = True
+    #print('***** CAM Inqueue received:', received)
     if (received[0] == 'set_mask'):
       self.viewer.drawpad.ringlist = received[1]
       self.viewer.drawpad.make_screen()
@@ -199,12 +201,12 @@ class c_cam(viewable):
       ydiff = 0 - received[2]
       self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
     else:
-      result = False  
+      result = False   
     return(result)
       
   async def run_one(self):
     if not self.do_run:
-      return(None)     
+      return(None)   
     if self.dbline.cam_virtual_fps:
       self.virt_ts += self.virt_step
       streams_redis.set_virt_time(self.id, self.virt_ts)
@@ -212,7 +214,7 @@ class c_cam(viewable):
     else:
       in_ts = time() 
     while True:
-      if (streams_redis.check_if_counts_zero('C', self.dbline.id) 
+      if (streams_redis.check_if_counts_zero('C', self.id) 
           or self.dbline.cam_pause): 
         if self.cam_active:
           if self.cam_ts is None:
@@ -220,34 +222,36 @@ class c_cam(viewable):
             break
           else:
             if ((time() - self.cam_ts) > 60) or self.dbline.cam_pause:
-              self.logger.info('Cam #'+str(self.dbline.id)+' is off')
+              self.logger.info('Cam #'+str(self.id)+' is off')
               self.cam_active = False
               self.cam_ts = None
               await self.stopprocess()
             else:
               break
-        else:
+        else: 
           if not self.do_run:
             return(None)
+          else:
+            break  
       else:
         if self.cam_active:
-          if (not streams_redis.record_from_dev('C', self.dbline.id)
+          if (not streams_redis.record_from_dev('C', self.id)
               and self.cam_recording):
             if self.ffmpeg_recording:
               await self.stopprocess()
               await self.newprocess() 
             self.cam_recording = False
-            self.logger.info('Cam #'+str(self.dbline.id)+' stopped recording')
-          if (streams_redis.record_from_dev('C', self.dbline.id) 
+            self.logger.info('Cam #'+str(self.id)+' stopped recording')
+          if (streams_redis.record_from_dev('C', self.id) 
               and not self.cam_recording):
             if not self.ffmpeg_recording:
               await self.stopprocess()
               await self.newprocess() 
             self.cam_recording = True
-            self.logger.info('Cam #'+str(self.dbline.id)+' started recording')
+            self.logger.info('Cam #'+str(self.id)+' started recording')
         else:
           await self.newprocess() 
-          self.logger.info('Cam #'+str(self.dbline.id)+' is on')
+          self.logger.info('Cam #'+str(self.id)+' is on')
           self.cam_active = True
         self.cam_ts = None
         break
@@ -257,8 +261,16 @@ class c_cam(viewable):
       in_bytes = bytearray()
       bytes_needed = self.bytes_per_frame
       while bytes_needed > 0:
+        if self.reset_buffer:
+          in_bytes = bytearray()
+          bytes_needed = self.bytes_per_frame
+          self.reset_buffer = False
+          continue
         try:
-          chunk = await asyncio.wait_for(self.ff_proc.stdout.read(min(65536, bytes_needed)), timeout=5.0)
+          chunk = await asyncio.wait_for(
+            self.ff_proc.stdout.read(min(65536, bytes_needed)), 
+            timeout=5.0,
+          )
           if not chunk:
             in_bytes = None
             break
@@ -301,7 +313,7 @@ class c_cam(viewable):
     if fps:
       self.dbline.cam_fpsactual = fps
       await self.dbline.asave(update_fields = ['cam_fpsactual', ])
-      streams_redis.fps_to_dev('C', self.dbline.id, fps)
+      streams_redis.fps_to_dev('C', self.id, fps)
     if self.dbline.cam_apply_mask and (self.viewer.drawpad.mask is not None):
       frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
     if self.dbline.cam_virtual_fps and self.file_end:
@@ -313,7 +325,7 @@ class c_cam(viewable):
     if self.dbline.cam_pause:
       return()
     self.logger.info('[' + str(maxcounter) + '] Probing camera #' 
-      + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
+      + str(self.id) + ' (' + self.dbline.name + ')...')
     await self.mycam.ffprobe()
     probe = self.mycam.probe
     #print('***', probe, '***')
@@ -338,13 +350,13 @@ class c_cam(viewable):
         self.real_fps = 0.0
       else:
         self.real_fps = float(self.real_fps[0]) / float(self.real_fps[1])
-      self.logger.info('+++++ CAM #' + str(self.dbline.id) + ': ' + self.dbline.name)
+      self.logger.info('+++++ CAM #' + str(self.id) + ': ' + self.dbline.name)
       self.logger.info('+++++ Video codec: ' + self.video_codec_name 
         + ' / Cam: ' + str(self.cam_fps) + 'fps / Connect: ' 
         + str(self.real_fps) + 'fps')
       try:
         streams_redis.x_y_res_to_cam(
-          self.dbline.id, probe['streams'][self.video_codec]['width'], 
+          self.id, probe['streams'][self.video_codec]['width'], 
           probe['streams'][self.video_codec]['height'])
       except KeyError:
         self.logger.warning('Key Error in redis.x_y_res_to_cam')
@@ -372,6 +384,9 @@ class c_cam(viewable):
       self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
 
   async def checkmp4(self):
+  
+    #self.ts2 = time() 
+    
     try:
       while True:
         try:
@@ -388,6 +403,8 @@ class c_cam(viewable):
             self.checkmp4busy = False
             continue
           if await aiofiles.os.path.exists(self.vid_file_path(self.vid_count + 2)):
+            #print('Found one:', time() - self.ts2) for Tests with webm :-)
+            #self.ts2 = time() 
             try:
               #print(self.vid_file_path(self.vid_count))
               timestamp = await asyncio.to_thread(
@@ -405,8 +422,10 @@ class c_cam(viewable):
             try:
               await aioshutil.move(self.vid_file_path(self.vid_count), 
                 self.recordingspath + '/' + targetname)
-              self.mydetector.myeventer.inqueue.put(('new_video', self.vid_count, 
-                targetname, timestamp))
+              await asyncio.to_thread(
+                self.eventer_inq.put, 
+                ('new_video', self.vid_count, targetname, timestamp)
+              )
               self.vid_count += 1
             except FileNotFoundError:
               self.logger.warning(
@@ -426,10 +445,16 @@ class c_cam(viewable):
           self.logger.info("Watchdog-Task wurde abgebrochen.")
           return  # Sauber beenden
         if self.dbline.cam_virtual_fps:
-          if self.ff_proc is None or self.ff_proc.poll() is None:
+          if (streams_redis.check_if_counts_zero('C', self.id)
+              and streams_redis.check_if_counts_zero('D', self.id)
+              and streams_redis.check_if_counts_zero('E', self.id)):
             continue
-          else:
-            self.file_end = True  
+          if self.ff_proc is None:
+            continue
+          if self.ff_proc.returncode is None:
+            continue
+          else:  
+            self.file_end = True
         else:
           timediff = time() - self.wd_ts
           #print('WD', time(), self.wd_ts, timediff)
@@ -440,16 +465,16 @@ class c_cam(viewable):
             continue
           if (timediff <= 180) and (self.getting_newprozess):
             continue
-          if not (streams_redis.view_from_dev('C', self.dbline.id)
-              or streams_redis.data_from_dev('C', self.dbline.id)):
+          if not (streams_redis.view_from_dev('C', self.id)
+              or streams_redis.data_from_dev('C', self.id)):
             continue
           self.wd_ts = time()
         if self.dbline.cam_virtual_fps:
           self.logger.info('*** Restarting Video, VirtCam #'
-            + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
+            + str(self.id) + ' (' + self.dbline.name + ')...')
         else:
           self.logger.info('*** Wakeup for Camera #'
-            + str(self.dbline.id) + ' (' + self.dbline.name + ')...')
+            + str(self.id) + ' (' + self.dbline.name + ')...')
         if not self.dbline.cam_virtual_fps:
           await self.stopprocess()
         await self.newprocess() 
@@ -475,72 +500,76 @@ class c_cam(viewable):
     else:
       self.eventer_inq.put(('purge_videos', ))
       source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
-      if streams_redis.record_from_dev(self.type, self.dbline.id):
+      if streams_redis.record_from_dev(self.type, self.id):
         self.vid_count = 0
         filepath = (self.recordingspath + 'C' 
-          + str(self.dbline.id).zfill(4) + '_%08d.mp4')
+          + str(self.id).zfill(4) + '_%08d.mp4')
       else:
         filepath = None
-    outparams1 = ''  
+    outparams1 = []
     if not self.dbline.cam_virtual_fps:
-      outparams1 += ' -map 0:'+str(self.video_codec) + ' -map -0:a'
-    outparams1 += ' -f rawvideo'
-    outparams1 += ' -pix_fmt bgr24'
+      outparams1 += ['-map', '0:' + str(self.video_codec), '-map', '-0:a']
+    outparams1 += ['-f', 'rawvideo']
+    outparams1 += ['-pix_fmt', 'bgr24']
     if inp_frame_rate:
-      outparams1 += ' -r ' + str(inp_frame_rate)
-      outparams1 += ' -fps_mode cfr'
-    outparams1 += ' pipe:1'
-    inparams = ' -i "' + source_string + '"'
-    generalparams = ' -v fatal'
+      outparams1 += ['-r', str(inp_frame_rate)]
+      outparams1 += ['-fps_mode', 'cfr']
+    outparams1 += ['pipe:1']
+    inparams = ['-i', source_string]
+    generalparams = ['-v', 'fatal']
     if is_raspi():
-      generalparams += ' -threads 1'
+      generalparams += ['-threads', '1']
     if not self.dbline.cam_virtual_fps:
       if source_string[:4].upper() == 'RTSP':
-        generalparams += ' -rtsp_transport tcp'
+        generalparams += ['-rtsp_transport', 'tcp']
       if self.dbline.cam_red_lat:
-        generalparams += ' -fflags nobuffer'
-        generalparams += ' -flags low_delay'
+        generalparams += ['-fflags', 'nobuffer']
+        generalparams += ['-flags', 'low_delay']
       if self.video_codec_name not in {'h264', 'hevc'}:
-        generalparams += ' -use_wallclock_as_timestamps 1'
-    outparams2 = ''
+        generalparams += ['-use_wallclock_as_timestamps', '1']
+    outparams2 = []
     if filepath:
       self.ffmpeg_recording = True
       if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
         video_framerate = self.dbline.cam_ffmpeg_fps
       else:
         video_framerate = None
-      outparams2 += ' -map 0:'+str(self.video_codec)
+      outparams2 += ['-map', '0:' + str(self.video_codec)]
       if self.audio_codec > -1:
-        outparams2 += ' -map 0:'+str(self.audio_codec)
+        outparams2 += ['-map', '0:' + str(self.audio_codec)]
       if self.video_codec_name in {'h264', 'hevc'}:
         if video_framerate:
-          outparams2 += ' -c:v libx264'
+          outparams2 += ['-c:v', 'libx264']
         else:
-          outparams2 += ' -c:v copy'
+          outparams2 += ['-c:v', 'copy']
         if self.audio_codec_name == 'pcm_alaw':
-          outparams2 += ' -c:a aac'
+          outparams2 += ['-c:a', 'aac']
         else:
-          outparams2 += ' -c:a copy'
+          outparams2 += ['-c:a', 'copy']
       else:    
-        outparams2 = ' -c libx264'
+        outparams2 = ['-c', 'libx264']
       if video_framerate:
-        outparams2 += ' -r ' + str(video_framerate)
-        outparams2 += (' -g ' 
-          + str(round(video_framerate * self.dbline.cam_ffmpeg_segment)))
-      outparams2 += ' -f segment'
-      outparams2 += ' -segment_time ' + str(self.dbline.cam_ffmpeg_segment)
+        outparams2 += ['-r', str(video_framerate)]
+        #outparams2 += (' -g ' 
+        outparams2 += ['-g', str(round(video_framerate * self.dbline.cam_ffmpeg_segment))]
+      outparams2 += ['-f', 'segment']
+      outparams2 += ['-segment_time', str(self.dbline.cam_ffmpeg_segment)]
       if video_framerate:
-        outparams2 += ' -segment_time_delta '+str(0.5 / (video_framerate))
-      outparams2 += ' -reset_timestamps 1'
+        outparams2 += ['-segment_time_delta', str(0.5 / (video_framerate))]
+      outparams2 += ['-reset_timestamps', '1']
       if self.dbline.cam_ffmpeg_crf:
-        outparams2 += ' -crf ' + str(self.dbline.cam_ffmpeg_crf)
-      outparams2 += ' ' + filepath
+        outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
+      outparams2 += [filepath]
     else:
       self.ffmpeg_recording = True  
-    cmd = ('/usr/bin/ffmpeg ' + generalparams + inparams + outparams1 
+    cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    #self.logger.info('#####' + cmd)
-    self.ff_proc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE)
+    #self.logger.info('#####' + str(cmd))
+    self.ff_proc = await asyncio.create_subprocess_exec(
+      '/usr/bin/ffmpeg',
+      *cmd,
+      stdout=asyncio.subprocess.PIPE,
+    )
 
   async def stopprocess(self):
     if self.ff_proc is not None and self.ff_proc.returncode is None:
@@ -554,25 +583,27 @@ class c_cam(viewable):
       self.ff_proc = None
 
   def ts_targetname(self, ts):
-    return('C'+str(self.dbline.id).zfill(4)+'_'
+    return('C'+str(self.id).zfill(4)+'_'
       +ts2filename(ts, noblank= True)+'.mp4')
 
   def vid_file_path(self, nr):
-    return(self.recordingspath + 'C'+str(self.dbline.id).zfill(4)
+    return(self.recordingspath + 'C'+str(self.id).zfill(4)
       + '_' + str(nr).zfill(8) + '.mp4')
 
   async def reset_cam(self):
     if not self.cam_active:
       return()
-    self.logger.info('Cam #'+str(self.dbline.id)+' is off')
+    self.logger.info('Cam #'+str(self.id)+' is off')
     if self.ff_proc is not None:
-      self.ff_proc.send_signal(SIGTERM)
+      await self.dbline.arefresh_from_db()
+      self.ff_proc.send_signal(SIGINT)
+      self.ff_proc.terminate()
       await self.ff_proc.wait()
       self.ff_proc = None
-    await self.dbline.arefresh_from_db()
+    self.reset_buffer = True
     await self.newprocess() 
-    self.logger.info('Cam #'+str(self.dbline.id)+' is on')
+    self.logger.info('Cam #'+str(self.id)+' is on')
 
-  def set_pause(self, status):
-    self.inqueue.put(('pause', status))
+  async def set_pause(self, status):
+    await asyncio.to_thread(self.inqueue.put, ('pause', status))
     

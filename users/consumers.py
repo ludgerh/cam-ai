@@ -43,22 +43,18 @@ class archiveConsumer(WebsocketConsumer):
       logger.error('Error in consumer: ' + logname + ' (archive)')
       logger.error(format_exc())
 
-  #@database_sync_to_async
   def to_archive(self, mytype, mynumber):
     myarchive.to_archive(mytype, mynumber, self.scope['user'])
 
-  #@database_sync_to_async
   def check_archive(self, mytype, mynumber):
     if free_quota(self.scope['user']):
       return(myarchive.check_archive(mytype, mynumber, self.scope['user']))
     else:
       return(True)  
 
-  #@database_sync_to_async
   def del_archive(self, mynumber):
     myarchive.del_archive(mynumber, self.scope['user'])
 
-  #@database_sync_to_async
   def get_dl_url(self, mynumber):
     archiveline = dbarchive.objects.get(id=mynumber)
     mytoken = maketoken('ADL', mynumber, 'Download from Archive #'+str(mynumber))

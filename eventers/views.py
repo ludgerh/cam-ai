@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -64,7 +64,7 @@ def oneevent(request, streamnr, eventnr):
     if len(seconds) == 1:
       seconds = '0'+seconds
     length += seconds
-    frames = event_frame.objects.filter(event_id=eventnr)
+    frames = event_frame.objects.filter(event_id=eventnr).order_by('time')
     for item in frames:
       item.name = item.name.replace('/', '$', 2)
     useragent = user_agent_parser.Parse(request.META['HTTP_USER_AGENT'])
