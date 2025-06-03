@@ -32,6 +32,7 @@ class userinfo(models.Model):
   mail_flag_quota75 = models.BooleanField(default=False)
   mail_flag_quota100 = models.BooleanField(default=False)
   mail_flag_discspace95 = models.BooleanField(default=False)
+  activation_key = models.CharField(max_length=100, default='')
 
   def __str__(self):
     return(self.user.username + ' (userinfo model)')

@@ -479,18 +479,18 @@ class admin_tools_async(AsyncWebsocketConsumer):
           basepath + '/camai/passwords.py'
         )
         if await aiofiles.os.path.exists(
-          'temp/backup/accounts/templates/django_registration/privacy.html'
+          'temp/backup/accounts/templates/registration/privacy.html'
         ):
           await aioshutil.copy(
-            'temp/backup/accounts/templates/django_registration/privacy.html', 
-            basepath + '/accounts/templates/django_registration/privacy.html'
+            'temp/backup/accounts/templates/registration/privacy.html', 
+            basepath + '/accounts/templates/registration/privacy.html'
           )
         if await aiofiles.os.path.exists(
-          'temp/backup/accounts/templates/django_registration/terms.html'
+          'temp/backup/accounts/templates/registration/terms.html'
         ):
           await aioshutil.copy(
-            'temp/backup/accounts/templates/django_registration/terms.html', 
-            basepath + '/accounts/templates/django_registration/terms.html'
+            'temp/backup/accounts/templates/registration/terms.html', 
+            basepath + '/accounts/templates/registration/terms.html'
           )
         await aioshutil.move('temp/backup/' + datapath, basepath + '/' + datapath)
         if await aiofiles.os.path.exists('temp/backup/plugins/'):

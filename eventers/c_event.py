@@ -363,7 +363,6 @@ class c_event(list):
         my_msg,
       )
       if my_smtp.result_code:
-        print('*****', my_smtp.result_code, my_smtp.answer, my_smtp.last_error)
         self.logger.error('SMTP: ' + my_smtp.answer)
         self.logger.error(str(my_smtp.last_error))
       await my_smtp.quit()

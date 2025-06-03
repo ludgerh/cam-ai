@@ -86,6 +86,10 @@ async def db_ini():
     'type' : 'TP-Link Tapo C200',
     'url' : 'rtsp://{user}:{pass}@{address}:{port}/stream1', 
   })
+  await add_if_none(camurl, 'type', {
+    'type' : 'Wyze CAM V2 with Dafang Hacks',
+    'url' : 'rtsp://{address}:{port}/unicast', 
+  })
   
   new_type = await add_if_none(alarm_device_type, 'name', {
     'name' : 'console',

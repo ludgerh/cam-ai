@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,55 +17,74 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 from django.urls import path
 from django.views.generic.base import TemplateView
 from . import views
-from .forms import MyRegistrationFormUniqueEmail
 
 app_name = 'accounts'
 
 urlpatterns = [
-  path("login/", views.MyLoginView.as_view(), name="login"),
-  path("register/", 
-    views.MyRegistrationView.as_view(form_class=MyRegistrationFormUniqueEmail),
+  # Registration & Activation
+  path(
+    "register/", 
+    views.MyRegistrationView.as_view(), 
     name="django_registration_register",
   ),
-  path("terms/", 
-    views.TermsView.as_view(),
-    name="django_terms_view",
-  ),
-  path("privacy/", 
-    views.PrivacyView.as_view(),
-    name="django_privacy_view",
+  path(
+    "register/complete/", 
+    TemplateView.as_view(template_name="registration/registration_complete.html"), 
+    name="django_registration_complete",
   ),
   path(
-    "activate/complete/",
-    TemplateView.as_view(
-      template_name="django_registration/activation_complete.html"
-    ),
-    name="django_registration_activation_complete",
-  ),
-  path(
-    "activate/<str:activation_key>/",
+    "activate/",
     views.MyActivationView.as_view(),
     name="django_registration_activate",
   ),
   path(
-    "pass_reset/",
-    views.MyPasswordResetView.as_view(),
-    name="pass_reset",
+    "activate/complete/", 
+    TemplateView.as_view(template_name="registration/activation_complete.html"), 
+    name="django_registration_activation_complete", 
   ),
   path(
-    "pass_reset/done/",
-    views.MyPasswordResetDoneView.as_view(),
-    name="pass_reset_done",
+    "activate/<activation_key>/",
+    views.MyActivationView.as_view(),
+    name="django_registration_activate",
+  ),
+  path("terms/", 
+    TemplateView.as_view(template_name="registration/terms.html"), 
+    name="django_terms_view",
+  ),
+  path("privacy/", 
+    TemplateView.as_view(template_name="registration/privacy.html"), 
+    name="django_privacy_view",
+  ),
+  # Auth
+  path(
+    "login/", 
+    views.MyLoginView.as_view(), 
+    name="login",
   ),
   path(
-    "reset/<uidb64>/<token>/",
-    views.MyPasswordResetConfirmView.as_view(),
+    "logout/", 
+    views.MyLogoutView.as_view(), 
+    name="logout",
+  ),
+  path(
+    "password_reset/", 
+    views.MyPasswordResetView.as_view(), 
+    name="password_reset",
+  ),
+  path(
+    "password_reset/done/", 
+    views.MyPasswordResetDoneView.as_view(), 
+    name="password_reset_done",
+  ),
+  path(
+    "reset/<uidb64>/<token>/", 
+    views.MyPasswordResetConfirmView.as_view(), 
     name="password_reset_confirm",
   ),
   path(
-    "reset/complete/",
-    views.MyPasswordResetCompleteView.as_view(),
-    name="reset_complete",
+    "reset/done/", 
+    views.MyPasswordResetCompleteView.as_view(), 
+    name="password_reset_complete",
   ),
 ]
 
