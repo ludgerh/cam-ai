@@ -14,7 +14,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-import asyncio
 from django.conf import settings
 from django.shortcuts import redirect
 from django_registration.backends.activation.views import ActivationView, RegistrationView
@@ -26,32 +25,10 @@ from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from camai.c_settings import safe_import
 from tools.l_tools import djconf
-from tools.c_tools import get_smtp_conf
-from tools.l_smtp import l_smtp, l_msg
 from users.models import userinfo
 from .forms import MyRegistrationFormUniqueEmail
 
 emulatestatic = safe_import('emulatestatic') 
-
-def async_sendmail(receiver_email, subject, message):
-  smtp_conf = get_smtp_conf()
-  my_smtp = l_smtp(**smtp_conf)
-  loop = asyncio.new_event_loop()
-  asyncio.set_event_loop(loop)
-  loop.run_until_complete(my_smtp.async_init())
-  my_msg = l_msg(
-    smtp_conf['sender_email'],
-    receiver_email,
-    subject,
-    message,
-  )
-  loop.run_until_complete(my_smtp.sendmail(
-    smtp_conf['sender_email'],
-    receiver_email,
-    my_msg,
-  ))
-  loop.run_until_complete(my_smtp.quit())
-  loop.close()
 
 class MyRegistrationView(RegistrationView):
   form_class = MyRegistrationFormUniqueEmail
@@ -77,7 +54,17 @@ class MyRegistrationView(RegistrationView):
     return(context)
     
   def send_activation_email(self, user):
+    from tools.l_smtp import async_sendmail
     activation_key = self.get_activation_key(user)
+    userinfo.objects.get_or_create(
+      user=user,
+      defaults={
+        'allowed_schools' : 3,
+        'allowed_streams': 3,
+        'pay_tokens': 5,
+        'activation_key' : activation_key,
+      }
+    )
     context = self.get_email_context(activation_key)
     context["user"] = user
     subject = render_to_string(

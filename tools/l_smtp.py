@@ -14,6 +14,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+import asyncio
 from socket import gaierror
 from aiosmtplib import (
   SMTP,
@@ -28,6 +29,7 @@ from email.mime.image import MIMEImage
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email import encoders
+from .c_tools import get_smtp_conf
 
 class l_msg(MIMEMultipart):
 
@@ -180,4 +182,25 @@ class l_smtp(SMTP):
   async def quit(self):
     if await self.is_connected():
       await super().quit()
+
+def async_sendmail(receiver_email, subject, message, html = None):
+  smtp_conf = get_smtp_conf()
+  my_smtp = l_smtp(**smtp_conf)
+  loop = asyncio.new_event_loop()
+  asyncio.set_event_loop(loop)
+  loop.run_until_complete(my_smtp.async_init())
+  my_msg = l_msg(
+    smtp_conf['sender_email'],
+    receiver_email,
+    subject,
+    message,
+    html,
+  )
+  loop.run_until_complete(my_smtp.sendmail(
+    smtp_conf['sender_email'],
+    receiver_email,
+    my_msg,
+  ))
+  loop.run_until_complete(my_smtp.quit())
+  loop.close()
       

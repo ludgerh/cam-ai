@@ -99,17 +99,14 @@ class trainer(spawn_process):
           elif self.dbline.t_type in {2, 3}:
             if train_once_remote is None:
               from .train_worker_remote import train_once_remote
-            train_process = Worker(
-              target  = train_once_remote,
-              args = (
+            my_trainer = train_once_remote(
                 myschool, 
                 myfit, 
                 self.dbline,
-                self.logger,
-              ), 
             )
+            train_process = Process(target = my_trainer.run)
             train_process.start()
-            await train_process.join()
+            train_process.join()
             trainresult = 0
           if not trainresult:
             filterdict = {

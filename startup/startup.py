@@ -111,16 +111,16 @@ class startup_class():
         os.kill(os.getpid(), SIGINT)
         return() 
       if (item := startup_redis.get_start_trainer_busy()):
-        if (item in trainers) and trainers[item].do_run:
+        if (item in trainers):
           trainers[item].stop()
         trainers[item] = trainer(item)
-        trainers[item].run()
+        trainers[item].start()
         startup_redis.set_start_trainer_busy(0)
       if (item := startup_redis.get_start_worker_busy()):
-        if (item in tf_workers) and tf_workers[item].do_run:
+        if (item in tf_workers):
           tf_workers[item].stop()
         tf_workers[item] = tf_worker(item)
-        tf_workers[item].run()
+        tf_workers[item].start()
         startup_redis.set_start_worker_busy(0)
       if (item := startup_redis.get_start_stream_busy()):
         if item in viewables:

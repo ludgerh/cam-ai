@@ -505,7 +505,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           await eventline.asave(update_fields=('done', ))
 
         outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))		
 
       elif params['command'] == 'delevent':

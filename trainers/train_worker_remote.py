@@ -20,10 +20,14 @@ import cv2 as cv
 import os
 import io
 from time import sleep, time
-from multitimer import MultiTimer
 from zipfile import ZipFile, ZIP_DEFLATED
+from setproctitle import setproctitle
+from logging import getLogger
 from django.utils import timezone
 from camai.version import version
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "camai.settings")
+django.setup()
 from tools.l_tools import djconf, seq_to_int
 from tools.c_tools import list_from_queryset
 from users.userinfo import afree_quota
@@ -32,18 +36,19 @@ from camai.version import version
 
 class train_once_remote():
 
-  def __init__(self, myschool, myfit, dbline, logger):
+  def __init__(self, myschool, myfit, dbline):
     self.myschool = myschool
     self.myfit = myfit
     self.t_type = dbline.t_type
-    self.logger = logger
+    self.tainer_id = dbline.id
     self.wsurl = dbline.wsserver+'ws/remotetrainer/'
     self.wsname = dbline.wsname
     self.wspass = dbline.wspass
     self.modeltype = dbline.modeltype
-    self.ws_ts = None
 
   def send_ping(self):
+    if time() - self.ws_ts < 2.0:
+      return()
     while True:
       try:
         self.ws.send('Ping', opcode=1)
@@ -54,6 +59,11 @@ class train_once_remote():
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
 
   def run(self):
+    from tools.c_logger import log_ini
+    setproctitle('CAM-AI-Rem-Train #'+str(self.tainer_id))
+    self.logname = 'rem_train #'+str(self.tainer_id)
+    self.logger = getLogger(self.logname)
+    log_ini(self.logger, self.logname)
     self.logger.info('****************************************************');
     self.logger.info('*** Working on School #'
       +str(self.myschool.id)+', '+self.myschool.name+'...');
@@ -108,10 +118,6 @@ class train_once_remote():
       if item[2]:
         remoteset_with_size.add(item[0])
     self.ws_ts = time()
-    pingproc = MultiTimer(interval=2, 
-      function=self.send_ping, 
-      runonstart=False)
-    pingproc.start()
     filterdict = {
       'school' : self.myschool.id, 
       'deleted' : False,
@@ -133,6 +139,7 @@ class train_once_remote():
         self.logger.info('(' + str(count) + ') Changed, deleting: ' + item)
         remoteset.remove(item)
       count -= 1  
+      self.send_ping()
     count = len(remoteset - localset)
     for item in (remoteset - localset):
       self.logger.info('(' + str(count) + ') Deleting: ' + item)
@@ -149,6 +156,7 @@ class train_once_remote():
         except TimeoutError:
           i += 1
       count -= 1
+      self.send_ping()
 
     datalist = list(localset - remoteset_with_size) 
     count = len(datalist)
@@ -172,7 +180,7 @@ class train_once_remote():
       zip_content = zip_buffer.read()
       self.ws.send_binary(zip_content)
       self.ws.recv()
-    pingproc.stop()  
+      self.send_ping()
     if self.t_type == 2:
       outdict = {
         'code' : 'checkfitdone',
