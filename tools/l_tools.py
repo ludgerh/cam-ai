@@ -392,6 +392,12 @@ def version_newer(first, second):
 def version_newer_or_equal(first, second):
   return version_flat(first) >= version_flat(second)  
   
+def version_older(first, second):
+  return version_flat(first) < version_flat(second)  
+  
+def version_older_or_equal(first, second):
+  return version_flat(first) <= version_flat(second)  
+  
 def get_dir_size(path='.'):
   total = 0
   try:

@@ -128,7 +128,7 @@ class c_cleanup():
 # ***** cleaning up events
           if self.do_run:
             for eventline in list_from_queryset(event.objects.filter(deleted = True)):
-              #self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
+              self.logger.info('Cleanup: Deleting event #' + str(eventline.id))
               framelines = event_frame.objects.filter(event__id = eventline.id)
               for frameline in framelines:
                 del_path = self.schoolframespath / frameline.name
@@ -195,6 +195,7 @@ class c_cleanup():
 
         
   def health_check(self): 
+    from tools.l_smtp import async_sendmail
     self.logger.info('Cleanup: Starting health check')
     timestamp = timezone.make_aware(datetime.now())
     files_to_delete_list = [item.name for item in list_from_queryset(

@@ -471,8 +471,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await aioshutil.move(basepath, 'temp/backup') 
         await aioshutil.move(zipresult, basepath) 
         await aioshutil.copy(
-          basepath + '/requirements.raspi_12',
-          basepath + '/requirements.raspi12'
+          'temp/backup/camai/passwords.py', 
+          basepath + '/camai/passwords.py'
         )
         if await aiofiles.os.path.exists(
           'temp/backup/accounts/templates/registration/privacy.html'

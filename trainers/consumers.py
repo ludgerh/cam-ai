@@ -31,10 +31,16 @@ from zipfile import ZipFile
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.forms.models import model_to_dict
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from camai.version import version
-from tools.l_tools import djconf, seq_to_int, version_newer_or_equal
+from tools.l_tools import (
+  djconf, 
+  seq_to_int, 
+  version_newer_or_equal, 
+  version_older_or_equal,
+)
 from tools.c_logger import log_ini
 from access.c_access import access
 from tools.tokens import maketoken_async
@@ -382,9 +388,63 @@ class trainerutil(AsyncWebsocketConsumer):
         return()
       #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
-      outlist = {'tracker' : json.loads(text_data)['tracker']}	
+      outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
-      if params['command'] == 'getschoolinfo':
+      if params['command'] == 'connecttrainer':
+        self.schoolnr = params['school']
+        if self.scope['user'].is_authenticated:
+          myuser = self.scope['user']
+        else:
+          myuser = await User.objects.aget(username=params['name'])
+          if await database_sync_to_async(myuser.check_password)(params['pass']):
+            self.authed = True
+          if not self.authed:
+            await self.close() 
+        if await access.check_async('S', self.schoolnr, myuser, 'R'):
+          self.maywrite = await access.check_async('S', self.schoolnr, myuser, 'W')
+          self.schoolline = await school.objects.aget(id=self.schoolnr)
+          self.trainer_nr, count = await get_trainer_nr(self.schoolline)
+          self.trainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
+          if 'version' in params:
+            self.version = params['version']
+          else:
+            self.version = '0.0.0'  
+          if self.trainerline.t_type in {2, 3}:
+            if self.ws_session is None:
+              import aiohttp
+              self.ws_session = aiohttp.ClientSession()
+            self.ws = await self.ws_session.ws_connect(
+              self.trainerline.wsserver + 'ws/trainerutil/')
+            self.ws_ts = time()
+            temp = json.loads(text_data)
+            temp['data']['school']=self.schoolline.e_school
+            temp['data']['name']=self.trainerline.wsname
+            temp['data']['pass']=self.trainerline.wspass
+            await self.ws.send_str(json.dumps(temp))
+            returned = await self.ws.receive() 
+            result = json.loads(returned.data)['data']
+            if result == 'OK' or ('status' in result and result['status'] == 'OK'):
+              outlist['data'] = result  
+            else:
+              await self.close()	
+              return()
+          else:  
+            if version_newer_or_equal(self.version, '1.6.2b'):
+              outlist['data'] = {
+                'status' : 'OK',
+                'trainer' : self.trainer_nr,
+                'count' : count,
+              }
+            else:  
+              self.trainer_nr = 1
+              outlist['data'] = 'OK'  
+        else: #Proper error description to both consoles!!!
+          await self.close()
+          return()
+        #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))			
+
+      elif params['command'] == 'getschoolinfo':
         countlist1 = trainframe.objects.filter(school=params['school'])
         infolocal = {}
         infolocal['nr_total'] = await countlist1.acount()
@@ -422,7 +482,13 @@ class trainerutil(AsyncWebsocketConsumer):
           temp['data']['school']=self.schoolline.e_school
           await self.ws.send_str(json.dumps(temp))
           returned = await self.ws.receive()
-          outlist['data'] = json.loads(returned.data)['data']
+          datatemp = json.loads(returned.data)['data']
+          if version_older_or_equal(self.version, '1.6.6'):
+            for item in datatemp[0]:
+              item['l_rate_patience'] = 0
+              item['l_rate_delta_min'] = 0
+              item['l_rate_decrement'] = 0
+          outlist['data'] = datatemp 
         else:
           if 'new_click' in params and params['new_click']:
             self.new_click = True
@@ -451,34 +517,9 @@ class trainerutil(AsyncWebsocketConsumer):
                 self.status_string = 'Idle'  
               self.query_working = False
             async for item in query_set:
-              result.append({
-                'id':item.id, 
-                'made':item.made.strftime("%Y-%m-%d"), 
-                'nr_tr':item.nr_tr, 
-                'nr_va':item.nr_va, 
-                'minutes':item.minutes, 
-                'epochs':item.epochs, 
-                'loss':item.loss, 
-                'binacc':item.binacc, 
-                'auc':item.auc, 
-                'val_loss':item.val_loss, 
-                'val_binacc':item.val_binacc, 
-                'val_auc':item.val_auc, 
-                'status':item.status, 
-                'model_type':item.model_type, 
-                'model_image_augmentation':item.model_image_augmentation, 
-                'model_weight_decay':item.model_weight_decay,
-                'model_weight_constraint':item.model_weight_constraint, 
-                'model_dropout':item.model_dropout, 
-                'l_rate_start':item.l_rate_start, 
-                'l_rate_stop':item.l_rate_stop, 
-                'l_rate_divisor':item.l_rate_divisor, 
-                'weight_min':item.weight_min, 
-                'weight_max':item.weight_max, 
-                'weight_boost':item.weight_boost, 
-                'early_stop_delta_min':item.early_stop_delta_min, 
-                'early_stop_patience':item.early_stop_patience,
-              })
+              fit_dict = model_to_dict(item)
+              fit_dict['made'] = item.made.strftime("%Y-%m-%d")
+              result.append(fit_dict)
           else:
             remove = 0
             new_epoch = False
@@ -535,58 +576,7 @@ class trainerutil(AsyncWebsocketConsumer):
             
           outlist['data'] = result
         logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))							
-
-      elif params['command'] == 'connecttrainer':
-        self.schoolnr = params['school']
-        if self.scope['user'].is_authenticated:
-          myuser = self.scope['user']
-        else:
-          myuser = await User.objects.aget(username=params['name'])
-          if await database_sync_to_async(myuser.check_password)(params['pass']):
-            self.authed = True
-          if not self.authed:
-            await self.close() 
-        if await access.check_async('S', self.schoolnr, myuser, 'R'):
-          self.maywrite = await access.check_async('S', self.schoolnr, myuser, 'W')
-          self.schoolline = await school.objects.aget(id=self.schoolnr)
-          self.trainer_nr, count = await get_trainer_nr(self.schoolline)
-          self.trainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
-          if self.trainerline.t_type in {2, 3}:
-            if self.ws_session is None:
-              import aiohttp
-              self.ws_session = aiohttp.ClientSession()
-            self.ws = await self.ws_session.ws_connect(
-              self.trainerline.wsserver + 'ws/trainerutil/')
-            self.ws_ts = time()
-            temp = json.loads(text_data)
-            temp['data']['school']=self.schoolline.e_school
-            temp['data']['name']=self.trainerline.wsname
-            temp['data']['pass']=self.trainerline.wspass
-            await self.ws.send_str(json.dumps(temp))
-            returned = await self.ws.receive() 
-            result = json.loads(returned.data)['data']
-            if result == 'OK' or ('status' in result and result['status'] == 'OK'):
-              outlist['data'] = result  
-            else:
-              await self.close()	
-              return()
-          else:  
-            if ('version' in params 
-              and version_newer_or_equal(params['version'], '1.6.2b')):
-              outlist['data'] = {
-                'status' : 'OK',
-                'trainer' : self.trainer_nr,
-                'count' : count,
-              }
-            else:  
-              self.trainer_nr = 1
-              outlist['data'] = 'OK'  
-        else: #Proper error description to both consoles!!!
-          await self.close()
-          return()
-        #logger.info('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))						
+        await self.send(json.dumps(outlist))				
 
       elif params['command'] == 'getqueueinfo':
         if self.trainerline.t_type in {2, 3}:
@@ -625,11 +615,17 @@ class trainerutil(AsyncWebsocketConsumer):
           answer = json.loads(returned.data)['data']
           schoolline = await school.objects.aget(id=self.schoolnr)
           setattr(schoolline, params['item'], answer)
-          await schoolline.asave(update_fields=[params['item']])
+          try:
+            await schoolline.asave(update_fields=[params['item']])
+          except ValueError:
+            logger.warning('Old table version: Better update your client software') 
           outlist['data'] = answer
         else:  
           schoolline = await school.objects.aget(id=self.schoolnr)
-          outlist['data'] = getattr(schoolline, params['item'])
+          try:
+            outlist['data'] = getattr(schoolline, params['item'])
+          except AttributeError:
+            outlist['data'] = 0
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))						
 

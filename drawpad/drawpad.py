@@ -42,6 +42,7 @@ class drawpad():
     self.ringlist = []
     self.mask_set = False
     self.mypoint = None
+    self.mask = None
     
   async def set_mask(self): 
     self.mask_set = True

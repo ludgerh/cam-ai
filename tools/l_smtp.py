@@ -147,7 +147,7 @@ class l_smtp(SMTP):
       self.last_error = e.args
       self.result_code = 1001
       
-  def sendmail(self, *args):
+  async def sendmail(self, *args):
     msg = args[2]
     if self.allowed_size and msg.get_size() > self.allowed_size:
       self.answer = 'This Email is too large for the SMTP-Server.'
@@ -157,7 +157,8 @@ class l_smtp(SMTP):
     self.answer = 'OK'
     self.last_error = (0, 'OK')
     try:
-      return super().sendmail(*args[:2], msg.as_string()) 
+      return await super().sendmail(*args[:2], msg.as_string()) 
+      self.result_code = 0
     except SMTPRecipientsRefused as e:
       self.answer = 'Server refused to take the mail. Wrong username? Wrong password? Wrong testing email?'
       self.last_error = e.args

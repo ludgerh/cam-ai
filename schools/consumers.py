@@ -254,11 +254,11 @@ class schooldbutil(AsyncWebsocketConsumer):
                   schoolline = await school.objects.aget(id=frameline.school)
                   xytemp = await self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
                   self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schoolline, }
-                imagepath = self.schoolinfo['schooldict'].dir + 'frames/' + frameline.name
+                imagepath = self.schoolinfo['schooldict'].dir + 'frames/' + frameline.name 
               async with aiofiles.open(imagepath, mode = "rb") as f:
                 myimage = await f.read()
               if frameline.encrypted:
-                myimage = self.crypt.decrypt(myimage)  
+                myimage = self.crypt.decrypt(myimage) 
               myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
               myimage = cv.cvtColor(myimage, cv.COLOR_BGR2RGB)
               imglist.append(myimage)
@@ -525,7 +525,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         except event.DoesNotExist:
           logger.warning('delevent - Did not find DB line: ' + str(params['eventnr']))
         outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))			
 
       elif params['command'] == 'delitem':

@@ -21,6 +21,7 @@ import cv2 as cv
 import pickle
 import asyncio
 import aiofiles
+import aiohttp
 from multiprocessing import Queue as p_queue, SimpleQueue as s_queue
 from collections import deque
 from time import time

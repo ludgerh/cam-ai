@@ -16,13 +16,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import os
 import asyncio
-asyncio.get_event_loop().set_debug(True)
+#asyncio.get_event_loop().set_debug(True)
 import numpy as np
 from time import time
 from threading import Lock as t_lock
 from traceback import format_exc
 from collections import deque
-from multiprocessing import shared_memory as sm, Queue as mp_queue, Lock as p_lock
+from multiprocessing import shared_memory as sm, Queue as mp_queue, Lock as p_lock, queues
 from queue import Empty, Full, Queue as mt_queue
 from copy import deepcopy
 import pickle
@@ -124,6 +124,7 @@ class l_buffer():
       print(info + f'{os.getpid()} is using queue with ID {self.data_queue._reader.fileno()} {self.data_queue._writer.fileno()}')
     
   async def put_to_shelf(self, data): 
+    
     while self.do_run:
       self.lock.acquire()
       if not self.block_put or self.shelf is False: 
@@ -140,7 +141,7 @@ class l_buffer():
   async def data_loop_runner(self):
     while self.do_run:
       try:
-        data_in = await asyncio.to_thread(self.data_queue.get)
+        data_in = self.data_queue.get(False)
         if self.debug:
           print(self.debug, '+++ Loop', debug_display(data_in)) 
         if data_in == 'stop' or data_in is None:
@@ -192,8 +193,9 @@ class l_buffer():
                   buffer=in_bytes,
                 )) 
       except Empty:
+        await asyncio.sleep(self.brake_time) 
         data_out = ''  
-      if data_out:
+      if data_out: 
         await self.put_to_shelf(data_out) 
         if self.debug:
           print(self.debug, '--- Loop:', debug_display(data_out)) 
@@ -301,8 +303,8 @@ class l_buffer():
       if self.put_count < 0xFFFF:
         self.put_count += 1
       else:
-        self.put_count = 0  
-    try:    
+        self.put_count = 0     
+    try:  
       await asyncio.to_thread(
         self.data_queue.put, 
         data_for_send, 
