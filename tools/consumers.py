@@ -455,14 +455,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'upgrade':
         if not self.scope['user'].is_superuser:
           await self.close()
-        #***************************************************
-        startup_redis.set_shutdown_command(20)
-        outlist['data'] = 'OK'
-        logger.info('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
-        while True:
-          await asleep(long_brake)
-        #****************************************************  
         basepath = getcwd() 
         chdir('..')
         async with aiohttp.ClientSession() as session:
