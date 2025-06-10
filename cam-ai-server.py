@@ -50,14 +50,15 @@ basepath = os.getcwd()
 print('***** CAM-AI server is running *****')
 print('Calling: python ' + ' '.join(argv[1:]))
 print()
-startup_redis.set_watch_status(2)
-while(startup_redis.get_watch_status()):
-  if startup_redis.get_watch_status() == 2:
-    startup_redis.set_watch_status(1)
-    call_pars = argv
-    call_pars[0] = 'python'
-    os.chdir(basepath)
-    subprocess.call(call_pars) 
-  sleep(10.0)
+startup_redis.set_shutdown_command(0) 
+while True:
+  call_pars = argv
+  call_pars[0] = 'python'
+  os.chdir(basepath)
+  subprocess.call(call_pars)
+  if startup_redis.get_shutdown_command() in {0, 10}:
+    break
+if startup_redis.get_shutdown_command() == 10:   
+  os.system('sudo shutdown now') 
 print('***** CAM-AI server is done *****')  
     

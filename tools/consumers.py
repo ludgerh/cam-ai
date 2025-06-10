@@ -445,16 +445,24 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'shutdown':
         if not self.scope['user'].is_superuser:
           await self.close()
-        startup_redis.set_shutdown_command(1)
-        while startup_redis.get_watch_status():
-          await asleep(long_brake) 
+        startup_redis.set_shutdown_command(10)
+        #while startup_redis.get_shutdown_command() != 11:
+        #  await asleep(long_brake) 
         outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         
       elif params['command'] == 'upgrade':
         if not self.scope['user'].is_superuser:
           await self.close()
+        #***************************************************
+        startup_redis.set_shutdown_command(20)
+        outlist['data'] = 'OK'
+        logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
+        while True:
+          await asleep(long_brake)
+        #****************************************************  
         basepath = getcwd() 
         chdir('..')
         async with aiohttp.ClientSession() as session:
@@ -509,11 +517,11 @@ class admin_tools_async(AsyncWebsocketConsumer):
         output, _ = await p.communicate()
         for line in output.decode().split('\n'):
           logger.info(line);
-        startup_redis.set_shutdown_command(2)
+        startup_redis.set_shutdown_command(20)
         outlist['data'] = 'OK'
-        #logger.info('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
-        while startup_redis.get_watch_status():
+        while True:
           await asleep(long_brake)
           
       elif params['command'] == 'sendlogs':

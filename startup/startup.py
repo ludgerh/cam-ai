@@ -70,7 +70,6 @@ class startup_class():
       await djconf.asetconfig('smtp_server', smtp_server)
       await djconf.asetconfigint('smtp_port', smtp_port)
       await djconf.asetconfig('smtp_email', smtp_email)
-      self.restart_mode = 0
       startup_redis.set_start_trainer_busy(0)
       startup_redis.set_start_worker_busy(0)
       startup_redis.set_start_stream_busy(0)
@@ -101,14 +100,8 @@ class startup_class():
     from streams.models import stream
     from tf_workers.c_tf_workers import tf_worker
     from trainers.c_trainers import trainer
-    global restart_mode
     while self.do_run:
-      if (command := startup_redis.get_shutdown_command()):
-        startup_redis.set_shutdown_command(0)
-        if command == 1:
-          restart_mode = 1
-        elif command == 2:  
-          restart_mode = 2
+      if (startup_redis.get_shutdown_command() in {10, 20}):
         os.kill(os.getpid(), SIGINT)
         return() 
       if (item := startup_redis.get_start_trainer_busy()):
@@ -169,16 +162,8 @@ async def newexit():
     await tf_workers[i].stop()
   for i in trainers:
     print('Closing trainer #', i)
-    await trainers[i].stop()  
-  if glob_startup.restart_mode == 0:
-    startup_redis.set_watch_status(0) 
-    kill_all_processes()
-  elif startup.restart_mode == 1:
-    startup_redis.set_watch_status(0) 
-    os.system('sudo shutdown now')
-    kill_all_processes()
-  elif startup.restart_mode == 2:
-    startup_redis.set_watch_status(2) 
+    await trainers[i].stop() 
+  kill_all_processes()
   exit(0) 
     
 def handle_signal(signum, frame):

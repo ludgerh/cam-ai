@@ -38,16 +38,15 @@ class new_redis(saferedis):
   def set_start_trainer_busy(self, value):
     self.set('cam-ai.startup.trainer_busy:', str(value)) 
     
-  def set_watch_status(self, value): #0 : finish, 1 : wait, 2 : restart
-    self.set('cam-ai.startup.watch_status:', value)   
-    
-  def get_shutdown_command(self): #0 : nothing, 1 : stop CAM-AI, 2 : restart CAM-AI
+  def get_shutdown_command(self):
     if (result := self.get('cam-ai.startup.shutdown:')) is None:
       return(0)
     else:  
+      print('%%%%%%%%%% get_shutdown_command:', result)
       return(int(result)) 
     
-  def set_shutdown_command(self, value): #0 : nothing, 1 : stop CAM-AI, 2 : restart CAM-AI
+  def set_shutdown_command(self, value):
+    print('%%%%%%%%%% set_shutdown_command:', value)
     self.set('cam-ai.startup.shutdown:', value) 
     
   def get_start_worker_busy(self):
@@ -66,11 +65,6 @@ class new_redis(saferedis):
     if (result := self.get('cam-ai.startup.trainer_busy:')) is None:
       return(0)
     else:  
-      return(int(result))  
-    
-  def get_watch_status(self):  #0 : finish, 1 : wait, 2 : restart
-    while (result := self.get('cam-ai.startup.watch_status:')) is None:
-      sleep(1.0)  
-    return(int(result))  
+      return(int(result)) 
       
 my_redis = new_redis()   
