@@ -257,8 +257,6 @@ class c_eventer(viewable):
     if streams_redis.check_if_counts_zero('E', self.id):
       await a_break_type(BR_LONG)
       return()
-    #await a_break_type(BR_LONG)
-    print('33333')
     if streams_redis.view_from_dev('E', self.id):
       while self.scrwidth is None:
         await a_break_type(BR_LONG)
@@ -272,6 +270,8 @@ class c_eventer(viewable):
           self.textheight = round(0.51 / self.scaling)
           self.textthickness = round(2.0 / self.scaling)
         await self.display_events(frame)
+    else:    
+      await a_break_type(BR_LONG)
     if self.do_run and self.dbline.eve_view:
       fps = self.som.gettime()
       if fps:
