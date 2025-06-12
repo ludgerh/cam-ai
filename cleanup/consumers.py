@@ -28,7 +28,6 @@ from trainers.models import trainframe
 from eventers.models import event, event_frame
 from .c_cleanup import my_cleanup
 from .redis import my_redis as cleanup_redis
-#from .redis import get_from_redis, get_from_redis_queue, len_from_redis_queue
 from .models import files_to_delete
 
 logname = 'ws_cleanup'
@@ -65,12 +64,30 @@ class cleanup(AsyncWebsocketConsumer):
 
         if params['command'] == 'checkevents':
           outlist['data'] = {
-            'events_temp' : len_from_redis_queue('events_temp', params['stream']),
-            'events_frames_correct' : get_from_redis('events_frames_correct', params['stream']),
-            'events_frames_missingframes' : len_from_redis_queue('events_frames_missingframes', params['stream']),
-            'eframes_correct' : get_from_redis('eframes_correct', params['stream']),
-            'eframes_missingdb' : len_from_redis_queue('eframes_missingdb', params['stream']),
-            'eframes_missingfiles' : len_from_redis_queue('eframes_missingfiles', params['stream']),
+            'events_temp' : cleanup_redis.len_from_redis_queue(
+              'events_temp', 
+              params['stream'],
+            ),
+            'events_frames_correct' : cleanup_redis.get_from_redis(
+              'events_frames_correct', 
+              params['stream'],
+            ),
+            'events_frames_missingframes' : cleanup_redis.len_from_redis_queue(
+              'events_frames_missingframes', 
+              params['stream'],
+            ),
+            'eframes_correct' : cleanup_redis.get_from_redis(
+              'eframes_correct', 
+              params['stream'],
+            ),
+            'eframes_missingdb' : cleanup_redis.len_from_redis_queue(
+              'eframes_missingdb', 
+              params['stream'],
+            ),
+            'eframes_missingfiles' : cleanup_redis.len_from_redis_queue(
+              'eframes_missingfiles', 
+              params['stream'],
+            ),
           }
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
@@ -102,7 +119,10 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_events_frames_missingframes':		
-          list_to_delete = get_from_redis_queue('events_frames_missingframes', params['stream'])
+          list_to_delete = get_from_redis_queue(
+            'events_frames_missingframes', 
+            params['stream'],
+          )
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -131,7 +151,10 @@ class cleanup(AsyncWebsocketConsumer):
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
-            del_line = files_to_delete(name = schoolframespath / item.decode(), min_age = 300)
+            del_line = files_to_delete(
+              name = schoolframespath / item.decode(), 
+              min_age = 300,
+            )
             await del_line.asave()
             outlist['callback'] = True
             outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
@@ -177,9 +200,18 @@ class cleanup(AsyncWebsocketConsumer):
 
         elif params['command'] == 'checkschool':
           outlist['data'] = {
-            'schools_correct' : get_from_redis('schools_correct', params['school']),
-            'schools_missingdb' : len_from_redis_queue('schools_missingdb', params['school']),
-            'schools_missingfiles' : len_from_redis_queue('schools_missingfiles', params['school']),
+            'schools_correct' : cleanup_redis.get_from_redis(
+              'schools_correct', 
+              params['school'],
+            ),
+            'schools_missingdb' : cleanup_redis.len_from_redis_queue(
+              'schools_missingdb', 
+              params['school'],
+            ),
+            'schools_missingfiles' : cleanup_redis.len_from_redis_queue(
+              'schools_missingfiles', 
+              params['school'],
+            ),
           }
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
@@ -191,10 +223,16 @@ class cleanup(AsyncWebsocketConsumer):
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
-            del_line = files_to_delete(name = school_line.dir + '/frames/' + item.decode() + '.bmp', min_age = 300)
+            del_line = files_to_delete(
+              name = school_line.dir + '/frames/' + item.decode() + '.bmp', 
+              min_age = 300,
+            )
             await del_line.asave()
             for dim in my_cleanup.model_dims[params['school']]:
-              del_line = files_to_delete(name = school_line.dir + '/coded/' + dim + '/' + item.decode() + '.cod', min_age = 300)
+              del_line = files_to_delete(
+                name = school_line.dir + '/coded/' + dim + '/' + item.decode() + '.cod', 
+                min_age = 300,
+              )
               await del_line.asave()
             outlist['callback'] = True
             outlist['data'] = '(' + str(counter) + '/' + str(counter_start) + ')'
@@ -243,13 +281,34 @@ class cleanup(AsyncWebsocketConsumer):
 
         elif params['command'] == 'checkrecfiles':
           outlist['data'] = {
-            'videos_correct' : get_from_redis('videos_correct', 0),
-            'videos_missingdb' : len_from_redis_queue('videos_missingdb', 0),
-            'videos_missingfiles' : len_from_redis_queue('videos_missingfiles', 0),
-            'videos_temp' : len_from_redis_queue('videos_temp', 0),
-            'videos_mp4' : get_from_redis('videos_mp4', 0),
-            'videos_webm' : get_from_redis('videos_webm', 0),
-            'videos_jpg' : get_from_redis('videos_jpg', 0),
+            'videos_correct' : cleanup_redis.get_from_redis(
+              'videos_correct', 
+              0,
+            ),
+            'videos_missingdb' : cleanup_redis.len_from_redis_queue(
+              'videos_missingdb', 
+              0,
+            ),
+            'videos_missingfiles' : cleanup_redis.len_from_redis_queue(
+              'videos_missingfiles', 
+              0,
+            ),
+            'videos_temp' : cleanup_redis.len_from_redis_queue(
+              'videos_temp', 
+              0,
+            ),
+            'videos_mp4' : cleanup_redis.get_from_redis(
+              'videos_mp4', 
+              0,
+            ),
+            'videos_webm' : cleanup_redis.get_from_redis(
+              'videos_webm', 
+              0,
+            ),
+            'videos_jpg' : cleanup_redis.get_from_redis(
+              'videos_jpg', 
+              0,
+            ),
           }
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	

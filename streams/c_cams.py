@@ -29,7 +29,7 @@ from traceback import format_exc
 from time import time
 from globals.c_globals import viewers, viewables
 from tools.c_spawn import viewable
-from tools.l_break import a_break_time, a_break_type, BR_MEDIUM, BR_LONG
+from tools.l_break import a_break_time, a_break_type, BR_SHORT, BR_MEDIUM, BR_LONG
 from tools.l_tools import djconf, ts2filename
 from tools.l_sysinfo import is_raspi
 from .redis import my_redis as streams_redis
@@ -138,9 +138,7 @@ class c_cam(viewable):
       #print('Launch: cam')
       while self.do_run:
         frameline = await self.run_one()
-        if frameline is None:
-          await a_break_type(BR_LONG)
-        else:
+        if frameline:
           if (self.dbline.cam_view 
               and streams_redis.view_from_dev('C', self.id)):
             await self.viewer_queue.put(frameline)
@@ -214,8 +212,7 @@ class c_cam(viewable):
     else:
       in_ts = time() 
     while True:
-      if (streams_redis.check_if_counts_zero('C', self.id) 
-          or self.dbline.cam_pause): 
+      if self.dbline.cam_pause or streams_redis.check_if_counts_zero('C', self.id):
         if self.cam_active:
           if self.cam_ts is None:
             self.cam_ts = time()
@@ -229,21 +226,17 @@ class c_cam(viewable):
             else:
               break
         else: 
-          if not self.do_run:
-            return(None)
-          else:
-            break  
+          await a_break_type(BR_LONG)
+          return(None)
       else:
         if self.cam_active:
-          if (not streams_redis.record_from_dev('C', self.id)
-              and self.cam_recording):
+          if self.cam_recording and not streams_redis.record_from_dev('C', self.id):
             if self.ffmpeg_recording:
               await self.stopprocess()
               await self.newprocess() 
             self.cam_recording = False
             self.logger.info('Cam #'+str(self.id)+' stopped recording')
-          if (streams_redis.record_from_dev('C', self.id) 
-              and not self.cam_recording):
+          if not self.cam_recording and streams_redis.record_from_dev('C', self.id): 
             if not self.ffmpeg_recording:
               await self.stopprocess()
               await self.newprocess() 
@@ -443,7 +436,7 @@ class c_cam(viewable):
           await a_break_time(self.wd_interval)
         except asyncio.CancelledError:
           self.logger.info("Watchdog-Task wurde abgebrochen.")
-          return  # Sauber beenden
+          return()
         if self.dbline.cam_virtual_fps:
           if (streams_redis.check_if_counts_zero('C', self.id)
               and streams_redis.check_if_counts_zero('D', self.id)
@@ -516,6 +509,7 @@ class c_cam(viewable):
       outparams1 += ['-fps_mode', 'cfr']
     outparams1 += ['pipe:1']
     inparams = ['-i', source_string]
+    #generalparams = ['-v', 'info']
     generalparams = ['-v', 'fatal']
     if is_raspi():
       generalparams += ['-threads', '1']

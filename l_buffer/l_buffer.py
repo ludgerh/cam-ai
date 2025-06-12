@@ -141,6 +141,7 @@ class l_buffer():
   async def data_loop_runner(self):
     while self.do_run:
       try:
+        #data_in = await asyncio.to_thread(self.data_queue.get, False)
         data_in = self.data_queue.get(False)
         if self.debug:
           print(self.debug, '+++ Loop', debug_display(data_in)) 
@@ -309,7 +310,7 @@ class l_buffer():
         self.data_queue.put, 
         data_for_send, 
         True, 
-        self.put_timeout, #???
+        self.put_timeout,
       )   
     except Empty:
       raise Empty

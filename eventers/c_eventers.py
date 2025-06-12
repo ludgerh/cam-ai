@@ -257,6 +257,8 @@ class c_eventer(viewable):
     if streams_redis.check_if_counts_zero('E', self.id):
       await a_break_type(BR_LONG)
       return()
+    #await a_break_type(BR_LONG)
+    print('33333')
     if streams_redis.view_from_dev('E', self.id):
       while self.scrwidth is None:
         await a_break_type(BR_LONG)

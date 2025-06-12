@@ -42,11 +42,9 @@ class new_redis(saferedis):
     if (result := self.get('cam-ai.startup.shutdown:')) is None:
       return(0)
     else:  
-      print('%%%%%%%%%% get_shutdown_command:', result)
       return(int(result)) 
     
   def set_shutdown_command(self, value):
-    print('%%%%%%%%%% set_shutdown_command:', value)
     self.set('cam-ai.startup.shutdown:', value) 
     
   def get_start_worker_busy(self):

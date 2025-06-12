@@ -73,6 +73,11 @@ else:
 # SchoolDBUtil
 #*****************************************************************************
 
+
+@database_sync_to_async
+def get_framelines(event_id):
+  return list(event_frame.objects.filter(event__id=event_id).order_by('time', 'id'))
+
 class schooldbutil(AsyncWebsocketConsumer):
 
   @database_sync_to_async
@@ -420,12 +425,8 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'geteventframes':
-        framelines = (
-          event_frame.objects.filter(event__id=params['event']).order_by('time', 'id')
-        )
-        result = []
-        async for item in framelines:
-          result.append(item.id)
+        framelines = await get_framelines(params['event'])
+        result = [item.id for item in framelines]
         outlist['data'] = (params['count'], result)
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
