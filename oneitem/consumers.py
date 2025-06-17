@@ -389,7 +389,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       elif params['command'] == 'save_conditions':
         if self.may_write:
           self.myitem.inqueue.put((
-            'save_conditions', params['reaction'], params['conditions']))
+            'save_condition', params['reaction'], params['conditions']))
           cond_dict = json.loads(params['conditions'])
           conditionlines = evt_condition.objects.filter(eventer_id=self.myitem.dbline.id, reaction=params['reaction'])
           async for item in conditionlines:

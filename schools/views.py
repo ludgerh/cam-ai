@@ -172,19 +172,20 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
   if not go_on:
     return(HttpResponse('No Access'))
   with open(filepath, "rb") as f:
-    if crypt: 
-      if (is_public_server 
-        and request.user.is_superuser
-        and request.user.id != streamline.creator.id
-      ):
-        myframe = c_convert(f.read(), typein=3, typeout=outtype, xycontained=xycontained, 
-          xout=x, yout=y)
-      else:  
-        myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, 
-          xout=x, yout=y, incrypt=crypter_dict[streamline.id]) 
-    else:
-      myframe = c_convert(f.read(), typein=2, typeout=outtype, xycontained=xycontained, 
-        xout=x, yout=y)  
+    image_data = f.read()
+  if crypt: 
+    if (is_public_server 
+      and request.user.is_superuser
+      and request.user.id != streamline.creator.id
+    ):
+      myframe = c_convert(image_data, typein=3, typeout=outtype, xycontained=xycontained, 
+        xout=x, yout=y)
+    else:  
+      myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
+        xout=x, yout=y, incrypt=crypter_dict[streamline.id]) 
+  else:
+    myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
+      xout=x, yout=y)  
           
   return HttpResponse(myframe, content_type="image/jpeg")
 

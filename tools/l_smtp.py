@@ -118,10 +118,10 @@ class l_smtp(SMTP):
         await self.starttls()
       if 'user' in kwargs: 
         if 'password' in kwargs: 
-          await self.login(kwargs['user'], kwargs['password'])  
+          await self.login(kwargs['user'], kwargs['password']) 
         else:  
-          await self.login(kwargs['user'], '')   
-      self.allowed_size = int(self.esmtp_features['size'])
+          await self.login(kwargs['user'], '') 
+      self.allowed_size = int(self.esmtp_features['SIZE'])
     except gaierror as e:
       self.answer = 'Domain is not reachable. Spelling?'
       self.last_error = e.args

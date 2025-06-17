@@ -480,3 +480,5 @@ class c_cleanup():
   def stop(self):
     self.inqueue.put(('stop',))
     self.run_process.join()
+    
+my_cleanup = c_cleanup()    

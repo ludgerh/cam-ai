@@ -194,7 +194,7 @@ function isInViewport(elementid) {
     return(
       rect.top >= 0 &&
       rect.left >= 0 &&
-      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+      //rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
       rect.right <= (window.innerWidth || document.documentElement.clientWidth)
     );
   } else {
@@ -300,12 +300,12 @@ function getimages() {
       };
     };
   };
-  if (next_frame > last_visible + 100) {
+  if (next_frame > last_visible + 16) {
     get_images_busy = false;
     return;
   };
-  frames_to_put = frames.slice(next_frame, last_visible + 100 + 1);
-  next_frame = last_visible + 100 + 1;
+  frames_to_put = frames.slice(next_frame, last_visible + 16 + 1);
+  next_frame = last_visible + 16 + 1;
   let idxs = [];
   let counts = [];
   for (const item of frames_to_put) {

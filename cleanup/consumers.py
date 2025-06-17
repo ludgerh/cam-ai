@@ -93,7 +93,10 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_events_temp':		
-          list_to_delete = get_from_redis_queue('events_temp', params['stream'])
+          list_to_delete = cleanup_redis.get_from_redis_queue(
+            'events_temp', 
+            params['stream'],
+          )
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -119,7 +122,7 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_events_frames_missingframes':		
-          list_to_delete = get_from_redis_queue(
+          list_to_delete = cleanup_redis.get_from_redis_queue(
             'events_frames_missingframes', 
             params['stream'],
           )
@@ -147,7 +150,10 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_eframes_missingdb':	
-          list_to_delete = get_from_redis_queue('eframes_missingdb', params['stream'])
+          list_to_delete = cleanup_redis.get_from_redis_queue(
+            'eframes_missingdb', 
+            params['stream'],
+          )
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -174,7 +180,10 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_eframes_missingfiles':	
-          list_to_delete = get_from_redis_queue('eframes_missingfiles', params['stream'])
+          list_to_delete = cleanup_redis.get_from_redis_queue(
+            'eframes_missingfiles', 
+            params['stream'],
+          )
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -219,7 +228,10 @@ class cleanup(AsyncWebsocketConsumer):
         elif params['command'] == 'fix_schools_missingdb':	
           school_line = await school.objects.aget(id=params['school'])
           myschooldir = school_line.dir
-          list_to_delete = get_from_redis_queue('schools_missingdb', params['school'])
+          list_to_delete = cleanup_redis.get_from_redis_queue(
+            'schools_missingdb', 
+            params['school'],
+          )
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -252,7 +264,10 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_schools_missingfiles':	
-          list_to_delete = get_from_redis_queue('schools_missingfiles', params['school'])
+          list_to_delete = cleanup_redis.get_from_redis_queue(
+            'schools_missingfiles', 
+            params['school'],
+          )
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -314,7 +329,7 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_videos_temp':	
-          list_to_delete = get_from_redis_queue('videos_temp', 0)
+          list_to_delete = cleanup_redis.get_from_redis_queue('videos_temp', 0)
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -338,7 +353,7 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_videos_missingdb':	
-          list_to_delete = get_from_redis_queue('videos_missingdb', 0)
+          list_to_delete = cleanup_redis.get_from_redis_queue('videos_missingdb', 0)
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:
@@ -364,7 +379,7 @@ class cleanup(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))	
 
         elif params['command'] == 'fix_videos_missingfiles':	
-          list_to_delete = get_from_redis_queue('videos_missingfiles', 0)
+          list_to_delete = cleanup_redis.get_from_redis_queue('videos_missingfiles', 0)
           counter = len(list_to_delete)
           counter_start = len(list_to_delete)
           for item in list_to_delete:

@@ -22,6 +22,7 @@ import aiofiles.os
 import aiohttp
 import aioshutil
 import io
+import os
 from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
@@ -33,6 +34,11 @@ from multiprocessing import Process
 from logging import getLogger
 from traceback import format_exc
 from zipfile import ZipFile, ZIP_DEFLATED
+
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'camai.settings')
+django.setup()
+
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -199,7 +205,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -408,7 +414,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
               await asleep(long_brake) 
           outlist['data'] = 'OK'
           del outlist['callback']
-          logger.debug('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
         else:
           await self.close()
@@ -521,7 +527,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         smtp_conf['sender_email'] = (
           'Logfile-Sender' + '<' + smtp_conf['sender_email'] + '>')
         my_smtp = l_smtp(**smtp_conf)
-        my_smtp.answer
+        await my_smtp.async_init()
         my_msg = l_msg(
           smtp_conf['sender_email'],
           'support@cam-ai.de',
@@ -531,7 +537,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         )
         my_msg.attach_file(logpath + 'c_server.err') 
         my_msg.attach_file(logpath + 'c_server.log')  
-        my_smtp.sendmail(
+        await my_smtp.sendmail(
           smtp_conf['sender_email'],
           'support@cam-ai.de',
           my_msg,
@@ -539,7 +545,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         if my_smtp.result_code:
           logger.error('SMTP: ' + my_smtp.answer)
           logger.error(str(my_smtp.last_error))
-        my_smtp.quit()
+        await my_smtp.quit()
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

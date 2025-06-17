@@ -149,6 +149,7 @@ class c_cam(viewable):
           if (self.dbline.eve_mode_flag 
               and (not streams_redis.check_if_counts_zero('E', self.id))):
             await self.eventer_dataq.put(frameline)
+      await self.dbline.asave(update_fields = ['cam_fpsactual', ])
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
       await self.stopprocess()
@@ -305,7 +306,6 @@ class c_cam(viewable):
     fps = self.som.gettime()
     if fps:
       self.dbline.cam_fpsactual = fps
-      await self.dbline.asave(update_fields = ['cam_fpsactual', ])
       streams_redis.fps_to_dev('C', self.id, fps)
     if self.dbline.cam_apply_mask and (self.viewer.drawpad.mask is not None):
       frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
@@ -590,7 +590,10 @@ class c_cam(viewable):
     self.logger.info('Cam #'+str(self.id)+' is off')
     if self.ff_proc is not None:
       await self.dbline.arefresh_from_db()
-      self.ff_proc.send_signal(SIGINT)
+      try:
+        self.ff_proc.send_signal(SIGINT)
+      except ProcessLookupError:
+        self.logger.warning("Process does not exist anymore. Cannot send signal")
       self.ff_proc.terminate()
       await self.ff_proc.wait()
       self.ff_proc = None

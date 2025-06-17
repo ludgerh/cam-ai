@@ -265,12 +265,12 @@ class c_event(list):
       y2 = frame[3][3],
       event = self.dbline,
     )
+    await frameline.asave()
     if self.to_email:
       frame.append(frameline.id)
-    await frameline.asave() 
 
   async def save(self, cond_dict):
-    #print('*** Saving Event:', self.id)
+    print('*** Saving Event:', self.id)
     self.frames_filter(self.number_of_frames, cond_dict)
     frames_to_save = self.frames.values()
     self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
@@ -300,7 +300,7 @@ class c_event(list):
     print('Sending Email:', self.to_email)
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
-      mytoken = await maketoken_async('EVR', self.id, receiver)
+      mytoken = await maketoken_async('EVR', self.dbline.id, receiver)
       subject = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
         + self.p_string())
       to_email = receiver
@@ -308,7 +308,7 @@ class c_event(list):
       plain_text += 'We had some movement.\n'  
       if self.savename:
         plain_text += 'Here is the movie: \n' 
-        plain_text += self.clienturl + 'schools/getbigmp4/' + str(self.id) + '/'
+        plain_text += self.clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
         plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
       plain_text += 'Here are the images: \n'  
       for item in self.mailimages:
@@ -330,7 +330,7 @@ class c_event(list):
           self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
           html_text += '<br>Here is the movie (click on the image to see): <br> \n' 
           html_text += ('<a href="' + self.clienturl + 'schools/getbigmp4/' 
-            + str(self.id) + '/')
+            + str(self.dbline.id) + '/')
           html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
           html_text += '" target="_blank">'
           html_text += '<img src="cid:image0" style="width: 400px; height: auto"></a> <br>\n'

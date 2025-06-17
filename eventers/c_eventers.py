@@ -134,12 +134,7 @@ class c_eventer(viewable):
         if item['id'] != received[2]]
       self.set_cam_counts()
     elif (received[0] == 'save_condition'):
-      for item in self.cond_dict[received[1]]:
-        if item['id'] == received[2]:
-          item['c_type'] = received[3]
-          item['x'] = received[4]
-          item['y'] = received[5]
-          break
+      self.cond_dict[received[1]] = json.loads(received[2])
       self.set_cam_counts()
     elif (received[0] == 'save_conditions'):
       self.cond_dict[received[1]] = json.loads(received[2])
@@ -276,9 +271,6 @@ class c_eventer(viewable):
       fps = self.som.gettime()
       if fps:
         self.dbline.eve_fpsactual = fps
-        await database_sync_to_async(
-          self.stream.objects.filter(id=self.id).update
-        )(eve_fpsactual = fps)
         streams_redis.fps_to_dev('E', self.id, fps)
 
   async def read_conditions(self):
@@ -471,7 +463,7 @@ class c_eventer(viewable):
               item.dbline.double = isdouble
               await item.dbline.asave()
               if not isdouble:
-                await asyncio.create_subprocess_exec(
+                proc = await asyncio.create_subprocess_exec(
                   'ffmpeg', 
                   '-ss', str(vid_offset), 
                   '-v', 'fatal', 
@@ -480,6 +472,7 @@ class c_eventer(viewable):
                   '-q:v', '2', 
                   savepath[:-4]+'.jpg'
                 )
+                await proc.wait()
             else:  
               is_ready = False
           if is_ready:
@@ -536,7 +529,6 @@ class c_eventer(viewable):
             cv.cvtColor(frame[1], cv.COLOR_BGR2RGB) for frame in detector_buffer
           ]
           del frame
-          ts = time()
           if not await self.tf_worker.ask_pred(
             self.school_line.id, 
             imglist, 
@@ -544,7 +536,6 @@ class c_eventer(viewable):
           ):
             await a_break_type(BR_MEDIUM)
             continue
-          ts = time()
           predictions = []
           for frame in detector_buffer:
             if len(predictions) == 0:
@@ -612,7 +603,8 @@ class c_eventer(viewable):
   def reset(self):  
     self.inqueue.put(('reset', ))
 
-  def stop(self):
+  async def stop(self):
+    await self.dbline.asave(update_fields = ['eve_fpsactual', ])
     self.dataqueue.stop()
     super().stop()
     

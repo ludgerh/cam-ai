@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import os
 import json
+import asyncio
 from socket import gaierror
 from importlib import reload
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -159,9 +160,16 @@ class smtp(myFormView):
         'CAM-AI Testmail',
         'The sending was successful, the settings are correct.',
       )
-      if my_smtp.is_connected():
-        my_smtp.sendmail(sender_email, test_email, my_msg)
-      my_smtp.quit()  
+      loop = asyncio.new_event_loop()
+      asyncio.set_event_loop(loop)
+      print('00000', my_smtp.result_code)
+      loop.run_until_complete(my_smtp.async_init())
+      print('11111', my_smtp.result_code)
+      if loop.run_until_complete(my_smtp.is_connected()):
+        loop.run_until_complete(my_smtp.sendmail(sender_email, test_email, my_msg))
+      print('22222', my_smtp.result_code)
+      loop.run_until_complete(my_smtp.quit())
+      loop.close()
       if my_smtp.result_code:  
         if my_smtp.result_code == 1:
           form.add_error('server', str(my_smtp.result_code) + ': ' + my_smtp.answer)
@@ -202,7 +210,6 @@ class smtp(myFormView):
         if item[1] != djconf.getconfig('smtp_email', forcedb=False):
           djconf.setconfig('smtp_email', item[1])
           changes['smtp_email'] = item[1]
-    print('Changes', changes)      
     if changes:
       sourcefile = open('camai/passwords.py', 'r')
       targetfile = open('camai/passwords.py-new', 'w')  

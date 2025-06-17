@@ -39,6 +39,7 @@ from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
 from tools.c_logger import log_ini
 from tools.l_crypt import l_crypt
+from tools.l_break import a_break_type, BR_LONG
 from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers

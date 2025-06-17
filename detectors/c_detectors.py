@@ -235,7 +235,6 @@ class c_detector(viewable):
       fps = self.som.gettime()
       if fps:
         self.dbline.det_fpsactual = fps
-        await self.dbline.asave(update_fields = ['det_fpsactual', ])
         streams_redis.fps_to_dev(self.type, self.id, fps)
       self.run_lock = False
       return([3, buffer1, frametime])
@@ -264,7 +263,8 @@ class c_detector(viewable):
   def reset(self):  
     self.inqueue.put(('reset', ))
 
-  def stop(self):
+  async def stop(self):
+    await self.dbline.asave(update_fields = ['det_fpsactual', ])
     self.dataqueue.stop()
     super().stop()
 
