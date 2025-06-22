@@ -162,12 +162,9 @@ class smtp(myFormView):
       )
       loop = asyncio.new_event_loop()
       asyncio.set_event_loop(loop)
-      print('00000', my_smtp.result_code)
       loop.run_until_complete(my_smtp.async_init())
-      print('11111', my_smtp.result_code)
       if loop.run_until_complete(my_smtp.is_connected()):
         loop.run_until_complete(my_smtp.sendmail(sender_email, test_email, my_msg))
-      print('22222', my_smtp.result_code)
       loop.run_until_complete(my_smtp.quit())
       loop.close()
       if my_smtp.result_code:  

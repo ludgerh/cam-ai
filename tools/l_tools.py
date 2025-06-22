@@ -414,7 +414,10 @@ def get_dir_size(path='.'):
 def kill_all_processes():
   parent = psutil.Process(os.getpid())
   for child in parent.children(recursive=True):
-    child.terminate()
+    try:
+      child.terminate()
+    except psutil.NoSuchProcess:
+      pass
   gone, still_alive = psutil.wait_procs(parent.children(), timeout=3)
   if still_alive:
     for child in still_alive:

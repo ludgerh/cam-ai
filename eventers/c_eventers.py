@@ -27,7 +27,6 @@ from aiopath import AsyncPath
 from logging import getLogger
 from signal import SIGKILL
 from os import environ, kill, getpid
-from traceback import format_exc
 from setproctitle import setproctitle
 from collections import deque
 from time import time
@@ -149,22 +148,22 @@ class c_eventer(viewable):
     return(result)
  
   async def async_runner(self):
-    import django
-    django.setup()
-    from l_buffer.l_buffer import l_buffer
-    from globals.c_globals import tf_workers
-    from tools.l_tools import djconf
-    from tools.c_tools import hasoverlap, rect_btoa
-    self.hasoverlap = hasoverlap
-    self.rect_btoa = rect_btoa
-    from tools.c_logger import alog_ini
-    from schools.c_schools import get_taglist
-    from streams.models import stream
-    from tf_workers.c_tf_workers import tf_worker_client
-    from .c_event import resolve_rules
-    self.resolve_rules = resolve_rules
-    self.stream = stream
-    try: 
+    try:
+      import django
+      django.setup()
+      from l_buffer.l_buffer import l_buffer
+      from globals.c_globals import tf_workers
+      from tools.l_tools import djconf
+      from tools.c_tools import hasoverlap, rect_btoa
+      self.hasoverlap = hasoverlap
+      self.rect_btoa = rect_btoa
+      from tools.c_logger import alog_ini
+      from schools.c_schools import get_taglist
+      from streams.models import stream
+      from tf_workers.c_tf_workers import tf_worker_client
+      from .c_event import resolve_rules
+      self.resolve_rules = resolve_rules
+      self.stream = stream
       self.logname = 'eventer #'+str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
@@ -200,7 +199,7 @@ class c_eventer(viewable):
       self.display_deque = deque()
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg, )
       self.tf_w_index = await self.tf_worker.register(self.tf_worker_id)
-      await self.tf_worker.run_out(self.tf_w_index)
+      await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
       self.school_line = await database_sync_to_async(lambda: self.dbline.eve_school)()
       self.xdim, self.ydim = await self.tf_worker.get_xy(
         self.school_line.id,
@@ -237,9 +236,13 @@ class c_eventer(viewable):
       await self.tf_worker.unregister(self.tf_w_index)
       #for thread in enumerate(): 
       #  print(thread)
-    except:
-      self.logger.error('Error in process: ' + self.logname)
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error(
+        'Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
       self.logger.info('Restarting process...')
       while True:
         await a_break_type(BR_LONG)
@@ -348,32 +351,39 @@ class c_eventer(viewable):
     del newframe  
 
   async def make_webm(self):
-    while self.do_run:
-      path = AsyncPath(self.recordingspath)
-      async for mp4_file in path.glob('E_????????????.mp4'):
-        mp4_file = str(mp4_file)
-        webm_file = mp4_file[:-4] + '.webm'
-        if not await aiofiles.os.path.exists(webm_file):
-          if self.dbline.eve_webm_procnum_limit:
-            descriptor = ['taskset', '-c', '0', ]
-          else:
-            descriptor = [] 
-          descriptor += ['ffmpeg', ]
-          descriptor += ['-v', 'fatal', ]
-          if self.dbline.eve_webm_fps:
-            descriptor += ['-r', str(self.dbline.eve_webm_fps), ]
-          if self.dbline.eve_webm_threads:
-            descriptor += ['-threads', str(self.dbline.eve_webm_threads), ]
-          descriptor += ['-i', mp4_file, ]
-          if self.dbline.eve_webm_crf:
-            descriptor += ['-crf', str(self.dbline.eve_webm_crf), ]
-          if self.dbline.eve_webm_width:
-            descriptor += ['-vf', 'scale=' + str(self.dbline.eve_webm_width)+':-1', ]
-          descriptor += [webm_file, ]
-          #print(descriptor)
-          process = await asyncio.create_subprocess_exec(*descriptor)
-          await process.wait()
-      await a_break_time(10.0)
+    try:
+      while self.do_run:
+        path = AsyncPath(self.recordingspath)
+        async for mp4_file in path.glob('E_????????????.mp4'):
+          mp4_file = str(mp4_file)
+          webm_file = mp4_file[:-4] + '.webm'
+          if not await aiofiles.os.path.exists(webm_file):
+            if self.dbline.eve_webm_procnum_limit:
+              descriptor = ['taskset', '-c', '0', ]
+            else:
+              descriptor = [] 
+            descriptor += ['ffmpeg', ]
+            descriptor += ['-v', 'fatal', ]
+            if self.dbline.eve_webm_fps:
+              descriptor += ['-r', str(self.dbline.eve_webm_fps), ]
+            if self.dbline.eve_webm_threads:
+              descriptor += ['-threads', str(self.dbline.eve_webm_threads), ]
+            descriptor += ['-i', mp4_file, ]
+            if self.dbline.eve_webm_crf:
+              descriptor += ['-crf', str(self.dbline.eve_webm_crf), ]
+            if self.dbline.eve_webm_width:
+              descriptor += ['-vf', 'scale=' + str(self.dbline.eve_webm_width)+':-1', ]
+            descriptor += [webm_file, ]
+            #print(descriptor)
+            process = await asyncio.create_subprocess_exec(*descriptor)
+            await process.wait()
+        await a_break_time(10.0)
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("makewebm crashed: %s", fatal, exc_info=True)
     
   async def check_event(self, i, item):
     if self.dbline.cam_virtual_fps:
@@ -495,9 +505,12 @@ class c_eventer(viewable):
             await(self.check_event(i, item))
           except KeyError:
             pass 
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (check_events)')
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("check_events crashed: %s", fatal, exc_info=True)
 
   async def tags_refresh(self):
     try:
@@ -506,14 +519,17 @@ class c_eventer(viewable):
         await database_sync_to_async(self.school_line.refresh_from_db)()
         if self.tag_list_active != self.dbline.eve_school.id:
           self.tag_list_active = self.dbline.eve_school.id
-          self.taglist = await database_sync_to_async(get_taglist)(self.tag_list_active) 
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (tags_refresh)')
-      self.logger.error(format_exc())
+          self.taglist = await database_sync_to_async(get_taglist)(self.tag_list_active)
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("tegs_refresh crashed: %s", fatal, exc_info=True)
       
   async def inserter(self):
-    from .c_event import c_event
     try:
+      from .c_event import c_event
       while (not (await self.tf_worker.check_ready(self.tf_w_index))):
         await a_break_type(BR_LONG)
       detector_buffer = deque()
@@ -565,9 +581,12 @@ class c_eventer(viewable):
           del frame
           detector_buffer.clear()
       return()  
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (inserter)')
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("tegs_refresh crashed: %s", fatal, exc_info=True)
       self.logger.info('Restarting process...')
       while startup_redis.get_start_stream_busy(): 
         await a_break_type(BR_LONG)

@@ -49,8 +49,10 @@ from tf_workers.models import school, worker
 from tf_workers.c_tf_workers import tf_worker_client
 from eventers.models import event, event_frame
 from trainers.models import trainframe, trainer
+from trainers.redis import my_redis as trainers_redis
 from users.models import userinfo
 from streams.models import stream
+from trainers.redis import my_redis as trainers_redis
 
 mydomain = safe_import('mydomain') 
 
@@ -500,6 +502,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               t.c8=params['cblist'][i][8]
               t.c9=params['cblist'][i][9]
               await t.asave()
+              trainers_redis.set_last_frame(params['school'], t.id)
               item.trainframe = t.id
               await item.asave(update_fields=('trainframe', ))
             i += 1 

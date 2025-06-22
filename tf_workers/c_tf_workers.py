@@ -181,12 +181,9 @@ class tf_worker(spawn_process):
           self.models[schoolnr]['ydim'],
           self.dbline.use_websocket,
         )
-      if len(self.model_buffers[schoolnr]) < self.dbline.maxblock:
-        await self.my_output.put(received[1], ('ask_pred_ok', True))
-        self.model_buffers[schoolnr].pause = False
-        self.model_buffers[schoolnr].append(received[1:])
-      else:
-        await self.my_output.put(received[1], ('ask_pred_ok', False))
+      await self.my_output.put(received[1], ('ask_pred_ok', True))
+      self.model_buffers[schoolnr].pause = False
+      self.model_buffers[schoolnr].append(received[1:])
     elif (received[0] == 'register'):
       myuser = tf_user()
       self.users[myuser.id] = myuser
@@ -332,10 +329,10 @@ class tf_worker(spawn_process):
               await wait_autos[schoolnr].wait() 
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-    except:
-      from traceback import format_exc
-      self.logger.error('Error in process: ' + self.logname)
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error(
+        'Error in process: ' + self.logname)
+      self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
 
   async def send_ping(self):
     if self.ws_ts is None:
@@ -405,7 +402,6 @@ class tf_worker(spawn_process):
               WebSocketConnectionClosedException,
               WebSocketAddressException,
               OSError,
-              #AttributeError,
             ):
           if logger:
             frameinfo = getframeinfo(currentframe())
@@ -444,10 +440,13 @@ class tf_worker(spawn_process):
     self.models[schoolnr]['last_check'] = time()
     if self.check_ts + 60.0 < time() and self.models[schoolnr]['model_type'] is not None:
       await school_dbline.arefresh_from_db()
-      if (school_dbline.lastmodelfile is not None
-          and	(datetime.timestamp(school_dbline.lastmodelfile) > self.models[schoolnr]['time']
+      if (
+        school_dbline.lastmodelfile is not None
+        and	(
+          datetime.timestamp(school_dbline.lastmodelfile) > self.models[schoolnr]['time']
           or school_dbline.model_type != self.models[schoolnr]['model_type']
-          )):
+        )
+      ):
         if schoolnr in self.model_buffers:  
           self.model_buffers[schoolnr].pause = True 
         self.models[schoolnr]['model_type'] = None   
@@ -499,9 +498,7 @@ class tf_worker(spawn_process):
             model_path=model_path, 
             num_threads=2,
           )
-          #interpreter = self.tflite.Interpreter(model_path=model_path, num_threads=2, )
           await asyncio.to_thread(interpreter.allocate_tensors)
-          #interpreter.allocate_tensors()
           self.models[schoolnr]['model'] = interpreter
           self.models[schoolnr]['int_input'] = interpreter.tensor(
             interpreter.get_input_details()[0]["index"],
@@ -509,8 +506,12 @@ class tf_worker(spawn_process):
           self.models[schoolnr]['int_output'] = interpreter.tensor(
             interpreter.get_output_details()[0]["index"],
           )
-          self.models[schoolnr]['xdim'] = interpreter.get_input_details()[0]['shape_signature'][2]
-          self.models[schoolnr]['ydim'] = interpreter.get_input_details()[0]['shape_signature'][1]
+          self.models[schoolnr]['xdim'] = (
+            interpreter.get_input_details()[0]['shape_signature'][2]
+          )  
+          self.models[schoolnr]['ydim'] = (
+            interpreter.get_input_details()[0]['shape_signature'][1]
+          )
         else: 
           while self.load_model is None:
             await a_break_type(BR_LONG)
@@ -703,9 +704,9 @@ class tf_worker_client():
           self.ask_pred_ok = received[1]
         else:
           raise QueueUnknownKeyword(received[0])
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (out_reader_proc)')
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error('Error in process: ' + self.logname)
+      self.logger.critical("out_reader_proc crashed: %s", fatal, exc_info=True)
 
   async def register(self, worker_id):
     await self.inqueue.put(('register', 0, ))
@@ -715,7 +716,9 @@ class tf_worker_client():
     self.my_output.clean_one(self.tf_w_index)
     return(self.tf_w_index)
 
-  async def run_out(self, index):
+  async def run_out(self, index, logger, logname):
+    self.logger = logger
+    self.logname = logname
     self.run_out_procs[index] = asyncio.create_task(
       self.out_reader_proc(index, ), 
       name = 'run_out_task', 

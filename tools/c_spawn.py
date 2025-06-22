@@ -17,7 +17,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import django
 django.setup()
 import asyncio
-from traceback import format_exc
 from signal import signal, SIGINT
 from multiprocessing import Process, SimpleQueue as s_queue
 from l_buffer.l_buffer import l_buffer
@@ -74,9 +73,12 @@ class spawn_process(Process):
         else:  
           if not await self.process_received(received):
             raise QueueUnknownKeyword(received[0])
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (inqueue)')
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True)
   
   async def stop(self):
     if self.is_alive():
@@ -129,5 +131,6 @@ class viewable(spawn_process):
         else:  
           self.sl = speedlimit(period = 0.0)
     self.som = speedometer()
-    await super().async_runner()   
+    await super().async_runner() 
+      
     

@@ -16,16 +16,17 @@ v1.6.6 01.03.25
 """
 
 import asyncio
+from asgiref.sync import sync_to_async
 from multiprocessing import Process
 from threading import Lock as t_lock
 from logging import getLogger
 from time import time
-from traceback import format_exc
 from setproctitle import setproctitle
 import gc
 from django.utils import timezone
+from django.forms.models import model_to_dict
 #from .models import trainframe, fit
-from .redis import my_redis
+from .redis import my_redis as trainers_redis
 
 #from threading import enumerate 
 
@@ -59,7 +60,7 @@ class trainer(spawn_process):
       setproctitle('CAM-AI-Trainer #'+str(self.id))
       self.do_run = True
       self.mylock = t_lock()
-      my_redis.set_trainerqueue(self.id, [])
+      trainers_redis.set_trainerqueue(self.id, [])
       self.job_queue_list = []
       train_once_gpu = None
       train_once_remote = None
@@ -68,6 +69,8 @@ class trainer(spawn_process):
       await alog_ini(self.logger, self.logname)
       self.finished = False
       self.job_queue = asyncio.Queue()
+      self.school_cache = {}
+      self.frames_cache = {}
       asyncio.create_task(self.job_queue_thread(), name = 'job_queue_thread')
       #print('Launch: trainer')
       await super().async_runner() 
@@ -120,14 +123,15 @@ class trainer(spawn_process):
             await myschool.asave(update_fields=['l_rate_divisor'])
           with self.mylock:
             self.job_queue_list.remove(myschool.id)
-          my_redis.set_trainerqueue(self.id, self.job_queue_list)
+          trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
           await asyncio.to_thread(gc.collect)
         await a_break_time(10.0)
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-    except:
-      self.logger.error('Error in process: ' + self.logname)
-      self.logger.error(format_exc()) 
+    except Exception as fatal:
+      self.logger.error(
+        'Error in process: ' + self.logname)
+      self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
 
   async def job_queue_thread(self):
     try:
@@ -136,58 +140,77 @@ class trainer(spawn_process):
       from tf_workers.models import school
       from .models import trainframe, fit
       while self.do_run:
-        #if trainers is None:
-        #  await a_break_time(10.0)
-        #  continue
         schoollines = school.objects.filter(
           active = True,
           trainers = self.id,
         )
         async for s_item in schoollines:
           await s_item.arefresh_from_db()
-          do_continue = False
+          if s_item.id in self.school_cache:
+            school_change = (
+              await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]
+            )
+            self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
+          else:
+            self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
+            continue
+          if s_item.id in self.frames_cache:
+            frames_change = (
+              trainers_redis.get_last_frame(s_item.id) != self.frames_cache[s_item.id]
+            )
+            self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
+          else:
+            self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
+            continue
+          if not (school_change or frames_change):
+            continue
           for t_item in trainers:
             if s_item.id in trainers[t_item].getqueueinfo():
               self.logger.warning(
                 '!!!!! School #' + str(s_item.id) 
                 + ' not inserted into Trainer Queue because already in.')
-              do_continue = True
-              break
-          if do_continue:
-            continue    
+              self.school_cache[s_item.id] = model_to_dict(s_item)
+              continue
           filterdict = {
             'school' : s_item.id,
             'train_status' : 0,}
           if not s_item.ignore_checked:
             filterdict['checked'] = True
-          undone = trainframe.objects.filter(**filterdict)
+          undone_qs = trainframe.objects.filter(**filterdict)
           if s_item.trainer_nr == self.id:
             run_condition = await trainframe.objects.filter(school=s_item.id).acount()
           else:
-            run_condition = (await undone.acount() >= s_item.trigger 
+            undone_count = await undone_qs.acount()
+            run_condition = (
+              undone_count >= s_item.trigger
               and not self.job_queue_list
-              and s_item.delegation_level == 1)
+              and s_item.delegation_level == 1
+            )
           if run_condition:
-            await undone.aupdate(train_status=1)
-            s_item.trainer_nr = 0
-            await s_item.asave(update_fields=["trainer_nr"])
-            myfit = fit(made=timezone.now(), 
+            await undone_qs.aupdate(train_status=1)
+            if s_item.trainer_nr != 0:
+              s_item.trainer_nr = 0
+              await s_item.asave(update_fields=["trainer_nr"])
+            myfit = fit(
+              made=timezone.now(), 
               school = s_item.id, 
               status = 'Queuing',
             )
             await myfit.asave() 
             with self.mylock:
               self.job_queue_list.append(s_item.id)
-            my_redis.set_trainerqueue(self.id, self.job_queue_list)
+            trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
             await self.job_queue.put((s_item, myfit)) 
         try:
           await a_break_time(10.0)
         except  asyncio.exceptions.CancelledError:
           pass  
-    except:
-      from traceback import format_exc
-      self.logger.error('Error in process: ' + self.logname + ' (job_queue_thread)')
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("job_queue_thread crashed: %s", fatal, exc_info=True)
 
 #***************************************************************************
 #
@@ -196,4 +219,4 @@ class trainer(spawn_process):
 #***************************************************************************
 
   def getqueueinfo(self):
-    return(my_redis.get_trainerqueue(self.id))
+    return(trainers_redis.get_trainerqueue(self.id))

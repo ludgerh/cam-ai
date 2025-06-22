@@ -17,7 +17,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import numpy as np
 import cv2 as cv
 from os import environ
-from traceback import format_exc
 from logging import getLogger
 from time import time
 from setproctitle import setproctitle
@@ -47,15 +46,15 @@ class c_detector(viewable):
     await super().run_here()
    
   async def async_runner(self):
-    import django
-    django.setup()
-    from tools.l_break import a_break_type, BR_MEDIUM
-    from tools.c_logger import alog_ini
-    from tools.c_tools import rect_atob, rect_btoa, merge_rects
-    self.merge_rects = merge_rects
-    self.rect_atob = rect_atob
-    self.rect_btoa = rect_btoa
     try:
+      import django
+      django.setup()
+      from tools.l_break import a_break_type, BR_MEDIUM
+      from tools.c_logger import alog_ini
+      from tools.c_tools import rect_atob, rect_btoa, merge_rects
+      self.merge_rects = merge_rects
+      self.rect_atob = rect_atob
+      self.rect_btoa = rect_btoa
       self.logname = 'detector #'+str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
@@ -86,9 +85,13 @@ class c_detector(viewable):
       self.dataqueue.stop()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-    except:
-      self.logger.error('Error in process: ' + self.logname)
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error(
+        'Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
     
   async def process_received(self, received):  
     result = True
@@ -130,116 +133,113 @@ class c_detector(viewable):
     return(result)
 
   async def run_one(self, input):
-    try:
-      if input is None or input[2] == 0.0:
-        return(None)
-      frametime = input[2]
-      if not (self.do_run and self.sl.greenlight(frametime)):
-        return(None)
-      if self.run_lock and not self.dbline.cam_virtual_fps: 
-        return(None)
-      self.run_lock = True
-      frame = input[1]
-      frameall = frame
-      if self.firstdetect:
-        if self.scaledown > 1:
-          self.buffer = cv.resize(
-            frame, 
-            (self.xres, self.yres), 
-            interpolation=cv.INTER_NEAREST,
-          )
-        else:
-          self.buffer = frame
-        self.background = np.float32(self.buffer)
-        self.firstdetect = False
+    if input is None or input[2] == 0.0:
+      return(None)
+    frametime = input[2]
+    if not (self.do_run and self.sl.greenlight(frametime)):
+      return(None)
+    if self.run_lock and not self.dbline.cam_virtual_fps: 
+      return(None)
+    self.run_lock = True
+    frame = input[1]
+    frameall = frame
+    if self.firstdetect:
       if self.scaledown > 1:
-        frame = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
-      if self.dbline.det_apply_mask and (self.viewer.drawpad.mask is not None):
-        frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
-      objectmaxsize = round(max(
-        self.buffer.shape[0],
-        self.buffer.shape[1],
-      ) * self.dbline.det_max_size,)
-      buffer1 = cv.absdiff(self.buffer, frame)
-      buffer1 = cv.split(buffer1)
-      buffer2 = cv.max(buffer1[0], buffer1[1])
-      buffer1 = cv.max(buffer2, buffer1[2])
-      ret, buffer1 = cv.threshold(buffer1,self.dbline.det_threshold,255,cv.THRESH_BINARY)
-      erosion = self.dbline.det_erosion
-      if (erosion > 0) :
-        kernel = np.ones((erosion*2 + 1,erosion*2 + 1),np.uint8)
-        buffer2 = cv.erode(buffer1,kernel,iterations =1)
+        self.buffer = cv.resize(
+          frame, 
+          (self.xres, self.yres), 
+          interpolation=cv.INTER_NEAREST,
+        )
       else:
-        buffer2 = buffer1
-      dilation = self.dbline.det_dilation
-      if (dilation > 0) :
-        kernel = np.ones((dilation*2 + 1,dilation*2 + 1),np.uint8)
-        buffer3 = cv.dilate(buffer2,kernel,iterations =1)
-      else:
-        buffer3 = buffer2
-      mask = 255 - buffer3
-      buffer1 = cv.cvtColor(buffer1, cv.COLOR_GRAY2BGR)
-      buffer2 = cv.cvtColor(buffer2, cv.COLOR_GRAY2BGR) 
-      buffer4 = cv.cvtColor(buffer3, cv.COLOR_GRAY2BGR)
-      buffer1 = list(cv.split(buffer1))
-      buffer1[1] = buffer1[1] * 0
-      buffer1 = cv.merge(buffer1)
-      buffer1 = cv.addWeighted(buffer4, 0.2, buffer1, 1, 0)
-      buffer1 = cv.addWeighted(buffer1, 1, buffer2, 1, 0)
-      rect_list = []
-      if dilation == 0:
-        grid = 2
-      else:
-        grid = dilation*2
-      xmax = buffer3.shape[1]-1
-      for x in range(0,xmax+grid,grid):
-        if x < xmax + grid:
-          x = min(x, xmax)
-          ymax = buffer3.shape[0]-1
-          for y in range(0,ymax+grid,grid):
-            if y < ymax + grid:
-              y = min(y, ymax)
-              if (buffer3[y,x] == 255) :
-                retval, image, dummy, recta = cv.floodFill(buffer3, None,
-                  (x, y), 100)
-                rectb = self.rect_atob(recta)
-                rect_list.append(rectb)
-                recta = self.rect_btoa(rectb)
-      if rect_list:          
-        rect_list = self.merge_rects(rect_list)
-        with self.ev_detectorq.multi_put_lock:
-          for rect in rect_list[:self.dbline.det_max_rect]:
-            recta = self.rect_btoa(rect)
-            cv.rectangle(buffer1, recta, (200), self.linewidth)
-            if ((recta[2]<=objectmaxsize) and (recta[3]<=objectmaxsize)):
-              if not streams_redis.check_if_counts_zero('E', self.id):
-                if self.scaledown > 1:
-                  rect = [item * self.scaledown for item in rect]
-                aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
-                await self.ev_detectorq.put((
-                  3, aoi, frametime, rect, cv.imencode('.bmp', aoi)[1].tobytes(),
-                ))  
-            else:
-              self.background = np.float32(frame)
-          if not streams_redis.check_if_counts_zero('E', self.id):
-            await self.ev_detectorq.put('stop') 
-      if self.dbline.det_backgr_delay == 0:
         self.buffer = frame
+      self.background = np.float32(self.buffer)
+      self.firstdetect = False
+    if self.scaledown > 1:
+      frame = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
+    if self.dbline.det_apply_mask and (self.viewer.drawpad.mask is not None):
+      frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
+    objectmaxsize = round(max(
+      self.buffer.shape[0],
+      self.buffer.shape[1],
+    ) * self.dbline.det_max_size,)
+    buffer1 = cv.absdiff(self.buffer, frame)
+    buffer1 = cv.split(buffer1)
+    buffer2 = cv.max(buffer1[0], buffer1[1])
+    buffer1 = cv.max(buffer2, buffer1[2])
+    ret, buffer1 = cv.threshold(buffer1,self.dbline.det_threshold,255,cv.THRESH_BINARY)
+    erosion = self.dbline.det_erosion
+    if (erosion > 0) :
+      kernel = np.ones((erosion*2 + 1,erosion*2 + 1),np.uint8)
+      buffer2 = cv.erode(buffer1,kernel,iterations =1)
+    else:
+      buffer2 = buffer1
+    dilation = self.dbline.det_dilation
+    if (dilation > 0) :
+      kernel = np.ones((dilation*2 + 1,dilation*2 + 1),np.uint8)
+      buffer3 = cv.dilate(buffer2,kernel,iterations =1)
+    else:
+      buffer3 = buffer2
+    mask = 255 - buffer3
+    buffer1 = cv.cvtColor(buffer1, cv.COLOR_GRAY2BGR)
+    buffer2 = cv.cvtColor(buffer2, cv.COLOR_GRAY2BGR) 
+    buffer4 = cv.cvtColor(buffer3, cv.COLOR_GRAY2BGR)
+    buffer1 = list(cv.split(buffer1))
+    buffer1[1] = buffer1[1] * 0
+    buffer1 = cv.merge(buffer1)
+    buffer1 = cv.addWeighted(buffer4, 0.2, buffer1, 1, 0)
+    buffer1 = cv.addWeighted(buffer1, 1, buffer2, 1, 0)
+    rect_list = []
+    if dilation == 0:
+      grid = 2
+    else:
+      grid = dilation*2
+    xmax = buffer3.shape[1]-1
+    for x in range(0,xmax+grid,grid):
+      if x < xmax + grid:
+        x = min(x, xmax)
+        ymax = buffer3.shape[0]-1
+        for y in range(0,ymax+grid,grid):
+          if y < ymax + grid:
+            y = min(y, ymax)
+            if (buffer3[y,x] == 255) :
+              retval, image, dummy, recta = cv.floodFill(buffer3, None,
+                (x, y), 100)
+              rectb = self.rect_atob(recta)
+              rect_list.append(rectb)
+              recta = self.rect_btoa(rectb)
+    if rect_list:          
+      rect_list = self.merge_rects(rect_list)
+      with self.ev_detectorq.multi_put_lock:
+        for rect in rect_list[:self.dbline.det_max_rect]:
+          recta = self.rect_btoa(rect)
+          cv.rectangle(buffer1, recta, (200), self.linewidth)
+          if ((recta[2]<=objectmaxsize) and (recta[3]<=objectmaxsize)):
+            if not streams_redis.check_if_counts_zero('E', self.id):
+              if self.scaledown > 1:
+                rect = [item * self.scaledown for item in rect]
+              aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
+              await self.ev_detectorq.put((
+                3, aoi, frametime, rect, cv.imencode('.bmp', aoi)[1].tobytes(),
+              ))  
+          else:
+            self.background = np.float32(frame)
+        if not streams_redis.check_if_counts_zero('E', self.id):
+          await self.ev_detectorq.put('stop') 
+    if self.dbline.det_backgr_delay == 0:
+      self.buffer = frame
+    else:
+      if (time() >= (self.ts_background + self.dbline.det_backgr_delay)): 
+        self.ts_background = time()
+        cv.accumulateWeighted(frame, self.background, 0.1)
       else:
-        if (time() >= (self.ts_background + self.dbline.det_backgr_delay)): 
-          self.ts_background = time()
-          cv.accumulateWeighted(frame, self.background, 0.1)
-        else:
-          cv.accumulateWeighted(frame, self.background, 0.5, mask)
-        self.buffer = np.uint8(self.background)
-      fps = self.som.gettime()
-      if fps:
-        self.dbline.det_fpsactual = fps
-        streams_redis.fps_to_dev(self.type, self.id, fps)
-      self.run_lock = False
-      return([3, buffer1, frametime])
-    except:
-      self.logger.error(format_exc())
+        cv.accumulateWeighted(frame, self.background, 0.5, mask)
+      self.buffer = np.uint8(self.background)
+    fps = self.som.gettime()
+    if fps:
+      self.dbline.det_fpsactual = fps
+      streams_redis.fps_to_dev(self.type, self.id, fps)
+    self.run_lock = False
+    return([3, buffer1, frametime])
       
   def get_scale_down(self): 
     result = self.dbline.det_scaledown

@@ -20,16 +20,27 @@ from tools.c_redis import saferedis
 
 class redis(saferedis):
   
-  stringbase = 'cam-ai.trainers.queue:'
+  queue_stringbase = 'cam-ai.trainers.queue:'
+  frames_stringbase = 'cam-ai.trainers.frames:'
 
   def set_trainerqueue(self, idx, value):
-    self.set(self.stringbase + str(idx)+':', str(json.dumps(value)))
+    self.set(self.queue_stringbase + str(idx)+':', str(json.dumps(value)))
     
   def get_trainerqueue(self, idx):
-    result = self.get(self.stringbase + str(idx)+':')
+    result = self.get(self.queue_stringbase + str(idx)+':')
     if result:
       return(json.loads(result))
     else:
       return(None) 
+
+  def set_last_frame(self, idx, value):
+    self.set(self.frames_stringbase + str(idx)+':', value)
+    
+  def get_last_frame(self, idx):
+    result = self.get(self.frames_stringbase + str(idx)+':')
+    if result:
+      return(int(result))
+    else:
+      return(0) 
       
 my_redis = redis()      

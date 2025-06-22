@@ -25,7 +25,6 @@ from psutil import Process
 from signal import SIGINT, SIGKILL, SIGTERM
 from setproctitle import setproctitle
 from logging import getLogger
-from traceback import format_exc
 from time import time
 from globals.c_globals import viewers, viewables
 from tools.c_spawn import viewable
@@ -47,10 +46,10 @@ class c_cam(viewable):
     super().__init__(logger, )
 
   async def async_runner(self):
-    import django
-    django.setup()
-    from tools.c_logger import alog_ini
     try:
+      import django
+      django.setup()
+      from tools.c_logger import alog_ini
       self.logname = 'camera #' + str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
@@ -166,9 +165,13 @@ class c_cam(viewable):
           await self.wd_proc  # Warten auf die Beendigung
         except asyncio.CancelledError:
           self.logger.info("MP4-Task wurde erfolgreich beendet.")
-    except:
-      self.logger.error('Error in process: ' + self.logname)
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error(
+        'Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
     
   async def process_received(self, received):  
     result = True
@@ -377,17 +380,13 @@ class c_cam(viewable):
       self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
 
   async def checkmp4(self):
-  
-    #self.ts2 = time() 
-    
     try:
       while True:
         try:
           await a_break_type(BR_LONG)
         except asyncio.CancelledError:
           self.logger.info("MP4-Task wurde abgebrochen.")
-          return  # Sauber beenden
-        #print('MP4')
+          return 
         if self.checkmp4busy:
           continue
         self.checkmp4busy = True
@@ -396,10 +395,7 @@ class c_cam(viewable):
             self.checkmp4busy = False
             continue
           if await aiofiles.os.path.exists(self.vid_file_path(self.vid_count + 2)):
-            #print('Found one:', time() - self.ts2) for Tests with webm :-)
-            #self.ts2 = time() 
             try:
-              #print(self.vid_file_path(self.vid_count))
               timestamp = await asyncio.to_thread(
                 os.path.getmtime, 
                 self.vid_file_path(self.vid_count),
@@ -424,10 +420,12 @@ class c_cam(viewable):
               self.logger.warning(
                   'Move did not find: '+self.vid_file_path(self.vid_count))
         self.checkmp4busy = False
-    except:
-      self.checkmp4busy = False
-      self.logger.error('Error in process: ' + self.logname + ' (checkmp4)')
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("checkmp4 crashed: %s", fatal, exc_info=True)
 
   async def watchdog(self):
     try:
@@ -472,9 +470,12 @@ class c_cam(viewable):
           await self.stopprocess()
         await self.newprocess() 
         self.getting_newprozess = True
-    except:
-      self.logger.error('Error in process: ' + self.logname + ' (watchdog)')
-      self.logger.error(format_exc())
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("watchdog crashed: %s", fatal, exc_info=True)
 
   async def newprocess(self):
     from globals.c_globals import viewables
