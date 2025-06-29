@@ -232,8 +232,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
         schoolline.creator = userline
         await schoolline.asave() 
         t_query = trainer.objects.filter(active = True)
-        async for t_item in t_query:
-          await database_sync_to_async(schoolline.trainers.add)(t_item)
         trainerline = await t_query.afirst()
         schoolline.dir = schoolsdir + 'model' + str(schoolline.id) + '/'
         await schoolline.asave(update_fields=('dir', ))

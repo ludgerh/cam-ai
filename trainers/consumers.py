@@ -21,6 +21,7 @@ import asyncio
 import aiofiles
 import aiofiles.os
 import io
+from asgiref.sync import sync_to_async
 from os import path, makedirs
 from math import inf
 from time import time, sleep
@@ -59,7 +60,7 @@ medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
 
 async def get_trainer_nr(school_line):
   trainerlist = []
-  async for item in school_line.trainers.filter(active = True):
+  async for item in dbtrainer.objects.filter(active = True):
     trainerlist.append(item)  
   if len(trainerlist) == 1:    
     result = trainerlist[0].id
@@ -276,8 +277,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         if self.mytrainerline.t_type in {2, 3}:
           await self.ws.send_str(json.dumps(indict))
         else:
-          self.myschoolline.trainer_nr = self.trainer_nr
-          await self.myschoolline.asave(update_fields=['trainer_nr'])
+          await sync_to_async(self.myschoolline.trainers.add)(self.trainerline)
           
       elif indict['code'] == 'checkfitdone':
         if self.mytrainerline.t_type in {2, 3}:
@@ -386,7 +386,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -598,8 +598,7 @@ class trainerutil(AsyncWebsocketConsumer):
       elif params['command'] == 'trainnow': 
         if self.maywrite:
           schoolline = await school.objects.aget(id=self.schoolnr)
-          schoolline.trainer_nr = self.trainer_nr
-          await schoolline.asave(update_fields=['trainer_nr'])
+          await sync_to_async(schoolline.trainers.add)(self.trainerline)
           outlist['data'] = 'OK' 
           #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	

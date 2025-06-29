@@ -64,7 +64,7 @@ class trainer(spawn_process):
       self.job_queue_list = []
       train_once_gpu = None
       train_once_remote = None
-      self.logname = 'trainer #'+str(self.dbline.id)
+      self.logname = 'trainer #'+str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       self.finished = False
@@ -171,19 +171,23 @@ class trainer(spawn_process):
                 + ' not inserted into Trainer Queue because already in.')
               self.school_cache[s_item.id] = model_to_dict(s_item)
               continue
+              
           filterdict = {
             'school' : s_item.id,
             'train_status' : 0,}
           if not s_item.ignore_checked:
             filterdict['checked'] = True
           undone_qs = trainframe.objects.filter(**filterdict)
-          if s_item.trainer_nr == self.id:
-            run_condition = await trainframe.objects.filter(school=s_item.id).acount()
-          else:
-            undone_count = await undone_qs.acount()
+          if await s_item.trainers.filter(id=self.id).aexists():
             run_condition = (
-              undone_count >= s_item.trigger
-              and not self.job_queue_list
+              await trainframe.objects.filter(school=s_item.id).acount() > 0
+            )
+            if run_condition:
+              await sync_to_async(s_item.trainers.remove)(self.dbline)
+          else:
+            run_condition = (
+              await undone_qs.acount() >= s_item.trigger
+              and not s_item.id in self.job_queue_list
               and s_item.delegation_level == 1
             )
           if run_condition:
@@ -208,7 +212,7 @@ class trainer(spawn_process):
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 
-        + ' - ' + self.type + str(self.id)
+        + ' - ' + str(self.id)
       )
       self.logger.critical("job_queue_thread crashed: %s", fatal, exc_info=True)
 

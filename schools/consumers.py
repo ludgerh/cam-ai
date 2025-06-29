@@ -422,7 +422,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           self.tf_worker = tf_workers[workerline.id]
           self.tf_worker = tf_worker_client(self.tf_worker.inqueue, self.tf_worker.registerqueue, )
           self.tf_w_index = await self.tf_worker.register(workerline.id)
-          await self.tf_worker.run_out(self.tf_w_index)
+          await self.tf_worker.run_out(self.tf_w_index, logger, logname)
         outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))

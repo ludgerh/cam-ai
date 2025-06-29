@@ -21,7 +21,7 @@ import os
 import cv2 as cv
 import numpy as np
 from aiopath import AsyncPath
-from psutil import Process
+from psutil import Process, NoSuchProcess
 from signal import SIGINT, SIGKILL, SIGTERM
 from setproctitle import setproctitle
 from logging import getLogger
@@ -39,6 +39,8 @@ class c_cam(viewable):
     self.type = 'C'
     self.dbline = dbline
     self.id = dbline.id
+    os.makedirs('/dev/shm/cam-ai', exist_ok = True)
+    self.fifo_path = '/dev/shm/cam-ai/cam' + str(self.id) + '.pipe'
     self.detector_dataq = detector_dataq
     self.eventer_dataq = eventer_dataq
     self.eventer_inq = eventer_inq
@@ -148,6 +150,8 @@ class c_cam(viewable):
           if (self.dbline.eve_mode_flag 
               and (not streams_redis.check_if_counts_zero('E', self.id))):
             await self.eventer_dataq.put(frameline)
+        else:
+          await a_break_type(BR_SHORT)
       await self.dbline.asave(update_fields = ['cam_fpsactual', ])
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
@@ -208,6 +212,7 @@ class c_cam(viewable):
       
   async def run_one(self):
     if not self.do_run:
+      await a_break_type(BR_LONG)
       return(None)   
     if self.dbline.cam_virtual_fps:
       self.virt_ts += self.virt_step
@@ -254,6 +259,7 @@ class c_cam(viewable):
         break
     while True:
       if self.ff_proc is None:
+        await a_break_type(BR_LONG)
         return(None)
       in_bytes = bytearray()
       bytes_needed = self.bytes_per_frame
@@ -264,16 +270,14 @@ class c_cam(viewable):
           self.reset_buffer = False
           continue
         try:
-          chunk = await asyncio.wait_for(
-            self.ff_proc.stdout.read(min(65536, bytes_needed)), 
-            timeout=5.0,
-          )
+          chunk = await asyncio.to_thread(self.fifo.read, bytes_needed)
           if not chunk:
             in_bytes = None
+            await a_break_type(BR_SHORT)
             break
           in_bytes.extend(chunk)
           bytes_needed -= len(chunk)
-        except asyncio.TimeoutError:
+        except ValueError:
           in_bytes = None
           break
         except AttributeError:
@@ -322,6 +326,8 @@ class c_cam(viewable):
       return()
     self.logger.info('[' + str(maxcounter) + '] Probing camera #' 
       + str(self.id) + ' (' + self.dbline.name + ')...')
+    #if self.id == 10:
+    #  await asyncio.sleep(10)
     await self.mycam.ffprobe()
     probe = self.mycam.probe
     #print('***', probe, '***')
@@ -385,7 +391,6 @@ class c_cam(viewable):
         try:
           await a_break_type(BR_LONG)
         except asyncio.CancelledError:
-          self.logger.info("MP4-Task wurde abgebrochen.")
           return 
         if self.checkmp4busy:
           continue
@@ -479,14 +484,22 @@ class c_cam(viewable):
 
   async def newprocess(self):
     from globals.c_globals import viewables
+    try:
+      os.mkfifo(self.fifo_path)
+    except OSError:
+      pass
+    try:
+      await asyncio.to_thread(os.mkfifo, self.fifo_path)
+    except OSError:
+      pass
     inp_frame_rate = 0.0
     if self.dbline.cam_virtual_fps:
       if (self.dbline.cam_fpslimit 
           and self.dbline.cam_fpslimit < self.dbline.cam_virtual_fps):
-        inp_frame_rate = min(self.dbline.cam_fpslimit, self.dbline.cam_virtual_fps)
+        inp_frame_rate = self.dbline.cam_fpslimit
     else:  
       if self.dbline.cam_fpslimit and self.dbline.cam_fpslimit < self.cam_fps:
-        inp_frame_rate = min(self.dbline.cam_fpslimit, self.cam_fps)
+        inp_frame_rate = self.dbline.cam_fpslimit
     self.wd_ts = time()
     if self.dbline.cam_virtual_fps:
       source_string = self.virt_cam_path + self.dbline.cam_url
@@ -508,12 +521,19 @@ class c_cam(viewable):
     if inp_frame_rate:
       outparams1 += ['-r', str(inp_frame_rate)]
       outparams1 += ['-fps_mode', 'cfr']
-    outparams1 += ['pipe:1']
+    else:  
+      outparams1 += ['-fps_mode', 'passthrough']
+    #outparams1 += ['pipe:1']
+    #outparams1 += ['-f', 'null', '-']
+    outparams1 += [self.fifo_path]
     inparams = ['-i', source_string]
-    #generalparams = ['-v', 'info']
-    generalparams = ['-v', 'fatal']
-    if is_raspi():
-      generalparams += ['-threads', '1']
+    #if inp_frame_rate:
+    #  inparams += ['-vf', 'fps=' + str(inp_frame_rate)]
+    generalparams = ['-y']
+    #generalparams += ['-v', 'info']
+    generalparams += ['-v', 'fatal']
+    #if is_raspi():
+    #  generalparams += ['-threads', '1']
     if not self.dbline.cam_virtual_fps:
       if source_string[:4].upper() == 'RTSP':
         generalparams += ['-rtsp_transport', 'tcp']
@@ -545,7 +565,6 @@ class c_cam(viewable):
         outparams2 = ['-c', 'libx264']
       if video_framerate:
         outparams2 += ['-r', str(video_framerate)]
-        #outparams2 += (' -g ' 
         outparams2 += ['-g', str(round(video_framerate * self.dbline.cam_ffmpeg_segment))]
       outparams2 += ['-f', 'segment']
       outparams2 += ['-segment_time', str(self.dbline.cam_ffmpeg_segment)]
@@ -556,26 +575,31 @@ class c_cam(viewable):
         outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
       outparams2 += [filepath]
     else:
-      self.ffmpeg_recording = True  
+      self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
     #self.logger.info('#####' + str(cmd))
     self.ff_proc = await asyncio.create_subprocess_exec(
       '/usr/bin/ffmpeg',
       *cmd,
-      stdout=asyncio.subprocess.PIPE,
+      stdout=None,
     )
+    self.fifo = open(self.fifo_path, "rb")
 
   async def stopprocess(self):
     if self.ff_proc is not None and self.ff_proc.returncode is None:
-      p = Process(self.ff_proc.pid)
-      child_pid = p.children(recursive=True)
-      for pid in child_pid:
-        pid.send_signal(SIGKILL)
-        pid.wait()
-      self.ff_proc.send_signal(SIGKILL)
-      await self.ff_proc.wait()
+      try:
+        p = Process(self.ff_proc.pid)
+        child_pid = p.children(recursive=True)
+        for pid in child_pid:
+          pid.send_signal(SIGKILL)
+          pid.wait()
+        self.ff_proc.send_signal(SIGKILL)
+        await self.ff_proc.wait()
+      except NoSuchProcess:
+        pass        
       self.ff_proc = None
+    self.fifo.close()
 
   def ts_targetname(self, ts):
     return('C'+str(self.id).zfill(4)+'_'

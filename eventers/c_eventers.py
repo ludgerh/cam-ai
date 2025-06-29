@@ -13,7 +13,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-V1.6.6 31.03.2025
+V1.6.6o 25.06.2025
 """
 
 import cv2 as cv
@@ -573,6 +573,9 @@ class c_eventer(viewable):
               new_event = await c_event.create(self.tf_worker, self.tf_w_index, frame, 
                 margin, self.dbline, self.school_line.id, count, self.logger)
               with self.eventdict_lock:
+                count = 0  
+                while count in self.eventdict:
+                  count += 1   
                 self.eventdict[count] = new_event
             else: 
               found.add_frame(frame)
