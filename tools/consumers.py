@@ -205,7 +205,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -251,7 +251,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
               message = await ws.receive()
               resultdict = json.loads(message.data)['data']
         else:
-          resultdict = {'status' : 'OK', 'school' : schoolline.id}      
+          resultdict = {'status' : 'OK', 'school' : schoolline.id} 
         if trainerline.t_type in {1, 2, 3} and resultdict['status'] == 'OK':
           if await afree_quota(userline):
             for ext in ('.keras', '.tflite'):

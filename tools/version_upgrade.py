@@ -42,15 +42,6 @@ def temp_func():
 proc_dict[version_flat('1.5.1')] = temp_func
 
 def temp_func():
-  from tf_workers.models import school
-  from trainers.models import trainer
-  for s_item in school.objects.filter(active = True):
-    if not s_item.trainers.all().exists():
-      for t_item in trainer.objects.filter(active = True):
-        s_item.trainers.add(t_item)
-proc_dict[version_flat('1.6.2a')] = temp_func
-
-def temp_func():
   from tf_workers.models import worker
   worker.objects.all().update(timeout = 0.1)
 proc_dict[version_flat('1.6.6a')] = temp_func

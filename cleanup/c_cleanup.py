@@ -452,7 +452,7 @@ class c_cleanup():
           userline.mail_flag_quota75 = True
         if result > userline.storage_quota:
           if not userline.mail_flag_quota100:
-            subject = 'Action Required: Your CAM-AI Storage is Full',
+            subject = 'Action Required: Your CAM-AI Storage is Full'
             message = (
               'Dear CAM-AI User, \n'
               + 'We are reaching out to inform you that your CAM-AI storage is currently full. \n'

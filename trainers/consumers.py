@@ -169,8 +169,9 @@ class remotetrainer(AsyncWebsocketConsumer):
       
       if indict['code'] == 'auth':
         self.myschoolline = await school.objects.aget(id=indict['school'])
-        t_query = self.myschoolline.trainers.filter(active = True)
-        self.mytrainerline = await t_query.afirst()
+        self.mytrainerline = await dbtrainer.objects.aget(
+          id = self.myschoolline.trainer_nr
+        )
         if self.mytrainerline.t_type in {2, 3}:
           if self.ws_session is None:
             import aiohttp

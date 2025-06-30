@@ -60,7 +60,7 @@ class school(models.Model):
   tf_worker = models.ForeignKey(worker, on_delete=models.SET_DEFAULT, default=1)
   trainers = models.ManyToManyField(trainermod)
   ignore_checked = models.BooleanField(default=True)
-  trainer_nr = models.IntegerField(default=0)
+  trainer_nr = models.IntegerField(default=1)
   donate_pics = models.BooleanField(default=False)
   save_new_model = models.BooleanField(default=True)
   model_type = models.CharField(max_length=50, default='efficientnetv2-b0')
@@ -74,7 +74,7 @@ class school(models.Model):
   model_stop_overfit = models.BooleanField(default=True)
   l_rate_start = models.CharField(max_length=20, default='0')
   l_rate_stop = models.CharField(max_length=20, default='0')
-  l_rate_divisor = models.FloatField(default=1000.0) #learning rate = val_loss / this
+  l_rate_divisor = models.FloatField(default=10000.0) #learning rate = val_loss / this
   weight_min = models.FloatField(default=1.0)
   weight_max = models.FloatField(default=2.0)
   weight_boost = models.FloatField(default=8.0)

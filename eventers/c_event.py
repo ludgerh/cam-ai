@@ -149,8 +149,8 @@ class c_event(list):
         if instance.dbline.camera.crypt_key:
           c_event.crypt = l_crypt(key=instance.dbline.camera.crypt_key)
         else:
-          c_event.crypt = l_crypt().key
-          instance.dbline.camera.crypt_key = c_event.crypt
+          c_event.crypt = l_crypt()
+          instance.dbline.camera.crypt_key = c_event.crypt.key
           await instance.dbline.camera.asave(update_fields=['crypt_key'])
     await instance.a_init()   
     return instance 
