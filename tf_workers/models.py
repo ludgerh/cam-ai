@@ -74,7 +74,7 @@ class school(models.Model):
   model_stop_overfit = models.BooleanField(default=True)
   l_rate_start = models.CharField(max_length=20, default='0')
   l_rate_stop = models.CharField(max_length=20, default='0')
-  l_rate_divisor = models.FloatField(default=10000.0) #learning rate = val_loss / this
+  l_rate_divisor = models.FloatField(default=1000.0) #learning rate = val_loss / this
   weight_min = models.FloatField(default=1.0)
   weight_max = models.FloatField(default=2.0)
   weight_boost = models.FloatField(default=8.0)

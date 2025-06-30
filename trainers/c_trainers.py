@@ -74,11 +74,27 @@ class trainer(spawn_process):
       asyncio.create_task(self.job_queue_thread(), name = 'job_queue_thread')
       #print('Launch: trainer')
       await super().async_runner() 
+      if self.dbline.t_type in {2, 3}:
+        self.process_dict = {}
       while self.do_run:
         timestr = ts2mysqltime(time())
         if((self.dbline.startworking < timestr) 
             and (self.dbline.stopworking > timestr)
             and self.dbline.running):
+          if self.dbline.t_type in {2, 3}:
+            print('++++++++++', self.id, len(self.process_dict))
+            for item in list(self.process_dict):
+              if not self.process_dict[item][0].is_alive():
+                filterdict = {
+                  'school' : self.process_dict[item][1].id,
+                  'train_status' : 1,
+                }
+                if not self.process_dict[item][1].ignore_checked:
+                  filterdict['checked'] = True
+                await trainframe.objects.filter(**filterdict).aupdate(train_status = 2)
+                myschool.l_rate_divisor = 10000.0
+                await myschool.asave(update_fields=['l_rate_divisor'])
+                del self.process_dict[item]
           try:  
             myschool, myfit = await asyncio.wait_for(self.job_queue.get(), timeout = 1.0)
           except asyncio.TimeoutError:
@@ -109,18 +125,7 @@ class trainer(spawn_process):
             )
             train_process = Process(target = my_trainer.run)
             train_process.start()
-            train_process.join()
-            trainresult = 0
-          if not trainresult:
-            filterdict = {
-              'school' : myschool.id,
-              'train_status' : 1,
-            }
-            if not myschool.ignore_checked:
-              filterdict['checked'] = True
-            await trainframe.objects.filter(**filterdict).aupdate(train_status = 2)
-            myschool.l_rate_divisor = 10000.0
-            await myschool.asave(update_fields=['l_rate_divisor'])
+            self.process_dict[train_process.pid] = ((train_process, myschool))
           with self.mylock:
             self.job_queue_list.remove(myschool.id)
           trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
@@ -140,12 +145,9 @@ class trainer(spawn_process):
       from tf_workers.models import school
       from .models import trainframe, fit
       while self.do_run:
-        print('????? +++')
         schoollines = await sync_to_async(list)(school.objects.filter(active=True))
         for s_item in schoollines:
-          print('++++++++++')
           await s_item.arefresh_from_db()
-          print('00000')
           if s_item.id in self.school_cache:
             school_change = (
               await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]
@@ -154,7 +156,6 @@ class trainer(spawn_process):
           else:
             school_change = True
             self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
-          print('11111')
           if s_item.id in self.frames_cache:
             frames_change = (
               trainers_redis.get_last_frame(s_item.id) != self.frames_cache[s_item.id]
@@ -166,9 +167,7 @@ class trainer(spawn_process):
           print('#####', self.id, '#####', s_item.id, '#####', school_change, frames_change) 
           if not (school_change or frames_change):
             await a_break_type(BR_LONG)
-            print('-------', 0)
             continue
-          print('22222')
           for t_item in trainers:
             if s_item.id in trainers[t_item].getqueueinfo():
               self.logger.warning(
@@ -176,16 +175,12 @@ class trainer(spawn_process):
                 + ' not inserted into Trainer Queue because already in.')
               self.school_cache[s_item.id] = model_to_dict(s_item)
               continue
-          print('33333')
           filterdict = {
             'school' : s_item.id,
             'train_status' : 0,}
-          print('44444')
           if not s_item.ignore_checked:
             filterdict['checked'] = True
-          print('55555')
           undone_qs = trainframe.objects.filter(**filterdict)
-          print('66666')
           if await s_item.trainers.filter(id=self.id).aexists():
             run_condition = (
               await trainframe.objects.filter(school=s_item.id).acount() > 0
@@ -198,7 +193,6 @@ class trainer(spawn_process):
               and not s_item.id in self.job_queue_list
               and s_item.delegation_level == 1
             )
-          print('77777')
           if run_condition:
             await undone_qs.aupdate(train_status=1)
             myfit = fit(
@@ -211,12 +205,10 @@ class trainer(spawn_process):
               self.job_queue_list.append(s_item.id)
             trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
             await self.job_queue.put((s_item, myfit)) 
-          print('-------', 1)
         try:
           await a_break_time(10.0)
         except  asyncio.exceptions.CancelledError:
           pass  
-        print('????? ---')
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 

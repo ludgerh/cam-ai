@@ -23,6 +23,7 @@ import aiohttp
 import aioshutil
 import io
 import os
+from asgiref.sync import sync_to_async
 from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
@@ -424,7 +425,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         except User.DoesNotExist:
           myuser = None
         if myuser:
-          if myuser.check_password(params['pass']):
+          if await sync_to_async(myuser.check_password)(params['pass']):
             outlist['data']['status'] = 'new'
             outlist['data']['idx'] = myuser.id
             outlist['data']['user'] = params['user']

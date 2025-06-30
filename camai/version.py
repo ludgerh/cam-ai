@@ -1,1 +1,1 @@
-version = '1.6.6q'
+version = '1.6.6r'

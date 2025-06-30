@@ -164,7 +164,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       if text_data == 'Ping':
         return()
         
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -240,6 +240,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         else:
           if 'version' in indict and version_newer_or_equal(indict['version'], '1.6.2b'):
             self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
+            self.mytrainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
           else:
             self.trainer_nr = 1  
           creator = await database_sync_to_async(lambda: self.myschoolline.creator)()
@@ -278,7 +279,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         if self.mytrainerline.t_type in {2, 3}:
           await self.ws.send_str(json.dumps(indict))
         else:
-          await sync_to_async(self.myschoolline.trainers.add)(self.trainerline)
+          await sync_to_async(self.myschoolline.trainers.add)(self.mytrainerline)
           
       elif indict['code'] == 'checkfitdone':
         if self.mytrainerline.t_type in {2, 3}:

@@ -68,7 +68,7 @@ class train_once_remote():
     self.logger.info('*** Working on School #'
       +str(self.myschool.id)+', '+self.myschool.name+'...');
     self.logger.info('****************************************************');
-    from websocket import WebSocket#, enableTrace
+    from websocket import WebSocket #, enableTrace
     from websocket._exceptions import WebSocketConnectionClosedException
     #enableTrace(True)
     self.ws = WebSocket()
