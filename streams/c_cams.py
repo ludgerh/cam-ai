@@ -485,13 +485,9 @@ class c_cam(viewable):
   async def newprocess(self):
     from globals.c_globals import viewables
     try:
-      os.mkfifo(self.fifo_path)
-    except OSError:
-      pass
-    try:
       await asyncio.to_thread(os.mkfifo, self.fifo_path)
-    except OSError:
-      pass
+    except FileExistsError:
+      pass  # FIFO exists
     inp_frame_rate = 0.0
     if self.dbline.cam_virtual_fps:
       if (self.dbline.cam_fpslimit 

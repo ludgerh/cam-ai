@@ -204,8 +204,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <tr>
           <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>LR0</th><th>LR1</th>
           <th>LRa</th><th>WMi</th><th>WMa</th><th>WBo</th><th>ESD</th><th>ESP</th>
-          <th>Min</th><th>Epochs</th><th>Loss</th><th>BinAcc</th><th>AUC</th>
-          <th>val_L</th><th>val_BinAcc</th><th>val_AUC</th><th>Status</th>
+          <th>Min</th><th>Epochs</th><th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
+          <th>val_L</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -329,10 +329,12 @@ function refresh_all() {
         newaddition += '<td>' + item.epochs + '</td>';
         newaddition += '<td>' + item.loss.toPrecision(4) + '</td>';
         newaddition += '<td>' + item.binacc.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.auc.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.recall.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.precision.toPrecision(4) + '</td>';
         newaddition += '<td>' + item.val_loss.toPrecision(4) + '</td>';
         newaddition += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.val_auc.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.val_recall.toPrecision(4) + '</td>';
+        newaddition += '<td>' + item.val_precision.toPrecision(4) + '</td>';
         newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/' 
           + item.id + '/" target="_blank">' + item.status + '</a></td>';
         newaddition += '</tr>';

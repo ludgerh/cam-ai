@@ -99,8 +99,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       <thead>
         <tr>
           <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>Loss</th>
-          <th>BinAcc</th><th>AUC</th><th>val_Loss</th><th>val_BinAcc</th><th>val_AUC</th>
-          <th>Status</th>
+          <th>BinAcc</th><th>Rec</th><th>Prec</th><th>val_Loss</th><th>val_BinAcc</th>
+          <th>val_Rec</th><th>val_Prec</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -205,7 +205,7 @@ function refresh_all() {
         if (item.status == 'Done') {
           graph_labels.push(datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4));
           graph_data.datasets[0].data.push(item.val_binacc);
-          graph_data.datasets[1].data.push(item.val_auc);
+          graph_data.datasets[1].data.push(item.val_precision);
           graph_data.datasets[2].data.push(item.val_loss);
         };
         newaddition += '<tr>';
@@ -215,10 +215,12 @@ function refresh_all() {
         newaddition += '<td>'+item.epochs+'</td>';
         newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.auc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.recall.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.precision.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_auc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_recall.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_precision.toPrecision(4)+'</td>';
         newaddition += '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.id+'/">'+item.status+'</a></td>';
         newaddition += '</tr>';
         $('#tablebody').empty();

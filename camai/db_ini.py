@@ -66,6 +66,10 @@ async def db_ini():
     'url' : 'rtsp://{user}:{pass}@{address}:{port}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1', 
   })
   await add_if_none(camurl, 'type', {
+    'type' : 'Instar IN-5907 HD',
+    'url' : 'rtsp://{user}:{pass}@{address}:{port}/11', 
+  })
+  await add_if_none(camurl, 'type', {
     'type' : 'Novus NVIP-4VE-6501',
     'url' : 'rtsp://{user}:{pass}@{address}:{port}/profile1', 
     'reduce_latence' : False, 

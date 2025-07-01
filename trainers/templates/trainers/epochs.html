@@ -51,7 +51,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <thead>
       <tr>
         <th>#</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>BinAcc</th>
-        <th>AUC</th><th>val_Loss</th><th>val_BinAcc</th><th>val_AUC</th>
+        <th>Rec</th><th>Prec</th><th>val_Loss</th><th>val_BinAcc</th><th>val_Rec</th>
+        <th>val_Prec</th>
       </tr>
     </thead>
     <tbody>
@@ -144,7 +145,7 @@ let graph_data = {
     data: [],
     },
     {
-    label: 'val_AUC',
+    label: 'val_Pecision',
     backgroundColor: 'rgb(0, 155, 0)',
     borderColor: 'rgb(0, 155, 0)',
     yAxisID: 'A',
@@ -198,7 +199,7 @@ function refresh_all() {
         counter += 1;
         graph_labels.push(counter);
         graph_data.datasets[0].data.push(item.val_binacc);
-        graph_data.datasets[1].data.push(item.val_auc);
+        graph_data.datasets[1].data.push(item.val_precision);
         graph_data.datasets[2].data.push(item.val_loss);
         newaddition += '<tr>';
         newaddition += '<td>'+counter+'</td>';
@@ -206,10 +207,12 @@ function refresh_all() {
         newaddition += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.auc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.recall.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.precision.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_auc.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_recall.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.val_precision.toPrecision(4)+'</td>';
         newaddition += '</tr>';
         $('#tablebody').empty();
         $('#tablebody').append(newaddition);

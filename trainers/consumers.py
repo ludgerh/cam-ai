@@ -541,10 +541,12 @@ class trainerutil(AsyncWebsocketConsumer):
             result.append({
               'loss':item.loss, 
               'binacc':item.binacc, 
-              'auc':item.auc, 
+              'recall':item.recall, 
+              'precision':item.precision, 
               'val_loss':item.val_loss, 
               'val_binacc':item.val_binacc, 
-              'val_auc':item.val_auc, 
+              'val_recall':item.val_recall, 
+              'val_precision':item.val_precision, 
               'seconds':item.seconds, 
               'learning_rate':item.learning_rate,
             })
