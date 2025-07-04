@@ -55,8 +55,6 @@ class c_viewer():
     self.framebuffer = None 
           
   async def onf(self, client_nr):
-    if self.drawpad and not self.drawpad.mask_set:
-      await self.drawpad.set_mask()
     if not self.client_dict[client_nr]['busy'].is_set():
       self.client_dict[client_nr]['busy'].set()
       self.client_dict[client_nr]['lat_ts'] = time()

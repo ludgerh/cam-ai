@@ -42,19 +42,21 @@ class drawpad():
     self.ringlist = []
     self.mask_set = False
     self.mypoint = None
-    self.mask = None
+    self.mask = None 
     
-  async def set_mask(self): 
-    self.mask_set = True
-    items = await database_sync_to_async(list)(
-      mask.objects.filter(stream_id=self.myid, mtype=self.mtype), 
-    )
-    for item in items:
-      self.ringlist.append(loads(item.definition))
-    viewables[self.myid][self.mtype].inqueue.put(('set_mask', self.ringlist))
+  async def set_mask_local(self, ringlist=None):
+    self.ringlist = ringlist
+    if self.ringlist:
+      items = await database_sync_to_async(list)(
+        mask.objects.filter(stream_id=self.myid, mtype=self.mtype), 
+      )
+      for item in items:
+        self.ringlist.append(loads(item.definition))
+    else:
+      self.ringlist = []    
     self.make_screen()
-    self.mask_from_polygons()
-    
+    self.mask_from_polygons()    
+    self.mask_set = True        
     
   async def load_ringlist(self):
     self.ringlist = []

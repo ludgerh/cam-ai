@@ -99,6 +99,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
         )
         if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
           outx = params['width']
+          print('?????', viewables)
           if params['mode'] == 'C':
             if outx > mystream.dbline.cam_min_x_view:
               outx *= mystream.dbline.cam_scale_x_view

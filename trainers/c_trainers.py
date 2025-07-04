@@ -82,7 +82,6 @@ class trainer(spawn_process):
             and (self.dbline.stopworking > timestr)
             and self.dbline.running):
           if self.dbline.t_type in {2, 3}:
-            print('++++++++++', self.id, len(self.process_dict))
             for item in list(self.process_dict):
               if not self.process_dict[item][0].is_alive():
                 filterdict = {
@@ -164,7 +163,6 @@ class trainer(spawn_process):
           else:
             frames_change = True
             self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
-          print('#####', self.id, '#####', s_item.id, '#####', school_change, frames_change) 
           if not (school_change or frames_change):
             await a_break_type(BR_LONG)
             continue

@@ -164,7 +164,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       if text_data == 'Ping':
         return()
         
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -388,7 +388,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 

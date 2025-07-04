@@ -20,7 +20,7 @@ import asyncio
 from signal import signal, SIGINT
 from multiprocessing import Process, SimpleQueue as s_queue
 from l_buffer.l_buffer import l_buffer
-from globals.c_globals import viewables, add_viewer
+from globals.c_globals import add_viewer
 from streams.redis import my_redis as streams_redis
 from viewers.c_viewers import c_viewer
 

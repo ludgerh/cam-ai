@@ -26,7 +26,7 @@ from signal import SIGINT, SIGKILL, SIGTERM
 from setproctitle import setproctitle
 from logging import getLogger
 from time import time
-from globals.c_globals import viewers, viewables
+from globals.c_globals import viewers
 from tools.c_spawn import viewable
 from tools.l_break import a_break_time, a_break_type, BR_SHORT, BR_MEDIUM, BR_LONG
 from tools.l_tools import djconf, ts2filename
@@ -39,8 +39,7 @@ class c_cam(viewable):
     self.type = 'C'
     self.dbline = dbline
     self.id = dbline.id
-    os.makedirs('/dev/shm/cam-ai', exist_ok = True)
-    self.fifo_path = '/dev/shm/cam-ai/cam' + str(self.id) + '.pipe'
+    self.fifo_path = 'shm/cam' + str(self.id) + '.pipe'
     self.detector_dataq = detector_dataq
     self.eventer_dataq = eventer_dataq
     self.eventer_inq = eventer_inq
@@ -136,6 +135,8 @@ class c_cam(viewable):
             while self.do_run and (counter > 0):
               counter -= 1
               await a_break_type(BR_LONG)
+      if self.dbline.cam_apply_mask:
+        await self.viewer.drawpad.set_mask_local()
       #print('Launch: cam')
       while self.do_run:
         frameline = await self.run_one()
@@ -181,9 +182,7 @@ class c_cam(viewable):
     result = True
     #print('***** CAM Inqueue received:', received)
     if (received[0] == 'set_mask'):
-      self.viewer.drawpad.ringlist = received[1]
-      self.viewer.drawpad.make_screen()
-      self.viewer.drawpad.mask_from_polygons()
+      await self.viewer.drawpad.set_mask_local(received[1])
     elif (received[0] == 'set_apply_mask'):
       self.dbline.cam_apply_mask = received[1]
     elif (received[0] == 'reset_cam'):
@@ -272,15 +271,11 @@ class c_cam(viewable):
         try:
           chunk = await asyncio.to_thread(self.fifo.read, bytes_needed)
           if not chunk:
-            in_bytes = None
             await a_break_type(BR_SHORT)
-            break
+            continue
           in_bytes.extend(chunk)
           bytes_needed -= len(chunk)
-        except ValueError:
-          in_bytes = None
-          break
-        except AttributeError:
+        except (ValueError, AttributeError):
           in_bytes = None
           break
       if in_bytes:
@@ -293,6 +288,7 @@ class c_cam(viewable):
           self.logger.warning('ValueError: cannot reshape array of size ' 
             + str(nptemp.size) + ' into shape ' 
             + str((self.dbline.cam_yres, self.dbline.cam_xres, 3)))
+          await a_break_type(BR_LONG)
           return(None)
         self.getting_newprozess = False
       else:
@@ -314,7 +310,7 @@ class c_cam(viewable):
     if fps:
       self.dbline.cam_fpsactual = fps
       streams_redis.fps_to_dev('C', self.id, fps)
-    if self.dbline.cam_apply_mask and (self.viewer.drawpad.mask is not None):
+    if self.dbline.cam_apply_mask:
       frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
     if self.dbline.cam_virtual_fps and self.file_end:
       in_ts = 0.0
@@ -483,11 +479,6 @@ class c_cam(viewable):
       self.logger.critical("watchdog crashed: %s", fatal, exc_info=True)
 
   async def newprocess(self):
-    from globals.c_globals import viewables
-    try:
-      await asyncio.to_thread(os.mkfifo, self.fifo_path)
-    except FileExistsError:
-      pass  # FIFO exists
     inp_frame_rate = 0.0
     if self.dbline.cam_virtual_fps:
       if (self.dbline.cam_fpslimit 
@@ -575,6 +566,10 @@ class c_cam(viewable):
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
     #self.logger.info('#####' + str(cmd))
+    try:
+      await asyncio.to_thread(os.mkfifo, self.fifo_path)
+    except FileExistsError:
+      pass  # FIFO exists
     self.ff_proc = await asyncio.create_subprocess_exec(
       '/usr/bin/ffmpeg',
       *cmd,

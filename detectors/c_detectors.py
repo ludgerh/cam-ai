@@ -76,6 +76,8 @@ class c_detector(viewable):
         + str(self.dbline.det_gpu_nr_cv))
       self.do_run = True
       self.warning_done = False
+      if self.dbline.det_apply_mask:
+        await self.viewer.drawpad.set_mask_local()
       #print('Launch: detector')
       while self.do_run:
         frameline = await self.run_one(await self.dataqueue.get())
@@ -102,10 +104,7 @@ class c_detector(viewable):
       else:
         self.sl.period = 1.0 / received[1]
     elif (received[0] == 'set_mask'):
-      mydrawpad = self.viewer.drawpad
-      mydrawpad.ringlist = received[1]
-      mydrawpad.make_screen()
-      mydrawpad.mask_from_polygons()
+      await self.viewer.drawpad.set_mask_local(received[1])
     elif (received[0] == 'set_apply_mask'):
       self.dbline.det_apply_mask = received[1]
     elif (received[0] == 'set_threshold'):
@@ -152,11 +151,13 @@ class c_detector(viewable):
         )
       else:
         self.buffer = frame
-      self.background = np.float32(self.buffer)
+      if self.dbline.det_apply_mask:
+        self.buffer = np.float32(cv.bitwise_and(self.buffer, self.viewer.drawpad.mask))
+      self.background = np.float32(self.buffer)  
       self.firstdetect = False
     if self.scaledown > 1:
       frame = cv.resize(frame, (self.xres, self.yres), interpolation=cv.INTER_NEAREST)
-    if self.dbline.det_apply_mask and (self.viewer.drawpad.mask is not None):
+    if self.dbline.det_apply_mask:
       frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
     objectmaxsize = round(max(
       self.buffer.shape[0],

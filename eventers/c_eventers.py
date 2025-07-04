@@ -23,7 +23,6 @@ import asyncio
 import aiofiles
 import aiofiles.os
 import aioshutil
-from aiopath import AsyncPath
 from logging import getLogger
 from signal import SIGKILL
 from os import environ, kill, getpid
@@ -48,6 +47,7 @@ from startup.redis import my_redis as startup_redis
 from schools.c_schools import get_taglist
 from streams.redis import my_redis as streams_redis
 from users.userinfo import afree_quota
+from .redis import my_redis as eventers_redis
 from .c_alarm import alarm, alarm_init
 
 class c_eventer(viewable):
@@ -353,30 +353,27 @@ class c_eventer(viewable):
   async def make_webm(self):
     try:
       while self.do_run:
-        path = AsyncPath(self.recordingspath)
-        async for mp4_file in path.glob('E_????????????.mp4'):
-          mp4_file = str(mp4_file)
+        if (mp4_file := eventers_redis.pop_from_webm(self.id)):
+          mp4_file = self.recordingspath + mp4_file.decode()
           webm_file = mp4_file[:-4] + '.webm'
-          if not await aiofiles.os.path.exists(webm_file):
-            if self.dbline.eve_webm_procnum_limit:
-              descriptor = ['taskset', '-c', '0', ]
-            else:
-              descriptor = [] 
-            descriptor += ['ffmpeg', ]
-            descriptor += ['-v', 'fatal', ]
-            if self.dbline.eve_webm_fps:
-              descriptor += ['-r', str(self.dbline.eve_webm_fps), ]
-            if self.dbline.eve_webm_threads:
-              descriptor += ['-threads', str(self.dbline.eve_webm_threads), ]
-            descriptor += ['-i', mp4_file, ]
-            if self.dbline.eve_webm_crf:
-              descriptor += ['-crf', str(self.dbline.eve_webm_crf), ]
-            if self.dbline.eve_webm_width:
-              descriptor += ['-vf', 'scale=' + str(self.dbline.eve_webm_width)+':-1', ]
-            descriptor += [webm_file, ]
-            #print(descriptor)
-            process = await asyncio.create_subprocess_exec(*descriptor)
-            await process.wait()
+          if self.dbline.eve_webm_procnum_limit:
+            descriptor = ['taskset', '-c', '0', ]
+          else:
+            descriptor = [] 
+          descriptor += ['ffmpeg', ]
+          descriptor += ['-v', 'fatal', ]
+          if self.dbline.eve_webm_fps:
+            descriptor += ['-r', str(self.dbline.eve_webm_fps), ]
+          if self.dbline.eve_webm_threads:
+            descriptor += ['-threads', str(self.dbline.eve_webm_threads), ]
+          descriptor += ['-i', mp4_file, ]
+          if self.dbline.eve_webm_crf:
+            descriptor += ['-crf', str(self.dbline.eve_webm_crf), ]
+          if self.dbline.eve_webm_width:
+            descriptor += ['-vf', 'scale=' + str(self.dbline.eve_webm_width)+':-1', ]
+          descriptor += [webm_file, ]
+          process = await asyncio.create_subprocess_exec(*descriptor)
+          await process.wait()
         await a_break_time(10.0)
     except Exception as fatal:
       self.logger.error('Error in process: ' 
@@ -467,6 +464,9 @@ class c_eventer(viewable):
                   await process.wait()
                   await aiofiles.os.remove(listfilename)
                   await aioshutil.move(temppath, savepath)
+                
+                if self.dbline.eve_webm_doit:
+                  eventers_redis.push_to_webm(self.id, savepath)
                 self.vid_str_dict[my_vid_str] = item.savename
                 isdouble = False
               item.dbline.videoclip = item.savename[:-4]
