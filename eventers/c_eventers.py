@@ -195,7 +195,7 @@ class c_eventer(viewable):
       self.vid_deque = deque()
       self.vid_deque_lock = a_lock()
       self.vid_str_dict = {}
-      self.set_cam_counts()
+      await self.set_cam_counts()
       self.display_deque = deque()
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg, )
       self.tf_w_index = await self.tf_worker.register(self.tf_worker_id)
