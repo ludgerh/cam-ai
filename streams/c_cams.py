@@ -72,7 +72,6 @@ class c_cam(viewable):
         self.wd_ts = time()
         self.wd_interval = 10.0 
       await super().async_runner() 
-      self.viewer.drawpad.mask = None
       self.mode_flag = self.dbline.cam_mode_flag
       self.cam_active = False
       self.cam_recording = False
@@ -311,7 +310,7 @@ class c_cam(viewable):
       self.dbline.cam_fpsactual = fps
       streams_redis.fps_to_dev('C', self.id, fps)
     if self.dbline.cam_apply_mask:
-      frame = cv.bitwise_and(frame, self.viewer.drawpad.mask)
+      frame = await asyncio.to_thread(cv.bitwise_and, frame, self.viewer.drawpad.mask)
     if self.dbline.cam_virtual_fps and self.file_end:
       in_ts = 0.0
       self.file_end = False 
@@ -322,8 +321,6 @@ class c_cam(viewable):
       return()
     self.logger.info('[' + str(maxcounter) + '] Probing camera #' 
       + str(self.id) + ' (' + self.dbline.name + ')...')
-    #if self.id == 10:
-    #  await asyncio.sleep(10)
     await self.mycam.ffprobe()
     probe = self.mycam.probe
     #print('***', probe, '***')

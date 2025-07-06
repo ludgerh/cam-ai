@@ -73,7 +73,10 @@ class l_smtp(SMTP):
       self.answer = 'There is no valid SMTP configuration.'
       self.last_error = (6, 'No SMTP config')
       self.result_code = 6
-      return()
+      self.ready = False
+      return(None)
+    else:
+      self.ready = True  
     self.allowed_size = None
     self.answer = 'OK'
     self.last_error = (0, 'OK')
@@ -97,6 +100,8 @@ class l_smtp(SMTP):
     self._kwargs = kwargs
     
   async def async_init(self):
+    if not self.ready:
+      return(None)
     kwargs = self._kwargs  
     try: 
       await self.connect()
@@ -148,6 +153,8 @@ class l_smtp(SMTP):
       self.result_code = 1001
       
   async def sendmail(self, *args):
+    if not self.ready:
+      return(None)
     msg = args[2]
     if self.allowed_size and msg.get_size() > self.allowed_size:
       self.answer = 'This Email is too large for the SMTP-Server.'
@@ -174,6 +181,8 @@ class l_smtp(SMTP):
       return({'Server-Error' : 'Other error', })
  
   async def is_connected(self):
+    if not self.ready:
+      return(None)
     try:
       await self.noop()
       return(True)
@@ -181,6 +190,8 @@ class l_smtp(SMTP):
       return(False)
       
   async def quit(self):
+    if not self.ready:
+      return(None)
     if await self.is_connected():
       await super().quit()
 

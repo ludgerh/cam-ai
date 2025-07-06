@@ -46,14 +46,13 @@ class drawpad():
     
   async def set_mask_local(self, ringlist=None):
     self.ringlist = ringlist
-    if self.ringlist:
+    if not self.ringlist:
+      self.ringlist = []
       items = await database_sync_to_async(list)(
         mask.objects.filter(stream_id=self.myid, mtype=self.mtype), 
       )
       for item in items:
         self.ringlist.append(loads(item.definition))
-    else:
-      self.ringlist = []    
     self.make_screen()
     self.mask_from_polygons()    
     self.mask_set = True        

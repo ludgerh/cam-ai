@@ -29,12 +29,12 @@ from os import environ, kill, getpid
 from setproctitle import setproctitle
 from collections import deque
 from time import time
-from threading import Lock as t_lock
+from asyncio import Lock as a_lock
 from multiprocessing import Process
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from django.forms.models import model_to_dict
-from tools.l_break import a_break_type, break_type, a_break_time, BR_MEDIUM, BR_LONG
+from tools.l_break import a_break_type, break_type, a_break_time, BR_SHORT, BR_MEDIUM, BR_LONG
 from tools.c_spawn import viewable
 from tools.c_tools import (
   add_record_count, 
@@ -78,13 +78,14 @@ class c_eventer(viewable):
     result = True
     #print('*** Eventer-Inqueue received:', received)
     if (received[0] == 'new_video'):
-      with self.vid_deque_lock:
+      async with self.vid_deque_lock:
         self.vid_deque.append(received[1:])
         while True:
           if self.vid_deque and (time() - self.vid_deque[0][2]) > 180.0:
             listitem = self.vid_deque.popleft()
             try:
               await aiofiles.os.remove(self.recordingspath + listitem[1])
+              await a_break_type(BR_SHORT)
             except FileNotFoundError:
               self.logger.warning('c_eventers.py:new_video - Delete did not find: '
                 + self.recordingspath + listitem[1])# Liste der zu löschenden Schlüssel
@@ -94,12 +95,14 @@ class c_eventer(viewable):
             for key in keys_to_delete:
                 del self.vid_str_dict[key]
           else:
+            await a_break_type(BR_SHORT)
             break
     elif (received[0] == 'purge_videos'):
-      with self.vid_deque_lock:
+      async with self.vid_deque_lock:
         for item in self.vid_deque.copy():
           try:
             await aiofiles.os.remove(self.recordingspath + item[1])
+            await a_break_type(BR_SHORT)
           except FileNotFoundError:
             self.logger.warning('c_eventers.py:purge_videos - Delete did not find: '
               + self.recordingspath + item[1])
@@ -126,18 +129,18 @@ class c_eventer(viewable):
       self.nr_of_cond_ed = max(0, self.nr_of_cond_ed - 1)
     elif (received[0] == 'new_condition'):
       self.cond_dict[received[1]].append(received[2])
-      self.set_cam_counts()
+      await self.set_cam_counts()
     elif (received[0] == 'del_condition'):
       self.cond_dict[received[1]] = [item 
         for item in self.cond_dict[received[1]] 
         if item['id'] != received[2]]
-      self.set_cam_counts()
+      await self.set_cam_counts()
     elif (received[0] == 'save_condition'):
       self.cond_dict[received[1]] = json.loads(received[2])
-      self.set_cam_counts()
+      await self.set_cam_counts()
     elif (received[0] == 'save_conditions'):
       self.cond_dict[received[1]] = json.loads(received[2])
-      self.set_cam_counts()
+      await self.set_cam_counts()
     elif (received[0] == 'setdscrwidth'):
       self.scrwidth = received[1]
       self.scaling = None
@@ -169,7 +172,6 @@ class c_eventer(viewable):
       await alog_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Eventer #' + str(self.id))
       await super().async_runner()  
-      self.vid_deque_lock = None
       self.display_ts = 0
       self.nr_of_cond_ed = 0
       await self.read_conditions()
@@ -190,10 +192,8 @@ class c_eventer(viewable):
       self.logger.info('**** Eventer #' + str(self.id)+' running GPU #' 
         + str(self.dbline.eve_gpu_nr_cv))
       self.eventdict = {}
-      self.eventdict_lock = t_lock()
-      self.display_lock = t_lock()
       self.vid_deque = deque()
-      self.vid_deque_lock = t_lock()
+      self.vid_deque_lock = a_lock()
       self.vid_str_dict = {}
       self.set_cam_counts()
       self.display_deque = deque()
@@ -210,23 +210,28 @@ class c_eventer(viewable):
       self.scrwidth = None 
       self.motion_frame = [0,0,0.0]
       self.last_insert_ts = float('inf')
-      self.run_one_task = None
       asyncio.create_task(self.check_events())
       asyncio.create_task(self.tags_refresh())
       asyncio.create_task(self.inserter())
       if self.dbline.eve_webm_doit:
         asyncio.create_task(self.make_webm())
+      self.inferencing_status = 0
       #print('Launch: eventer')
       while self.do_run:
         if streams_redis.check_if_counts_zero('E', self.id):
           await a_break_type(BR_LONG)
+          continue
         frameline = await self.dataqueue.get()
+        if self.inferencing_status == 1:
+          await a_break_type(BR_LONG)
+          continue
+        elif self.inferencing_status == 0:  
+          self.inferencing_status == 1  
         if not self.do_run:
           break  
         if (frameline is not None and frameline[0] is not None 
             and self.sl.greenlight(frameline[2])):
-          if self.run_one_task is None or self.run_one_task.done():  
-            self.run_one_task = asyncio.create_task(self.run_one(frameline))
+          await self.run_one(frameline)  
         else:
           await a_break_type(BR_MEDIUM)
       self.dataqueue.stop()
@@ -234,8 +239,6 @@ class c_eventer(viewable):
       self.logger.info('Finished Process '+self.logname+'...')
       self.tf_worker.stop_out(self.tf_w_index)
       await self.tf_worker.unregister(self.tf_w_index)
-      #for thread in enumerate(): 
-      #  print(thread)
     except Exception as fatal:
       self.logger.error(
         'Error in process: ' 
@@ -268,6 +271,7 @@ class c_eventer(viewable):
           self.textheight = round(0.51 / self.scaling)
           self.textthickness = round(2.0 / self.scaling)
         await self.display_events(frame)
+        await a_break_type(BR_SHORT)
     else:    
       await a_break_type(BR_LONG)
     if self.do_run and self.dbline.eve_view:
@@ -283,11 +287,10 @@ class c_eventer(viewable):
     async for item in condition_lines:
       self.cond_dict[item.reaction].append(model_to_dict(item))
 
-  def merge_events(self):
+  async def merge_events(self):
     while True:
       del_set = set()
-      with self.eventdict_lock:
-        i_list = list(self.eventdict.items())
+      i_list = list(self.eventdict.items())
       j_list = i_list
       for i, event_i in i_list:
         if not event_i.check_out_ts:
@@ -304,30 +307,35 @@ class c_eventer(viewable):
                   event_i.merge_frames(event_j)
                   del_set.add(j) 
       if del_set:   
-        with self.eventdict_lock:
-          for j in del_set:
-            if j in self.eventdict:
-              del self.eventdict[j]
+        for j in del_set:
+          if j in self.eventdict:
+            del self.eventdict[j]
       else:
         break
+      await a_break_type(BR_SHORT)
 
   async def display_events(self, frame):
-    self.display_deque.append(frame) 
-    with self.display_lock:
-      display_list = [
-        item for item in self.eventdict.values() if item.check_out_ts is None
-      ]
+    if len(self.display_deque) >= 10: 
+      self.display_deque.popleft()  
+      await a_break_type(BR_SHORT)
+      return()  
+    #print(self.id, '+++ 000', len(self.display_deque))
+    self.display_deque.append(frame)
+    display_list = [
+      item for item in self.eventdict.values() if item.check_out_ts is None
+    ]
     if (display_list 
         and self.display_deque[0][2] > self.last_insert_ts + self.dbline.eve_sync_factor):
+      await a_break_type(BR_SHORT)
       return()
     newframe = self.display_deque.popleft()
     newframe[1] = newframe[1].copy()  # Ensure the array is writable
     for item in display_list:
-      predictions = item.pred_read(max=1.0)
-      if self.resolve_rules(self.cond_dict[1], predictions):
+      predictions = await item.pred_read(max=1.0)
+      if await self.resolve_rules(self.cond_dict[1], predictions):
         if self.nr_of_cond_ed <= 0:
           self.last_cond_ed = 1
-        if self.resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
+        if await self.resolve_rules(self.cond_dict[self.last_cond_ed], predictions):
           colorcode= (0, 0, 255)
         else:
           colorcode= (0, 255, 0)
@@ -335,18 +343,30 @@ class c_eventer(viewable):
           if predictions[j] >= 0.5]
         tag_display_list.sort(key = lambda x: -x[1])
         tag_display_list = tag_display_list[:3]
-        cv.rectangle(newframe[1], self.rect_btoa(item[:4]), colorcode, self.linewidth)
+        await asyncio.to_thread(
+          cv.rectangle, 
+          newframe[1], 
+          self.rect_btoa(item[:4]), 
+          colorcode, 
+          self.linewidth, 
+        )
         if item[2] < (self.dbline.cam_yres - item[3]):
           y0 = item[3] + 30 * self.textheight
         else:
           y0 = item[2] - (10 + (len(tag_display_list) - 1) * 30) * self.textheight
         for j in range(len(tag_display_list)):
-          cv.putText(newframe[1], 
+          await asyncio.to_thread(
+            cv.putText, 
+            newframe[1], 
             self.tag_list[tag_display_list[j][0]].name[:3]
             +' - '+str(round(tag_display_list[j][1],2)), 
             (item[0]+2, y0 + j * 30 * self.textheight), 
-            cv.FONT_HERSHEY_SIMPLEX, self.textheight, colorcode, 
-            self.textthickness, cv.LINE_AA)
+            cv.FONT_HERSHEY_SIMPLEX, 
+            self.textheight, 
+            colorcode, 
+            self.textthickness, 
+            cv.LINE_AA, 
+          )
     await self.viewer.inqueue.put(newframe)
     del newframe  
 
@@ -372,6 +392,7 @@ class c_eventer(viewable):
           if self.dbline.eve_webm_width:
             descriptor += ['-vf', 'scale=' + str(self.dbline.eve_webm_width)+':-1', ]
           descriptor += [webm_file, ]
+          await a_break_type(BR_SHORT)
           process = await asyncio.create_subprocess_exec(*descriptor)
           await process.wait()
         await a_break_time(10.0)
@@ -383,30 +404,30 @@ class c_eventer(viewable):
       self.logger.critical("makewebm crashed: %s", fatal, exc_info=True)
     
   async def check_event(self, i, item):
+    await a_break_type(BR_SHORT)
     if self.dbline.cam_virtual_fps:
       newtime = streams_redis.get_virt_time(self.id)
     else:
       newtime = time()  
     if (item.end < newtime - self.dbline.eve_event_time_gap 
-        or item.end > item.start + 20.0):
-        #or item.end > item.start + 120.0):
+        or item.end > item.start + 120.0):
       item.check_out_ts = item.end
     if self.cond_dict[5]:
-      predictions = item.pred_read(max=1.0)
+      predictions = await item.pred_read(max=1.0)
     else:
       predictions = None   
-    if self.resolve_rules(self.cond_dict[5], predictions):
+    if await self.resolve_rules(self.cond_dict[5], predictions):
       await alarm(self.id, predictions) 
     if item.check_out_ts:
       if predictions is None and self.cond_dict[2]:
-        predictions = item.pred_read(max=1.0)
-      item.goes_to_school = self.resolve_rules(self.cond_dict[2], predictions)
+        predictions = await item.pred_read(max=1.0)
+      item.goes_to_school = await self.resolve_rules(self.cond_dict[2], predictions)
       if predictions is None and self.cond_dict[3]:
-        predictions = item.pred_read(max=1.0)
-      item.isrecording = self.resolve_rules(self.cond_dict[3], predictions)
+        predictions = await item.pred_read(max=1.0)
+      item.isrecording = await self.resolve_rules(self.cond_dict[3], predictions)
       if predictions is None and self.cond_dict[4]:
-        predictions = item.pred_read(max=1.0)
-      if self.resolve_rules(self.cond_dict[4], predictions):
+        predictions = await item.pred_read(max=1.0)
+      if await self.resolve_rules(self.cond_dict[4], predictions):
         item.to_email = self.dbline.eve_alarm_email
       else:
         item.to_email = ''
@@ -414,7 +435,7 @@ class c_eventer(viewable):
       if item.goes_to_school or item.isrecording or item.to_email:
         if await afree_quota(item.stream_creator):
           if item.isrecording:
-            with self.vid_deque_lock:
+            async with self.vid_deque_lock:
               if (checkbool := (self.vid_deque 
                   and item.check_out_ts <= self.vid_deque[-1][2])):
                 my_vid_list = [v_item for v_item in self.vid_deque 
@@ -444,7 +465,9 @@ class c_eventer(viewable):
                   listfilename = (self.recordingspath + 'T_'
                     + str(item.dbline.id).zfill(12)+'.temp')
                   listfilename = await aiofiles.os.path.abspath(listfilename)
+                  await a_break_type(BR_SHORT)
                   savepath = await aiofiles.os.path.abspath(savepath)
+                  await a_break_type(BR_SHORT)
                   async with aiofiles.open(listfilename, 'w') as f1:
                     for line in my_vid_list:
                       await f1.write(
@@ -452,6 +475,7 @@ class c_eventer(viewable):
                         + await aiofiles.os.path.abspath(self.recordingspath + line[1]) 
                         + '\n'
                       )
+                  await a_break_type(BR_SHORT)
                   process = await asyncio.create_subprocess_exec(
                     'ffmpeg', 
                     '-f', 'concat', 
@@ -463,6 +487,7 @@ class c_eventer(viewable):
                   )
                   await process.wait()
                   await aiofiles.os.remove(listfilename)
+                  await a_break_type(BR_SHORT)
                   await aioshutil.move(temppath, savepath)
                 
                 if self.dbline.eve_webm_doit:
@@ -490,21 +515,16 @@ class c_eventer(viewable):
         else:
           self.logger.warning('!!!!! Did not save the event because of low quota')    
       if is_ready: 
-        with self.eventdict_lock:
-          with self.display_lock:
-            if i in self.eventdict:
-              del self.eventdict[i]
+        if i in self.eventdict:
+          del self.eventdict[i]
 
   async def check_events(self):
     try:
       while self.do_run:
         await(a_break_type(BR_LONG))
-        for i in list(self.eventdict.keys()):
-          try:
-            item = self.eventdict[i]
-            await(self.check_event(i, item))
-          except KeyError:
-            pass 
+        for i, item in list(self.eventdict.items()):
+          await(a_break_type(BR_SHORT))
+          await self.check_event(i, item)
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 
@@ -540,9 +560,14 @@ class c_eventer(viewable):
             break
           else:
             detector_buffer.append(frame)
+            await a_break_type(BR_SHORT)
         if detector_buffer:
           imglist = [
-            cv.cvtColor(frame[1], cv.COLOR_BGR2RGB) for frame in detector_buffer
+            await asyncio.to_thread(
+              cv.cvtColor, 
+              frame[1], 
+              cv.COLOR_BGR2RGB, 
+            ) for frame in detector_buffer
           ]
           del frame
           if not await self.tf_worker.ask_pred(
@@ -566,23 +591,26 @@ class c_eventer(viewable):
                   frame[3][2] - margin, frame[3][3] + margin), item):
                 found = item
                 break
+              await a_break_type(BR_SHORT)
             if found is None or found.check_out_ts:
               count = 0  
               while count in self.eventdict:
                 count += 1   
               new_event = await c_event.create(self.tf_worker, self.tf_w_index, frame, 
                 margin, self.dbline, self.school_line.id, count, self.logger)
-              with self.eventdict_lock:
-                count = 0  
-                while count in self.eventdict:
-                  count += 1   
-                self.eventdict[count] = new_event
+              count = 0  
+              while count in self.eventdict:
+                count += 1   
+              self.eventdict[count] = new_event
             else: 
               found.add_frame(frame)
-          self.merge_events()
+          await self.merge_events()
           self.last_insert_ts = frame[2]
+          self.inferencing_status = 2
           del frame
           detector_buffer.clear()
+        else:
+          await a_break_type(BR_SHORT)  
       return()  
     except Exception as fatal:
       self.logger.error('Error in process: ' 
@@ -596,7 +624,7 @@ class c_eventer(viewable):
       startup_redis.set_start_stream_busy(self.id)
       kill(getpid(), SIGKILL)
 
-  def set_cam_counts(self):
+  async def set_cam_counts(self):
     if any([len(self.cond_dict[x]) for x in range(2,6)]):
       add_data_count(self.type, self.id) #just switch 0 or 1
     else:
@@ -605,6 +633,7 @@ class c_eventer(viewable):
       add_record_count(self.type, self.id)
     else:
       take_record_count(self.type, self.id)
+    await a_break_type(BR_SHORT)
 
   def build_string(self, i):
     if i['c_type'] == 1:

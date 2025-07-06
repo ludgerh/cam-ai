@@ -12,6 +12,8 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+V1.8.1 05.07.2025
 """
 
 import json
@@ -35,6 +37,24 @@ log_ini(logger, logname)
 
 class oneitemConsumer(AsyncWebsocketConsumer):
 
+  async def save_ringlist(self):
+    self.mydetectordrawpad.ringlist = self.mydrawpad.ringlist
+    self.mydetectordrawpad.reduce_rings_size()
+    self.mydetectordrawpad.make_screen()
+    self.mydetectordrawpad.mask_from_polygons()
+    masklines = mask.objects.filter(stream_id=self.idx, mtype='D',)
+    async for item in masklines:
+      await item.adelete()
+    for ring in self.mydetectordrawpad.ringlist:
+      m = mask(
+        name='New Ring',
+        definition=json.dumps(ring),
+        stream_id=self.idx,
+        mtype='D',
+      )
+      await m.asave()
+    self.mydetectoritem.inqueue.put(('set_mask', self.mydetectordrawpad.ringlist))
+
   async def connect(self):
     try:
       await self.accept()
@@ -49,26 +69,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       if self.myitem is not None:
         self.myitem.nr_of_cond_ed = 0
         self.myitem.last_cond_ed = 0
-      if self.detectormask_changed:
-        self.mydetectordrawpad.ringlist = self.mydrawpad.ringlist
-        self.mydetectordrawpad.make_screen()
-        self.mydetectordrawpad.reduce_rings_size()
-        self.mydetectordrawpad.mask_from_polygons()
-        viewables[self.idx]['D'].inqueue.put((
-          'set_mask', 
-          self.mydetectordrawpad.ringlist
-        ))
-        masklines = mask.objects.filter(stream_id=self.idx, mtype='D',)
-        async for item in masklines:
-          await item.adelete()
-        for ring in self.mydetectordrawpad.ringlist:
-          m = mask(
-            name='New Ring',
-            definition=json.dumps(ring),
-            stream_id=self.idx,
-            mtype='D',
-          )
-          await m.asave()
     except:
       logger.error('Error in consumer: ' + logname + ' (oneitem)')
       logger.error(format_exc())
@@ -86,15 +86,21 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'setmyitem':
-        if await access.check_async(params['mode'], params['itemid'], self.scope['user'], 'R'):
+        if await access.check_async(
+            params['mode'], 
+            params['itemid'], 
+            self.scope['user'], 
+            'R', 
+          ):
           self.mode = params['mode']
           self.idx = params['itemid']
           self.mycamitem = viewables[params['itemid']]['C']
           self.myitem = viewables[params['itemid']][self.mode]
           if self.mode in {'C', 'D'}:
-            self.mydrawpad = viewers[params['itemid']][self.mode].drawpad
+            self.mydrawpad = self.myitem.viewer.drawpad
             if self.mode == 'C':
-              self.mydetectordrawpad = viewers[params['itemid']]['D'].drawpad
+              self.mydetectoritem = viewables[params['itemid']]['D']
+              self.mydetectordrawpad = self.mydetectoritem.viewer.drawpad
           self.may_write = await access.check_async(
             params['mode'], 
             int(params['itemid']), 
@@ -221,10 +227,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               stream_id=self.idx, 
               mtype=self.mydrawpad.mtype
             ).adelete()
-            #await deletefilter(mask, {
-            #  'stream_id' : self.idx,
-            #  'mtype' : self.mydrawpad.mtype,
-            #})
             for ring in self.mydrawpad.ringlist:
               m = mask(
                 name='New Ring',
@@ -234,7 +236,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               )
               await m.asave()
             if self.mydrawpad.mtype == 'X':
-              self.detectormask_changed = True
+              await self.save_ringlist()
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
@@ -246,7 +248,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               params['x']/self.scaling, params['y'] / self.scaling)
         else:
           if self.mycamitem.mycam and self.mycamitem.mycam.myptz:
-            self.mycamitem.inqueue.put(('ptz_mdown', params['x']/self.scaling, params['y']/self.scaling))
+            self.mycamitem.inqueue.put(
+              ('ptz_mdown', params['x']/self.scaling, params['y']/self.scaling)
+            )
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
@@ -258,10 +262,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               params['x']/self.scaling, params['y'] / self.scaling)
             self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
             if self.mydrawpad.mtype == 'X':
-              self.detectormask_changed = True
+              await self.save_ringlist()
         else:
           if self.mycamitem.mycam and self.mycamitem.mycam.myptz:
-            self.mycamitem.inqueue.put(('ptz_mup', params['x']/self.scaling, params['y']/self.scaling))
+            self.mycamitem.inqueue.put(
+              ('ptz_mup', params['x']/self.scaling, params['y']/self.scaling)
+            )
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
@@ -281,7 +287,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             params['x'] / self.scaling, params['y'] / self.scaling)
           self.myitem.inqueue.put(('set_mask', self.myitem.viewer.drawpad.ringlist))
           if self.mydrawpad.mtype == 'X':
-            self.detectormask_changed = True
+            await self.save_ringlist()
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
@@ -391,7 +397,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.myitem.inqueue.put((
             'save_condition', params['reaction'], params['conditions']))
           cond_dict = json.loads(params['conditions'])
-          conditionlines = evt_condition.objects.filter(eventer_id=self.myitem.dbline.id, reaction=params['reaction'])
+          conditionlines = evt_condition.objects.filter(
+            eventer_id=self.myitem.dbline.id, 
+            reaction=params['reaction'], 
+          )
           async for item in conditionlines:
             await item.adelete()
           for item in cond_dict:

@@ -26,7 +26,7 @@ from multiprocessing import Queue as p_queue, SimpleQueue as s_queue
 from collections import deque
 from time import time
 from datetime import datetime
-from threading import Thread, Lock as t_lock
+from threading import Lock as t_lock
 from random import random
 from logging import getLogger
 from signal import signal, SIGINT
@@ -59,11 +59,10 @@ class model_buffer(deque):
     self.ts = time()
     self.xdim = xdim
     self.ydim = ydim
-    self.bufferlock = t_lock()
     self.websocket = websocket
     self.pause = True
 
-  def append(self, initem):
+  async def append(self, initem):
     # structure of initem:
     # initem[0] = userindex, schoolnr, initem[1] = np.image, initem[2] = np.image...
     # structure of outitem:
@@ -74,23 +73,19 @@ class model_buffer(deque):
     for frame in initem[2:]:
       if self.websocket:
         if frame.shape[1] * frame.shape[0] > self.xdim * self.ydim:
-          frame = cv.resize(frame, (self.xdim, self.ydim))
+          frame = await asyncio.to_thread(cv.resize, frame, (self.xdim, self.ydim))
       else:
         if frame.shape[1] != self.xdim or  frame.shape[0] != self.ydim:
-          frame = cv.resize(frame, (self.xdim, self.ydim))
-      with self.bufferlock:
+          frame = await asyncio.to_thread(cv.resize, frame, (self.xdim, self.ydim))
         super().append((frame, initem[0]))
 
   def get(self, maxcount):
     result = []
     while True:
-      self.bufferlock.acquire()
       if not len(self):
-        self.bufferlock.release()
         break
       else:  
         initem = self.popleft()
-        self.bufferlock.release()
       result.append(initem)
       if len(result) >= maxcount:
         break 
@@ -98,10 +93,8 @@ class model_buffer(deque):
 
 class tf_user(object):
   clientset = set()
-  clientlock = t_lock()
 
   def __init__(self):
-    with self.clientlock:
       i = 0
       while (i in self.clientset):
         i += 1
@@ -109,7 +102,6 @@ class tf_user(object):
       self.id = i 
 
   def __del__(self):
-    with self.clientlock:
       self.clientset.discard(self.id)
       
 class output_dist():   
@@ -183,7 +175,7 @@ class tf_worker(spawn_process):
         )
       await self.my_output.put(received[1], ('ask_pred_ok', True))
       self.model_buffers[schoolnr].pause = False
-      self.model_buffers[schoolnr].append(received[1:])
+      await self.model_buffers[schoolnr].append(received[1:])
     elif (received[0] == 'register'):
       myuser = tf_user()
       self.users[myuser.id] = myuser
@@ -247,7 +239,6 @@ class tf_worker(spawn_process):
       self.active_models = 0
       #*** Client Var
       self.run_out_procs = {}
-      self.model_check_lock = t_lock()
       self.ws_ts = None
       signal(SIGINT, sigint_handler)
       self.len_taglist = len(await database_sync_to_async(get_taglist)(1, ))

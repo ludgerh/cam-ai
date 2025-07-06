@@ -39,7 +39,7 @@ from .models import event, event_frame
 
 import os
 
-def resolve_rules(conditions, predictions):
+async def resolve_rules(conditions, predictions):
   if predictions is None:
     return(False)
   if len(conditions) > 0:
@@ -205,7 +205,7 @@ class c_event(list):
       self.focus_max = the_other_one.focus_max
       self.focus_time = the_other_one.focus_time
 
-  def pred_read(self, radius=3, max=None, ave=None, last=None):
+  async def pred_read(self, radius=3, max=None, ave=None, last=None):
     result2 = np.zeros((len(self.tag_list)), np.float32)
     if self[4]:
       result1 = np.vstack(self[4])
@@ -221,8 +221,8 @@ class c_event(list):
     else:
       return(result2)
 
-  def p_string(self):
-    predictions = self.pred_read(max=1.0)
+  async def p_string(self):
+    predictions = await self.pred_read(max=1.0)
     predline = '['
     for i in range(len(self.tag_list)):
       if (predictions[i] >= 0.5):
@@ -231,11 +231,11 @@ class c_event(list):
         predline += str(self.tag_list[i].name)[:3]
     return(predline+']')
 
-  def frames_filter(self, outlength, cond_dict):  
+  async def frames_filter(self, outlength, cond_dict):  
     sortindex = [x for x in self.frames if (
-      resolve_rules(cond_dict[2],  self.frames[x][5])
-        or resolve_rules(cond_dict[3], self.frames[x][5])
-        or resolve_rules(cond_dict[4],  self.frames[x][5])
+      await resolve_rules(cond_dict[2],  self.frames[x][5])
+        or await resolve_rules(cond_dict[3], self.frames[x][5])
+        or await resolve_rules(cond_dict[4],  self.frames[x][5])
     )] 
     if len(sortindex) > outlength:
       sortindex.sort(key=lambda x: np.max(self.frames[x][5][1:]), reverse=True) #prediction
@@ -271,10 +271,10 @@ class c_event(list):
 
   async def save(self, cond_dict):
     #print('*** Saving Event:', self.id)
-    self.frames_filter(self.number_of_frames, cond_dict)
+    await self.frames_filter(self.number_of_frames, cond_dict)
     frames_to_save = self.frames.values()
     self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
-      + self.p_string())
+      + await self.p_string())
     self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
     self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
     self.dbline.xmin=self[0]
@@ -302,7 +302,7 @@ class c_event(list):
     for receiver in self.to_email:
       mytoken = await maketoken_async('EVR', self.dbline.id, receiver)
       subject = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
-        + self.p_string())
+        + await self.p_string())
       to_email = receiver
       plain_text = 'Hello CAM-AI user,\n' 
       plain_text += 'We had some movement.\n'  
