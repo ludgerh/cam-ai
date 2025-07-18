@@ -439,10 +439,14 @@ class c_eventer(viewable):
               if (checkbool := (self.vid_deque 
                   and item.check_out_ts <= self.vid_deque[-1][2])):
                 my_vid_list = [v_item for v_item in self.vid_deque 
-                  if item.start <= v_item[2] and item.end >= v_item[2] - 10.5]   
-                #10 seconds video length plus average trigger delay from checkmp4
-                #print(my_vid_list)
-                my_vid_start = my_vid_list[0][2]
+                  if item.start <= v_item[2] and item.end >= v_item[2] - 15.0]  
+                try:
+                  my_vid_start = my_vid_list[0][2]
+                except IndexError:
+                  self.logger.warning(f"❗️No matching videos for event {item.dbline.id} "
+                    f"(start={item.start}, end={item.end}, deque={[v[2] for v in self.vid_deque]})")
+                  checkbool = False
+                  self.eventdict.items[i].isrecording = False
             if checkbool:
               vid_offset = item.focus_time - my_vid_start
               vid_offset = max(vid_offset, 0.0)

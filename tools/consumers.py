@@ -454,7 +454,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         #while startup_redis.get_shutdown_command() != 11:
         #  await asleep(long_brake) 
         outlist['data'] = 'OK'
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         
       elif params['command'] == 'upgrade':

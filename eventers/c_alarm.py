@@ -32,7 +32,7 @@ if plugin_taposwitch_ok:
   from plugins.cam_ai_taposwitch.taposwitch import taposwitch123_alarm
 plugin_proxy_ok = os.path.exists('plugins/cam_ai_proxy')
 if plugin_proxy_ok:
-  from plugins.cam_ai_proxy.proxy import proxy_gpio_alarm
+  from plugins.cam_ai_proxy.proxy import proxy_gpio_alarm, proxy_sound_alarm
   
 mylogger = None 
 alarm_list = []
@@ -73,6 +73,17 @@ def alarm_init(logger, idx):
             mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
       else:
         mylogger.warning('***** For alarm device proxy-gpio we need the proxy-plugin, '
+          + 'ignoring this alarm.') 
+    elif device_type_name == 'proxy-sound':
+      if plugin_proxy_ok:  
+        while True:
+          try:
+            alarm_list.append(proxy_sound_alarm(item, mylogger))
+            break
+          except init_failed_exception as e:
+            mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
+      else:
+        mylogger.warning('***** For alarm device proxy-sound we need the proxy-plugin, '
           + 'ignoring this alarm.') 
 
 class console_alarm(alarm_base):
