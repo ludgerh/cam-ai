@@ -26,7 +26,6 @@ from setproctitle import setproctitle
 from logging import getLogger
 from datetime import datetime
 from django.utils import timezone
-from tools.c_redis import saferedis
 import django
 django.setup()
 from tools.l_tools import djconf, get_dir_size
@@ -53,8 +52,19 @@ def sigint_handler(signal, frame):
   
 class c_cleanup():
   def __init__(self, *args, **kwargs):
-    self.recordingspath = None
-    self.inqueue = Queue()
+    try:
+      self.recordingspath = None
+      self.inqueue = Queue()
+      cleanup_redis.clean_redis('model_dims')
+      for schoolline in school.objects.filter(active = True):
+        for item in model_type.objects.all():
+          dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
+          if ((Path(schoolline.dir) / 'coded' / dim_code).exists()
+              and any((Path(schoolline.dir) / 'coded' / dim_code).iterdir())):
+            cleanup_redis.add_to_redis_queue('model_dims', schoolline.id, [dim_code])
+    except:
+      self.logger.error('Error in c_cleanup_init:')
+      self.logger.error(format_exc())
 
   def run(self):
     self.run_process = Process(target=self.runner)
@@ -63,21 +73,18 @@ class c_cleanup():
   def runner(self):
     from tools.l_smtp import async_sendmail
     try:
-      self.model_dims = {}
-      for schoolline in school.objects.filter(active = True):
-        myschooldir = schoolline.dir
-        self.model_dims[schoolline.id] = []
-        for item in model_type.objects.all():
-          dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
-          if ((Path(myschooldir) / 'coded' / dim_code).exists()
-              and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
-            self.model_dims[schoolline.id].append(dim_code)
       if self.recordingspath is None:
         datapath = djconf.getconfig('datapath', 'data/')
-        self.recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
+        self.recordingspath = Path(djconf.getconfig(
+          'recordingspath', 
+          datapath + 'recordings/'), 
+        )
         if not self.recordingspath.exists():
           makedirs(self.recordingspath)
-        self.schoolframespath = Path(djconf.getconfig('schoolframespath', datapath + 'schoolframes/'))
+        self.schoolframespath = Path(djconf.getconfig(
+          'schoolframespath', 
+          datapath + 'schoolframes/', 
+        ))
         self.archivepath = Path(djconf.getconfig('archivepath', datapath + 'archive/'))
         self.schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
       self.logname = 'cleanup'
@@ -117,7 +124,7 @@ class c_cleanup():
             for frameline in list_from_queryset(
                 event_frame.objects.filter(deleted = True)
               ):
-              #self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
+              self.logger.info('Cleanup: Deleting event_frame #' + str(frameline.id))
               del_path = self.schoolframespath / frameline.name
               if del_path.exists():
                 del_path.unlink()
@@ -146,7 +153,7 @@ class c_cleanup():
             for frameline in list_from_queryset(
                 trainframe.objects.filter(deleted = True)
               ):
-              #self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
+              self.logger.info('Cleanup: Deleting trainframe #' + str(frameline.id))
               schoolline = school.objects.get(id = frameline.school)
               myschooldir = Path(schoolline.dir)
               del_path = myschooldir / 'frames' / frameline.name
@@ -166,7 +173,7 @@ class c_cleanup():
               if delpath.exists():
                 if ((not fileline.min_age) 
                     or delpath.stat().st_mtime < time() - fileline.min_age):
-                  #self.logger.info('Cleanup: Deleting file: ' + str(delpath))
+                  self.logger.info('Cleanup: Deleting file: ' + str(delpath))
                   delpath.unlink() 
               fileline.delete()
 # *****
@@ -230,7 +237,11 @@ class c_cleanup():
       eventset = {item.id for item in eventquery}
       events_frames_correct = eventset & (eventframeset | eventvideoset)
       my_status_events.events_frames_correct = len(events_frames_correct)
-      cleanup_redis.add_to_redis('events_frames_correct', streamline.id, len(events_frames_correct))
+      cleanup_redis.add_to_redis(
+        'events_frames_correct', 
+        streamline.id, 
+        len(events_frames_correct), 
+      )
       events_frames_missingframes = eventset - (eventframeset | eventvideoset)
       my_status_events.events_frames_missingframes = len(events_frames_missingframes)
       cleanup_redis.add_to_redis_queue(
@@ -252,10 +263,18 @@ class c_cleanup():
       cleanup_redis.add_to_redis('eframes_correct', streamline.id, len(eframes_correct))
       eframes_missingdb = framefileset - framedbset
       my_status_events.eframes_missingdb = len(eframes_missingdb)
-      cleanup_redis.add_to_redis_queue('eframes_missingdb', streamline.id, eframes_missingdb)
+      cleanup_redis.add_to_redis_queue(
+        'eframes_missingdb', 
+        streamline.id, 
+        eframes_missingdb, 
+      )
       eframes_missingfiles = framedbset - framefileset
       my_status_events.eframes_missingfiles = len(eframes_missingfiles)
-      cleanup_redis.add_to_redis_queue('eframes_missingfiles', streamline.id, eframes_missingfiles)
+      cleanup_redis.add_to_redis_queue(
+        'eframes_missingfiles', 
+        streamline.id, 
+        eframes_missingfiles, 
+      )
       my_status_events.save()
 # ***** checking videos vs files
     files_to_delete_set = {
@@ -340,14 +359,7 @@ class c_cleanup():
                     + item.as_posix()
                   ) not in files_to_delete_list_local:
                   fileset.add(subdir+'/'+item.stem)
-      if schoolline.id not in self.model_dims:
-        self.model_dims[schoolline.id] = []
-      for item in model_type.objects.all():
-        dim_code = str(item.x_in_default) + 'x' + str(item.y_in_default)
-        if ((Path(myschooldir) / 'coded' / dim_code).exists()
-            and any((Path(myschooldir) / 'coded' / dim_code).iterdir())):
-          self.model_dims[schoolline.id].append(dim_code)
-      for dim in self.model_dims[schoolline.id]:
+      for dim in cleanup_redis.read_from_redis_queue('model_dims', schoolline.id):
         if (Path(myschooldir) / 'coded' / dim).exists():
           for item in (Path(myschooldir) / 'coded' / dim).iterdir():
             if item.is_file() and item.suffix == '.cod':
@@ -382,8 +394,16 @@ class c_cleanup():
       schools_missingfiles = dbset - fileset
       my_status_schools.schools_missingfiles = len(schools_missingfiles)
       cleanup_redis.add_to_redis('schools_correct', schoolline.id, len(schools_correct))
-      cleanup_redis.add_to_redis_queue('schools_missingdb', schoolline.id, schools_missingdb)
-      cleanup_redis.add_to_redis_queue('schools_missingfiles', schoolline.id, schools_missingfiles)
+      cleanup_redis.add_to_redis_queue(
+        'schools_missingdb', 
+        schoolline.id, 
+        schools_missingdb, 
+      )
+      cleanup_redis.add_to_redis_queue(
+        'schools_missingfiles', 
+        schoolline.id, 
+        schools_missingfiles, 
+      )
       my_status_schools.save()
     #self.logger.info('Cleanup: Getting stream file sizes') 
     for streamline in list_from_queryset(stream.objects.all()): 
@@ -432,8 +452,10 @@ class c_cleanup():
           message = (
             'Dear CAM-AI User, \n'
             + 'We want to inform you that your CAM-AI storage is now 75% full. \n'
-            + 'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events. \n'
-            + 'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
+            + 'To avoid any disruptions to your CAM-AI services, please consider '
+            + 'managing your storage by deleting events. \n'
+            + 'If you require an individual plan with additional storage, feel free to '
+            + 'contact us at info@cam-ai.de \n'
             + 'Thank you for choosing CAM-AI. \n'
             + 'Best regards, \n'
             + 'The CAM-AI Team'
@@ -441,12 +463,15 @@ class c_cleanup():
           html = (
             '<br>Dear CAM-AI User,<br>\n'
             + '<br>We want to inform you that your CAM-AI storage is now 75% full.\n'
-            + 'To avoid any disruptions to your CAM-AI services, please consider managing your storage by deleting events.<br>\n'
-            + '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
+            + 'To avoid any disruptions to your CAM-AI services, please consider '
+            + 'managing your storage by deleting events.<br>\n'
+            + '<br>If you require an individual plan with additional storage, feel '
+            + 'free to contact us at info@cam-ai.de <br>\n'
             + '<br>Thank you for choosing CAM-AI.<br>\n'
             + '<br>Best regards,<br>\n'
             + 'The CAM-AI Team<br>\n'
-            + '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>'
+            + '<br><br><p style="color: lightgrey;">This email was sent automatically '
+            + 'by the CAM-AI system.</p>'
           )
           async_sendmail(userline.user.email, subject, message, html=html)
           userline.mail_flag_quota75 = True
@@ -455,26 +480,37 @@ class c_cleanup():
             subject = 'Action Required: Your CAM-AI Storage is Full'
             message = (
               'Dear CAM-AI User, \n'
-              + 'We are reaching out to inform you that your CAM-AI storage is currently full. \n'
-              + 'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space. \n'
-              + 'If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de \n'
+              + 'We are reaching out to inform you that your CAM-AI storage is '
+              + 'currently full. \n'
+              + 'To ensure uninterrupted access to all CAM-AI features, please delete '
+              + 'some events to free up space. \n'
+              + 'If you require an individual plan with additional storage, feel free '
+              + 'to contact us at info@cam-ai.de \n'
               + 'Thank you for choosing CAM-AI. \n'
               + 'Best regards, \n'
               + 'The CAM-AI Team'
             )
             html = (
               '<br>Dear CAM-AI User,<br>\n'
-              + '<br>We are reaching out to inform you that your CAM-AI storage is currently full. \n'
-              + 'To ensure uninterrupted access to all CAM-AI features, please delete some events to free up space.<br>\n'
-              + '<br>If you require an individual plan with additional storage, feel free to contact us at info@cam-ai.de <br>\n'
+              + '<br>We are reaching out to inform you that your CAM-AI storage is '
+              + 'currently full. \n'
+              + 'To ensure uninterrupted access to all CAM-AI features, please delete '
+              + 'some events to free up space.<br>\n'
+              + '<br>If you require an individual plan with additional storage, feel '
+              + 'free to contact us at info@cam-ai.de <br>\n'
               + '<br>Thank you for choosing CAM-AI.<br>\n'
               + '<br>Best regards,<br>\n'
               + 'The CAM-AI Team<br>\n'
-              + '<br><br><p style="color: lightgrey;">This email was sent automatically by the CAM-AI system.</p>'
+              + '<br><br><p style="color: lightgrey;">This email was sent '
+              + 'automatically by the CAM-AI system.</p>'
             )
             async_sendmail(userline.user.email, subject, message, html=html)
             userline.mail_flag_quota100 = True
-      userline.save(update_fields = ['storage_used', 'mail_flag_quota75', 'mail_flag_quota100',]) 
+      userline.save(update_fields = [
+        'storage_used', 
+        'mail_flag_quota75', 
+        'mail_flag_quota100', 
+      ]) 
     self.logger.info('Cleanup: Finished health check')     
 
   def stop(self):

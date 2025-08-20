@@ -240,7 +240,7 @@ class cleanup(AsyncWebsocketConsumer):
               min_age = 300,
             )
             await del_line.asave()
-            for dim in my_cleanup.model_dims[params['school']]:
+            for dim in cleanup_redis.read_from_redis_queue('model_dims', params['school']):
               del_line = files_to_delete(
                 name = school_line.dir + '/coded/' + dim + '/' + item.decode() + '.cod', 
                 min_age = 300,

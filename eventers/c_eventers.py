@@ -183,7 +183,7 @@ class c_eventer(viewable):
         'recordingspath', datapath + 'recordings/', 
       )
       
-      await database_sync_to_async(alarm_init)(self.logger, self.id)
+      await database_sync_to_async(alarm_init)(self.logger)
       environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
       if self.dbline.eve_gpu_nr_cv== -1:
         environ["CUDA_VISIBLE_DEVICES"] = ''
@@ -354,13 +354,15 @@ class c_eventer(viewable):
           y0 = item[3] + 30 * self.textheight
         else:
           y0 = item[2] - (10 + (len(tag_display_list) - 1) * 30) * self.textheight
+        if y0 > frame[1].shape[0] - 5 or y0 < 5:
+          y0 = item[2] + 30 * self.textheight
         for j in range(len(tag_display_list)):
           await asyncio.to_thread(
             cv.putText, 
             newframe[1], 
             self.tag_list[tag_display_list[j][0]].name[:3]
             +' - '+str(round(tag_display_list[j][1],2)), 
-            (item[0]+2, y0 + j * 30 * self.textheight), 
+            (item[0] + 5, y0 + j * 30 * self.textheight), 
             cv.FONT_HERSHEY_SIMPLEX, 
             self.textheight, 
             colorcode, 
@@ -409,9 +411,12 @@ class c_eventer(viewable):
       newtime = streams_redis.get_virt_time(self.id)
     else:
       newtime = time()  
-    if (item.end < newtime - self.dbline.eve_event_time_gap 
-        or item.end > item.start + 120.0):
+    if self.id == 163:  
       item.check_out_ts = item.end
+    else:  
+      if (item.end < newtime - self.dbline.eve_event_time_gap 
+          or item.end > item.start + 120.0):
+        item.check_out_ts = item.end
     if self.cond_dict[5]:
       predictions = await item.pred_read(max=1.0)
     else:
@@ -564,7 +569,7 @@ class c_eventer(viewable):
             break
           else:
             detector_buffer.append(frame)
-            await a_break_type(BR_SHORT)
+            await a_break_type(BR_SHORT)   
         if detector_buffer:
           imglist = [
             await asyncio.to_thread(
@@ -590,12 +595,13 @@ class c_eventer(viewable):
             frame = frame + [prediction]
             found = None
             margin = self.dbline.eve_margin
-            for j, item in list(self.eventdict.items()):
-              if self.hasoverlap((frame[3][0] - margin, frame[3][1] + margin, 
-                  frame[3][2] - margin, frame[3][3] + margin), item):
-                found = item
-                break
-              await a_break_type(BR_SHORT)
+            if self.id != 163:
+              for j, item in list(self.eventdict.items()):
+                if self.hasoverlap((frame[3][0] - margin, frame[3][1] + margin, 
+                    frame[3][2] - margin, frame[3][3] + margin), item):
+                  found = item
+                  break
+                await a_break_type(BR_SHORT)
             if found is None or found.check_out_ts:
               count = 0  
               while count in self.eventdict:

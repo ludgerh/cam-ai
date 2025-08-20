@@ -16,7 +16,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import os
 import asyncio
+from asgiref.sync import sync_to_async
 from time import sleep
+from channels.db import database_sync_to_async
 from .models import alarm as dbalarm
 from .alarm_base import alarm_base, init_failed_exception
 
@@ -35,56 +37,11 @@ if plugin_proxy_ok:
   from plugins.cam_ai_proxy.proxy import proxy_gpio_alarm, proxy_sound_alarm
   
 mylogger = None 
-alarm_list = []
+alarm_dict = {}
   
-def alarm_init(logger, idx):
+def alarm_init(logger):
   global mylogger
-  global alarm_list
   mylogger = logger  
-  for item in dbalarm.objects.filter(active=True, mystream__id=idx):
-    device_type_name = item.mydevice.device_type.name
-    if device_type_name == 'console':
-      alarm_list.append(console_alarm(item, mylogger))
-    elif device_type_name == 'shelly123':
-      if plugin_shelly_ok:  
-        alarm_list.append(shelly123_alarm(item, mylogger))
-      else:
-        mylogger.warning('***** For alarm device shelly123 we need the shelly-plugin, '
-          + 'ignoring this alarm.')   
-    elif device_type_name == 'hue':
-      if plugin_hue_ok:  
-        alarm_list.append(hue_alarm(item, mylogger))
-      else:
-        mylogger.warning('***** For alarm device phillips hue we need the hue-plugin, '
-          + 'ignoring this alarm.') 
-    elif device_type_name == 'taposwitch123':
-      if plugin_taposwitch_ok:  
-        alarm_list.append(taposwitch123_alarm(item, mylogger))
-      else:
-        mylogger.warning('***** For alarm device taposwitch123 we need the hue-plugin, '
-          + 'ignoring this alarm.') 
-    elif device_type_name == 'proxy-gpio':
-      if plugin_proxy_ok:  
-        while True:
-          try:
-            alarm_list.append(proxy_gpio_alarm(item, mylogger))
-            break
-          except init_failed_exception as e:
-            mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
-      else:
-        mylogger.warning('***** For alarm device proxy-gpio we need the proxy-plugin, '
-          + 'ignoring this alarm.') 
-    elif device_type_name == 'proxy-sound':
-      if plugin_proxy_ok:  
-        while True:
-          try:
-            alarm_list.append(proxy_sound_alarm(item, mylogger))
-            break
-          except init_failed_exception as e:
-            mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
-      else:
-        mylogger.warning('***** For alarm device proxy-sound we need the proxy-plugin, '
-          + 'ignoring this alarm.') 
 
 class console_alarm(alarm_base):
 
@@ -96,7 +53,72 @@ class console_alarm(alarm_base):
     await super().action(pred=pred)
     self.logger.info(self.notice_line + ' ' + self.stream.name + '(' + str(self.stream.id) 
       + ') : ' + self.classes_list[self.maxpos+1].name)
+      
+async def make_alarm(alarm_line):
+  device_type_name = alarm_line.mydevice.device_type.name
+  if device_type_name == 'console':
+    return(await database_sync_to_async(console_alarm)(alarm_line, mylogger))
+  elif device_type_name == 'shelly123':
+    if plugin_shelly_ok:  
+      return(await database_sync_to_async(shelly123_alarm)(alarm_line, mylogger))
+    else:
+      mylogger.warning('***** For alarm device shelly123 we need the shelly-plugin, '
+        + 'ignoring this alarm.')   
+  elif device_type_name == 'hue':
+    if plugin_hue_ok:  
+      return(await database_sync_to_async(hue_alarm)(alarm_line, mylogger))
+    else:
+      mylogger.warning('***** For alarm device phillips hue we need the hue-plugin, '
+        + 'ignoring this alarm.') 
+  elif device_type_name == 'taposwitch123':
+    if plugin_taposwitch_ok:  
+      return(await database_sync_to_async(taposwitch123_alarm)(alarm_line, mylogger))
+    else:
+      mylogger.warning('***** For alarm device taposwitch123 we need the hue-plugin, '
+        + 'ignoring this alarm.') 
+  elif device_type_name == 'proxy-gpio':
+    if plugin_proxy_ok:  
+      while True:
+        try:
+          return(await database_sync_to_async(proxy_gpio_alarm)(alarm_line, mylogger))
+          break
+        except init_failed_exception as e:
+          mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
+    else:
+      mylogger.warning('***** For alarm device proxy-gpio we need the proxy-plugin, '
+        + 'ignoring this alarm.') 
+  elif device_type_name == 'proxy-sound':
+    if plugin_proxy_ok:  
+      while True:
+        try:
+          return(await database_sync_to_async(proxy_sound_alarm)(alarm_line, mylogger))
+        except init_failed_exception as e:
+          mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
+    else:
+      mylogger.warning('***** For alarm device proxy-sound we need the proxy-plugin, '
+        + 'ignoring this alarm.')   
 
 async def alarm(stream_id, pred):
-  tasks = [item.action(pred=pred) for item in alarm_list]
+  global alarm_dict
+  new_alarm_dict = {}
+  items = await sync_to_async(
+    lambda: list(
+      dbalarm.objects
+      .filter(active=True, mystream__id=stream_id)
+      .select_related("mydevice__device_type")
+    )
+  )()
+  for item in items:
+    new_alarm_dict[item.id] = item
+  for i, item in new_alarm_dict.items():
+    if i not in alarm_dict:
+      alarm_dict[i] = await make_alarm(item)
+    else:
+      if (item.mendef != alarm_dict[i].mendef
+          or item.mydevice_id != alarm_dict[i].device_id):
+        alarm_dict[i] = await make_alarm(item)
+  for i in list(alarm_dict):
+    if i not in new_alarm_dict:
+      del alarm_dict[i]  
+  tasks = [item.action(pred=pred) for item in alarm_dict.values()]
   await asyncio.gather(*tasks)

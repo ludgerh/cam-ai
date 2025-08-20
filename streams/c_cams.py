@@ -21,7 +21,7 @@ import os
 import cv2 as cv
 import numpy as np
 from aiopath import AsyncPath
-from psutil import Process, NoSuchProcess
+from psutil import Process, NoSuchProcess, TimeoutExpired, AccessDenied
 from signal import SIGINT, SIGKILL, SIGTERM
 from setproctitle import setproctitle
 from logging import getLogger
@@ -145,7 +145,8 @@ class c_cam(viewable):
             await self.viewer_queue.put(frameline)
           if (self.dbline.det_mode_flag 
               and (streams_redis.view_from_dev('D', self.id) 
-              or streams_redis.data_from_dev('D', self.id))): 
+              or streams_redis.data_from_dev('D', self.id))
+              and frameline):
             await self.detector_dataq.put(frameline) 
           if (self.dbline.eve_mode_flag 
               and (not streams_redis.check_if_counts_zero('E', self.id))):
@@ -562,39 +563,59 @@ class c_cam(viewable):
       cmd = (generalparams + inparams + outparams1 
         + outparams2)
       #self.logger.info('#####' + str(cmd))
+      
+      self.logger.info('#'+str(self.id) + ' 00000')
+      while self.ff_proc is not None and self.ff_proc.returncode is None:
+        await a_break_type(BR_LONG)
+      self.logger.info('#'+str(self.id) + ' 11111')
       if os.path.exists(self.fifo_path):
         await asyncio.to_thread(os.remove, self.fifo_path)
+      self.logger.info('#'+str(self.id) + ' 22222')
       await asyncio.to_thread(os.mkfifo, self.fifo_path)
+      self.logger.info('#'+str(self.id) + ' 33333')
       self.ff_proc = await asyncio.create_subprocess_exec(
         '/usr/bin/ffmpeg',
         *cmd,
         stdout=None,
       )
+      self.logger.info('#'+str(self.id) + ' 44444')
       try:
         self.fifo = await asyncio.wait_for(
           asyncio.to_thread(lambda: open(self.fifo_path, "rb")), 
           timeout = 60.0, 
         )
+        self.logger.info('#'+str(self.id) + ' 55555')
         break
       except asyncio.TimeoutError:
-        self.logger.info(str(self.id) + 'Timeout beim Öffnen des Fifos')
+        self.logger.info('#' + str(self.id) + ' Timeout beim Öffnen des Fifos')
         await self.stopprocess()
         await a_break_time(10.0)
 
   async def stopprocess(self):
+    self.logger.info(
+      '#'+str(self.id) + ' xxxxx ' 
+      + str(self.ff_proc) 
+      + ' ' + str(self.ff_proc.returncode)
+    )
     if self.ff_proc is not None and self.ff_proc.returncode is None:
       try:
+        self.logger.info('#'+str(self.id) + ' aaaaa')
         p = Process(self.ff_proc.pid)
         child_pid = p.children(recursive=True)
         for pid in child_pid:
           pid.send_signal(SIGKILL)
           pid.wait()
+        self.logger.info('#'+str(self.id) + ' bbbbb')
         self.ff_proc.send_signal(SIGKILL)
+        self.logger.info('#'+str(self.id) + ' ccccc')
         await self.ff_proc.wait()
+        self.logger.info('#'+str(self.id) + ' ddddd')
       except NoSuchProcess:
         pass        
       self.ff_proc = None
+      self.logger.info('#'+str(self.id) + ' eeeee')
     self.fifo.close()
+    self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
     return('C'+str(self.id).zfill(4)+'_'

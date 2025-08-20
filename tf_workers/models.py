@@ -53,6 +53,7 @@ class school(models.Model):
   encrypted = models.BooleanField(default=True)
   dir = models.CharField(max_length=256, default='data/schools/model1/')
   trigger = models.IntegerField(default=500)
+  last_fit = models.IntegerField(default=0)
   lastmodelfile = models.DateTimeField(
     default=timezone.make_aware(datetime(1900, 1, 1)))
   active = models.IntegerField(default=1)

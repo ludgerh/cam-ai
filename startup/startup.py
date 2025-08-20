@@ -17,11 +17,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import asyncio
 import os
+from glob import glob
 from signal import signal, SIGINT
 from .redis import my_redis as startup_redis
 from tools.l_tools import djconf, kill_all_processes
 from tools.l_break import a_break_type, a_break_time, BR_LONG
 from tools.health import my_health_runner
+from cleanup.c_cleanup import my_cleanup
 
 #from threading import enumerate
 
@@ -35,7 +37,6 @@ class startup_class():
     from asgiref.sync import sync_to_async
     from tools.c_logger import alog_ini
     from tools.version_upgrade import version_upgrade
-    from cleanup.c_cleanup import c_cleanup
     from camai.db_ini import db_ini
     from camai.version import version as software_version
     from camai.passwords import (
@@ -54,6 +55,18 @@ class startup_class():
     try:
       while not apps.ready:
         await a_break_type(BR_LONG)
+      for path in glob("/dev/shm/psm_*"):
+        try:
+          os.remove(path)
+        except FileNotFoundError:
+          pass  # falls inzwischen schon weg
+        except PermissionError as e:
+          print("No privileges to remove:", path, e)
+      for path in glob("shm/cam*.pipe"):
+        try:
+          os.remove(path)
+        except FileNotFoundError:
+          pass  # falls inzwischen schon weg
       logname = 'startup'
       logger = getLogger(logname)
       await alog_ini(logger, logname)
@@ -84,7 +97,7 @@ class startup_class():
         await viewables[item]['stream'].run()
       asyncio.create_task(self.restartcheck_thread())
       asyncio.create_task(my_health_runner.health_task())  
-      self.cleanup = c_cleanup()
+      self.cleanup = my_cleanup
       self.cleanup.run()  
       while self.do_run:  
         await asyncio.sleep(1.0)

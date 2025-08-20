@@ -249,7 +249,8 @@ class train_once_remote():
         dlfile += model_type + '.tflite'
       self.logger.info('DL Model: ' + dlfile)
       open(dlfile, 'wb').write(r.content)
+      self.myschool.last_fit += 1
       self.myschool.lastmodelfile = timezone.now()
-      self.myschool.save(update_fields=["lastmodelfile"])
+      self.myschool.save(update_fields=("last_fit", "lastmodelfile"))
     self.logger.info('Done...')
     return(0)

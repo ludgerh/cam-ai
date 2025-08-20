@@ -149,7 +149,7 @@ class tf_worker(spawn_process):
     
   async def process_received(self, received):  
     result = True
-    #print('TF-Worker-Inqueue received:', received[:3])
+    #print('TF-Worker-Inqueue received:', received[:3], len(received))
     if (received[0] == 'unregister'):
       if received[1] in self.users:
         del self.users[received[1]]
@@ -165,6 +165,9 @@ class tf_worker(spawn_process):
     elif (received[0] == 'ask_pred'):
       schoolnr = received[2]
       await self.check_model(schoolnr, self.logger, True)
+      if len(received) == 3: #no images
+        await self.my_output.put(received[1], ('ask_pred_ok', True))
+        return(True)
       while not 'xdim' in self.models[schoolnr]:
         await a_break_type(BR_LONG)
       if schoolnr not in self.model_buffers:
@@ -431,12 +434,10 @@ class tf_worker(spawn_process):
     self.models[schoolnr]['last_check'] = time()
     if self.check_ts + 60.0 < time() and self.models[schoolnr]['model_type'] is not None:
       await school_dbline.arefresh_from_db()
+      self.check_ts = time()
       if (
-        school_dbline.lastmodelfile is not None
-        and	(
-          datetime.timestamp(school_dbline.lastmodelfile) > self.models[schoolnr]['time']
-          or school_dbline.model_type != self.models[schoolnr]['model_type']
-        )
+        school_dbline.last_fit != self.models[schoolnr]['fit_nr']
+        or school_dbline.model_type != self.models[schoolnr]['model_type']
       ):
         if schoolnr in self.model_buffers:  
           self.model_buffers[schoolnr].pause = True 
@@ -452,10 +453,10 @@ class tf_worker(spawn_process):
         del self.models[nr_to_replace]['model']
         self.active_models -= 1
       if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket: #remote or simulation
-        self.models[schoolnr]['time'] = time()
+        self.models[schoolnr]['fit_nr'] = 1
         self.models[schoolnr]['model_type'] = 'simulation'
       else:  #lokal GPU
-        self.models[schoolnr]['time'] = datetime.timestamp(school_dbline.lastmodelfile)
+        self.models[schoolnr]['fit_nr'] = school_dbline.last_fit
         self.models[schoolnr]['model_type'] = school_dbline.model_type
         await a_break_time(self.dbline.gpu_sim_loading)
       if self.dbline.gpu_sim >= 0:

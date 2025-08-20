@@ -17,17 +17,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import json
 import numpy as np
 import cv2 as cv
+import asyncio
 import aiofiles
 import aiofiles.os
 import aioshutil
 import aiohttp
-from asyncio.exceptions import CancelledError as AIOCancelledError
 from glob import glob
 from os import path
 from random import randint
 from logging import getLogger
 from traceback import format_exc
 from datetime import datetime
+from collections import defaultdict
+from time import time
 from django.utils import timezone
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
@@ -76,12 +78,28 @@ else:
 # SchoolDBUtil
 #*****************************************************************************
 
+CHUNK_SIZE = 32
+
+def decode_and_convert_image(myimage_bytes):
+  img = cv.imdecode(np.frombuffer(myimage_bytes, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  cv.imwrite('/home/ludger/temp/' + str(time()) + '.bmp', img)
+  return cv.cvtColor(img, cv.COLOR_BGR2RGB)
+
+def _chunked(seq, n):
+  for i in range(0, len(seq), n):
+    yield seq[i:i+n]
+
 
 @database_sync_to_async
 def get_framelines(event_id):
   return list(event_frame.objects.filter(event__id=event_id).order_by('time', 'id'))
 
 class schooldbutil(AsyncWebsocketConsumer):
+
+  cache_dict = {}
+  cache_dict['tagging'] = defaultdict(dict)
+  cache_dict['school'] = defaultdict(dict)
+  school_lines = {}
 
   @database_sync_to_async
   def gettags(self, myschool):
@@ -97,19 +115,18 @@ class schooldbutil(AsyncWebsocketConsumer):
     
   @database_sync_to_async  
   def gettrainobjectlist(self, page_nr):
-    return(self.trainpage.page(page_nr).object_list)
-    
-    
+    page = self.trainpage.get_page(page_nr)
+    return list(page.object_list) 
 
   async def connect(self):
     try:
+      self.check_ts = 0.0
       self.user = self.scope['user']
       self.tf_w_index = None
       if self.user.is_authenticated:
         await self.accept()
       else:
         await self.close()
-      self.schoolinfo = None
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -122,6 +139,88 @@ class schooldbutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
+      
+  async def predictions_from_tfw(self, frames, school_nr, is_tagger):
+    #print('00000', frames, school_nr, is_tagger)
+    if school_nr not in self.school_lines:
+      self.school_lines[school_nr] = await school.objects.aget(id = school_nr)
+      self.check_ts = time()
+    school_dbline = self.school_lines[school_nr]
+    if self.check_ts + 60.0 < time():
+      await school_dbline.arefresh_from_db()
+      self.check_ts = time()
+    i_global = 0  # for periodic sleep()
+    for chunk in _chunked(frames, CHUNK_SIZE):
+      imglist = []
+      code_list = []
+      frame_ids = []
+      for item in chunk:
+        try:
+          # Periodical release of eventloop for ping/pong
+          if i_global % 3 == 0:
+            await asyncio.sleep(0)
+          if is_tagger:
+            my_cache_dict = schooldbutil.cache_dict['tagging']
+            use_ram_cache = (
+              item['idx'] in my_cache_dict
+              and my_cache_dict[item['idx']]['fit'] == school_dbline.last_fit
+            )
+            frameline = await event_frame.objects.aget(id=item['idx'])
+            imagepath = schoolframespath + frameline.name
+          else:
+            my_cache_dict = schooldbutil.cache_dict['school']
+            use_ram_cache = (
+              item['idx'] in my_cache_dict
+              and my_cache_dict[item['idx']]['fit'] == school_dbline.last_fit
+            )
+            frameline = await trainframe.objects.aget(id=item['idx'])
+            imagepath = school_dbline.dir + 'frames/' + frameline.name 
+          frame_ids.append(frameline.id)
+          if use_ram_cache:
+            code_list.append('R')
+          else:    
+            async with aiofiles.open(imagepath, mode = "rb") as f:
+              myimage = await f.read()
+            if frameline.encrypted:
+              myimage = self.crypt.decrypt(myimage) 
+            myimage = await asyncio.to_thread(decode_and_convert_image, myimage)  
+            imglist.append(myimage)
+            code_list.append('I')
+        except FileNotFoundError:
+          logger.error('*** File not found: %s', imagepath)
+          raise  # lasse den Fehler nach oben gehen
+        except asyncio.CancelledError:
+          logger.warning('** getpredictions was cancelled')
+          await self.close()
+          raise
+        finally:
+          i_global += 1
+      #print('00000', code_list)
+      await self.tf_worker.ask_pred(
+        school_nr, 
+        imglist, 
+        self.tf_w_index,
+      )
+      received = []
+      for code, frame_dict, frame_id in zip(code_list, chunk, frame_ids):
+        if code == 'I':
+          try:
+            if not received:
+              received = (await asyncio.wait_for(
+                self.tf_worker.get_from_outqueue(self.tf_w_index),
+                timeout=60
+              )).tolist()
+            prediction = received.pop(0)  
+            frame_dict['prediction'] = prediction
+            cache_entry = my_cache_dict.setdefault(frame_id, {})
+            cache_entry['pred'] = prediction
+            cache_entry['fit'] = school_dbline.last_fit
+          except asyncio.TimeoutError:
+            logger.error('** Timeout while waiting for predictions')
+            frame_dict['prediction'] = None
+        elif code == 'R':
+          frame_dict['prediction'] = my_cache_dict[frame_id]['pred']
+    return() 
 
   async def receive(self, text_data):
     try:
@@ -135,8 +234,10 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.close()
 
       if params['command'] == 'settrainpage' :
+        self.schoolline = None
+        school_nr = params['school_nr']
         filterdict = {
-          'school' : params['model'],
+          'school' : school_nr,
           'deleted' : False,
         }
         if params['cbnot']:
@@ -154,14 +255,36 @@ class schooldbutil(AsyncWebsocketConsumer):
             filterdict['c'+str(i)] = 0
         else:
           filterdict['c'+str(params['class'])] = 1
-        
         framelines = trainframe.objects.filter(**filterdict)
+        if params ['cbdifferences']:
+          schoolline = await school.objects.aget(id=school_nr)
+          frames = []
+          async for item in framelines.aiterator(chunk_size=1000):
+            frame = {
+              'idx' : item.id, 
+              'tags' : [
+                item.c0, item.c1, item.c2, item.c3, item.c4, 
+                item.c5, item.c6, item.c7, item.c8, item.c9, ], 
+              'line' : item,  
+            }
+            frames.append(frame)
+          await self.predictions_from_tfw(
+            frames, 
+            school_nr, 
+            False, 
+          )
+          framelines = []
+          for item in frames:
+            for i in range(10):
+              if item['tags'][i] != round(item['prediction'][i]):
+                framelines.append(item['line'])
+                break
         self.trainpage = Paginator(framelines, params['pagesize'])
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      if params['command'] == 'seteventpage' :
+      elif params['command'] == 'seteventpage' :
         if params['showdone']:
           eventlines = event.objects.filter(
             camera=params['streamnr'], 
@@ -180,9 +303,9 @@ class schooldbutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      if params['command'] == 'gettrainimages' :
+      elif params['command'] == 'gettrainimages' :
         lines = []
-        async for line in await self.gettrainobjectlist(params['page_nr']):
+        for line in await self.gettrainobjectlist(params['page_nr']):
           made_by_nr = await database_sync_to_async(
             lambda: line.made_by)()
           if made_by_nr is None:
@@ -201,7 +324,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      if params['command'] == 'getevents' :
+      elif params['command'] == 'getevents' :
         lines = []
         async for line in self.eventpage.page(params['page_nr']).object_list:
           lines.append({
@@ -221,7 +344,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      if params['command'] == 'gettrainshortlist' :
+      elif params['command'] == 'gettrainshortlist' :
         result = list(await self.gettrainshortlist(params['page_nr']))
         for i in range(len(result)):
           if not isinstance(result[i], int):
@@ -230,7 +353,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      if params['command'] == 'geteventshortlist' :
+      elif params['command'] == 'geteventshortlist' :
         result = list(await self.geteventshortlist(params['page_nr']))
         for i in range(len(result)):
           if not isinstance(result[i], int):
@@ -246,53 +369,21 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'getpredictions':
         if await access.check_async('S', params['school'], self.scope['user'], 'R'):
-          imglist = []
-          found_images = True
-          for item in params['idxs']:
-            try:
-              if params['is_school']:
-                frameline = await event_frame.objects.aget(id=item)
-                imagepath = schoolframespath + frameline.name
-                if self.schoolinfo is None:
-                  xytemp = await self.tf_worker.get_xy(params['school'], self.tf_w_index)
-                  self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], }
-              else:
-                frameline = await trainframe.objects.aget(id=item,)
-                if self.schoolinfo is None:
-                  schoolline = await school.objects.aget(id=frameline.school)
-                  xytemp = await self.tf_worker.get_xy(schoolline.id, self.tf_w_index)
-                  self.schoolinfo = {'xdim' : xytemp[0], 'ydim' : xytemp[1], 'schooldict' : schoolline, }
-                imagepath = self.schoolinfo['schooldict'].dir + 'frames/' + frameline.name 
-              async with aiofiles.open(imagepath, mode = "rb") as f:
-                myimage = await f.read()
-              if frameline.encrypted:
-                myimage = self.crypt.decrypt(myimage) 
-              myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
-              myimage = cv.cvtColor(myimage, cv.COLOR_BGR2RGB)
-              imglist.append(myimage)
-            except FileNotFoundError:
-              if params['is_school']:
-                logger.error('***File not found: ' + imagepath)
-              else:  
-                found_images = False
-            except AIOCancelledError:
-              logger.warning('** getpredictions was cancelled')
-              return()   
-          if found_images:   
-            await self.tf_worker.ask_pred(
+          frames = params['frames']
+          if params['is_tagger']:
+            await self.predictions_from_tfw(
+              frames, 
               params['school'], 
-              imglist, 
-              self.tf_w_index,
+              True, 
             )
-            predictions = np.empty((0, len(classes_list)), np.float32)
-            while predictions.shape[0] < len(imglist):
-              predictions = np.vstack((
-                predictions, 
-                await self.tf_worker.get_from_outqueue(self.tf_w_index)
-              ))
-          else:    
-            predictions = np.zeros((len(params['idxs']), len(classes_list)), np.float32)
-          outlist['data'] = (params['counts'], params['idxs'], predictions.tolist())
+            outlist['data'] = ([params['count'], frames])
+          else:  
+            await self.predictions_from_tfw(
+              frames, 
+              params['school'], 
+              False, 
+            )
+            outlist['data'] = frames
           #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))
 
@@ -474,7 +565,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               if item.encrypted:
                 do_crypt = self.crypt
               else:
-                do_crypt = None  
+                do_crypt = None   
               await reduce_image_async(
                 schoolframespath + item.name, 
                 modelpath + 'frames/' + newname, 

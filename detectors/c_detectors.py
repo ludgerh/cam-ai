@@ -130,8 +130,8 @@ class c_detector(viewable):
       result = False  
     return(result)
 
-  async def run_one(self, input):
-    if input is None or input[2] == 0.0:
+  async def run_one(self, input): 
+    if input[2] == 0.0:
       return(None)
     frametime = input[2]
     if not (self.do_run and self.sl.greenlight(frametime)):
@@ -231,9 +231,9 @@ class c_detector(viewable):
               rectb = self.rect_atob(recta)
               rect_list.append(rectb)
               recta = self.rect_btoa(rectb)
-    if rect_list:          
-      rect_list = self.merge_rects(rect_list)
-      with self.ev_detectorq.multi_put_lock:
+    if rect_list:  
+      rect_list = self.merge_rects(rect_list)  
+      with self.ev_detectorq.multi_put_lock: 
         for rect in rect_list[:self.dbline.det_max_rect]:
           recta = self.rect_btoa(rect)
           await asyncio.to_thread(cv.rectangle, buffer1, recta, (200), self.linewidth)
@@ -252,7 +252,7 @@ class c_detector(viewable):
           else:
             self.background = np.float32(frame)
         if not streams_redis.check_if_counts_zero('E', self.id):
-          await self.ev_detectorq.put('stop') 
+          await self.ev_detectorq.put('stop')   
     if self.dbline.det_backgr_delay == 0:
       self.buffer = frame
     else:
@@ -266,7 +266,7 @@ class c_detector(viewable):
     if fps:
       self.dbline.det_fpsactual = fps
       streams_redis.fps_to_dev(self.type, self.id, fps)
-    self.run_lock = False
+    self.run_lock = False 
     return([3, buffer1, frametime])
       
   def get_scale_down(self): 

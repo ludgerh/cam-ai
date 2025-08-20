@@ -120,4 +120,8 @@ async def db_ini():
     'name' : 'proxy-gpio',
     'mendef' : '[["s", "IP", "1.2.3.4"], ["i", "channel", 1]]', 
   })
+  await add_if_none(alarm_device_type, 'name', {
+    'name' : 'proxy-sound',
+    'mendef' : '[["s", "IP", "1.2.3.4"], ["i", "channel", 1]]', 
+  })
   

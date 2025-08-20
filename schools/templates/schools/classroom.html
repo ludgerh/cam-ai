@@ -210,6 +210,14 @@ function get_lines() {
   get_lines_busy = false;
 };
 
+function chunkArray(array, chunkSize) {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 function getimages (count) {
   SchoolDBUtilSocket.sendandwait({
     'command' : 'geteventframes',
@@ -220,9 +228,11 @@ function getimages (count) {
     let frame_count = result[0];
     frames = result[1];
     let countdown = frames.length;
-    idxs = [];
+    frames_list = [];
     for (const item of frames) {
-      idxs.push(item);
+      frame_item = {};
+      frame_item.idx = item;
+      frames_list.push(frame_item);
       mycard = '<div id="card'+item+'" class="card m-1 p-0"'
       mycard += 'style="width: 212px; height: auto;">'
       mycard += '<a href="/schools/getbigbmp/0/'
@@ -236,34 +246,34 @@ function getimages (count) {
     };
     SchoolDBUtilSocket.sendandwait({
       'command' : 'getpredictions',
-      'idxs' : idxs,
-      'counts' : frame_count,
+      'frames' : frames_list,
       'school' : {{ school.id }},
-      'is_school' : true,
+      'is_tagger' : true,
+      'count' : frame_count,
     })
     .then((result) => {
       count = result[0];
-      idxs = result[1];
-      predictions = result[2];
-      for (let j=0; j<predictions.length; j++) {
+      frameslist = result[1];
+      console.log(frameslist);
+      for (let j=0; j < frameslist.length; j++) {
         cblines = '<div class="checklist h4">';
         for (let k=0; k<taglines.length; k++) {
 {% if may_write_school %}
 	        cblines += '<input type="checkbox" class="checkboxx" data-k="' + k + '"';
-	        if (predictions[j][k] >= 0.5) {
+	        if (frameslist[j]['prediction'][k] >= 0.5) {
 		        cblines += ' checked>';
 	        } else {
 		        cblines += '>';
 	        };
 {% endif %}
-	        cblines += '<span pred="'+predictions[j][k]+'"> '+taglines[k].substr(0,3)+': ';
-	        cblines += Math.round(predictions[j][k]*10000)
+	        cblines += '<span pred="'+frameslist[j]['prediction'][k]+'"> '+taglines[k].substr(0,3)+': ';
+	        cblines += Math.round(frameslist[j]['prediction'][k]*10000)
 			        /10000+'</span><br>';
         };
         cblines += '</div>';
-        $('#card'+idxs[j]).append(cblines);
+        $('#card' + frameslist[j]['idx']).append(cblines);
 {% if may_write_school %}
-        $('#card'+idxs[j]).find('input:checkbox').change(function(evt) {
+        $('#card' + frameslist[j]['idx']).find('input:checkbox').change(function(evt) {
           if ($(evt.target).prop('checked')) {
             if ($(evt.target).next().attr('pred') >= 0.5) {
               $(evt.target).next().removeClass('bluegrey');
@@ -295,7 +305,7 @@ function getimages (count) {
         $('#del_button' + frame_count).removeClass('disabled');
       };
 {% endif %}
-    })
+    });
 {% if may_write_school %}
     buttonline = '<h4>Who / what is this?<br>';
     buttonline += '<select id="myselect'+frame_count

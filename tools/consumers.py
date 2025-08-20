@@ -472,6 +472,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         else:
           zipresult = glob('temp/expanded/ludgerh-cam-ai-*')[0]
         if await aiofiles.os.path.exists('temp/backup'):
+          await asyncio.to_thread(subprocess.run, ['umount', 'temp/backup/shm'], check=False)
           await aioshutil.rmtree('temp/backup')
         await aioshutil.move(basepath, 'temp/backup') 
         await aioshutil.move(zipresult, basepath) 

@@ -24,13 +24,13 @@ class new_redis(saferedis):
     self.tag = 'cam-ai.cleanup:'
     super().__init__()
  
-  def clean_redis(self, name, idx=0): 
+  def clean_redis(self, name, idx = 0): 
     self.delete(self.tag + name + ':' + str(idx))
      
   def add_to_redis(self, name, idx, myvalue):
     self.set(self.tag + name + ':' + str(idx), myvalue)
      
-  def get_from_redis(self, name, idx):
+  def get_from_redis(self, name, idx = 0):
     mytag = self.tag + name + ':' + str(idx)
     while (not self.exists(mytag)):
       break_type(BR_MEDIUM)
@@ -42,7 +42,7 @@ class new_redis(saferedis):
     for item in myset:
       self.lpush(mytag, item)
     
-  def get_from_redis_queue(self, name, idx):
+  def get_from_redis_queue(self, name, idx = 0):
     mytag = self.tag + name + ':' + str(idx)
     result = []  
     if self.exists(mytag):
@@ -50,7 +50,12 @@ class new_redis(saferedis):
         result.append(rline) 
     return(result)  
     
-  def len_from_redis_queue(self, name, idx):
+  def read_from_redis_queue(self, name, idx = 0):
+    mytag = self.tag + name + ':' + str(idx)
+    items = self.lrange(mytag, 0, -1)
+    return([item.decode() for item in items])
+    
+  def len_from_redis_queue(self, name, idx = 0):
     mytag = self.tag + name + ':' + str(idx)
     if self.exists(mytag):
       return(self.llen(mytag))  
