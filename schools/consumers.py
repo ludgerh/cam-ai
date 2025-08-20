@@ -82,7 +82,7 @@ CHUNK_SIZE = 32
 
 def decode_and_convert_image(myimage_bytes):
   img = cv.imdecode(np.frombuffer(myimage_bytes, dtype=np.uint8), cv.IMREAD_UNCHANGED)
-  cv.imwrite('/home/ludger/temp/' + str(time()) + '.bmp', img)
+  #cv.imwrite('/home/ludger/temp/' + str(time()) + '.bmp', img)
   return cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
 def _chunked(seq, n):
