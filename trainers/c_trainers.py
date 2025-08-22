@@ -59,14 +59,17 @@ def _chunked(seq, n):
     yield seq[i:i+n]
 
 class trainer(spawn_process):
-  def __init__(self, idx, worker_inqueue, worker_registerqueue):
+  def __init__(self, idx, worker_inqueue, worker_registerqueue, glob_lock):
     self.id = idx
     self.worker_in = worker_inqueue
     self.worker_reg = worker_registerqueue
+    self.glob_lock = glob_lock
+    if self.id == 1:
+      self.glob_lock.acquire()
     super().__init__()
       
   async def update_predictions(self, school_nr, last_fit):
-    with self.mylock:
+    with self.glob_lock:
       if trainers_redis.get_predict_proc_active(school_nr): 
         return()
       trainers_redis.set_predict_proc_active(school_nr, True)
@@ -137,7 +140,6 @@ class trainer(spawn_process):
       await alog_ini(self.logger, self.logname)
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg)
       self.tf_w_index = await self.tf_worker.register(1)
-      print('##### TFW-Index:', self.tf_w_index)
       await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
       self.finished = False
       self.job_queue = asyncio.Queue()
@@ -219,14 +221,19 @@ class trainer(spawn_process):
       from globals.c_globals import trainers
       from tf_workers.models import school
       from .models import trainframe, fit
-      first_time = True
+      if self.id == 1:  
+        schoollines = await sync_to_async(list)(school.objects.filter(
+          active=True, 
+          delegation_level = 1, 
+        ))
+        for s_item in schoollines: 
+          trainers_redis.set_predict_proc_active(s_item.id, False)
+        self.glob_lock.release()    
       while self.do_run:
         schoollines = await sync_to_async(list)(school.objects.filter(active=True))
         for s_item in schoollines:
-          if first_time:
-            trainers_redis.set_predict_proc_active(s_item.id, False)
           await s_item.arefresh_from_db()
-          if s_item.delegation_level <= 1:  
+          if s_item.delegation_level == 1:  
             await self.update_predictions(s_item.id, s_item.last_fit) 
           if s_item.id in self.school_cache:
             school_change = (
@@ -288,8 +295,6 @@ class trainer(spawn_process):
           await a_break_time(10.0)
         except  asyncio.exceptions.CancelledError:
           pass
-        if first_time:
-          first_time = False  
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 

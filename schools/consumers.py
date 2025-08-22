@@ -190,7 +190,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           raise
         finally:
           i_global += 1
-      print('00000', code_list)
+      logger.info('00000 ' + str(code_list))
       await self.tf_worker.ask_pred(
         school_nr, 
         imglist, 

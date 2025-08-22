@@ -89,10 +89,10 @@ class startup_class():
       startup_redis.set_shutdown_command(0)
       await sync_to_async(version_upgrade)(old_version, software_version)
       await clean_fits()
-      for item in trainers:
-        trainers[item].start()
       for item in tf_workers:
         tf_workers[item].start()
+      for item in trainers:
+        trainers[item].start()
       for item in viewables:
         await viewables[item]['stream'].run()
       asyncio.create_task(self.restartcheck_thread())

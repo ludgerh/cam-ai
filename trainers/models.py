@@ -67,7 +67,7 @@ class trainframe(models.Model):
     on_delete=models.SET_NULL, null=True)
   train_status = models.SmallIntegerField(default=0)
   img_sizes = models.ManyToManyField(img_size)
-  last_fit = models.IntegerField(default=0)
+  last_fit = models.IntegerField(default = -1)
   pred0 = models.FloatField(default=0.0)
   pred1 = models.FloatField(default=0.0)
   pred2 = models.FloatField(default=0.0)
