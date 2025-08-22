@@ -82,8 +82,9 @@ class trainer(spawn_process):
       if item.last_fit != school_dbline.last_fit:
         frames.append(item)
     if frames:  
-      self.logger.info('Trainer #' + str(self.id) + ' re-inferencing ' 
-        + str(len(frames)) + ' frames of school #' + str(school_nr))  
+      self.logger.info(
+        f'TR{self.id}: Re-inferencing {len(frames)} frames of school #{school_nr}'
+      )  
       for chunk in _chunked(frames, CHUNK_SIZE):
         imglist = []
         frame_ids = []
@@ -116,8 +117,9 @@ class trainer(spawn_process):
           await frameline.asave(
             update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
           )
-      self.logger.info('Trainer #'+str(self.id) + ' finished re-inferencing of school #' 
-        + str(school_nr)) 
+      self.logger.info(
+        f'TR{self.id}: Finished re-inferencing of school #{school_nr}'
+      )  
     trainers_redis.set_predict_proc_active(school_nr, False)
     
               
@@ -257,8 +259,9 @@ class trainer(spawn_process):
           for t_item in trainers:
             if s_item.id in trainers[t_item].getqueueinfo():
               self.logger.warning(
-                '!!!!! School #' + str(s_item.id) 
-                + ' not inserted into Trainer Queue because already in.')
+                f'TR{self.id}: School #{s_item.id} not inserted into Trainer Queue '
+                + 'because already in.'
+              )  
               self.school_cache[s_item.id] = model_to_dict(s_item)
               continue
           filterdict = {

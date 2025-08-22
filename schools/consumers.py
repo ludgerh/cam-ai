@@ -190,7 +190,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           raise
         finally:
           i_global += 1
-      logger.info('00000 ' + str(code_list))
+      #logger.info('00000 ' + str(code_list))
       await self.tf_worker.ask_pred(
         school_nr, 
         imglist, 
@@ -267,7 +267,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         if params ['cbdifferences']:
           frames = []
           frames_to_infer = []
-          async for item in framelines.aiterator(chunk_size=1000):
+          async for item in framelines.aiterator(chunk_size=100):
             frame = {
               'idx' : item.id, 
               'line' : item, 

@@ -522,7 +522,7 @@ class c_eventer(viewable):
           if is_ready:
             await item.save(self.cond_dict)
         else:
-          self.logger.warning('!!!!! Did not save the event because of low quota')    
+          self.logger.warning(f'EV{self.id}: Did not save the event because of low quota')  
       if is_ready: 
         if i in self.eventdict:
           del self.eventdict[i]
