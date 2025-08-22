@@ -26,15 +26,20 @@ def initialize():
   import django
   django.setup()
   from multiprocessing import SimpleQueue
-  from trainers.models import trainer as trainer_mod
-  from trainers.c_trainers import trainer
-  for item in trainer_mod.objects.filter(active=True):
-    trainers[item.id] = trainer(item.id, )
-    #Tricky: Queues and buffers stay in this Process, even if not named
   from tf_workers.models import worker as worker_mod
   from tf_workers.c_tf_workers import tf_worker
   for item in worker_mod.objects.filter(active=True):
     tf_workers[item.id] = tf_worker(item.id, )
+    #Tricky: Queues and buffers stay in this Process, even if not named
+  from trainers.models import trainer as trainer_mod
+  from trainers.c_trainers import trainer
+  my_worker = tf_workers[1] #may variable in the future 
+  for item in trainer_mod.objects.filter(active=True):
+    trainers[item.id] = trainer(
+      item.id, 
+      my_worker.inqueue,
+      my_worker.registerqueue,
+    )
     #Tricky: Queues and buffers stay in this Process, even if not named
   from streams.models import stream as stream_mod
   from streams.c_streams import c_stream

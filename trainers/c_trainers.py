@@ -16,6 +16,9 @@ v1.6.6 01.03.25
 """
 
 import asyncio
+import aiofiles
+import numpy as np
+import cv2 as cv
 from asgiref.sync import sync_to_async
 from multiprocessing import Process
 from threading import Lock as t_lock
@@ -25,7 +28,8 @@ from setproctitle import setproctitle
 import gc
 from django.utils import timezone
 from django.forms.models import model_to_dict
-#from .models import trainframe, fit
+from globals.c_globals import tf_workers
+from tf_workers.c_tf_workers import tf_worker_client
 from .redis import my_redis as trainers_redis
 
 #from threading import enumerate 
@@ -35,26 +39,90 @@ async def clean_fits():
   async for item in fit.objects.all():
     if item.status == 'Queuing' or item.status == 'Working':
       item.status = 'Stopped'
-      await item.asave(update_fields=['status', ])
+      await item.asave(update_fields=['status', ])        
 
 #***************************************************************************
 #
 # trainers server
 #
 #***************************************************************************
+def decode_and_convert_image(myimage_bytes):
+  img = cv.imdecode(np.frombuffer(myimage_bytes, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  return cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
 from tools.c_spawn import spawn_process
 
-class trainer(spawn_process):
-  def __init__(self, idx, ):
-    self.id = idx
-    super().__init__()
+CHUNK_SIZE = 32
 
+def _chunked(seq, n):
+  for i in range(0, len(seq), n):
+    yield seq[i:i+n]
+
+class trainer(spawn_process):
+  def __init__(self, idx, worker_inqueue, worker_registerqueue):
+    self.id = idx
+    self.worker_in = worker_inqueue
+    self.worker_reg = worker_registerqueue
+    super().__init__()
+      
+  async def update_predictions(self, school_nr, last_fit):
+    with self.mylock:
+      if trainers_redis.get_predict_proc_active(school_nr): 
+        return()
+      trainers_redis.set_predict_proc_active(school_nr, True)
+    from .models import trainframe
+    from tf_workers.models import school
+    school_dbline = await school.objects.aget(id = school_nr)
+    framelines = trainframe.objects.filter(school = school_nr)
+    frames = []
+    async for item in framelines.aiterator(chunk_size=1000):
+      if item.last_fit != school_dbline.last_fit:
+        frames.append(item)
+    if frames:  
+      self.logger.info('Trainer #' + str(self.id) + ' re-inferencing ' 
+        + str(len(frames)) + ' frames of school #' + str(school_nr))  
+      for chunk in _chunked(frames, CHUNK_SIZE):
+        imglist = []
+        frame_ids = []
+        for item in chunk:
+          await asyncio.sleep(0)
+          imagepath = school_dbline.dir + 'frames/' + item.name 
+          async with aiofiles.open(imagepath, mode = "rb") as f:
+            myimage = await f.read()
+          myimage = await asyncio.to_thread(decode_and_convert_image, myimage) 
+          frame_ids.append(item.id) 
+          imglist.append(myimage)
+        await self.tf_worker.ask_pred(
+          school_nr, 
+          imglist, 
+          self.tf_w_index,
+        )
+        received = []
+        for idx in frame_ids:
+          await asyncio.sleep(0)
+          if not received:
+            received = (await asyncio.wait_for(
+              self.tf_worker.get_from_outqueue(self.tf_w_index),
+              timeout=60
+            )).tolist()
+          prediction = received.pop(0) 
+          frameline = await trainframe.objects.aget(id = idx)
+          frameline.last_fit = school_dbline.last_fit
+          for i in range(10):
+            setattr(frameline, f"pred{i}", prediction[i])
+          await frameline.asave(
+            update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
+          )
+      self.logger.info('Trainer #'+str(self.id) + ' finished re-inferencing of school #' 
+        + str(school_nr)) 
+    trainers_redis.set_predict_proc_active(school_nr, False)
+    
+              
   async def async_runner(self): 
     try:
       from tools.c_logger import alog_ini
       from tools.l_tools import ts2mysqltime
-      from tools.l_break import a_break_time
+      from tools.l_break import a_break_time, a_break_type, BR_LONG
       from .models import trainer as dbtrainer, trainframe
       self.dbline = await dbtrainer.objects.aget(id = self.id)
       setproctitle('CAM-AI-Trainer #'+str(self.id))
@@ -67,6 +135,10 @@ class trainer(spawn_process):
       self.logname = 'trainer #'+str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
+      self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg)
+      self.tf_w_index = await self.tf_worker.register(1)
+      print('##### TFW-Index:', self.tf_w_index)
+      await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
       self.finished = False
       self.job_queue = asyncio.Queue()
       self.school_cache = {}
@@ -125,11 +197,15 @@ class trainer(spawn_process):
             train_process = Process(target = my_trainer.run)
             train_process.start()
             self.process_dict[train_process.pid] = ((train_process, myschool))
+          if myschool.delegation_level <= 1:  
+            await self.update_predictions(myschool.id, myschool.last_fit) 
           with self.mylock:
             self.job_queue_list.remove(myschool.id)
           trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
           await asyncio.to_thread(gc.collect)
         await a_break_time(10.0)
+      await self.tf_worker.stop_out(self.tf_w_index)
+      await self.tf_worker.unregister(self.tf_w_index) 
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
     except Exception as fatal:
@@ -143,10 +219,15 @@ class trainer(spawn_process):
       from globals.c_globals import trainers
       from tf_workers.models import school
       from .models import trainframe, fit
+      first_time = True
       while self.do_run:
         schoollines = await sync_to_async(list)(school.objects.filter(active=True))
         for s_item in schoollines:
+          if first_time:
+            trainers_redis.set_predict_proc_active(s_item.id, False)
           await s_item.arefresh_from_db()
+          if s_item.delegation_level <= 1:  
+            await self.update_predictions(s_item.id, s_item.last_fit) 
           if s_item.id in self.school_cache:
             school_change = (
               await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]
@@ -206,7 +287,9 @@ class trainer(spawn_process):
         try:
           await a_break_time(10.0)
         except  asyncio.exceptions.CancelledError:
-          pass  
+          pass
+        if first_time:
+          first_time = False  
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 

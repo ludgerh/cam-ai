@@ -82,7 +82,6 @@ CHUNK_SIZE = 32
 
 def decode_and_convert_image(myimage_bytes):
   img = cv.imdecode(np.frombuffer(myimage_bytes, dtype=np.uint8), cv.IMREAD_UNCHANGED)
-  #cv.imwrite('/home/ludger/temp/' + str(time()) + '.bmp', img)
   return cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
 def _chunked(seq, n):
@@ -141,14 +140,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       logger.error(format_exc())
       
   async def predictions_from_tfw(self, frames, school_nr, is_tagger):
-    #print('00000', frames, school_nr, is_tagger)
-    if school_nr not in self.school_lines:
-      self.school_lines[school_nr] = await school.objects.aget(id = school_nr)
-      self.check_ts = time()
     school_dbline = self.school_lines[school_nr]
-    if self.check_ts + 60.0 < time():
-      await school_dbline.arefresh_from_db()
-      self.check_ts = time()
     i_global = 0  # for periodic sleep()
     for chunk in _chunked(frames, CHUNK_SIZE):
       imglist = []
@@ -178,14 +170,17 @@ class schooldbutil(AsyncWebsocketConsumer):
           frame_ids.append(frameline.id)
           if use_ram_cache:
             code_list.append('R')
-          else:    
-            async with aiofiles.open(imagepath, mode = "rb") as f:
-              myimage = await f.read()
-            if frameline.encrypted:
-              myimage = self.crypt.decrypt(myimage) 
-            myimage = await asyncio.to_thread(decode_and_convert_image, myimage)  
-            imglist.append(myimage)
-            code_list.append('I')
+          else: 
+            if not is_tagger and frameline.last_fit == school_dbline.last_fit:
+              code_list.append('D')
+            else: 
+              async with aiofiles.open(imagepath, mode = "rb") as f:
+                myimage = await f.read()
+              if frameline.encrypted:
+                myimage = self.crypt.decrypt(myimage) 
+              myimage = await asyncio.to_thread(decode_and_convert_image, myimage)  
+              imglist.append(myimage)
+              code_list.append('I')
         except FileNotFoundError:
           logger.error('*** File not found: %s', imagepath)
           raise  # lasse den Fehler nach oben gehen
@@ -195,7 +190,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           raise
         finally:
           i_global += 1
-      #print('00000', code_list)
+      print('00000', code_list)
       await self.tf_worker.ask_pred(
         school_nr, 
         imglist, 
@@ -220,6 +215,14 @@ class schooldbutil(AsyncWebsocketConsumer):
             frame_dict['prediction'] = None
         elif code == 'R':
           frame_dict['prediction'] = my_cache_dict[frame_id]['pred']
+        elif code == 'D':
+          frameline = await trainframe.objects.aget(id=frame_id)
+          frame_dict['prediction'] = tuple(
+              getattr(frameline, f"pred{i}") for i in range(10)
+            )
+          cache_entry = my_cache_dict.setdefault(frame_id, {})
+          cache_entry['pred'] = frame_dict['prediction']
+          cache_entry['fit'] = school_dbline.last_fit
     return() 
 
   async def receive(self, text_data):
@@ -234,8 +237,13 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.close()
 
       if params['command'] == 'settrainpage' :
-        self.schoolline = None
         school_nr = params['school_nr']
+        if school_nr not in self.school_lines:
+          self.school_lines[school_nr] = await school.objects.aget(id = school_nr)
+          self.check_ts = time()
+        if self.check_ts + 60.0 < time():
+          await self.school_lines[school_nr].arefresh_from_db()
+          self.check_ts = time()
         filterdict = {
           'school' : school_nr,
           'deleted' : False,
@@ -257,22 +265,35 @@ class schooldbutil(AsyncWebsocketConsumer):
           filterdict['c'+str(params['class'])] = 1
         framelines = trainframe.objects.filter(**filterdict)
         if params ['cbdifferences']:
-          schoolline = await school.objects.aget(id=school_nr)
           frames = []
+          frames_to_infer = []
           async for item in framelines.aiterator(chunk_size=1000):
             frame = {
               'idx' : item.id, 
-              'tags' : [
-                item.c0, item.c1, item.c2, item.c3, item.c4, 
-                item.c5, item.c6, item.c7, item.c8, item.c9, ], 
-              'line' : item,  
+              'line' : item, 
+              'tags' : tuple(
+                getattr(item, f"c{i}") for i in range(10)
+              )
             }
+            if item.last_fit != self.school_lines[school_nr].last_fit:
+              frames_to_infer.append(frame)
+            else:
+              frame['prediction'] = tuple(
+                getattr(item, f"pred{i}") for i in range(10)
+              )
             frames.append(frame)
           await self.predictions_from_tfw(
-            frames, 
+            frames_to_infer, 
             school_nr, 
             False, 
           )
+          for item in frames_to_infer:
+            item['line'].last_fit = self.school_lines[school_nr].last_fit
+            for i in range(10):
+              setattr(item['line'], f"pred{i}", item['prediction'][i])
+            await item['line'].asave(
+              update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
+            )
           framelines = []
           for item in frames:
             for i in range(10):
