@@ -39,7 +39,7 @@ class c_cam(viewable):
     self.type = 'C'
     self.dbline = dbline
     self.id = dbline.id
-    self.fifo_path = 'shm/cam' + str(self.id) + '.pipe'
+    self.fifo_path = f'/home/cam_ai/shm/cam{self.id}.pipe'
     self.detector_dataq = detector_dataq
     self.eventer_dataq = eventer_dataq
     self.eventer_inq = eventer_inq
