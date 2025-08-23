@@ -17,6 +17,7 @@ v1.6.6 01.03.25
 
 import asyncio
 import aiofiles
+import aiofiles.os
 import numpy as np
 import cv2 as cv
 from asgiref.sync import sync_to_async
@@ -76,7 +77,7 @@ class trainer(spawn_process):
     from .models import trainframe
     from tf_workers.models import school
     school_dbline = await school.objects.aget(id = school_nr)
-    framelines = trainframe.objects.filter(school = school_nr)
+    framelines = trainframe.objects.filter(school = school_nr, deleted = False)
     frames = []
     async for item in framelines.aiterator(chunk_size=1000):
       if item.last_fit != school_dbline.last_fit:
@@ -91,11 +92,16 @@ class trainer(spawn_process):
         for item in chunk:
           await asyncio.sleep(0)
           imagepath = school_dbline.dir + 'frames/' + item.name 
-          async with aiofiles.open(imagepath, mode = "rb") as f:
-            myimage = await f.read()
-          myimage = await asyncio.to_thread(decode_and_convert_image, myimage) 
-          frame_ids.append(item.id) 
-          imglist.append(myimage)
+          try:
+            async with aiofiles.open(imagepath, mode = "rb") as f:
+              myimage = await f.read()
+            myimage = await asyncio.to_thread(decode_and_convert_image, myimage) 
+            frame_ids.append(item.id) 
+            imglist.append(myimage)
+          except FileNotFoundError:
+            self.logger.warning(
+              f'TR{self.id}: School #{school_nr}: {imagepath} not found'
+            )  
         await self.tf_worker.ask_pred(
           school_nr, 
           imglist, 

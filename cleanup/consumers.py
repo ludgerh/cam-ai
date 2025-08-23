@@ -221,6 +221,10 @@ class cleanup(AsyncWebsocketConsumer):
               'schools_missingfiles', 
               params['school'],
             ),
+            'schools_missingbmps' : cleanup_redis.len_from_redis_queue(
+              'schools_missingbmps', 
+              params['school'],
+            ),
           }
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
@@ -263,9 +267,10 @@ class cleanup(AsyncWebsocketConsumer):
           logger.debug('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
 
-        elif params['command'] == 'fix_schools_missingfiles':	
+        elif (params['command'] == 'fix_schools_missingfiles' 
+            or params['command'] == 'fix_schools_missingbmps'):	  
           list_to_delete = cleanup_redis.get_from_redis_queue(
-            'schools_missingfiles', 
+            params['command'][4:],
             params['school'],
           )
           counter = len(list_to_delete)

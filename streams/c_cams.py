@@ -39,7 +39,6 @@ class c_cam(viewable):
     self.type = 'C'
     self.dbline = dbline
     self.id = dbline.id
-    self.fifo_path = f'/home/cam_ai/shm/cam{self.id}.pipe'
     self.detector_dataq = detector_dataq
     self.eventer_dataq = eventer_dataq
     self.eventer_inq = eventer_inq
@@ -55,6 +54,9 @@ class c_cam(viewable):
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Camera #'+str(self.id))
+      self.fifo_path = await djconf.agetconfig('fifo_path', '/home/cam_ai/shm/')
+      self.fifo_path += f'cam{self.id}.pipe'
+      print('##########', self.fifo_path)
       if self.dbline.cam_virtual_fps:
         self.wd_ts = 0.0
         self.wd_interval = 1.0

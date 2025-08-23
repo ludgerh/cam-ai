@@ -174,18 +174,26 @@ class schooldbutil(AsyncWebsocketConsumer):
             if not is_tagger and frameline.last_fit == school_dbline.last_fit:
               code_list.append('D')
             else: 
-              async with aiofiles.open(imagepath, mode = "rb") as f:
-                myimage = await f.read()
-              if frameline.encrypted:
-                myimage = self.crypt.decrypt(myimage) 
-              myimage = await asyncio.to_thread(decode_and_convert_image, myimage)  
-              imglist.append(myimage)
-              code_list.append('I')
+              try:
+                async with aiofiles.open(imagepath, mode = "rb") as f:
+                  myimage = await f.read()
+                if frameline.encrypted:
+                  myimage = self.crypt.decrypt(myimage) 
+                myimage = await asyncio.to_thread(decode_and_convert_image, myimage)  
+                imglist.append(myimage)
+                code_list.append('I')
+              except FileNotFoundError:
+                logger.warning(
+                  f'SC{school_nr}: {imagepath} not found'
+                )  
+                code_list.append('0')
         except FileNotFoundError:
           logger.error('*** File not found: %s', imagepath)
           raise  # lasse den Fehler nach oben gehen
         except asyncio.CancelledError:
-          logger.warning('** getpredictions was cancelled')
+          logger.warning(
+            f'SC{school_nr}: {imagepath}: Getpredictions was cancelled'
+          )  
           await self.close()
           raise
         finally:
@@ -211,7 +219,9 @@ class schooldbutil(AsyncWebsocketConsumer):
             cache_entry['pred'] = prediction
             cache_entry['fit'] = school_dbline.last_fit
           except asyncio.TimeoutError:
-            logger.error('** Timeout while waiting for predictions')
+            logger.error(
+              f'SC{school_nr}: Getpredictions was cancelled'
+            )  
             frame_dict['prediction'] = None
         elif code == 'R':
           frame_dict['prediction'] = my_cache_dict[frame_id]['pred']
@@ -223,6 +233,8 @@ class schooldbutil(AsyncWebsocketConsumer):
           cache_entry = my_cache_dict.setdefault(frame_id, {})
           cache_entry['pred'] = frame_dict['prediction']
           cache_entry['fit'] = school_dbline.last_fit
+        elif code == '0':  
+          frame_dict['prediction'] = None
     return() 
 
   async def receive(self, text_data):
@@ -289,15 +301,16 @@ class schooldbutil(AsyncWebsocketConsumer):
           )
           for item in frames_to_infer:
             item['line'].last_fit = self.school_lines[school_nr].last_fit
-            for i in range(10):
-              setattr(item['line'], f"pred{i}", item['prediction'][i])
+            if item['prediction']:
+              for i in range(10):
+                setattr(item['line'], f"pred{i}", item['prediction'][i])
             await item['line'].asave(
               update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
             )
           framelines = []
           for item in frames:
             for i in range(10):
-              if item['tags'][i] != round(item['prediction'][i]):
+              if item['prediction'] and item['tags'][i] != round(item['prediction'][i]):
                 framelines.append(item['line'])
                 break
         self.trainpage = Paginator(framelines, params['pagesize'])

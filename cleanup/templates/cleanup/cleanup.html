@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -30,7 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="statusModalLabel">Checking & ceaning up your database</h5>
+          <h5 class="modal-title" id="statusModalLabel">Checking & cleaning up your database</h5>
         </div>
         <div class="modal-body">
           <p>This process may take some minutes...</p>
@@ -133,9 +133,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
             <tr>
-              <td>Missing files</td>
+              <td>Missing any files</td>
               <td id="schools_missingfiles{{ item.id }}">?</td>
               <td> <button class="btn btn-primary m-2 fix_schools_missingfiles" idx="{{ item.id }}" 
+                type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
+            </tr>
+            <tr>
+              <td>Missing BMP files</td>
+              <td id="schools_missingbmps{{ item.id }}">?</td>
+              <td> <button class="btn btn-primary m-2 fix_schools_missingbmps" idx="{{ item.id }}" 
                 type="button" style="width: 100px; height: 35px;" disabled>Fix it</button></td> 
             </tr>
           </tbody>
@@ -246,9 +252,12 @@ function updateschool(schoolnr) {
       !result.schools_missingdb);
     $('.fix_schools_missingfiles').filter('[idx='+schoolnr+']').prop('disabled', 
       !result.schools_missingfiles);
+    $('.fix_schools_missingbmps').filter('[idx='+schoolnr+']').prop('disabled', 
+      !result.schools_missingbmps);
     $('#schools_correct'+schoolnr).text(result.schools_correct);
     $('#schools_missingdb'+schoolnr).text(result.schools_missingdb);
     $('#schools_missingfiles'+schoolnr).text(result.schools_missingfiles);
+    $('#schools_missingbmps'+schoolnr).text(result.schools_missingbmps);
   });
 };
 
@@ -415,6 +424,33 @@ $('.fix_schools_missingfiles').click(function(e) {
   }
   cleanupSocket.sendandwait({
     'command' : 'fix_schools_missingfiles',
+    'school' : parseInt(btn.attr('idx')),
+  }, mycallback)
+  .then((result) => {
+    if (result == 'OK') {
+      btn.removeClass('btn-warning');
+      $('#statusModal').on('shown.bs.modal', function () {
+        $('#statusModal').modal('hide');
+      });
+      if ($('#statusModal').hasClass('show')) {
+        $('#statusModal').modal('hide');
+      };
+      updateschool(parseInt(btn.attr('idx')));
+    };
+  });
+});
+
+$('.fix_schools_missingbmps').click(function(e) {
+  btn = $(e.target);
+  btn.prop('disabled', true);
+  btn.addClass('btn-warning');
+  $('#statusModal').modal('show');
+  mycallback = function (param) {
+    result = JSON.parse(param)
+    $('#progress').text(result.data);
+  }
+  cleanupSocket.sendandwait({
+    'command' : 'fix_schools_missingbmps',
     'school' : parseInt(btn.attr('idx')),
   }, mycallback)
   .then((result) => {

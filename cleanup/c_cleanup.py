@@ -337,6 +337,7 @@ class c_cleanup():
         if item.startswith(myschooldir)
       }
       fileset = set()
+      bmpset = set()
       framespath = Path(myschooldir) / 'frames'
       if framespath.exists():
         for item in framespath.iterdir():
@@ -347,6 +348,7 @@ class c_cleanup():
                 + item.as_posix()
               ) not in files_to_delete_list_local:
               fileset.add(item.stem)
+              bmpset.add(item.stem)
           elif item.is_dir():
             subdir = item.name
             for item in (Path(myschooldir) / 'frames' / subdir).iterdir():
@@ -359,6 +361,7 @@ class c_cleanup():
                     + item.as_posix()
                   ) not in files_to_delete_list_local:
                   fileset.add(subdir+'/'+item.stem)
+                  bmpset.add(subdir+'/'+item.stem)
       for dim in cleanup_redis.read_from_redis_queue('model_dims', schoolline.id):
         if (Path(myschooldir) / 'coded' / dim).exists():
           for item in (Path(myschooldir) / 'coded' / dim).iterdir():
@@ -392,6 +395,7 @@ class c_cleanup():
       schools_missingdb = fileset - dbset
       my_status_schools.schools_missingdb = len(schools_missingdb)
       schools_missingfiles = dbset - fileset
+      schools_missingbmps = dbset - bmpset
       my_status_schools.schools_missingfiles = len(schools_missingfiles)
       cleanup_redis.add_to_redis('schools_correct', schoolline.id, len(schools_correct))
       cleanup_redis.add_to_redis_queue(
@@ -403,6 +407,11 @@ class c_cleanup():
         'schools_missingfiles', 
         schoolline.id, 
         schools_missingfiles, 
+      )
+      cleanup_redis.add_to_redis_queue(
+        'schools_missingbmps', 
+        schoolline.id, 
+        schools_missingbmps, 
       )
       my_status_schools.save()
     #self.logger.info('Cleanup: Getting stream file sizes') 
