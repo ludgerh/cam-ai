@@ -250,9 +250,6 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       if params['command'] == 'settrainpage' :
         school_nr = params['school_nr']
-        if school_nr not in self.school_lines:
-          self.school_lines[school_nr] = await school.objects.aget(id = school_nr)
-          self.check_ts = time()
         if self.check_ts + 60.0 < time():
           await self.school_lines[school_nr].arefresh_from_db()
           self.check_ts = time()
@@ -539,6 +536,9 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'register_ai':
         self.myschool = int(params['school'])
+        if self.myschool not in self.school_lines:
+          self.school_lines[self.myschool] = await school.objects.aget(id = self.myschool)
+          self.check_ts = time()
         if ('logout' in params) and params['logout'] and (self.myschool > 0):
           await self.disconnect(None)
         if self.myschool > 0:

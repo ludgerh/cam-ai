@@ -77,11 +77,12 @@ class trainer(spawn_process):
     from .models import trainframe
     from tf_workers.models import school
     school_dbline = await school.objects.aget(id = school_nr)
-    framelines = trainframe.objects.filter(school = school_nr, deleted = False)
+    framelines = (trainframe.objects
+      .filter(school = school_nr, deleted = False)
+      .exclude(last_fit=school_dbline.last_fit)) 
     frames = []
     async for item in framelines.aiterator(chunk_size=1000):
-      if item.last_fit != school_dbline.last_fit:
-        frames.append(item)
+      frames.append(item)
     if frames:  
       self.logger.info(
         f'TR{self.id}: Re-inferencing {len(frames)} frames of school #{school_nr}'

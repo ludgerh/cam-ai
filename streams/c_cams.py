@@ -162,14 +162,14 @@ class c_cam(viewable):
       if self.wd_proc is not None:
         self.wd_proc.cancel()
         try:
-          await self.wd_proc  # Warten auf die Beendigung
+          await self.wd_proc
         except asyncio.CancelledError:
           self.logger.info("Watchdog-Task wurde erfolgreich beendet.")
       if not self.dbline.cam_virtual_fps:
         if self.mp4_proc is not None:
           self.mp4_proc.cancel()
         try:
-          await self.wd_proc  # Warten auf die Beendigung
+          await self.wd_proc
         except asyncio.CancelledError:
           self.logger.info("MP4-Task wurde erfolgreich beendet.")
     except Exception as fatal:
@@ -210,6 +210,9 @@ class c_cam(viewable):
     else:
       result = False   
     return(result)
+    
+  def _read_chunk(self, fd, n):
+    return os.read(fd, n)  # nonblocking → may throw BlockingIOError
       
   async def run_one(self):
     if not self.do_run:
@@ -271,7 +274,9 @@ class c_cam(viewable):
           self.reset_buffer = False
           continue
         try:
-          chunk = await asyncio.to_thread(self.fifo.read, bytes_needed)
+          chunk = await asyncio.to_thread(
+            self._read_chunk, self.fifo.fileno(), min(bytes_needed, 65536)
+          )
           if not chunk:
             await a_break_type(BR_SHORT)
             continue
@@ -477,6 +482,11 @@ class c_cam(viewable):
         + ' - ' + self.type + str(self.id)
       )
       self.logger.critical("watchdog crashed: %s", fatal, exc_info=True)
+    
+  def _open_fifo_pair(self):
+    self._fifo_dummy_fd = os.open(self.fifo_path, os.O_RDWR | os.O_NONBLOCK)
+    rd_fd = os.open(self.fifo_path, os.O_RDONLY)
+    return os.fdopen(rd_fd, "rb", buffering=0)
 
   async def newprocess(self):
     while True:
@@ -516,10 +526,10 @@ class c_cam(viewable):
       #if inp_frame_rate:
       #  inparams += ['-vf', 'fps=' + str(inp_frame_rate)]
       generalparams = ['-y']
-      #generalparams += ['-v', 'info']
-      generalparams += ['-v', 'fatal']
-      if is_raspi():
-        generalparams += ['-threads', '1']
+      generalparams += ['-v', 'info']
+      #generalparams += ['-v', 'fatal']
+      #if is_raspi():
+      #  generalparams += ['-threads', '1']
       if not self.dbline.cam_virtual_fps:
         if source_string[:4].upper() == 'RTSP':
           generalparams += ['-rtsp_transport', 'tcp']
@@ -582,16 +592,19 @@ class c_cam(viewable):
       )
       self.logger.info('#'+str(self.id) + ' 44444')
       try:
-        self.fifo = await asyncio.wait_for(
-          asyncio.to_thread(lambda: open(self.fifo_path, "rb")), 
-          timeout = 60.0, 
-        )
-        self.logger.info('#'+str(self.id) + ' 55555')
+        self.fifo = await asyncio.to_thread(self._open_fifo_pair)
+        self.logger.info('#%s 55555', self.id)
         break
-      except asyncio.TimeoutError:
-        self.logger.info('#' + str(self.id) + ' Timeout beim Öffnen des Fifos')
+      except FileNotFoundError:
+        self.logger.warning('#%s FIFO fehlt – lege neu an', self.id)
+        await asyncio.to_thread(lambda: (os.makedirs(os.path.dirname(self.fifo_path), exist_ok=True),
+                                         os.path.exists(self.fifo_path) or os.mkfifo(self.fifo_path, 0o660)))
+        await a_break_time(0.5)
+      except OSError as e:
+        self.logger.exception('#%s Fehler beim Öffnen des Fifos: %s', self.id, e)
         await self.stopprocess()
-        await a_break_time(10.0)
+        return
+
 
   async def stopprocess(self):
     self.logger.info(
@@ -616,7 +629,16 @@ class c_cam(viewable):
         pass        
       self.ff_proc = None
       self.logger.info('#'+str(self.id) + ' eeeee')
-    self.fifo.close()
+    try:  
+      self.fifo.close()
+    except AttributeError:
+      self.logger.info('#' + str(self.id) + ' Fifo does not exist: No closing.')
+    try:  
+      os.close(self._fifo_dummy_fd)
+    except Exception:
+      pass
+    self._fifo_dummy_fd = None
+
     self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
