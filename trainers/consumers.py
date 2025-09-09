@@ -36,12 +36,7 @@ from django.forms.models import model_to_dict
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from camai.version import version
-from tools.l_tools import (
-  djconf, 
-  seq_to_int, 
-  version_newer_or_equal, 
-  version_older_or_equal,
-)
+from tools.l_tools import djconf, seq_to_int, version_newer_or_equal
 from tools.c_logger import log_ini
 from access.c_access import access
 from tools.tokens import maketoken_async
@@ -119,8 +114,7 @@ class remotetrainer(AsyncWebsocketConsumer):
                   + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
                   + '/' + item[:-4] + '.cod')
                 mydir = path.dirname(codpath) 
-                if not await aiofiles.os.path.exists(mydir):
-                  makedirs(mydir)
+                await aiofiles.os.makedirs(mydir, exist_ok=True)
                 jpgdata = myzip.read(item)
                 imgdata = cv.imdecode(np.frombuffer(
                   jpgdata, dtype=np.uint8), cv.IMREAD_COLOR)
@@ -187,13 +181,10 @@ class remotetrainer(AsyncWebsocketConsumer):
           await self.ws.receive()
         else:
           self.user = await User.objects.aget(username=indict['name'])
-          if 'version' in indict:
-            in_version = indict['version']
-          else:
-            in_version = '?'
+          self.client_version = indict['version']
           if self.user.check_password(indict['pass']):
             logger.info('Successfull login:' + indict['name'] + ' - Software v' 
-                + in_version)
+                + self.client_version)
             self.authed = True
           if not self.authed:
             logger.info('Login failure: ' + indict['name'])
@@ -240,11 +231,8 @@ class remotetrainer(AsyncWebsocketConsumer):
           result = json.loads(result.data)
           await self.send(json.dumps(result))
         else:
-          if 'version' in indict and version_newer_or_equal(indict['version'], '1.6.2b'):
-            self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
-            self.mytrainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
-          else:
-            self.trainer_nr = 1  
+          self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
+          self.mytrainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
           creator = await database_sync_to_async(lambda: self.myschoolline.creator)()
           if await afree_quota(creator):
             result = {
@@ -323,8 +311,11 @@ class remotetrainer(AsyncWebsocketConsumer):
             dlurl += 'trainers/downmodel/'
             dlurl += str(self.myschoolline.id) + '/' + str(mytoken[0])
             dlurl += '/' + mytoken[1] +'/'
-            result = dlurl
-          elif indict['mode'] == 'check':
+            if version_newer_or_equal(self.client_version, '1.8.8b'):
+              result = {'dl_url' : dlurl, 'fit_nr' : self.lastfit, } 
+            else:  
+              result = dlurl
+          elif indict['mode'] == 'check': #obsolete if all clients are beyond v1.8.8a
             fitline = await fit.objects.aget(id=self.lastfit)
             result = fitline.status == 'Done' 
         #logger.info('--> ' + str(result))
@@ -411,10 +402,7 @@ class trainerutil(AsyncWebsocketConsumer):
           self.schoolline = await school.objects.aget(id=self.schoolnr)
           self.trainer_nr, count = await get_trainer_nr(self.schoolline)
           self.trainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
-          if 'version' in params:
-            self.version = params['version']
-          else:
-            self.version = '0.0.0'  
+          self.client_version = params['version']
           if self.trainerline.t_type in {2, 3}:
             if self.ws_session is None:
               import aiohttp
@@ -435,15 +423,11 @@ class trainerutil(AsyncWebsocketConsumer):
               await self.close()	
               return()
           else:  
-            if version_newer_or_equal(self.version, '1.6.2b'):
-              outlist['data'] = {
-                'status' : 'OK',
-                'trainer' : self.trainer_nr,
-                'count' : count,
-              }
-            else:  
-              self.trainer_nr = 1
-              outlist['data'] = 'OK'  
+            outlist['data'] = {
+              'status' : 'OK',
+              'trainer' : self.trainer_nr,
+              'count' : count,
+            }
         else: #Proper error description to both consoles!!!
           await self.close()
           return()
@@ -489,11 +473,6 @@ class trainerutil(AsyncWebsocketConsumer):
           await self.ws.send_str(json.dumps(temp))
           returned = await self.ws.receive()
           datatemp = json.loads(returned.data)['data']
-          if version_older_or_equal(self.version, '1.6.6'):
-            for item in datatemp[0]:
-              item['l_rate_patience'] = 0
-              item['l_rate_delta_min'] = 0
-              item['l_rate_decrement'] = 0
           outlist['data'] = datatemp 
         else:
           if 'new_click' in params and params['new_click']:

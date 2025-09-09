@@ -19,6 +19,7 @@ import requests
 import cv2 as cv
 import os
 import io
+import aiofiles
 from time import sleep, time
 from zipfile import ZipFile, ZIP_DEFLATED
 from setproctitle import setproctitle
@@ -29,17 +30,47 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "camai.settings")
 django.setup()
 from tools.l_tools import djconf, seq_to_int
+from tools.l_break import break_time
 from tools.c_tools import list_from_queryset
 from users.userinfo import afree_quota
-from .models import trainframe
+from tf_workers.models import school as school_db
+from .models import trainframe, download
 from camai.version import version
+
+async def check_downloads(logger, session):
+  new_download = await download.objects.afirst()
+  if new_download is None:
+    return()
+  response = await session.get(new_download.dl_url, allow_redirects=True)   
+  #r = requests.get(new_download.dl_url, allow_redirects=True)
+  #print('?????', await response.text(), type(await response.text()))
+  probe = await response.content.read(16)
+  if probe.decode(errors="ignore").strip() == "Wait!":
+    return()
+  datapath = await djconf.agetconfig('datapath', 'data/')
+  dlfile = await djconf.agetconfig('schools_dir', datapath + 'schools/')
+  dlfile += 'model' + str(new_download.school) + '/model/'
+  if new_download.model_kat == 1:
+    dlfile += new_download.model_type + '.keras'
+  else:
+    dlfile += new_download.model_type + '.tflite'
+  logger.info('DL Model: ' + dlfile)
+  async with aiofiles.open(dlfile, 'wb') as f:
+    await f.write(probe)
+    async for chunk in response.content.iter_chunked(1 << 20):  # 1 MiB
+      await f.write(chunk)
+  #open(dlfile, 'wb').write(response.content)
+  school_line = await school_db.objects.aget(id = new_download.school)
+  school_line.last_fit += 1
+  school_line.lastmodelfile = timezone.now()
+  await school_line.asave(update_fields=("last_fit", "lastmodelfile"))
+  await new_download.adelete()
 
 class train_once_remote():
 
   def __init__(self, myschool, myfit, dbline):
     self.myschool = myschool
     self.myfit = myfit
-    self.t_type = dbline.t_type
     self.tainer_id = dbline.id
     self.wsurl = dbline.wsserver+'ws/remotetrainer/'
     self.wsname = dbline.wsname
@@ -168,7 +199,8 @@ class train_once_remote():
       with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
         for item in sublist:
           imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
-          if imagedata.shape[1] > model_in_dims[0] or imagedata.shape[0] > model_in_dims[1]:
+          if (imagedata.shape[1] > model_in_dims[0] 
+              or imagedata.shape[0] > model_in_dims[1]):
             imagedata = cv.resize(imagedata, model_in_dims)
           imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
           zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
@@ -181,76 +213,46 @@ class train_once_remote():
       self.ws.send_binary(zip_content)
       self.ws.recv()
       self.send_ping()
-    if self.t_type == 2:
-      outdict = {
-        'code' : 'checkfitdone',
-        'mode' : 'init',
-        'school' : self.myschool.e_school,
-      }
-      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      temp = self.ws.recv()
-      model_type = json.loads(temp)
+    outdict = {
+      'code' : 'checkfitdone',
+      'mode' : 'init',
+      'school' : self.myschool.e_school,
+    }
+    self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+    temp = self.ws.recv()
+    model_type = json.loads(temp)
     outdict = {
       'code' : 'trainnow',
     } 
     self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
     self.logger.info('Sent trigger for train_now... ')
-    if self.t_type == 2:
-      outdict = {
-        'code' : 'checkfitdone',
-        'mode' : 'sync',
-        'school' : self.myschool.e_school,
-      }
-      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-      dlurl = json.loads(self.ws.recv())
-      self.logger.info('DL Url: ' + dlurl)
-      outdict = {
-        'code' : 'checkfitdone',
-        'mode' : 'check',
-        'school' : self.myschool.e_school,
-      }
-      while True:
-        while True:
-          try:
-            self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-            result = json.loads(self.ws.recv())
-            break
-          except  WebSocketConnectionClosedException:
-            self.logger.info('Reconnecting Websocket while waiting... ')
-            sleep(10.0)
-            self.ws.connect(self.wsurl)
-        if result:
-          break
-        else:
-          sleep(10.0)
-          
+    outdict = {
+      'code' : 'checkfitdone',
+      'mode' : 'sync',
+      'school' : self.myschool.e_school,
+    }
+    self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+    result = json.loads(self.ws.recv())
+    dlurl = result['dl_url']
+    fit_nr = result['fit_nr']
     outdict = {
       'code' : 'close_ws',
     }
     self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
     self.ws.recv()
-    #sleep(2.0)
     self.ws.close()
-          
-    if self.t_type == 2:
-      if self.modeltype == 1:
-        dlurl += 'K/'
-      elif self.modeltype == 2:
-        dlurl += 'L/'
-      elif self.modeltype == 3:
-        dlurl += 'Q/'
-      r = requests.get(dlurl, allow_redirects=True)
-      datapath = djconf.getconfig('datapath', 'data/')
-      dlfile = djconf.getconfig('schools_dir', datapath + 'schools/')
-      dlfile += 'model' + str(self.myschool.id) + '/model/'
-      if self.modeltype == 1:
-        dlfile += model_type + '.keras'
-      else:
-        dlfile += model_type + '.tflite'
-      self.logger.info('DL Model: ' + dlfile)
-      open(dlfile, 'wb').write(r.content)
-      self.myschool.last_fit += 1
-      self.myschool.lastmodelfile = timezone.now()
-      self.myschool.save(update_fields=("last_fit", "lastmodelfile"))
-    self.logger.info('Done...')
+    if self.modeltype == 1:
+      dlurl += 'K/'
+    elif self.modeltype == 2:
+      dlurl += 'L/'
+    elif self.modeltype == 3:
+      dlurl += 'Q/'
+    dlurl += str(fit_nr)  
+    new_download = download(
+      dl_url = dlurl, 
+      school = self.myschool.id, 
+      model_kat = self.modeltype, 
+    )
+    new_download.save()
+    self.logger.info('DL Url: ' + dlurl)
     return(0)

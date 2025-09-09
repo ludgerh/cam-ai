@@ -16,6 +16,7 @@ v1.6.1 30.03.2025
 """
 
 import os
+import json
 import numpy as np
 import cv2 as cv
 import pickle
@@ -468,7 +469,7 @@ class tf_worker(spawn_process):
           'scho' : school_dbline.e_school,
         }
         xytemp = json.loads(await self.continue_sending(json.dumps(outdict), 
-          opcode=1, loggprocess_bufferer=logger, get_answer=True))
+          opcode=1, logger=logger, get_answer=True))
         self.models[schoolnr]['xdim'] = xytemp[0]
         self.models[schoolnr]['ydim'] = xytemp[1]
         await a_break_time(self.dbline.gpu_sim_loading)

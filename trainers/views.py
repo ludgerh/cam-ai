@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@ from tf_workers.models import school
 from schools.c_schools import get_taglist
 from tools.l_tools import djconf
 from tools.tokens import checktoken
-from .models import model_type
+from .models import model_type, fit
 
 emulatestatic = safe_import('emulatestatic') 
 
@@ -83,18 +83,26 @@ def dashboard(request, schoolnr):
   else:
     return(HttpResponse('No Access'))
     
-def downmodel(request, schoolnr, tokennr, token, model_type='K'): 
+def downmodel(request, schoolnr, tokennr, token, model_type = 'K', fit_nr = None): 
   if checktoken((tokennr, token), 'MOD', schoolnr):
-    myschool = school.objects.get(pk = schoolnr)
-    filename = myschool.dir + 'model/'
-    if model_type == 'K':
-      filename += myschool.model_type + '.keras'
-    elif model_type == 'L':
-      filename += myschool.model_type + '.tflite'
-    elif model_type == 'Q':
-      filename += 'q_' + myschool.model_type + '.tflite'
-    modelfile = open(filename, 'rb')
-    return FileResponse(modelfile)
+    if fit_nr:
+      fitline = fit.objects.get(id=fit_nr)
+      do_it = fitline.status == 'Done'
+    else:
+      do_it = True
+    if do_it:    
+      myschool = school.objects.get(id = schoolnr)
+      filename = myschool.dir + 'model/'
+      if model_type == 'K':
+        filename += myschool.model_type + '.keras'
+      elif model_type == 'L':
+        filename += myschool.model_type + '.tflite'
+      elif model_type == 'Q':
+        filename += 'q_' + myschool.model_type + '.tflite'
+      modelfile = open(filename, 'rb')
+      return FileResponse(modelfile)
+    else:  
+      return(HttpResponse('Wait!'))
   else:
     return(HttpResponse('No Access.'))
 

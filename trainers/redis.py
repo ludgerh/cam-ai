@@ -45,9 +45,9 @@ class redis(saferedis):
       return(0) 
       
   def get_predict_proc_active(self, idx): 
-    result = int(self.get(self.predict_stringbase + str(idx)+':'))
+    result = self.get(self.predict_stringbase + str(idx)+':')
     if result:
-      return(True)
+      return(int(result))
     else:
       return(False)
       

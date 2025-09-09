@@ -18,6 +18,7 @@ v1.6.6 01.03.25
 import asyncio
 import aiofiles
 import aiofiles.os
+import aiohttp
 import numpy as np
 import cv2 as cv
 from asgiref.sync import sync_to_async
@@ -154,16 +155,20 @@ class trainer(spawn_process):
       self.job_queue = asyncio.Queue()
       self.school_cache = {}
       self.frames_cache = {}
+      self.check_dl_ts = 0.0
       asyncio.create_task(self.job_queue_thread(), name = 'job_queue_thread')
       await super().async_runner() 
-      if self.dbline.t_type in {2, 3}:
+      if self.dbline.t_type == 2:
         self.process_dict = {}
       while self.do_run:
         timestr = ts2mysqltime(time())
         if((self.dbline.startworking < timestr) 
             and (self.dbline.stopworking > timestr)
             and self.dbline.running):
-          if self.dbline.t_type in {2, 3}:
+          if self.dbline.t_type == 1: 
+            if train_once_gpu is None:
+              from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
+          elif self.dbline.t_type == 2:
             for item in list(self.process_dict):
               if not self.process_dict[item][0].is_alive():
                 filterdict = {
@@ -176,13 +181,17 @@ class trainer(spawn_process):
                 myschool.l_rate_divisor = 10000.0
                 await myschool.asave(update_fields=['l_rate_divisor'])
                 del self.process_dict[item]
+            if train_once_remote is None:
+              from .train_worker_remote import train_once_remote, check_downloads
+              self.aiohttp = aiohttp.ClientSession()
+            if (new_time := time()) - self.check_dl_ts > 10.0: 
+              self.check_dl_ts = new_time
+              await check_downloads(self.logger, self.aiohttp)  
           try:  
             myschool, myfit = await asyncio.wait_for(self.job_queue.get(), timeout = 1.0)
           except asyncio.TimeoutError:
             continue  
           if self.dbline.t_type == 1:
-            if train_once_gpu is None:
-              from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
             train_process = Process(target = train_once_gpu, args = (
               myschool, 
               myfit, 
@@ -196,9 +205,7 @@ class trainer(spawn_process):
             train_process.start()
             await asyncio.to_thread(train_process.join)
             trainresult = (train_process.exitcode)
-          elif self.dbline.t_type in {2, 3}:
-            if train_once_remote is None:
-              from .train_worker_remote import train_once_remote
+          elif self.dbline.t_type == 2:
             my_trainer = train_once_remote(
                 myschool, 
                 myfit, 

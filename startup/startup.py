@@ -19,6 +19,7 @@ import asyncio
 import os
 from glob import glob
 from signal import signal, SIGINT
+from multiprocessing import Lock as p_lock
 from .redis import my_redis as startup_redis
 from tools.l_tools import djconf, kill_all_processes
 from tools.l_break import a_break_type, a_break_time, BR_LONG
@@ -120,7 +121,14 @@ class startup_class():
       if (item := startup_redis.get_start_trainer_busy()):
         if (item in trainers):
           trainers[item].stop()
-        trainers[item] = trainer(item)
+        glob_lock = p_lock()
+        my_worker = tf_workers[1] #may be variable in the future 
+        trainers[item] = trainer(
+          item, 
+          my_worker.inqueue,
+          my_worker.registerqueue,
+          glob_lock,
+        )
         trainers[item].start()
         startup_redis.set_start_trainer_busy(0)
       if (item := startup_redis.get_start_worker_busy()):

@@ -34,7 +34,7 @@ def initialize():
   from trainers.models import trainer as trainer_mod
   from trainers.c_trainers import trainer
   glob_lock = p_lock()
-  my_worker = tf_workers[1] #may variable in the future 
+  my_worker = tf_workers[1] #may be variable in the future 
   for item in trainer_mod.objects.filter(active=True):
     trainers[item.id] = trainer(
       item.id, 

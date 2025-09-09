@@ -48,7 +48,7 @@ class img_size(models.Model):
 class trainframe(models.Model):
   deleted = models.BooleanField(default=False)
   made = models.DateTimeField()
-  school = models.SmallIntegerField()
+  school = models.IntegerField()
   encrypted = models.BooleanField(default=True)
   name = models.CharField(max_length=256)
   code = models.CharField(max_length=2)
@@ -81,6 +81,11 @@ class trainframe(models.Model):
 
   def __str__(self):
     return('Trainframe, Name = '+self.name)
+
+  class Meta:
+    indexes = [
+        models.Index(fields=["name", "school"]),
+    ]
 
 class fit(models.Model):
   made = models.DateTimeField(default=timezone.now)
@@ -137,9 +142,19 @@ class epoch(models.Model):
     return('epoch model (TBD ...)')
     
 class model_type(models.Model):
-  name =  models.CharField(max_length=50, default = 'efficientnetv2-b0')  
+  name = models.CharField(max_length=50, default = 'efficientnetv2-b0')  
   x_in_default = models.IntegerField(default=224)
   y_in_default = models.IntegerField(default=224)
 
   def __str__(self):
     return('model_type, Name = '+self.name)
+    
+class download(models.Model):
+  dl_url = models.CharField(max_length=128)
+  school = models.IntegerField(default=1)
+  model_kat = models.IntegerField("model type", choices=((1, 'Keras'), (2, 'LiteRT'), 
+    (3, 'LiteRTQ')), default=2) #Codes for download: K, L, Q
+  model_type = models.CharField(max_length=50, default='efficientnetv2-b0') 
+
+  def __str__(self):
+    return('Model download, Url = '+self.dl_url)
