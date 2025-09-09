@@ -116,7 +116,9 @@ class acaminst(AsyncWebsocketConsumer):
         while startup_redis.get_start_stream_busy():
           await asyncio.sleep(long_brake)
         startup_redis.set_start_stream_busy(newstream.id)
-        while (not (newstream.id in viewables and 'stream' in viewables[newstream.id])):
+        while (not (newstream.id in viewables 
+            and 'stream' in viewables[newstream.id] 
+            and 'E' in viewables[newstream.id])):
           await asyncio.sleep(long_brake)
         await evt_condition.objects.filter(eventer = newstream).adelete()
         new_condition = evt_condition(reaction = 1, eventer = newstream, y = 1)

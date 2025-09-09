@@ -124,4 +124,13 @@ async def db_ini():
     'name' : 'proxy-sound',
     'mendef' : '[["s", "IP", "1.2.3.4"], ["i", "channel", 1]]', 
   })
+  await add_if_none(alarm_device_type, 'name', {
+    'name' : 'tasmota',
+    'mendef' : '[["s", "IP", "1.2.3.4"], '
+      + '["s", "board_type", ""], ' 
+      + '["s", "action", "onoff"], ' 
+      + '["i", "count", 1], ' 
+      + '["i", "time", 1.0]'
+      + ']', 
+  })
   

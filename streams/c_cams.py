@@ -56,7 +56,6 @@ class c_cam(viewable):
       setproctitle('CAM-AI-Camera #'+str(self.id))
       self.fifo_path = await djconf.agetconfig('fifo_path', '/home/cam_ai/shm/')
       self.fifo_path += f'cam{self.id}.pipe'
-      print('##########', self.fifo_path)
       if self.dbline.cam_virtual_fps:
         self.wd_ts = 0.0
         self.wd_interval = 1.0
@@ -526,8 +525,8 @@ class c_cam(viewable):
       #if inp_frame_rate:
       #  inparams += ['-vf', 'fps=' + str(inp_frame_rate)]
       generalparams = ['-y']
-      generalparams += ['-v', 'info']
-      #generalparams += ['-v', 'fatal']
+      #generalparams += ['-v', 'info']
+      generalparams += ['-v', 'fatal']
       #if is_raspi():
       #  generalparams += ['-threads', '1']
       if not self.dbline.cam_virtual_fps:
@@ -652,6 +651,7 @@ class c_cam(viewable):
   async def reset_cam(self):
     if not self.cam_active:
       return()
+    await self.stopprocess() 
     self.logger.info('Cam #'+str(self.id)+' is off')
     if self.ff_proc is not None:
       await self.dbline.arefresh_from_db()

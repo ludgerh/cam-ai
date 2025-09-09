@@ -88,6 +88,7 @@ class stream(models.Model):
   eve_scale_x_view = models.FloatField(default=1.0)
   eve_shrink_factor = models.FloatField("shrink factor", default=0.2) # 0.0 -> No Shrinking 1.0 50%
   eve_sync_factor = models.FloatField("sync factor", default=0.0) # in seconds
+  eve_alarm_max_nr = models.IntegerField("max alarm nr", default=99)
   eve_alarm_email = models.CharField("alarm email", max_length=255, default='')
   eve_event_time_gap = models.IntegerField("new event gap", default=60)
   eve_margin = models.IntegerField("frame margin", default=20)

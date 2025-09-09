@@ -19,6 +19,7 @@ import asyncio
 from asgiref.sync import sync_to_async
 from time import sleep
 from channels.db import database_sync_to_async
+from tools.l_break import a_break_type, BR_LONG
 from .models import alarm as dbalarm
 from .alarm_base import alarm_base, init_failed_exception
 
@@ -35,6 +36,9 @@ if plugin_taposwitch_ok:
 plugin_proxy_ok = os.path.exists('plugins/cam_ai_proxy')
 if plugin_proxy_ok:
   from plugins.cam_ai_proxy.proxy import proxy_gpio_alarm, proxy_sound_alarm
+plugin_tasmota_ok = os.path.exists('plugins/cam_ai_tasmota')
+if plugin_tasmota_ok:
+  from plugins.cam_ai_tasmota.tasmota import tasmota_alarm
   
 mylogger = None 
 alarm_dict = {}
@@ -84,6 +88,7 @@ async def make_alarm(alarm_line):
           break
         except init_failed_exception as e:
           mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
+          await a_break_type(BR_LONG)
     else:
       mylogger.warning('***** For alarm device proxy-gpio we need the proxy-plugin, '
         + 'ignoring this alarm.') 
@@ -94,13 +99,23 @@ async def make_alarm(alarm_line):
           return(await database_sync_to_async(proxy_sound_alarm)(alarm_line, mylogger))
         except init_failed_exception as e:
           mylogger.warning('!!!!! Proxy init failed: ' + str(e)) 
+          await a_break_type(BR_LONG)
     else:
       mylogger.warning('***** For alarm device proxy-sound we need the proxy-plugin, '
+        + 'ignoring this alarm.')  
+  elif device_type_name == 'tasmota':
+    if plugin_tasmota_ok:  
+      while True:
+        try:
+          return(await database_sync_to_async(tasmota_alarm)(alarm_line, mylogger))
+        except init_failed_exception as e:
+          mylogger.warning('!!!!! Tasmota init failed: ' + str(e)) 
+          await a_break_type(BR_LONG)
+    else:
+      mylogger.warning('***** For alarm device tasmota we need the tasmota-plugin, '
         + 'ignoring this alarm.')   
 
 async def alarm(stream_id, pred):
-  global alarm_dict
-  new_alarm_dict = {}
   items = await sync_to_async(
     lambda: list(
       dbalarm.objects
@@ -108,17 +123,19 @@ async def alarm(stream_id, pred):
       .select_related("mydevice__device_type")
     )
   )()
-  for item in items:
-    new_alarm_dict[item.id] = item
-  for i, item in new_alarm_dict.items():
-    if i not in alarm_dict:
-      alarm_dict[i] = await make_alarm(item)
-    else:
-      if (item.mendef != alarm_dict[i].mendef
-          or item.mydevice_id != alarm_dict[i].device_id):
+  if items:
+    new_alarm_dict = {}
+    for item in items:
+      new_alarm_dict[item.id] = item
+    for i, item in new_alarm_dict.items():
+      if i not in alarm_dict:
         alarm_dict[i] = await make_alarm(item)
-  for i in list(alarm_dict):
-    if i not in new_alarm_dict:
-      del alarm_dict[i]  
-  tasks = [item.action(pred=pred) for item in alarm_dict.values()]
-  await asyncio.gather(*tasks)
+      else:
+        if (item.mendef != alarm_dict[i].mendef
+            or item.mydevice_id != alarm_dict[i].device_id):
+          alarm_dict[i] = await make_alarm(item)
+    for i in list(alarm_dict):
+      if i not in new_alarm_dict:
+        del alarm_dict[i]  
+    tasks = [item.action(pred=pred) for item in alarm_dict.values()]
+    await asyncio.gather(*tasks)

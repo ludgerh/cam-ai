@@ -173,6 +173,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             myschool = await school.objects.aget(id = value)
             self.myitem.dbline.eve_school = myschool 
             self.myitem.inqueue.put(('set_school', value))
+          elif params['pname'] == 'eve_alarm_max_nr':
+            value = int(params['value'])
+            self.myitem.dbline.eve_alarm_max_nr = value
+            self.myitem.inqueue.put(('set_alarm_max_nr', value))
           elif params['pname'] == 'eve_alarm_email':
             self.myitem.dbline.eve_alarm_email = params['value']
             self.myitem.inqueue.put(('set_alarm_email', params['value']))

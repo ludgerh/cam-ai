@@ -26,6 +26,7 @@ class init_failed_exception(Exception):
 class alarm_base():
   def __init__(self, dbline, logger):
     self.mendef = dbline.mendef
+    self.name = dbline.name
     self.params = json.loads(dbline.mendef)
     self.stream = dbline.mystream
     self.device_id = dbline.mydevice.id

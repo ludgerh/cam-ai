@@ -137,6 +137,7 @@ class c_event(list):
       self.focus_time = frame[2]
       self.check_out_ts = None
       self.dirs_checked = False
+      self.remaining_alarms = eventer_dbl.eve_alarm_max_nr
   
   @classmethod  
   async def create(cls, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 

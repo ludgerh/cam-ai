@@ -144,8 +144,10 @@ class remotetrainer(AsyncWebsocketConsumer):
                     school = self.myschoolline.id,
                     name = item,
                     code = jsondata[11],
-                    c0 = jsondata[0], c1 = jsondata[1], c2 = jsondata[2], c3 = jsondata[3],
-                    c4 = jsondata[4], c5 = jsondata[5], c6 = jsondata[6], c7 = jsondata[7],
+                    c0 = jsondata[0], c1 = jsondata[1], 
+                    c2 = jsondata[2], c3 = jsondata[3],
+                    c4 = jsondata[4], c5 = jsondata[5], 
+                    c6 = jsondata[6], c7 = jsondata[7],
                     c8 = jsondata[8], c9 = jsondata[9],
                     checked = 1,
                     train_status = 0,
@@ -290,7 +292,9 @@ class remotetrainer(AsyncWebsocketConsumer):
         else:
           if indict['mode'] == 'init':
             try:    
-              fitline = await fit.objects.filter(school=self.myschoolline.id).alatest('id')
+              fitline = await fit.objects.filter(
+                school = self.myschoolline.id
+              ).alatest('id')
               self.lastfit = fitline.id
               model_type = self.myschoolline.model_type
             except fit.DoesNotExist:

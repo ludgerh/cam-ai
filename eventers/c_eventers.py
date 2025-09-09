@@ -120,6 +120,8 @@ class c_eventer(viewable):
     elif (received[0] == 'set_school'):
       self.school_line = await school.objects.aget(id=received[1])
       self.dbline.eve_school = self.school_line
+    elif (received[0] == 'set_alarm_max_nr'):
+      self.dbline.eve_alarm_max_nr = received[1]
     elif (received[0] == 'set_alarm_email'):
       self.dbline.eve_alarm_email = received[1]
     elif (received[0] == 'cond_open'):
@@ -422,7 +424,9 @@ class c_eventer(viewable):
     else:
       predictions = None   
     if await self.resolve_rules(self.cond_dict[5], predictions):
-      await alarm(self.id, predictions) 
+      if item.remaining_alarms:
+        await alarm(self.id, predictions) 
+        item.remaining_alarms -= 1
     if item.check_out_ts:
       if predictions is None and self.cond_dict[2]:
         predictions = await item.pred_read(max=1.0)

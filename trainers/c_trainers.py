@@ -79,9 +79,9 @@ class trainer(spawn_process):
     school_dbline = await school.objects.aget(id = school_nr)
     framelines = (trainframe.objects
       .filter(school = school_nr, deleted = False)
-      .exclude(last_fit=school_dbline.last_fit)) 
+      .exclude(last_fit=school_dbline.last_fit)[:1000])
     frames = []
-    async for item in framelines.aiterator(chunk_size=1000):
+    async for item in framelines.aiterator():
       frames.append(item)
     if frames:  
       self.logger.info(
@@ -155,7 +155,6 @@ class trainer(spawn_process):
       self.school_cache = {}
       self.frames_cache = {}
       asyncio.create_task(self.job_queue_thread(), name = 'job_queue_thread')
-      #print('Launch: trainer')
       await super().async_runner() 
       if self.dbline.t_type in {2, 3}:
         self.process_dict = {}
