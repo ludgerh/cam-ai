@@ -149,7 +149,7 @@ class trainer(spawn_process):
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg)
-      self.tf_w_index = await self.tf_worker.register(1)
+      self.tf_w_index = await self.tf_worker.register(1, prio = 8)
       await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
       self.finished = False
       self.job_queue = asyncio.Queue()

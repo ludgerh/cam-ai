@@ -138,12 +138,9 @@ class train_once_remote():
     remoteset = set()
     remoteset_with_size = set()
     remotedict = {}
-    remotelist = []
     while True:
       if (item := json.loads(self.ws.recv())) == 'done':
         break
-      remotelist.append(item)
-    for item in remotelist:
       remotedict[item[0]] = item[1]
       remoteset.add(item[0])
       if item[2]:
@@ -164,15 +161,17 @@ class train_once_remote():
       localdict[item.name] += [seq_to_int(localdict[item.name])]
       localdict[item.name] += [item.code]
       localset.add(item.name)
-    count = len(remoteset & localset)
-    for item in (remoteset & localset):
+    temp_set = remoteset & localset
+    count = len(temp_set)
+    for item in (temp_set):
       if remotedict[item] != localdict[item][10]:
         self.logger.info('(' + str(count) + ') Changed, deleting: ' + item)
         remoteset.remove(item)
       count -= 1  
       self.send_ping()
-    count = len(remoteset - localset)
-    for item in (remoteset - localset):
+    temp_set = remoteset - localset
+    count = len(temp_set)
+    for item in (temp_set):
       self.logger.info('(' + str(count) + ') Deleting: ' + item)
       outdict = {
         'code' : 'delete',
@@ -188,7 +187,6 @@ class train_once_remote():
           i += 1
       count -= 1
       self.send_ping()
-
     datalist = list(localset - remoteset_with_size) 
     count = len(datalist)
     start = 0

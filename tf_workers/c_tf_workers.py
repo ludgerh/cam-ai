@@ -23,8 +23,8 @@ import pickle
 import asyncio
 import aiofiles
 import aiohttp
+import itertools
 from multiprocessing import Queue as p_queue, SimpleQueue as s_queue
-from collections import deque
 from time import time
 from datetime import datetime
 from threading import Lock as t_lock
@@ -53,41 +53,39 @@ def sigint_handler(signal, frame):
 #
 #***************************************************************************
 
-class model_buffer(deque):
+class model_buffer(asyncio.PriorityQueue):
 
-  def __init__(self, schoolnr, xdim, ydim, websocket):
+  def __init__(self, schoolnr, xdim, ydim):
     super().__init__()
+    self._counter = itertools.count()
     self.ts = time()
     self.xdim = xdim
     self.ydim = ydim
-    self.websocket = websocket
     self.pause = True
 
-  async def append(self, initem):
+  async def append(self, initem, prio):
     # structure of initem:
     # initem[0] = userindex, schoolnr, initem[1] = np.image, initem[2] = np.image...
     # structure of outitem:
     # outitem[0] = np.image, outitem[1] = userindex
     if self.pause:
-      break_type(BR_LONG)
+      await a_break_type(BR_LONG)
       return()
     for frame in initem[2:]:
-      if self.websocket:
-        if frame.shape[1] * frame.shape[0] > self.xdim * self.ydim:
-          frame = await asyncio.to_thread(cv.resize, frame, (self.xdim, self.ydim))
-      else:
-        if frame.shape[1] != self.xdim or  frame.shape[0] != self.ydim:
-          frame = await asyncio.to_thread(cv.resize, frame, (self.xdim, self.ydim))
-        super().append((frame, initem[0]))
+      if frame.shape[1] != self.xdim or  frame.shape[0] != self.ydim:
+        frame = await asyncio.to_thread(cv.resize, frame, (self.xdim, self.ydim))
+      cnt = next(self._counter) 
+      await super().put((prio, cnt, (frame, initem[0])))
 
-  def get(self, maxcount):
+  async def get(self, maxcount):
     result = []
     while True:
-      if not len(self):
+      if self.empty():
         break
       else:  
-        initem = self.popleft()
-      result.append(initem)
+        outitem = (await super().get())[2]
+        #prio, count, outitem = (await super().get())
+      result.append(outitem)
       if len(result) >= maxcount:
         break 
     return(result)
@@ -95,12 +93,13 @@ class model_buffer(deque):
 class tf_user(object):
   clientset = set()
 
-  def __init__(self):
+  def __init__(self, prio = 4):
       i = 0
       while (i in self.clientset):
         i += 1
       self.clientset.add(i)
       self.id = i 
+      self.prio = prio
 
   def __del__(self):
       self.clientset.discard(self.id)
@@ -167,7 +166,6 @@ class tf_worker(spawn_process):
       schoolnr = received[2]
       await self.check_model(schoolnr, self.logger, True)
       if len(received) == 3: #no images
-        await self.my_output.put(received[1], ('ask_pred_ok', True))
         return(True)
       while not 'xdim' in self.models[schoolnr]:
         await a_break_type(BR_LONG)
@@ -175,13 +173,14 @@ class tf_worker(spawn_process):
         self.model_buffers[schoolnr] = model_buffer(schoolnr, 
           self.models[schoolnr]['xdim'], 
           self.models[schoolnr]['ydim'],
-          self.dbline.use_websocket,
         )
-      await self.my_output.put(received[1], ('ask_pred_ok', True))
       self.model_buffers[schoolnr].pause = False
-      await self.model_buffers[schoolnr].append(received[1:])
+      await self.model_buffers[schoolnr].append(
+        received[1:], 
+        self.users[received[1]].prio,
+      )
     elif (received[0] == 'register'):
-      myuser = tf_user()
+      myuser = tf_user(prio = received[1])
       self.users[myuser.id] = myuser
       self.registerqueue.put(myuser.id)
     elif (received[0] == 'checkmod'):
@@ -254,9 +253,6 @@ class tf_worker(spawn_process):
       self.load_model = None
       if self.dbline.gpu_sim >= 0: # Random values
         self.cachedict = {}
-      elif self.dbline.use_websocket: # Websocket
-        if self.dbline.wsname:
-          await self.reset_websocket()
       else: #Local CPU or GPU
         if self.dbline.use_litert:
           if sysinfo()['hw'] == 'raspi':
@@ -292,14 +288,10 @@ class tf_worker(spawn_process):
       #print('Launch: tf_worker')
       await super().async_runner() 
       while self.do_run and not self.model_buffers:
-        if self.dbline.use_websocket:
-          await self.send_ping()
         await a_break_type(BR_LONG)
       self.finished = False
       wait_autos = {}
       while self.do_run:
-        if self.dbline.use_websocket:
-          await self.send_ping()
         while self.do_run:
           schoolnr += 1
           if schoolnr > max(self.model_buffers):
@@ -314,10 +306,10 @@ class tf_worker(spawn_process):
               wait_autos[schoolnr] = a_break_auto()  
             timeout = time() > self.model_buffers[schoolnr].ts + self.dbline.timeout
             if (schoolnr in self.model_buffers
-                and (len(self.model_buffers[schoolnr]) >= self.dbline.maxblock
+                and (self.model_buffers[schoolnr].qsize() >= self.dbline.maxblock
                 or timeout)):
               wait_autos[schoolnr].reset()
-              if self.do_run and len(self.model_buffers[schoolnr]):
+              if self.do_run and not self.model_buffers[schoolnr].empty():
                 await self.process_buffer(schoolnr, self.logger, timeout)
               self.model_buffers[schoolnr].ts = time() 
             else:
@@ -328,97 +320,6 @@ class tf_worker(spawn_process):
       self.logger.error(
         'Error in process: ' + self.logname)
       self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
-
-  async def send_ping(self):
-    if self.ws_ts is None:
-      return()
-    if (time() - self.ws_ts) > 15:
-      while True:
-        try:
-          await asyncio.to_thread(self.ws.send, 'Ping', opcode=1)
-          self.ws_ts = time()
-          break
-        except (ConnectionResetError, OSError, BrokenPipeError):
-          await a_break_type(BR_LONG)
-          await self.reset_websocket()
-
-  async def reset_websocket(self):
-    from websockets import WebSocket
-    #enableTrace(True)
-    from websocket._exceptions import (WebSocketTimeoutException, 
-      WebSocketConnectionClosedException,
-      WebSocketBadStatusException, 
-      WebSocketAddressException,
-    )
-    while self.do_run:
-      try:
-        self.ws_ts = time()
-        self.ws = WebSocket()
-        self.ws.connect(self.dbline.wsserver+'ws/predictions/')
-        outdict = {
-          'code' : 'auth',
-          'name' : self.dbline.wsname,
-          'pass' : self.dbline.wspass,
-          'ws_id' : self.dbline.wsid,
-          'ws_name' : self.dbline.wsname,
-          'worker_nr' : self.id,
-          'soft_ver' : djconf.getconfig('version', 'not set'),
-        }
-        await asyncio.to_thread(self.ws.send, json.dumps(outdict), opcode=1) #1 = Text
-        await asyncio.to_thread(self.ws.recv)    
-        break
-      except (BrokenPipeError, 
-            TimeoutError,
-            WebSocketBadStatusException, 
-            ConnectionRefusedError,
-            WebSocketConnectionClosedException,
-            WebSocketAddressException,
-            OSError,
-          ):
-        self.logger.warning('BrokenPipe or Timeout while resetting '
-          + 'prediction websocket server')
-        await a_break_type(BR_LONG)
-
-  async def continue_sending(self, payload, opcode=1, logger=None, get_answer=False):
-    while self.do_run:
-      while self.do_run:
-        try:
-          if opcode:
-            await asyncio.to_thread(self.ws.send, payload, opcode = 1) # 1 = Text
-            frameinfo = getframeinfo(currentframe())
-          else:
-            await asyncio.to_thread(self.ws.send_binary, payload)
-            frameinfo = getframeinfo(currentframe())
-          break
-        except (BrokenPipeError,
-              TimeoutError,
-              WebSocketBadStatusException, 
-              ConnectionRefusedError,
-              WebSocketConnectionClosedException,
-              WebSocketAddressException,
-              OSError,
-            ):
-          if logger:
-            frameinfo = getframeinfo(currentframe())
-            logger.warning('Pipe error while sending in ' + frameinfo.filename 
-              + ':' + str(frameinfo.lineno))
-          await a_break_type(BR_LONG)    
-          await self.reset_websocket()
-      if get_answer:
-        try:
-          return(await asyncio.to_thread(self.ws.recv))
-        except (WebSocketTimeoutException, 
-              WebSocketConnectionClosedException, 
-              ConnectionRefusedError,
-            ):
-          if logger:
-            logger.warning('Pipe error while reading in ' + frameinfo.filename 
-              + ':' + str(frameinfo.lineno))
-          await a_break_type(BR_LONG)
-          await self.reset_websocket()
-      else:
-        return(None)
-    
 
 #***************************************************************************
 #
@@ -453,7 +354,7 @@ class tf_worker(spawn_process):
         self.models[nr_to_replace]['model_type'] = None   
         del self.models[nr_to_replace]['model']
         self.active_models -= 1
-      if (self.dbline.gpu_sim >= 0) or self.dbline.use_websocket: #remote or simulation
+      if self.dbline.gpu_sim >= 0: #simulation
         self.models[schoolnr]['fit_nr'] = 1
         self.models[schoolnr]['model_type'] = 'simulation'
       else:  #lokal GPU
@@ -463,17 +364,6 @@ class tf_worker(spawn_process):
       if self.dbline.gpu_sim >= 0:
         self.models[schoolnr]['xdim'] = 50
         self.models[schoolnr]['ydim'] = 50
-      elif self.dbline.use_websocket:
-        outdict = {
-          'code' : 'get_xy',
-          'scho' : school_dbline.e_school,
-        }
-        xytemp = json.loads(await self.continue_sending(json.dumps(outdict), 
-          opcode=1, logger=logger, get_answer=True))
-        self.models[schoolnr]['xdim'] = xytemp[0]
-        self.models[schoolnr]['ydim'] = xytemp[1]
-        await a_break_time(self.dbline.gpu_sim_loading)
-        
       else: #lokal GPU
         if self.dbline.use_litert:
           model_path = (school_dbline.dir 
@@ -534,7 +424,7 @@ class tf_worker(spawn_process):
   async def process_buffer(self, schoolnr, logger, had_timeout=False):
     mybuffer = self.model_buffers[schoolnr]
     ts_one = time()
-    slice_to_process = mybuffer.get(self.dbline.maxblock)
+    slice_to_process = await mybuffer.get(self.dbline.maxblock)
     framelist = [item[0] for item in slice_to_process]
     framesinfo = [item[1] for item in slice_to_process]
     await self.check_model(schoolnr, logger, True)
@@ -554,59 +444,12 @@ class tf_worker(spawn_process):
           line = np.array([np.float32(line)])
           self.cachedict[myindex] = line
         predictions = np.vstack((predictions, line))
-    elif self.dbline.use_websocket: #Predictions from Server
-      self.ws_ts = time()
-      outdict = {
-        'code' : 'imgl',
-        'scho' : models[schoolnr]['dbline'].e_school,
-      }
-      result = json.loads(
-          await self.continue_sending(json.dumps(outdict), 
-          opcode=1, 
-          logger=logger, get_answer=True
-        )
-      )
-      if result != 'OK':
-        logger.error(result)
-        return()
-      while True:
-        try:
-          for item in framelist:
-            jpgdata = await asyncio.to_thread(
-              lambda: cv.imencode('.jpg', 
-              item)[1].tobytes(), 
-            )
-            schoolbytes = models[schoolnr]['dbline'].e_school.to_bytes(8, 'big')
-            await self.continue_sending(schoolbytes+jpgdata, opcode=0, 
-              logger=logger, get_answer=False)
-          outdict = {
-            'code' : 'done',
-            'scho' : models[schoolnr]['dbline'].e_school,
-          }
-          predictions = await self.continue_sending(json.dumps(outdict), opcode=1, 
-            logger=logger, get_answer=True)
-          try:  
-            predictions = json.loads(predictions) 
-          except json.decoder.JSONDecodeError:
-            self.logger.error('Error in process: ' + self.logname)
-            self.logger.error(format_exc())
-            self.logger.error('***** Received predictions: *' + str(predictions) + '*')
-            predictions = None  
-          if predictions is None:
-            predictions = np.zeros((len(framelist), self.len_taglist), np.float32)
-          else:
-            predictions = np.array(predictions, dtype=np.float32)
-          break
-        except (ConnectionResetError, OSError):
-          await a_break_type(BR_LONG)
-          await self.reset_websocket()
     else: #local GPU
       if self.dbline.use_litert: #Predictions Tensorflow Lite
         predictions = np.empty((0, self.len_taglist), np.float32)
         for item in framelist:
           np.copyto(self.models[schoolnr]['int_input'](), item)
           await asyncio.to_thread(self.models[schoolnr]['model'].invoke)
-          #self.models[schoolnr]['model'].invoke()
           line=np.zeros((1, self.len_taglist), np.float32)
           np.copyto(line, self.models[schoolnr]['int_output']())
           predictions = np.vstack((predictions, line))
@@ -686,23 +529,21 @@ class tf_worker_client():
         elif (received[0] == 'pred_to_send'):
           while True:
             with self.pred_out_lock:
-              if  received[2] not in self.pred_out_dict:
+              if received[2] not in self.pred_out_dict:
                 self.pred_out_dict[received[2]] = None
               if self.pred_out_dict[received[2]] is None:
                 self.pred_out_dict[received[2]] = received[1]
                 self.auto_break.reset()
                 break
             await self.auto_break.wait() 
-        elif (received[0] == 'ask_pred_ok'):
-          self.ask_pred_ok = received[1]
         else:
           raise QueueUnknownKeyword(received[0])
     except Exception as fatal:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.critical("out_reader_proc crashed: %s", fatal, exc_info=True)
 
-  async def register(self, worker_id):
-    await self.inqueue.put(('register', 0, ))
+  async def register(self, worker_id, prio = 4):
+    await self.inqueue.put(('register', prio, ))
     self.tf_w_index = await asyncio.to_thread(self.registerqueue.get)
     self.id = worker_id
     self.my_output = output_dist(self.id)
@@ -739,14 +580,9 @@ class tf_worker_client():
     return(self.xy)
 
   async def ask_pred(self, school, image_list, tf_w_index):
-    self.ask_pred_ok = None
     command_line = ['ask_pred', tf_w_index, school, ]
     command_line += image_list
     await self.inqueue.put(command_line)
-    while self.ask_pred_ok is None:
-      await self.auto_break.wait() 
-    self.auto_break.reset()  
-    return(self.ask_pred_ok)
 
   async def client_check_model(self, tf_w_index, schoolnr, test_pred = False):
     await self.inqueue.put((

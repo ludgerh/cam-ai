@@ -98,7 +98,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         cod_x = self.myschoolline.model_xin
         cod_y = self.myschoolline.model_yin
         ram_file = io.BytesIO(bytes_data)
-        if self.mytrainerline.t_type in {2, 3}:
+        if self.mytrainerline.t_type == 2:
           zip_buffer = io.BytesIO()  
           zip_content = ram_file.read()
           await self.ws.send_bytes(zip_content)
@@ -168,7 +168,7 @@ class remotetrainer(AsyncWebsocketConsumer):
         self.mytrainerline = await dbtrainer.objects.aget(
           id = self.myschoolline.trainer_nr
         )
-        if self.mytrainerline.t_type in {2, 3}:
+        if self.mytrainerline.t_type == 2:
           if self.ws_session is None:
             import aiohttp
             self.ws_session = aiohttp.ClientSession()
@@ -192,15 +192,13 @@ class remotetrainer(AsyncWebsocketConsumer):
         await self.send(json.dumps('OK'))
           
       elif indict['code'] == 'namecheck':
-        if self.mytrainerline.t_type in {2, 3}:
+        if self.mytrainerline.t_type == 2:
           indict['school'] = self.myschoolline.e_school
           await self.ws.send_str(json.dumps(indict))
           while True:
-            result = await self.ws.receive()
-            result = result.data
-            result = json.loads(result)
-            await self.send(json.dumps(result))
-            if result == 'done':
+            result = (await self.ws.receive()).data
+            await self.send(result)
+            if json.loads(result) == 'done':
               break
         else:
           try:
@@ -224,12 +222,10 @@ class remotetrainer(AsyncWebsocketConsumer):
           await self.send(json.dumps('done'))
                   
       elif indict['code'] == 'init_trainer':
-        if self.mytrainerline.t_type in {2, 3}:
+        if self.mytrainerline.t_type == 2:
           indict['school'] = self.myschoolline.e_school
           await self.ws.send_str(json.dumps(indict))
-          result = await self.ws.receive()
-          result = json.loads(result.data)
-          await self.send(json.dumps(result))
+          await self.send((await self.ws.receive()).data)
         else:
           self.trainer_nr, count = await get_trainer_nr(self.myschoolline)
           self.mytrainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
@@ -252,10 +248,9 @@ class remotetrainer(AsyncWebsocketConsumer):
             await self.close() 
         
       elif indict['code'] == 'delete':
-        if self.mytrainerline.t_type in {2, 3}:
+        if self.mytrainerline.t_type == 2:
           await self.ws.send_str(json.dumps(indict))
-          result = await self.ws.receive()
-          await self.send(result.data)
+          await self.send((await self.ws.receive()).data)
         else:
           frameline = await trainframe.objects.aget(
             name=indict['name'], 
@@ -266,17 +261,16 @@ class remotetrainer(AsyncWebsocketConsumer):
           await self.send('OK')
         
       elif indict['code'] == 'trainnow':
-        if self.mytrainerline.t_type in {2, 3}:
+        if self.mytrainerline.t_type == 2:
           await self.ws.send_str(json.dumps(indict))
         else:
           await sync_to_async(self.myschoolline.trainers.add)(self.mytrainerline)
           
       elif indict['code'] == 'checkfitdone':
-        if self.mytrainerline.t_type in {2, 3}:
+        if self.mytrainerline.t_type == 2:
           indict['school'] = self.myschoolline.e_school
           await self.ws.send_str(json.dumps(indict))
-          result = await self.ws.receive()
-          result = json.loads(result.data)
+          result = json.loads((await self.ws.receive()).data)
         else:
           if indict['mode'] == 'init':
             try:    
@@ -403,7 +397,7 @@ class trainerutil(AsyncWebsocketConsumer):
           self.trainer_nr, count = await get_trainer_nr(self.schoolline)
           self.trainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
           self.client_version = params['version']
-          if self.trainerline.t_type in {2, 3}:
+          if self.trainerline.t_type == 2:
             if self.ws_session is None:
               import aiohttp
               self.ws_session = aiohttp.ClientSession()
@@ -454,7 +448,7 @@ class trainerutil(AsyncWebsocketConsumer):
         infolocal['recog7'] = await countlist1.filter(c7=1).acount()
         infolocal['recog8'] = await countlist1.filter(c8=1).acount()
         infolocal['recog9'] = await countlist1.filter(c9=1).acount()
-        if self.trainerline.t_type in {2, 3}:
+        if self.trainerline.t_type == 2:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoolline.e_school
           await self.ws.send_str(json.dumps(temp))
@@ -467,7 +461,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))				
 
       elif params['command'] == 'getfitinfo':
-        if self.trainerline.t_type in {2, 3}:
+        if self.trainerline.t_type == 2:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoolline.e_school
           await self.ws.send_str(json.dumps(temp))
@@ -513,7 +507,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'getepochsinfo':
-        if self.trainerline.t_type in {2, 3}:
+        if self.trainerline.t_type == 2:
           temp = json.loads(text_data)
           await self.ws.send_str(json.dumps(temp))
           returned = await self.ws.receive()
@@ -539,7 +533,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))								
 
       elif params['command'] == 'getparams':
-        if self.trainerline.t_type in {2, 3}:
+        if self.trainerline.t_type == 2:
           await self.ws.send_str(text_data)
           returned = await self.ws.receive()
           outlist['data'] = json.loads(returned.data)['data']
@@ -566,7 +560,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))				
 
       elif params['command'] == 'getqueueinfo':
-        if self.trainerline.t_type in {2, 3}:
+        if self.trainerline.t_type == 2:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoolline.e_school
           await self.ws.send_str(json.dumps(temp))
@@ -593,7 +587,7 @@ class trainerutil(AsyncWebsocketConsumer):
           self.close()		
           
       elif params['command'] == 'get_for_dashboard':  	
-        if self.trainerline.t_type in {2, 3}:
+        if self.trainerline.t_type == 2:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoolline.e_school
           await self.ws.send_str(json.dumps(temp))
@@ -620,7 +614,7 @@ class trainerutil(AsyncWebsocketConsumer):
           schoolline = await school.objects.aget(id=self.schoolnr)
           setattr(schoolline, params['item'], params['value'])
           await schoolline.asave(update_fields=[params['item']])
-          if self.trainerline.t_type in {2, 3}:
+          if self.trainerline.t_type == 2:
             temp = json.loads(text_data)
             temp['data']['school']=self.schoolline.e_school
             await self.ws.send_str(json.dumps(temp))
@@ -634,20 +628,13 @@ class trainerutil(AsyncWebsocketConsumer):
           self.close()						
 
       elif params['command'] == 'getavailmodels':
-        if self.trainerline.t_type == 3:
-          temp = json.loads(text_data)
-          temp['data']['school']=self.schoolline.e_school
-          await self.ws.send_str(json.dumps(temp))
-          returned = await self.ws.receive()
-          outlist['data'] = json.loads(returned.data)['data']
-        else:
-          modeldir = self.schoolline.dir
-          outlist['data'] = []
-          model_type_lines = model_type.objects.all()
-          async for item in  model_type_lines:
-            search_path = modeldir + 'model/' + item.name
-            if await aiofiles.os.path.exists(search_path + '.keras'):
-              outlist['data'].append(item.name)
+        modeldir = self.schoolline.dir
+        outlist['data'] = []
+        model_type_lines = model_type.objects.all()
+        async for item in  model_type_lines:
+          search_path = modeldir + 'model/' + item.name
+          if await aiofiles.os.path.exists(search_path + '.keras'):
+            outlist['data'].append(item.name)
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
     except:

@@ -211,7 +211,10 @@ class c_eventer(viewable):
       self.scaling = None
       self.scrwidth = None 
       self.motion_frame = [0,0,0.0]
-      self.last_insert_ts = float('inf')
+      self.last_insert_ready = 0.0
+      self.last_insert_start = float('inf')
+      self.old_frame_ts = 0.0
+      self.old_frame_time = 0.0
       asyncio.create_task(self.check_events())
       asyncio.create_task(self.tags_refresh())
       asyncio.create_task(self.inserter())
@@ -326,8 +329,17 @@ class c_eventer(viewable):
     display_list = [
       item for item in self.eventdict.values() if item.check_out_ts is None
     ]
+    new_frame_time = self.display_deque[0][2]
+    leave = ((new_frame_ts := time()) - self.old_frame_ts 
+      < (new_frame_time - self.old_frame_time) * 0.75)
+    self.old_frame_ts = new_frame_ts
+    self.old_frame_time = new_frame_time
+    if leave:
+      await a_break_type(BR_SHORT)
+      return()
     if (display_list 
-        and self.display_deque[0][2] > self.last_insert_ts + self.dbline.eve_sync_factor):
+        and new_frame_time <= self.last_insert_start + self.dbline.eve_sync_factor
+        and new_frame_time > self.last_insert_ready + self.dbline.eve_sync_factor):
       await a_break_type(BR_SHORT)
       return()
     newframe = self.display_deque.popleft()
@@ -572,6 +584,7 @@ class c_eventer(viewable):
           if frame == 'stop':
             break
           else:
+            self.last_insert_start = frame[2]
             detector_buffer.append(frame)
             await a_break_type(BR_SHORT)   
         if detector_buffer:
@@ -583,13 +596,11 @@ class c_eventer(viewable):
             ) for frame in detector_buffer
           ]
           del frame
-          if not await self.tf_worker.ask_pred(
+          await self.tf_worker.ask_pred(
             self.school_line.id, 
             imglist, 
             self.tf_w_index,
-          ):
-            await a_break_type(BR_MEDIUM)
-            continue
+          )
           predictions = []
           for frame in detector_buffer:
             if len(predictions) == 0:
@@ -619,7 +630,7 @@ class c_eventer(viewable):
             else: 
               found.add_frame(frame)
           await self.merge_events()
-          self.last_insert_ts = frame[2]
+          self.last_insert_ready = frame[2]
           self.inferencing_status = 2
           del frame
           detector_buffer.clear()
