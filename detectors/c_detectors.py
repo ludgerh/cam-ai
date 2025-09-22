@@ -27,19 +27,21 @@ from streams.redis import my_redis as streams_redis
 from tools.c_spawn import viewable
 
 class c_detector(viewable):
-  def __init__(self, dbline, ev_detectorq, logger, ):
+  def __init__(self, dbline, myeventer, logger, ):
     from tools.c_tools import c_buffer
     self.type = 'D'
     self.dbline = dbline
     self.id = dbline.id
     if self.dbline.cam_virtual_fps:
-      self.dataqueue = c_buffer()
+      self.dataqueue = c_buffer(
+        #debug = 'Det' + str(self.id), 
+      )
     else:  
       self.dataqueue = c_buffer(
         block_put = False, 
         #debug = 'Det' + str(self.id), 
       )
-    self.ev_detectorq = ev_detectorq
+    self.myeventer = myeventer  
     self.scaledown = self.get_scale_down()
     super().__init__(logger, )
    
@@ -77,13 +79,15 @@ class c_detector(viewable):
       if self.dbline.det_apply_mask:
         await self.viewer.drawpad.set_mask_local()
       #print('Launch: detector')
-      while self.do_run:
-        frameline = await self.run_one(await self.dataqueue.get())
+      while not self.got_sigint:
+        frameline = await self.dataqueue.get(timeout = 2.0)
+        if frameline:
+          frameline = await self.run_one(frameline)
         if frameline:
           if self.dbline.det_view and streams_redis.view_from_dev('D', self.id):
             await self.viewer.inqueue.put(frameline)
         await a_break_type(BR_SHORT)
-      self.dataqueue.stop()
+      await self.dataqueue.stop()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
     except Exception as fatal:
@@ -94,7 +98,8 @@ class c_detector(viewable):
       )
       self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
     
-  async def process_received(self, received):  
+  async def process_received(self, received): 
+    #print(f'***** DET Inqueue #{self.id}:', received) 
     result = True
     if (received[0] == 'set_fpslimit'):
       self.dbline.det_fpslimit = received[1]
@@ -126,6 +131,8 @@ class c_detector(viewable):
       self.scaledown = self.get_scale_down()
       self.firstdetect = True
       self.run_lock = False
+    elif (received[0] == 'stop'):
+      return(True)
     else:
       result = False  
     return(result)
@@ -134,7 +141,7 @@ class c_detector(viewable):
     if input[2] == 0.0:
       return(None)
     frametime = input[2]
-    if not (self.do_run and self.sl.greenlight(frametime)):
+    if self.got_sigint or not self.sl.greenlight(frametime):
       return(None)
     if self.run_lock and not self.dbline.cam_virtual_fps: 
       return(None)
@@ -233,7 +240,7 @@ class c_detector(viewable):
               recta = self.rect_btoa(rectb)
     if rect_list:  
       rect_list = self.merge_rects(rect_list)  
-      with self.ev_detectorq.multi_put_lock: 
+      with self.myeventer.detectorqueue.multi_put_lock: 
         for rect in rect_list[:self.dbline.det_max_rect]:
           recta = self.rect_btoa(rect)
           await asyncio.to_thread(cv.rectangle, buffer1, recta, (200), self.linewidth)
@@ -242,7 +249,7 @@ class c_detector(viewable):
               if self.scaledown > 1:
                 rect = [item * self.scaledown for item in rect]
               aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
-              await self.ev_detectorq.put((
+              await self.myeventer.detectorqueue.put((
                 3, 
                 aoi, 
                 frametime, 
@@ -252,7 +259,7 @@ class c_detector(viewable):
           else:
             self.background = np.float32(frame)
         if not streams_redis.check_if_counts_zero('E', self.id):
-          await self.ev_detectorq.put('stop')   
+          await self.myeventer.detectorqueue.put('stop')   
     if self.dbline.det_backgr_delay == 0:
       self.buffer = frame
     else:
@@ -293,6 +300,5 @@ class c_detector(viewable):
 
   async def stop(self):
     await self.dbline.asave(update_fields = ['det_fpsactual', ])
-    self.dataqueue.stop()
-    super().stop()
+    await super().stop()
 

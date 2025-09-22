@@ -254,7 +254,7 @@ $(document).ready(function() {
     }));
   })
   .then((result) => {
-    if (result == 'OK') {
+    if (result.status == 'OK') {
       WSAsync(
       ws_scheme + '//'
       + window.location.host

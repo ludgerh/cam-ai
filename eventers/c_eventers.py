@@ -58,7 +58,9 @@ class c_eventer(viewable):
     self.dbline = dbline
     self.id = dbline.id
     if self.dbline.cam_virtual_fps:
-      self.dataqueue = c_buffer()
+      self.dataqueue = c_buffer(
+        #debug = 'Eve' + str(self.id), 
+      )
     else:  
       self.dataqueue = c_buffer(
         block_put = False, 
@@ -148,6 +150,8 @@ class c_eventer(viewable):
       self.scaling = None
     elif (received[0] == 'reset'):
       await self.dbline.arefresh_from_db()
+    elif (received[0] == 'stop'):
+      return(True)
     else:
       result = False  
     return(result)
@@ -222,11 +226,13 @@ class c_eventer(viewable):
         asyncio.create_task(self.make_webm())
       self.inferencing_status = 0
       #print('Launch: eventer')
-      while self.do_run:
+      while not self.got_sigint:
         if streams_redis.check_if_counts_zero('E', self.id):
           await a_break_type(BR_LONG)
           continue
-        frameline = await self.dataqueue.get()
+        frameline = await self.dataqueue.get(timeout = 2.0)
+        if frameline is None:
+          continue
         if self.inferencing_status == 1:
           await a_break_type(BR_LONG)
           continue
@@ -234,15 +240,15 @@ class c_eventer(viewable):
           self.inferencing_status == 1  
         if not self.do_run:
           break  
-        if (frameline is not None and frameline[0] is not None 
+        if (frameline[0] is not None 
             and self.sl.greenlight(frameline[2])):
           await self.run_one(frameline)  
         else:
           await a_break_type(BR_MEDIUM)
-      self.dataqueue.stop()
+      await self.dataqueue.stop()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
-      self.tf_worker.stop_out(self.tf_w_index)
+      await self.tf_worker.stop_out(self.tf_w_index)
       await self.tf_worker.unregister(self.tf_w_index)
     except Exception as fatal:
       self.logger.error(
@@ -681,6 +687,5 @@ class c_eventer(viewable):
 
   async def stop(self):
     await self.dbline.asave(update_fields = ['eve_fpsactual', ])
-    self.dataqueue.stop()
-    super().stop()
+    await super().stop()
     

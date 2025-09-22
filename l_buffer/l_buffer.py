@@ -39,7 +39,6 @@ q_len: Length of data queue (default = 1), None: no queue (only if not m_proc)
 block_put: Block put() until the previous data was read (default = True)
 block_get: Block get() until new data (default = True)
 put_timeout: Return after x seconds if blocked (default = None)
-get_timeout: Return after x seconds if blocked (default = None)
 multi_in: More then one process as source, number of the input item element providing
   the index for sorting in (default = None)
 call: Callback on the get side (default = None)
@@ -65,6 +64,8 @@ GET_STORAGE_ITEM = {
 def debug_display(input):
   if isinstance(input, str):
     result = input
+  elif input is None:
+    result = str(input) 
   else: 
     result = []
     for item in input:
@@ -81,15 +82,14 @@ def count_sm(struct):
 
 class l_buffer():
   def __init__(self, struct, m_proc = True, q_len = 1, block_put = True, 
-      block_get = True, put_timeout = None, get_timeout = None, multi_in = None, 
-      call = None, brake_time = 0.01, debug = 0):   
+      block_get = True, put_timeout = None, multi_in = None, call = None, 
+      brake_time = 0.01, debug = 0):   
     self.struct = struct
     self.m_proc = m_proc
     self.q_len = q_len
     self.block_put = block_put
     self.block_get = block_get
     self.put_timeout = put_timeout
-    self.get_timeout = get_timeout
     self.multi_in = multi_in
     self.call = call
     self.brake_time = brake_time
@@ -141,7 +141,6 @@ class l_buffer():
   async def data_loop_runner(self):
     while self.do_run:
       try:
-        #data_in = await asyncio.to_thread(self.data_queue.get, False)
         data_in = self.data_queue.get(False)
         if self.debug:
           print(self.debug, '+++ Loop', debug_display(data_in)) 
@@ -323,7 +322,10 @@ class l_buffer():
     if self.q_len is not None and self.data_loop_task is None:
       if self.m_proc:
         self.lock = t_lock()
-      self.data_loop_task = asyncio.create_task(self.data_loop_runner()) 
+      self.data_loop_task = asyncio.create_task(
+        self.data_loop_runner(), 
+        name = str(self.debug) + 'l_buffer_data_loop',
+      ) 
       
   async def multi_get(self): #not tested
     result = []
@@ -334,10 +336,12 @@ class l_buffer():
         else:
           result.extend(item)      
 
-  async def get(self):
+  async def get(self, timeout = None):
     if self.debug:
       print(self.debug, '+++ Get:')
     self.start_data_loop()
+    if timeout:
+      _get_ts = time()
     while self.do_run:
       with self.lock:
         if self.shelf is not False and (not self.block_get or self.new_data): 
@@ -345,10 +349,13 @@ class l_buffer():
           self.new_data = False
           if self.block_put: 
             self.shelf = False
-          break  
+          break
+      if timeout and time() - _get_ts >= timeout:
+        data_in = None
+        break
       await asyncio.sleep(self.brake_time)
     if not self.do_run:
-      return()
+      return(None)
     if self.debug:
       print(self.debug, '--- Get:', debug_display(data_in))
     return(data_in)
@@ -364,6 +371,7 @@ class l_buffer():
   async def stop(self, mode = 'X'): 
     if self.q_len is None:
       return()  
+    self.do_run = False  
     if mode == 'P':
       if self.m_proc:
         while not self.data_queue.empty():
@@ -372,9 +380,7 @@ class l_buffer():
           item[1].close()
           item[1].unlink()
     else:   
-      while not self.data_queue.empty():
-        await asyncio.sleep(self.brake_time) 
+      self.data_queue = None
       if self.data_loop_task is not None:
         self.data_loop_task.cancel()
-      self.data_queue.put('stop')
       

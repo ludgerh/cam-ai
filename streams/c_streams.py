@@ -56,15 +56,14 @@ class c_stream():
       if self.dbline.det_mode_flag:
         self.mydetector = c_detector(
           self.dbline, 
-          self.myeventer.detectorqueue,
+          self.myeventer,
           self.logger,
         )
         add_viewable(self.mydetector)
       self.mycam = c_cam(
         self.dbline, 
-        self.mydetector.dataqueue,
-        self.myeventer.dataqueue,
-        self.myeventer.inqueue,
+        self.mydetector,
+        self.myeventer,
         self.logger,
       )
       add_viewable(self.mycam)
@@ -84,6 +83,9 @@ class c_stream():
   async def stop(self):
     my_redis.set_killing_stream(self.dbline.id, True)
     await self.mycam.stop()
+    print('11111 Stopped Cam')
     await self.mydetector.stop()
+    print('22222 Stopped Detector')
     await self.myeventer.stop()
+    print('33333 Stopped Eventer')
     self.logger.info('Finished Process '+self.logname+'...')

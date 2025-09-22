@@ -188,9 +188,9 @@ async def newexit():
   exit(0) 
     
 def handle_signal(signum, frame):
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(newexit())
-    except RuntimeError:
-        asyncio.run(newexit())
+  try:
+      loop = asyncio.get_running_loop()
+      loop.create_task(newexit())
+  except RuntimeError:
+      asyncio.run(newexit())
   

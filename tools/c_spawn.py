@@ -17,15 +17,34 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import django
 django.setup()
 import asyncio
-from signal import signal, SIGINT
+import signal
 from multiprocessing import Process, SimpleQueue as s_queue
 from l_buffer.l_buffer import l_buffer
 from globals.c_globals import add_viewer
 from streams.redis import my_redis as streams_redis
 from viewers.c_viewers import c_viewer
 
-def sigint_handler(signal = None, frame = None ):
-  pass
+import inspect  
+
+def dump_asyncio_tasks():
+    loop = asyncio.get_running_loop()
+    tasks = [t for t in asyncio.all_tasks(loop) if t is not asyncio.current_task(loop)]
+    print(f"{len(tasks)} offene asyncio-Tasks:")
+    for t in tasks:
+        coro = t.get_coro()
+        cname = getattr(coro, "__qualname__", getattr(coro, "__name__", repr(coro)))
+        print(f"- {t.get_name()} done={t.done()} cancelled={t.cancelled()} -> {cname}")
+        if not t.done():
+            t.print_stack()  # zeigt, wo das Task gerade steckt
+    for t in asyncio.all_tasks():
+        c = t.get_coro()
+        name = getattr(c, "__qualname__", repr(c))
+        if "Queue.get" in name:
+            try:
+                loc = inspect.getcoroutinestate(c), inspect.getcoroutinelocals(c)
+                print("Queue.get locals:", loc[1])  # enthält u.a. die Queue-Instanz
+            except Exception as e:
+                print("konnte Locals nicht lesen:", e)
 
 class QueueUnknownKeyword(Exception):
   def __init__(self, keyword, message="Unknown keyword: "):
@@ -44,17 +63,21 @@ class spawn_process(Process):
     else:
       self.use_buffer = False
       self.inqueue = s_queue()
+    self.got_sigint = False
     super().__init__()
 
   def run(self):
     asyncio.run(self.async_runner())
+    
+  def sigint_handler(self, signal = None, frame = None ):
+    print('sigint', self.id)
+    self.got_sigint = True 
         
   async def async_runner(self):
-    signal(SIGINT, sigint_handler)
-    loop = asyncio.get_running_loop()
-    loop.add_signal_handler(SIGINT, sigint_handler)
-    asyncio.create_task(self.in_queue_thread(), name = 'in_queue_thread')
     self.do_run = True
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGINT, self.sigint_handler)
+    self._inq_task = asyncio.create_task(self.in_queue_thread(), name = 'in_queue_thread')
         
   async def process_received(self, received):  
     result = False
@@ -64,15 +87,16 @@ class spawn_process(Process):
     try:
       while self.do_run:
         if self.use_buffer:
-          received = await self.inqueue.get()
+          if self.use_buffer:
+            received = await self.inqueue.get(timeout=2.0)
+            if received is None:
+              continue
         else:  
           received = await asyncio.to_thread(self.inqueue.get)
-        if (received[0] == 'stop'): 
-          self.do_run = False
-          break 
-        else:  
-          if not await self.process_received(received):
-            raise QueueUnknownKeyword(received[0])
+        if received[0] == 'stop':
+          self.do_run = False  
+        if not await self.process_received(received):
+          raise QueueUnknownKeyword(received[0])
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 
@@ -81,12 +105,20 @@ class spawn_process(Process):
       self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True)
   
   async def stop(self):
+    if hasattr(self, "type"):
+      _self_type = self.type + str(self.id)
+    else:
+      _self_type = '?'  
+    print(_self_type, 'aaaaa')
     if self.is_alive():
-      self.do_run = False
       if self.use_buffer:
         await self.inqueue.put(('stop', 0, ))
       else:  
         self.inqueue.put(('stop',))
+    print(_self_type, 'bbbbb')
+    dump_asyncio_tasks()
+    self.join()
+    print(_self_type, 'ccccc')
     
 class viewable(spawn_process):
   def __init__(self, logger, ):

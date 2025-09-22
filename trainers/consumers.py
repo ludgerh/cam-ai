@@ -396,7 +396,7 @@ class trainerutil(AsyncWebsocketConsumer):
           self.schoolline = await school.objects.aget(id=self.schoolnr)
           self.trainer_nr, count = await get_trainer_nr(self.schoolline)
           self.trainerline = await dbtrainer.objects.aget(id = self.trainer_nr)
-          self.client_version = params['version']
+          #self.client_version = params['version']
           if self.trainerline.t_type == 2:
             if self.ws_session is None:
               import aiohttp
@@ -425,7 +425,7 @@ class trainerutil(AsyncWebsocketConsumer):
         else: #Proper error description to both consoles!!!
           await self.close()
           return()
-        #logger.info('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))			
 
       elif params['command'] == 'getschoolinfo':
@@ -457,7 +457,7 @@ class trainerutil(AsyncWebsocketConsumer):
           infolocal['nr_trained'] = inforemote['nr_trained']
           infolocal['nr_validated'] = inforemote['nr_validated']
         outlist['data'] = infolocal
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))				
 
       elif params['command'] == 'getfitinfo':
