@@ -61,10 +61,10 @@ def _chunked(seq, n):
     yield seq[i:i+n]
 
 class trainer(spawn_process):
-  def __init__(self, idx, worker_inqueue, worker_registerqueue, glob_lock):
+  def __init__(self, idx, myworker_in, myworker_reg, glob_lock):
     self.id = idx
-    self.worker_in = worker_inqueue
-    self.worker_reg = worker_registerqueue
+    self.worker_in = myworker_in
+    self.worker_reg = myworker_reg
     self.glob_lock = glob_lock
     if self.id == 1:
       self.glob_lock.acquire()

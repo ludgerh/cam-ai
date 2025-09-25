@@ -27,7 +27,7 @@ from streams.redis import my_redis as streams_redis
 from tools.c_spawn import viewable
 
 class c_detector(viewable):
-  def __init__(self, dbline, myeventer, logger, ):
+  def __init__(self, dbline, myeventer_det_queue, logger, ):
     from tools.c_tools import c_buffer
     self.type = 'D'
     self.dbline = dbline
@@ -41,7 +41,7 @@ class c_detector(viewable):
         block_put = False, 
         #debug = 'Det' + str(self.id), 
       )
-    self.myeventer = myeventer  
+    self.myeventer_det_queue = myeventer_det_queue 
     self.scaledown = self.get_scale_down()
     super().__init__(logger, )
    
@@ -240,7 +240,7 @@ class c_detector(viewable):
               recta = self.rect_btoa(rectb)
     if rect_list:  
       rect_list = self.merge_rects(rect_list)  
-      with self.myeventer.detectorqueue.multi_put_lock: 
+      with self.myeventer_det_queue.multi_put_lock: 
         for rect in rect_list[:self.dbline.det_max_rect]:
           recta = self.rect_btoa(rect)
           await asyncio.to_thread(cv.rectangle, buffer1, recta, (200), self.linewidth)
@@ -249,7 +249,7 @@ class c_detector(viewable):
               if self.scaledown > 1:
                 rect = [item * self.scaledown for item in rect]
               aoi = np.copy(frameall[rect[2]:rect[3], rect[0]:rect[1]])
-              await self.myeventer.detectorqueue.put((
+              await self.myeventer_det_queue.put((
                 3, 
                 aoi, 
                 frametime, 
@@ -259,7 +259,7 @@ class c_detector(viewable):
           else:
             self.background = np.float32(frame)
         if not streams_redis.check_if_counts_zero('E', self.id):
-          await self.myeventer.detectorqueue.put('stop')   
+          await self.myeventer_det_queue.put('stop')   
     if self.dbline.det_backgr_delay == 0:
       self.buffer = frame
     else:

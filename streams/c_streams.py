@@ -56,14 +56,15 @@ class c_stream():
       if self.dbline.det_mode_flag:
         self.mydetector = c_detector(
           self.dbline, 
-          self.myeventer,
+          self.myeventer.detectorqueue,
           self.logger,
         )
         add_viewable(self.mydetector)
       self.mycam = c_cam(
         self.dbline, 
-        self.mydetector,
-        self.myeventer,
+        self.mydetector.dataqueue,
+        self.myeventer.dataqueue,
+        self.myeventer.inqueue,
         self.logger,
       )
       add_viewable(self.mycam)

@@ -35,12 +35,13 @@ from .redis import my_redis as streams_redis
 from .c_camera import c_camera
 
 class c_cam(viewable):
-  def __init__(self, dbline, mydetector, myeventer, logger, ):
+  def __init__(self, dbline, mydetector_data, myeventer_data, myeventer_in, logger, ):
     self.type = 'C'
     self.dbline = dbline
     self.id = dbline.id
-    self.mydetector = mydetector
-    self.myeventer = myeventer
+    self.mydetector_data = mydetector_data
+    self.myeventer_data = myeventer_data
+    self.myeventer_in = myeventer_in
     self.mycam = None
     super().__init__(logger, )
 
@@ -159,13 +160,13 @@ class c_cam(viewable):
               or streams_redis.data_from_dev('D', self.id))
               and frameline):
             try:
-              await asyncio.wait_for(self.mydetector.dataqueue.put(frameline), timeout=5.0)
+              await asyncio.wait_for(self.mydetector_data.put(frameline), timeout=5.0)
             except asyncio.TimeoutError:
               pass
           if (self.dbline.eve_mode_flag 
               and (not streams_redis.check_if_counts_zero('E', self.id))):
             try:
-              await asyncio.wait_for(self.myeventer.dataqueue.put(frameline), timeout=5.0)
+              await asyncio.wait_for(self.myeventer_data.put(frameline), timeout=5.0)
             except asyncio.TimeoutError:
               pass
         else:
@@ -443,7 +444,7 @@ class c_cam(viewable):
               await aioshutil.move(self.vid_file_path(self.vid_count), 
                 self.recordingspath + '/' + targetname)
               await asyncio.to_thread(
-                self.myeventer.inqueue.put, 
+                self.myeventer_in.put, 
                 ('new_video', self.vid_count, targetname, timestamp)
               )
               self.vid_count += 1
@@ -535,7 +536,7 @@ class c_cam(viewable):
         source_string += self.dbline.cam_url
         filepath = None
       else:
-        self.myeventer.inqueue.put(('purge_videos', ))
+        self.myeventer_in.put(('purge_videos', ))
         source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
         if streams_redis.record_from_dev(self.type, self.id):
           self.vid_count = 0
