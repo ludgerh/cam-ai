@@ -126,6 +126,8 @@ class c_eventer(viewable):
       self.dbline.eve_alarm_max_nr = received[1]
     elif (received[0] == 'set_alarm_email'):
       self.dbline.eve_alarm_email = received[1]
+    elif (received[0] == 'set_one_frame_per_event'):
+      self.dbline.eve_one_frame_per_event = received[1]
     elif (received[0] == 'cond_open'):
       self.nr_of_cond_ed += 1
       self.last_cond_ed = received[1]
@@ -430,8 +432,8 @@ class c_eventer(viewable):
     if self.dbline.cam_virtual_fps:
       newtime = streams_redis.get_virt_time(self.id)
     else:
-      newtime = time()  
-    if self.id == 163:  
+      newtime = time() 
+    if self.dbline.eve_one_frame_per_event:  
       item.check_out_ts = item.end
     else:  
       if (item.end < newtime - self.dbline.eve_event_time_gap 
@@ -440,7 +442,7 @@ class c_eventer(viewable):
     if self.cond_dict[5]:
       predictions = await item.pred_read(max=1.0)
     else:
-      predictions = None   
+      predictions = None  
     if await self.resolve_rules(self.cond_dict[5], predictions):
       if item.remaining_alarms:
         await alarm(self.id, predictions) 
@@ -616,7 +618,7 @@ class c_eventer(viewable):
             frame = frame + [prediction]
             found = None
             margin = self.dbline.eve_margin
-            if self.id != 163:
+            if not self.dbline.eve_one_frame_per_event:
               for j, item in list(self.eventdict.items()):
                 if self.hasoverlap((frame[3][0] - margin, frame[3][1] + margin, 
                     frame[3][2] - margin, frame[3][3] + margin), item):

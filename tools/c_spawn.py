@@ -24,28 +24,6 @@ from globals.c_globals import add_viewer
 from streams.redis import my_redis as streams_redis
 from viewers.c_viewers import c_viewer
 
-import inspect  
-
-def dump_asyncio_tasks():
-    loop = asyncio.get_running_loop()
-    tasks = [t for t in asyncio.all_tasks(loop) if t is not asyncio.current_task(loop)]
-    print(f"{len(tasks)} offene asyncio-Tasks:")
-    for t in tasks:
-        coro = t.get_coro()
-        cname = getattr(coro, "__qualname__", getattr(coro, "__name__", repr(coro)))
-        print(f"- {t.get_name()} done={t.done()} cancelled={t.cancelled()} -> {cname}")
-        if not t.done():
-            t.print_stack()  # zeigt, wo das Task gerade steckt
-    for t in asyncio.all_tasks():
-        c = t.get_coro()
-        name = getattr(c, "__qualname__", repr(c))
-        if "Queue.get" in name:
-            try:
-                loc = inspect.getcoroutinestate(c), inspect.getcoroutinelocals(c)
-                print("Queue.get locals:", loc[1])  # enthält u.a. die Queue-Instanz
-            except Exception as e:
-                print("konnte Locals nicht lesen:", e)
-
 class QueueUnknownKeyword(Exception):
   def __init__(self, keyword, message="Unknown keyword: "):
     self.message = message + keyword
@@ -70,7 +48,6 @@ class spawn_process(Process):
     asyncio.run(self.async_runner())
     
   def sigint_handler(self, signal = None, frame = None ):
-    print('sigint', self.id)
     self.got_sigint = True 
         
   async def async_runner(self):
@@ -105,20 +82,12 @@ class spawn_process(Process):
       self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True)
   
   async def stop(self):
-    if hasattr(self, "type"):
-      _self_type = self.type + str(self.id)
-    else:
-      _self_type = '?'  
-    print(_self_type, 'aaaaa')
     if self.is_alive():
       if self.use_buffer:
         await self.inqueue.put(('stop', 0, ))
       else:  
         self.inqueue.put(('stop',))
-    print(_self_type, 'bbbbb')
-    dump_asyncio_tasks()
     self.join()
-    print(_self_type, 'ccccc')
     
 class viewable(spawn_process):
   def __init__(self, logger, ):

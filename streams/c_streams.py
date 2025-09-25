@@ -83,9 +83,6 @@ class c_stream():
   async def stop(self):
     my_redis.set_killing_stream(self.dbline.id, True)
     await self.mycam.stop()
-    print('11111 Stopped Cam')
     await self.mydetector.stop()
-    print('22222 Stopped Detector')
     await self.myeventer.stop()
-    print('33333 Stopped Eventer')
     self.logger.info('Finished Process '+self.logname+'...')

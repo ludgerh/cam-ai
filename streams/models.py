@@ -90,6 +90,7 @@ class stream(models.Model):
   eve_sync_factor = models.FloatField("sync factor", default=0.0) # in seconds
   eve_alarm_max_nr = models.IntegerField("max alarm nr", default=99)
   eve_alarm_email = models.CharField("alarm email", max_length=255, default='')
+  eve_one_frame_per_event = models.BooleanField("one frame per event", default=False)
   eve_event_time_gap = models.IntegerField("new event gap", default=60)
   eve_margin = models.IntegerField("frame margin", default=20)
   eve_school = models.ForeignKey(school, on_delete=models.SET_DEFAULT, default=1)

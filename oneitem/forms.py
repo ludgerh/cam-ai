@@ -78,6 +78,7 @@ class EventerForm(forms.ModelForm):
       'eve_school', 
       'eve_alarm_max_nr',
       'eve_alarm_email',
+      'eve_one_frame_per_event',
     )
     widgets = {
       'eve_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
@@ -87,6 +88,7 @@ class EventerForm(forms.ModelForm):
       'eve_sync_factor' : forms.NumberInput(attrs={'size': 10, 'min' : -2.0, 'max' : 2.0, 'step' : 0.01}), 
       'eve_alarm_max_nr' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 99}), 
       'eve_alarm_email' : forms.TextInput(attrs={'size': 70}),
+      'eve_one_frame_per_event' : forms.CheckboxInput(),
     }		
 	  
   def __init__(self, *args, **kwargs):

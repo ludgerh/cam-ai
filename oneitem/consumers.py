@@ -180,6 +180,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           elif params['pname'] == 'eve_alarm_email':
             self.myitem.dbline.eve_alarm_email = params['value']
             self.myitem.inqueue.put(('set_alarm_email', params['value']))
+          elif params['pname'] == 'eve_one_frame_per_event':
+            self.myitem.dbline.eve_eve_one_frame_per_event = params['value']
+            self.myitem.inqueue.put(('set_one_frame_per_event', params['value']))
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	

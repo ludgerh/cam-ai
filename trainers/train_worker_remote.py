@@ -68,7 +68,7 @@ async def check_downloads(logger, session):
 
 class train_once_remote():
 
-  def __init__(self, myschool, myfit, dbline):
+  def __init__(self, myschool, dbline, myfit = None):
     self.myschool = myschool
     self.myfit = myfit
     self.tainer_id = dbline.id
@@ -166,7 +166,8 @@ class train_once_remote():
     for item in (temp_set):
       if remotedict[item] != localdict[item][10]:
         self.logger.info('(' + str(count) + ') Changed, deleting: ' + item)
-        remoteset.remove(item)
+        remoteset.discard(item)
+        remoteset_with_size.discard(item)
       count -= 1  
       self.send_ping()
     temp_set = remoteset - localset

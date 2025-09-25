@@ -425,7 +425,7 @@ class trainerutil(AsyncWebsocketConsumer):
         else: #Proper error description to both consoles!!!
           await self.close()
           return()
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))			
 
       elif params['command'] == 'getschoolinfo':

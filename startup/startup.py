@@ -176,13 +176,10 @@ async def newexit():
   my_health_runner.stop()
   glob_startup.cleanup.stop()
   for i in viewables:
-    print('Closing stream #', i)
     await viewables[i]['stream'].stop()
   for i in tf_workers:
-    print('Closing tf_worker #', i)
     await tf_workers[i].stop()
   for i in trainers:
-    print('Closing trainer #', i)
     await trainers[i].stop() 
   kill_all_processes()
   exit(0) 

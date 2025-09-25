@@ -84,11 +84,12 @@ class trainer(spawn_process):
     frames = []
     async for item in framelines.aiterator():
       frames.append(item)
-    if frames:  
+    if frames: 
       self.logger.info(
         f'TR{self.id}: Re-inferencing {len(frames)} frames of school #{school_nr}'
       )  
       for chunk in _chunked(frames, CHUNK_SIZE):
+        ts1 = time()
         imglist = []
         frame_ids = []
         for item in chunk:
@@ -125,6 +126,8 @@ class trainer(spawn_process):
           await frameline.asave(
             update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
           )
+        time_diff = time() - ts1
+        await asyncio.sleep(time_diff)
       self.logger.info(
         f'TR{self.id}: Finished re-inferencing of school #{school_nr}'
       )  
@@ -156,11 +159,14 @@ class trainer(spawn_process):
       self.school_cache = {}
       self.frames_cache = {}
       self.check_dl_ts = 0.0
-      asyncio.create_task(self.job_queue_thread(), name = 'job_queue_thread')
+      self.job_queue_task = asyncio.create_task(
+        self.job_queue_thread(), 
+        name = 'job_queue_thread', 
+      )
       await super().async_runner() 
       if self.dbline.t_type == 2:
         self.process_dict = {}
-      while self.do_run:
+      while not self.got_sigint:
         timestr = ts2mysqltime(time())
         if((self.dbline.startworking < timestr) 
             and (self.dbline.stopworking > timestr)
@@ -187,10 +193,15 @@ class trainer(spawn_process):
             if (new_time := time()) - self.check_dl_ts > 10.0: 
               self.check_dl_ts = new_time
               await check_downloads(self.logger, self.aiohttp)  
+          got = False
           try:  
             myschool, myfit = await asyncio.wait_for(self.job_queue.get(), timeout = 1.0)
+            got = True
           except asyncio.TimeoutError:
             continue  
+          finally:
+            if got:
+              self.job_queue.task_done()
           if self.dbline.t_type == 1:
             train_process = Process(target = train_once_gpu, args = (
               myschool, 
@@ -207,9 +218,9 @@ class trainer(spawn_process):
             trainresult = (train_process.exitcode)
           elif self.dbline.t_type == 2:
             my_trainer = train_once_remote(
-                myschool, 
-                myfit, 
-                self.dbline,
+                myschool = myschool, 
+                dbline = self.dbline,
+                myfit = myfit, 
             )
             train_process = Process(target = my_trainer.run)
             train_process.start()
@@ -229,6 +240,13 @@ class trainer(spawn_process):
       self.logger.error(
         'Error in process: ' + self.logname)
       self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
+    finally:  
+      if self.job_queue_task:
+        self.job_queue_task.cancel()
+        try:
+          await self.job_queue_task
+        except asyncio.CancelledError:
+          pass
 
   async def job_queue_thread(self):
     try:
@@ -244,7 +262,7 @@ class trainer(spawn_process):
         for s_item in schoollines: 
           trainers_redis.set_predict_proc_active(s_item.id, False)
         self.glob_lock.release()    
-      while self.do_run:
+      while  not self.got_sigint:
         schoollines = await sync_to_async(list)(school.objects.filter(active=True))
         for s_item in schoollines:
           await s_item.arefresh_from_db()
@@ -310,7 +328,7 @@ class trainer(spawn_process):
         try:
           await a_break_time(10.0)
         except  asyncio.exceptions.CancelledError:
-          pass
+          return()
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 
