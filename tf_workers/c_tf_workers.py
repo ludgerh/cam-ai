@@ -149,7 +149,7 @@ class tf_worker(spawn_process):
     
   async def process_received(self, received):  
     result = True
-    print('TF-Worker-Inqueue received:', received[:3], len(received))
+    #print('TF-Worker-Inqueue received:', received[:3], len(received))
     if (received[0] == 'unregister'):
       if received[1] in self.users:
         del self.users[received[1]]
@@ -181,11 +181,8 @@ class tf_worker(spawn_process):
       )
     elif (received[0] == 'register'):
       myuser = tf_user(prio = received[1])
-      print('myuser = tf_user(prio = received[1])')
       self.users[myuser.id] = myuser
-      print('self.users[myuser.id] = myuser')
       self.registerqueue.put(myuser.id)
-      print('self.registerqueue.put(myuser.id)')
     elif (received[0] == 'checkmod'):
       await self.check_model(received[2], self.logger, True)
     else:
@@ -546,17 +543,11 @@ class tf_worker_client():
       self.logger.critical("out_reader_proc crashed: %s", fatal, exc_info=True)
 
   async def register(self, worker_id, prio = 4):
-    print('00000')
     await self.inqueue.put(('register', prio, ))
-    print('11111')
     self.tf_w_index = await asyncio.to_thread(self.registerqueue.get)
-    print('22222')
     self.id = worker_id
-    print('33333')
     self.my_output = output_dist(self.id)
-    print('44444')
     self.my_output.clean_one(self.tf_w_index)
-    print('55555')
     return(self.tf_w_index)
 
   async def run_out(self, index, logger, logname):

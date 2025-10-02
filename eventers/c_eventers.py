@@ -83,7 +83,7 @@ class c_eventer(viewable):
       async with self.vid_deque_lock:
         self.vid_deque.append(received[1:])
         while True:
-          if self.vid_deque and (time() - self.vid_deque[0][2]) > 180.0:
+          if self.vid_deque and (time() - self.vid_deque[0][2]) > 240.0:
             listitem = self.vid_deque.popleft()
             try:
               await aiofiles.os.remove(self.recordingspath + listitem[1])

@@ -19,7 +19,10 @@ import requests
 import cv2 as cv
 import os
 import io
+import asyncio
 import aiofiles
+import aiofiles.os
+import aioshutil
 from time import sleep, time
 from zipfile import ZipFile, ZIP_DEFLATED
 from setproctitle import setproctitle
@@ -41,11 +44,13 @@ async def check_downloads(logger, session):
   new_download = await download.objects.afirst()
   if new_download is None:
     return()
-  response = await session.get(new_download.dl_url, allow_redirects=True)   
-  #r = requests.get(new_download.dl_url, allow_redirects=True)
-  #print('?????', await response.text(), type(await response.text()))
-  probe = await response.content.read(16)
-  if probe.decode(errors="ignore").strip() == "Wait!":
+  response = await session.get(new_download.dl_url, allow_redirects=True) 
+  byte_probe = await response.content.read(16)
+  probe = byte_probe.decode(errors = 'ignore').strip()
+  if probe == 'Wait!':
+    return()
+  logger.info('DL Probe: ' + probe)
+  if probe.startswith('<html>'):
     return()
   datapath = await djconf.agetconfig('datapath', 'data/')
   dlfile = await djconf.agetconfig('schools_dir', datapath + 'schools/')
@@ -55,11 +60,19 @@ async def check_downloads(logger, session):
   else:
     dlfile += new_download.model_type + '.tflite'
   logger.info('DL Model: ' + dlfile)
-  async with aiofiles.open(dlfile, 'wb') as f:
-    await f.write(probe)
+  tmp = dlfile + ".part"
+  async with aiofiles.open(tmp, 'wb') as f:
+    await f.write(byte_probe)
     async for chunk in response.content.iter_chunked(1 << 20):  # 1 MiB
       await f.write(chunk)
-  #open(dlfile, 'wb').write(response.content)
+    await f.flush()
+    await asyncio.to_thread(os.fsync, f.fileno())
+  dir_fd = os.open(os.path.dirname(dlfile) or ".", os.O_DIRECTORY)
+  try:
+    await aioshutil.move(tmp, dlfile) 
+    await asyncio.to_thread(os.fsync, dir_fd)
+  finally:
+    os.close(dir_fd)
   school_line = await school_db.objects.aget(id = new_download.school)
   school_line.last_fit += 1
   school_line.lastmodelfile = timezone.now()

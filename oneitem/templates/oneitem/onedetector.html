@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -101,17 +101,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <script>
 
-xscale = ($(window).width() - 20) / {{ dbline.cam_xres }};
-yscale = ($(window).height() - 230) / {{ dbline.cam_yres }};
-let displaywidth;
-let displayheight;
-if (xscale > yscale) {
-  displaywidth = Math.round({{ dbline.cam_xres }} * yscale);
-  displayheight = Math.round({{ dbline.cam_yres }} * yscale);
-} else {
-  displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
-  displayheight = Math.round({{ dbline.cam_yres }}* xscale);
-};
+xscale = ($(window).width() - 60) / {{ dbline.cam_xres }};
+let displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
+let displayheight = Math.round({{ dbline.cam_yres }}* xscale);
+//yscale = ($(window).height() - 230) / {{ dbline.cam_yres }};
+//let displaywidth;
+//let displayheight;
+//if (xscale > yscale) {
+//  displaywidth = Math.round({{ dbline.cam_xres }} * yscale);
+//  displayheight = Math.round({{ dbline.cam_yres }} * yscale);
+//} else {
+//  displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
+//  displayheight = Math.round({{ dbline.cam_yres }}* xscale);
+//};
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let r_array = {};
 let c_view_Socket;

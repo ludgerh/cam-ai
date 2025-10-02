@@ -517,7 +517,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           logger.info(line);
         startup_redis.set_shutdown_command(20)
         outlist['data'] = 'OK'
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while True:
           await asleep(long_brake)

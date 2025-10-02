@@ -36,8 +36,7 @@ def do_log_ini(logger, logname, logpath, loglevelstring):
 def log_ini(logger, logname):
   datapath = djconf.getconfig('datapath', 'data/')
   logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
-  if not path.exists(logpath):
-    makedirs(logpath)
+  makedirs(logpath, exist_ok=True)
   loglevelstring = djconf.getconfig('loglevel', default='INFO')
   do_log_ini(logger, logname, logpath, loglevelstring)
 

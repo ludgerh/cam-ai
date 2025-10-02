@@ -34,6 +34,9 @@ from tools.l_sysinfo import is_raspi
 from .redis import my_redis as streams_redis
 from .c_camera import c_camera
 
+datapath = djconf.getconfig('datapath', 'data/')
+logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
+
 class c_cam(viewable):
   def __init__(self, dbline, mydetector_data, myeventer_data, myeventer_in, logger, ):
     self.type = 'C'
@@ -107,7 +110,7 @@ class c_cam(viewable):
           'recordingspath', 
           datapath + 'recordings/', 
         )
-        self.checkmp4busy = False
+        self._mp4_lock = asyncio.Lock()
         self.cam_fps = 0.0
         self.video_codec = -1
         self.video_codec_name = '?'
@@ -115,7 +118,7 @@ class c_cam(viewable):
         self.vid_count = None
         await aiofiles.os.makedirs(self.recordingspath, exist_ok=True)
         path = AsyncPath(self.recordingspath)
-        async for file in path.glob(f'C{str(self.id).zfill(4)}_????????.mp4'):
+        async for file in path.glob(f'C{str(self.id).zfill(4)}*.mp4'):
           try:
             await asyncio.to_thread(os.remove, file)
           except Exception as e:
@@ -415,44 +418,37 @@ class c_cam(viewable):
   async def checkmp4(self):
     try:
       while not self.got_sigint:
-        try:
-          await a_break_type(BR_LONG)
-        except asyncio.CancelledError:
-          return 
-        if self.checkmp4busy:
+        await a_break_type(BR_LONG)
+        if not self.cam_recording or self.vid_count is None:
           continue
-        self.checkmp4busy = True
-        if self.cam_recording:
-          if self.vid_count is None:
-            self.checkmp4busy = False
+        async with self._mp4_lock:
+          if not await aiofiles.os.path.exists(self.vid_file_path(self.vid_count + 2)):
             continue
-          if await aiofiles.os.path.exists(self.vid_file_path(self.vid_count + 2)):
-            try:
-              timestamp = await asyncio.to_thread(
-                os.path.getmtime, 
-                self.vid_file_path(self.vid_count),
-              )
-            except FileNotFoundError:
-              self.checkmp4busy = False
-              continue
-            if timestamp > self.mp4timestamp:
-              self.mp4timestamp = timestamp
-            else:
-              continue
-            targetname = self.ts_targetname(timestamp)
-            try:
-              await aioshutil.move(self.vid_file_path(self.vid_count), 
-                self.recordingspath + '/' + targetname)
-              await asyncio.to_thread(
-                self.myeventer_in.put, 
-                ('new_video', self.vid_count, targetname, timestamp)
-              )
-              self.vid_count += 1
-            except FileNotFoundError:
-              self.logger.warning(
-                f'CA{self.id}: Move did not find: {self.vid_file_path(self.vid_count)}'
-              )
-        self.checkmp4busy = False
+          try:
+            timestamp = await asyncio.to_thread(
+              os.path.getmtime, 
+              self.vid_file_path(self.vid_count),
+            )
+          except FileNotFoundError:
+            continue
+          if timestamp <= self.mp4timestamp:
+            continue
+          self.mp4timestamp = timestamp
+          targetname = self.ts_targetname(timestamp)
+          try:
+            await aioshutil.move(self.vid_file_path(self.vid_count), 
+              self.recordingspath + '/' + targetname)
+            await asyncio.to_thread(
+              self.myeventer_in.put, 
+              ('new_video', self.vid_count, targetname, timestamp)
+            )
+            self.vid_count += 1
+          except FileNotFoundError:
+            self.logger.warning(
+              f'CA{self.id}: Move did not find: {self.vid_file_path(self.vid_count)}'
+            )
+    except asyncio.CancelledError:
+        return()
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 
@@ -544,6 +540,23 @@ class c_cam(viewable):
             + str(self.id).zfill(4) + '_%08d.mp4')
         else:
           filepath = None
+      generalparams = ['-y']
+      #**********
+      log_ffmpeg = False
+      #**********
+      if log_ffmpeg:
+        generalparams += ['-v', 'info']
+      else:  
+        generalparams += ['-v', 'fatal']
+      if not self.dbline.cam_virtual_fps:
+        if source_string[:4].upper() == 'RTSP':
+          generalparams += ['-rtsp_transport', 'tcp']
+        if self.dbline.cam_red_lat:
+          generalparams += ['-fflags', 'nobuffer']
+          generalparams += ['-flags', 'low_delay']
+        if self.video_codec_name not in {'h264', 'hevc'}:
+          generalparams += ['-use_wallclock_as_timestamps', '1']
+      inparams = ['-i', source_string]
       outparams1 = []
       if not self.dbline.cam_virtual_fps:
         outparams1 += ['-map', '0:' + str(self.video_codec), '-map', '-0:a']
@@ -555,22 +568,6 @@ class c_cam(viewable):
       else:  
         outparams1 += ['-fps_mode', 'passthrough']
       outparams1 += [self.fifo_path]
-      inparams = ['-i', source_string]
-      #if inp_frame_rate:
-      #  inparams += ['-vf', 'fps=' + str(inp_frame_rate)]
-      generalparams = ['-y']
-      #generalparams += ['-v', 'info']
-      generalparams += ['-v', 'fatal']
-      #if is_raspi():
-      #  generalparams += ['-threads', '1']
-      if not self.dbline.cam_virtual_fps:
-        if source_string[:4].upper() == 'RTSP':
-          generalparams += ['-rtsp_transport', 'tcp']
-        if self.dbline.cam_red_lat:
-          generalparams += ['-fflags', 'nobuffer']
-          generalparams += ['-flags', 'low_delay']
-        if self.video_codec_name not in {'h264', 'hevc'}:
-          generalparams += ['-use_wallclock_as_timestamps', '1']
       outparams2 = []
       if filepath:
         self.ffmpeg_recording = True
@@ -609,26 +606,35 @@ class c_cam(viewable):
         + outparams2)
       #self.logger.info('#####' + str(cmd))
       
-      #self.logger.info('#'+str(self.id) + ' 00000')
+      self.logger.info('#'+str(self.id) + ' 00000')
       while self.ff_proc is not None and self.ff_proc.returncode is None:
         await a_break_type(BR_LONG)
-      #self.logger.info('#'+str(self.id) + ' 11111')
+      self.logger.info('#'+str(self.id) + ' 11111')
       try:
         await aiofiles.os.remove(self.fifo_path)
       except FileNotFoundError:
         pass
-      #self.logger.info('#'+str(self.id) + ' 22222')
+      self.logger.info('#'+str(self.id) + ' 22222')
       await asyncio.to_thread(os.mkfifo, self.fifo_path)
-      #self.logger.info('#'+str(self.id) + ' 33333')
-      self.ff_proc = await asyncio.create_subprocess_exec(
-        '/usr/bin/ffmpeg',
-        *cmd,
-        stdout=None,
-      )
-      #self.logger.info('#'+str(self.id) + ' 44444')
+      self.logger.info('#'+str(self.id) + ' 33333')
+      if log_ffmpeg:
+        log = open(logpath + f'ffmpeg{self.id}.log', "ab")
+        self.ff_proc = await asyncio.create_subprocess_exec(
+          '/usr/bin/ffmpeg',
+          *cmd,
+          stdout=None,
+          stderr=log,
+        )
+      else:  
+        self.ff_proc = await asyncio.create_subprocess_exec(
+          '/usr/bin/ffmpeg',
+          *cmd,
+          stdout=None,
+        )
+      self.logger.info('#'+str(self.id) + ' 44444')
       try:
         self.fifo = await asyncio.to_thread(self._open_fifo_pair)
-        #self.logger.info('#%s 55555', self.id)
+        self.logger.info('#%s 55555', self.id)
         break
       except FileNotFoundError:
         self.logger.warning('#%s FIFO fehlt – lege neu an', self.id)
@@ -643,32 +649,32 @@ class c_cam(viewable):
           f'CA{self.id}: Fehler beim Öffnen des Fifos {e}'
         )
         await self.stopprocess()
-        return
+        return()
 
 
   async def stopprocess(self):
     if self.ff_proc is not None and self.ff_proc.returncode is None:
-      #self.logger.info(
-      #  '#'+str(self.id) + ' xxxxx ' 
-      #  + str(self.ff_proc) 
-      #  + ' ' + str(self.ff_proc.returncode)
-      #)
+      self.logger.info(
+        '#'+str(self.id) + ' xxxxx ' 
+        + str(self.ff_proc) 
+        + ' ' + str(self.ff_proc.returncode)
+      )
       try:
-        #self.logger.info('#'+str(self.id) + ' aaaaa')
+        self.logger.info('#'+str(self.id) + ' aaaaa')
         p = Process(self.ff_proc.pid)
         child_pid = p.children(recursive=True)
         for pid in child_pid:
           pid.send_signal(SIGKILL)
           pid.wait()
-        #self.logger.info('#'+str(self.id) + ' bbbbb')
+        self.logger.info('#'+str(self.id) + ' bbbbb')
         self.ff_proc.send_signal(SIGKILL)
-        #self.logger.info('#'+str(self.id) + ' ccccc')
+        self.logger.info('#'+str(self.id) + ' ccccc')
         await self.ff_proc.wait()
-        #self.logger.info('#'+str(self.id) + ' ddddd')
+        self.logger.info('#'+str(self.id) + ' ddddd')
       except NoSuchProcess:
         pass        
       self.ff_proc = None
-      #self.logger.info('#'+str(self.id) + ' eeeee')
+      self.logger.info('#'+str(self.id) + ' eeeee')
     try:  
       self.fifo.close()
     except AttributeError:#
@@ -681,8 +687,8 @@ class c_cam(viewable):
     #self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
-    return('C'+str(self.id).zfill(4)+'_'
-      +ts2filename(ts, noblank= True)+'.mp4')
+    return('C'+str(self.id).zfill(4) + '_'
+      +ts2filename(ts, noblank = True) + '.mp4')
 
   def vid_file_path(self, nr):
     return(self.recordingspath + 'C'+str(self.id).zfill(4)
