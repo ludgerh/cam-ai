@@ -87,10 +87,7 @@ def downmodel(request, schoolnr, tokennr, token, model_type = 'K', fit_nr = None
   if checktoken((tokennr, token), 'MOD', schoolnr):
     if fit_nr:
       fitline = fit.objects.get(id=fit_nr)
-      do_it = fitline.status == 'Done'
-    else:
-      do_it = True
-    if do_it:    
+    if fitline.status == 'Done':    
       myschool = school.objects.get(id = schoolnr)
       filename = myschool.dir + 'model/'
       if model_type == 'K':
@@ -101,6 +98,8 @@ def downmodel(request, schoolnr, tokennr, token, model_type = 'K', fit_nr = None
         filename += 'q_' + myschool.model_type + '.tflite'
       modelfile = open(filename, 'rb')
       return FileResponse(modelfile)
+    elif fitline.status == 'Stopped':   
+      return(HttpResponse('Stop!')) 
     else:  
       return(HttpResponse('Wait!'))
   else:

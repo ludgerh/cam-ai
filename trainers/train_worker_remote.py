@@ -22,6 +22,7 @@ import io
 import asyncio
 import aiofiles
 import aiofiles.os
+import aiohttp
 import aioshutil
 from time import sleep, time
 from zipfile import ZipFile, ZIP_DEFLATED
@@ -44,9 +45,15 @@ async def check_downloads(logger, session):
   new_download = await download.objects.afirst()
   if new_download is None:
     return()
-  response = await session.get(new_download.dl_url, allow_redirects=True) 
+  try:
+    response = await session.get(new_download.dl_url, allow_redirects=True) 
+  except aiohttp.client_exceptions.ConnectionTimeoutError:
+    return() 
   byte_probe = await response.content.read(16)
   probe = byte_probe.decode(errors = 'ignore').strip()
+  if probe == 'Stop!':
+    await new_download.adelete()
+    return()
   if probe == 'Wait!':
     return()
   logger.info('DL Probe: ' + probe)

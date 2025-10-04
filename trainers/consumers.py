@@ -138,15 +138,12 @@ class remotetrainer(AsyncWebsocketConsumer):
                     school = self.myschoolline.id,
                     name = item,
                     code = jsondata[11],
-                    c0 = jsondata[0], c1 = jsondata[1], 
-                    c2 = jsondata[2], c3 = jsondata[3],
-                    c4 = jsondata[4], c5 = jsondata[5], 
-                    c6 = jsondata[6], c7 = jsondata[7],
-                    c8 = jsondata[8], c9 = jsondata[9],
                     checked = 1,
                     train_status = 0,
                   )
-                  await frameline.asave()
+                for j, v in enumerate(jsondata[:10]):
+                  setattr(frameline, f"c{j}", v)
+                await frameline.asave()
                 try:
                   sizeline = await img_size.objects.aget(x=cod_x, y=cod_y)
                 except img_size.DoesNotExist:

@@ -548,6 +548,8 @@ class c_cam(viewable):
         generalparams += ['-v', 'info']
       else:  
         generalparams += ['-v', 'fatal']
+      #if is_raspi():
+      #  generalparams += ['-threads', '1']
       if not self.dbline.cam_virtual_fps:
         if source_string[:4].upper() == 'RTSP':
           generalparams += ['-rtsp_transport', 'tcp']

@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 V1.6.6o 25.06.2025
 """
 
+import os
 import cv2 as cv
 import json
 import numpy as np
@@ -25,7 +26,6 @@ import aiofiles.os
 import aioshutil
 from logging import getLogger
 from signal import SIGKILL
-from os import environ, kill, getpid
 from setproctitle import setproctitle
 from collections import deque
 from time import time
@@ -192,11 +192,11 @@ class c_eventer(viewable):
       )
       
       await database_sync_to_async(alarm_init)(self.logger)
-      environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+      os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
       if self.dbline.eve_gpu_nr_cv== -1:
-        environ["CUDA_VISIBLE_DEVICES"] = ''
+        os.environ["CUDA_VISIBLE_DEVICES"] = ''
       else:  
-        environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.eve_gpu_nr_cv)
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.eve_gpu_nr_cv)
       self.logger.info('**** Eventer #' + str(self.id)+' running GPU #' 
         + str(self.dbline.eve_gpu_nr_cv))
       self.eventdict = {}
@@ -206,7 +206,7 @@ class c_eventer(viewable):
       await self.set_cam_counts()
       self.display_deque = deque()
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg, )
-      self.tf_w_index = await self.tf_worker.register(self.tf_worker_id)
+      self.tf_w_index = await self.tf_worker.register(self.tf_worker_id, prio = 2)
       await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
       self.school_line = await database_sync_to_async(lambda: self.dbline.eve_school)()
       self.xdim, self.ydim = await self.tf_worker.get_xy(
@@ -265,7 +265,7 @@ class c_eventer(viewable):
         if not startup_redis.get_start_stream_busy(): 
           break
       startup_redis.set_start_stream_busy(self.id)
-      kill(getpid(), SIGKILL)
+      os.kill(os.getpid(), SIGKILL)
 
   async def run_one(self, frame):
     if streams_redis.check_if_counts_zero('E', self.id):
@@ -509,20 +509,30 @@ class c_eventer(viewable):
                         + '\n'
                       )
                   await a_break_type(BR_SHORT)
-                  process = await asyncio.create_subprocess_exec(
-                    'ffmpeg', 
-                    '-f', 'concat', 
-                    '-safe', '0', 
-                    '-v', 'fatal', 
-                    '-i', listfilename, 
-                    '-codec', 'copy', 
-                    temppath,
+                  cmd = [
+                      'ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+                      '-f', 'concat', '-safe', '0', '-i', listfilename,
+                      '-c', 'copy', temppath,
+                  ]
+                  proc = await asyncio.create_subprocess_exec(
+                      *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
                   )
-                  await process.wait()
-                  await aiofiles.os.remove(listfilename)
-                  await a_break_type(BR_SHORT)
-                  await aioshutil.move(temppath, savepath)
-                
+                  _, stderr = await proc.communicate()
+                  try:
+                    await aiofiles.os.remove(listfilename)
+                  except FileNotFoundError:
+                    pass
+                  if proc.returncode != 0 or not await aiofiles.os.path.exists(temppath):
+                    self.logger.error(
+                      f"ffmpeg concat failed rc={proc.returncode}, out='{temppath}' fehlt. "
+                      f"stderr: {stderr.decode(errors='ignore').strip()}"
+                    )
+                    del self.eventdict[i]
+                    return()
+                  try:
+                    await asyncio.to_thread(os.replace, temppath, savepath)
+                  except OSError:
+                    await aioshutil.move(temppath, savepath)
                 if self.dbline.eve_webm_doit:
                   eventers_redis.push_to_webm(self.id, savepath)
                 self.vid_str_dict[my_vid_str] = item.savename
@@ -655,7 +665,7 @@ class c_eventer(viewable):
       while startup_redis.get_start_stream_busy(): 
         await a_break_type(BR_LONG)
       startup_redis.set_start_stream_busy(self.id)
-      kill(getpid(), SIGKILL)
+      os.kill(os.getpid(), SIGKILL)
 
   async def set_cam_counts(self):
     if any([len(self.cond_dict[x]) for x in range(2,6)]):

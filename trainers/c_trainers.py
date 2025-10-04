@@ -114,10 +114,18 @@ class trainer(spawn_process):
         for idx in frame_ids:
           await asyncio.sleep(0)
           if not received:
-            received = (await asyncio.wait_for(
-              self.tf_worker.get_from_outqueue(self.tf_w_index),
-              timeout=60
-            )).tolist()
+            while True:
+              try:
+                received = (await asyncio.wait_for(
+                  self.tf_worker.get_from_outqueue(self.tf_w_index),
+                  timeout=60
+                )).tolist()
+                break
+              except TimeoutError: 
+                self.logger.warning(
+                  f'TR{self.id}: School #{school_nr}: Inferencing timeout'
+                )  
+                await a_break_type(BR_LONG)
           prediction = received.pop(0) 
           frameline = await trainframe.objects.aget(id = idx)
           frameline.last_fit = school_dbline.last_fit
@@ -127,7 +135,7 @@ class trainer(spawn_process):
             update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
           )
         time_diff = time() - ts1
-        await asyncio.sleep(time_diff)
+        await asyncio.sleep(time_diff * 2.0)
       self.logger.info(
         f'TR{self.id}: Finished re-inferencing of school #{school_nr}'
       )  
