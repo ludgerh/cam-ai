@@ -105,13 +105,15 @@ class tf_user(object):
       self.clientset.discard(self.id)
       
 class output_dist():   
-  def __init__(self, idx):
-    self.nametag = 'cam-ai.tf_worker.output:' + str(idx) + ':'
+  def __init__(self, tf_worker):
+    self.nametag = 'cam-ai.tf_worker.output:' + str(tf_worker.id) + ':'
     self.used_adresses = set()
     self.auto_break = a_break_auto(tmin = 0.01, tmax = 0.1, rate = 0.01)
+    self.tf_worker = tf_worker
     
   async def put(self, tf_w_index, data):
-    while safe_redis.exists(self.nametag + str(tf_w_index) + ':'): 
+    while (not getattr(self.tf_worker, 'got_sigint', False)
+        and safe_redis.exists(self.nametag + str(tf_w_index) + ':')): 
       await self.auto_break.wait()
     self.auto_break.reset()
     self.used_adresses.add(tf_w_index) 
@@ -202,7 +204,8 @@ class tf_worker(spawn_process):
       self.dbline = await dbworker.objects.aget(id = self.id)
       setproctitle('CAM-AI-TFWorker #'+str(self.dbline.id))
       #*** Requirements
-      self.my_output = output_dist(self.id)
+      self.got_sigint = False
+      self.my_output = output_dist(self)
       datapath = await djconf.agetconfig('datapath', 'data/')
       schoolsdir = await djconf.agetconfig('schools_dir', datapath + 'schools/')
       async for schoolline in dbschool.objects.filter(
@@ -243,7 +246,7 @@ class tf_worker(spawn_process):
       #*** Client Var
       self.run_out_procs = {}
       self.ws_ts = None
-      signal(SIGINT, sigint_handler)
+      #signal(SIGINT, sigint_handler)
       self.len_taglist = len(await database_sync_to_async(get_taglist)(1, ))
       self.users = {}
       self.logname = 'tf_worker #'+str(self.dbline.id)
@@ -287,18 +290,18 @@ class tf_worker(spawn_process):
       schoolnr = 0
       #print('Launch: tf_worker')
       await super().async_runner() 
-      while self.do_run and not self.model_buffers:
+      while not (self.got_sigint or self.model_buffers):
         await a_break_type(BR_LONG)
       self.finished = False
       wait_autos = {}
-      while self.do_run:
-        while self.do_run:
+      while not self.got_sigint:
+        while not self.got_sigint:
           schoolnr += 1
           if schoolnr > max(self.model_buffers):
             schoolnr = 1
           if schoolnr in self.model_buffers:
             break
-        if self.do_run:
+        if not self.got_sigint:
           if self.model_buffers[schoolnr].pause:
             await a_break_type(BR_LONG)
           else: 
@@ -309,7 +312,7 @@ class tf_worker(spawn_process):
                 and (self.model_buffers[schoolnr].qsize() >= self.dbline.maxblock
                 or timeout)):
               wait_autos[schoolnr].reset()
-              if self.do_run and not self.model_buffers[schoolnr].empty():
+              if not self.got_sigint and not self.model_buffers[schoolnr].empty():
                 await self.process_buffer(schoolnr, self.logger, timeout)
               self.model_buffers[schoolnr].ts = time() 
             else:
@@ -546,7 +549,7 @@ class tf_worker_client():
     await self.inqueue.put(('register', prio, ))
     self.tf_w_index = await asyncio.to_thread(self.registerqueue.get)
     self.id = worker_id
-    self.my_output = output_dist(self.id)
+    self.my_output = output_dist(self)
     self.my_output.clean_one(self.tf_w_index)
     return(self.tf_w_index)
 

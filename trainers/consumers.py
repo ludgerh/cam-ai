@@ -374,7 +374,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -625,14 +625,23 @@ class trainerutil(AsyncWebsocketConsumer):
           self.close()						
 
       elif params['command'] == 'getavailmodels':
-        modeldir = self.schoolline.dir
-        outlist['data'] = []
-        model_type_lines = model_type.objects.all()
-        async for item in  model_type_lines:
-          search_path = modeldir + 'model/' + item.name
-          if await aiofiles.os.path.exists(search_path + '.keras'):
-            outlist['data'].append(item.name)
-        logger.debug('--> ' + str(outlist))
+      
+  
+        if self.trainerline.t_type == 2:
+          temp = json.loads(text_data)
+          temp['data']['school']=self.schoolline.e_school
+          await self.ws.send_str(json.dumps(temp))
+          returned = await self.ws.receive()
+          outlist['data'] = json.loads(returned.data)['data']
+        else: 
+          modeldir = self.schoolline.dir
+          outlist['data'] = []
+          model_type_lines = model_type.objects.all()
+          async for item in  model_type_lines:
+            search_path = modeldir + 'model/' + item.name
+            if await aiofiles.os.path.exists(search_path + '.keras'):
+              outlist['data'].append(item.name)
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')

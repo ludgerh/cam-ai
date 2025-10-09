@@ -22,6 +22,7 @@ import aiofiles
 import aiofiles.os
 import aioshutil
 import aiohttp
+from asgiref.sync import sync_to_async
 from glob import glob
 from os import path
 from random import randint
@@ -34,7 +35,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
+from channels.db import database_sync_to_async, close_old_connections
 from django.contrib.auth.hashers import check_password
 from camai.c_settings import safe_import
 from tools.l_tools import ts2filename, djconf, uniquename_async
@@ -274,23 +275,30 @@ class schooldbutil(AsyncWebsocketConsumer):
           filterdict['c'+str(params['class'])] = 1
         framelines = trainframe.objects.filter(**filterdict)
         if params ['cbdifferences']:
+          BATCH = 1000
+          last_pk = 0
           frames = []
           frames_to_infer = []
-          async for item in framelines.aiterator(chunk_size=100):
-            frame = {
-              'idx' : item.id, 
-              'line' : item, 
-              'tags' : tuple(
-                getattr(item, f"c{i}") for i in range(10)
-              )
-            }
-            if item.last_fit != self.school_lines[school_nr].last_fit:
-              frames_to_infer.append(frame)
-            else:
-              frame['prediction'] = tuple(
-                getattr(item, f"pred{i}") for i in range(10)
-              )
-            frames.append(frame)
+          while True:
+            qs = (framelines
+              .filter(pk__gt=last_pk)
+              .order_by("pk")[:BATCH])
+            batch = await sync_to_async(list)(qs)
+            if not batch:
+              break
+            for item in batch:
+              frame = {
+                "idx": item.id,
+                "line": item,
+                "tags": tuple(getattr(item, f"c{i}") for i in range(10)),
+              }
+              if item.last_fit != self.school_lines[school_nr].last_fit:
+                frames_to_infer.append(frame)
+              else:
+                frame["prediction"] = tuple(getattr(item, f"pred{i}") for i in range(10))
+              frames.append(frame)
+              last_pk = item.id
+            await sync_to_async(close_old_connections)()
           await self.predictions_from_tfw(
             frames_to_infer, 
             school_nr, 

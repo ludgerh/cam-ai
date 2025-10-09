@@ -68,7 +68,7 @@ class school(models.Model):
   model_train_type = models.CharField(max_length=50, default='efficientnetv2-b0')
   model_xin = models.IntegerField(default=224)
   model_yin = models.IntegerField(default=224)
-  model_image_augmentation = models.FloatField(default=0.5)
+  model_image_augmentation = models.FloatField(default=0.2)
   model_weight_decay = models.FloatField(default=0.0)
   model_weight_constraint = models.FloatField(default=0.0)
   model_dropout = models.FloatField(default=0.0)

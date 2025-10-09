@@ -176,6 +176,7 @@ class c_cam(viewable):
           await a_break_type(BR_SHORT)
       await self.dbline.asave(update_fields = ['cam_fpsactual', ])
       if getattr(self, "_inq_task", None):
+        self._inq_task.cancel()
         try:
           await self._inq_task
         except asyncio.CancelledError:
@@ -196,6 +197,10 @@ class c_cam(viewable):
           await self.mp4_proc
         except asyncio.CancelledError:
           pass
+      try:
+        await asyncio.get_running_loop().shutdown_default_executor()
+      except RuntimeError:
+        pass
     except Exception as fatal:
       self.logger.error(
         'Error in process: ' 

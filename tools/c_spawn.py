@@ -42,6 +42,7 @@ class spawn_process(Process):
       self.use_buffer = False
       self.inqueue = s_queue()
     self.got_sigint = False
+    self._inq_task = None
     super().__init__()
 
   def run(self):
@@ -64,16 +65,16 @@ class spawn_process(Process):
     try:
       while self.do_run:
         if self.use_buffer:
-          if self.use_buffer:
-            received = await self.inqueue.get(timeout=2.0)
-            if received is None:
-              continue
+          received = await self.inqueue.get(timeout=2.0)
+          if received is None:
+            continue
         else:  
           received = await asyncio.to_thread(self.inqueue.get)
-        if received[0] == 'stop':
-          self.do_run = False  
         if not await self.process_received(received):
           raise QueueUnknownKeyword(received[0])
+        if received and received[0] == 'stop':
+          self.got_sigint = True
+          self.do_run = False  
     except Exception as fatal:
       self.logger.error('Error in process: ' 
         + self.logname 
@@ -86,8 +87,14 @@ class spawn_process(Process):
       if self.use_buffer:
         await self.inqueue.put(('stop', 0, ))
       else:  
-        self.inqueue.put(('stop',))
-    self.join()
+        await asyncio.to_thread(self.inqueue.put, ('stop',))
+      if self._inq_task:
+        self._inq_task.cancel()
+        try:
+          await self._inq_task
+        except asyncio.CancelledError:
+          pass
+      await asyncio.to_thread(self.join, 5.0)
     
 class viewable(spawn_process):
   def __init__(self, logger, ):
