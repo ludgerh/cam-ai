@@ -32,6 +32,7 @@ from django.utils import timezone
 from django.forms.models import model_to_dict
 from globals.c_globals import tf_workers
 from tf_workers.c_tf_workers import tf_worker_client
+from tools.l_break import a_break_time, a_break_type, BR_LONG
 from .redis import my_redis as trainers_redis
 
 #from threading import enumerate 
@@ -81,6 +82,8 @@ class trainer(spawn_process):
     framelines = (trainframe.objects
       .filter(school = school_nr, deleted = False)
       .exclude(last_fit=school_dbline.last_fit)[:1000])
+    if self.got_sigint:
+      return()  
     frames = []
     async for item in framelines.aiterator():
       frames.append(item)
@@ -89,6 +92,8 @@ class trainer(spawn_process):
         f'TR{self.id}: Re-inferencing {len(frames)} frames of school #{school_nr}'
       )  
       for chunk in _chunked(frames, CHUNK_SIZE):
+        if self.got_sigint:
+          return()  
         ts1 = time()
         imglist = []
         frame_ids = []
@@ -146,7 +151,6 @@ class trainer(spawn_process):
     try:
       from tools.c_logger import alog_ini
       from tools.l_tools import ts2mysqltime
-      from tools.l_break import a_break_time, a_break_type, BR_LONG
       from .models import trainer as dbtrainer, trainframe
       self.dbline = await dbtrainer.objects.aget(id = self.id)
       setproctitle('CAM-AI-Trainer #'+str(self.id))
@@ -258,7 +262,6 @@ class trainer(spawn_process):
 
   async def job_queue_thread(self):
     try:
-      from tools.l_break import a_break_time, a_break_type, BR_LONG
       from globals.c_globals import trainers
       from tf_workers.models import school
       from .models import trainframe, fit

@@ -61,7 +61,7 @@ while True:
   else: 
     sleep(0.1) 
 if startup_redis.get_shutdown_command() == 10:  
-  print('!!!!! Shutting down !!!!!') 
-  #os.system('sudo shutdown now') 
+  #print('!!!!! Shutting down !!!!!') 
+  os.system('sudo shutdown now') 
 print('***** CAM-AI server is done *****')  
     
