@@ -149,6 +149,12 @@ class tf_worker(spawn_process):
     self.registerqueue = s_queue()
     super().__init__(buffer_code = 'OOON')
     
+  def _safe_maxblock(self) -> int:
+    if self.dbline.use_litert:
+      return(1)
+    else:  
+      return(self.dbline.maxblock)
+    
   async def process_received(self, received):  
     result = True
     #print('TF-Worker-Inqueue received:', received[:3], len(received))
@@ -309,7 +315,7 @@ class tf_worker(spawn_process):
               wait_autos[schoolnr] = a_break_auto()  
             timeout = time() > self.model_buffers[schoolnr].ts + self.dbline.timeout
             if (schoolnr in self.model_buffers
-                and (self.model_buffers[schoolnr].qsize() >= self.dbline.maxblock
+                and (self.model_buffers[schoolnr].qsize() >= self._safe_maxblock()
                 or timeout)):
               wait_autos[schoolnr].reset()
               if not self.got_sigint and not self.model_buffers[schoolnr].empty():
@@ -381,8 +387,8 @@ class tf_worker(spawn_process):
         if self.dbline.use_litert:
           interpreter = await asyncio.to_thread(
             self.tflite.Interpreter, 
-            model_path=model_path, 
-            num_threads=2,
+            model_path = model_path, 
+            num_threads = 1,
           )
           await asyncio.to_thread(interpreter.allocate_tensors)
           self.models[schoolnr]['model'] = interpreter
@@ -427,7 +433,7 @@ class tf_worker(spawn_process):
   async def process_buffer(self, schoolnr, logger, had_timeout=False):
     mybuffer = self.model_buffers[schoolnr]
     ts_one = time()
-    slice_to_process = await mybuffer.get(self.dbline.maxblock)
+    slice_to_process = await mybuffer.get(self._safe_maxblock())
     framelist = [item[0] for item in slice_to_process]
     framesinfo = [item[1] for item in slice_to_process]
     await self.check_model(schoolnr, logger, True)
