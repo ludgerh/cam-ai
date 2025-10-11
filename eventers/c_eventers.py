@@ -78,6 +78,7 @@ class c_eventer(viewable):
     self.worker_reg = worker_registerqueue
     self.tf_worker_id = worker_id
     self.cond_dict = {1:[], 2:[], 3:[], 4:[], 5:[]}
+    self.last_saved_event_end = 0.0
     super().__init__(logger, )
     
   async def process_received(self, received):  
@@ -87,7 +88,8 @@ class c_eventer(viewable):
       async with self.vid_deque_lock:
         self.vid_deque.append(received[1:])
         while True:
-          if self.vid_deque and (time() - self.vid_deque[0][2]) > 240.0:
+          if (self.vid_deque 
+              and (self.last_saved_event_end - self.vid_deque[0][2]) > 240.0):
             listitem = self.vid_deque.popleft()
             try:
               await aiofiles.os.remove(self.recordingspath + listitem[1])
@@ -575,8 +577,9 @@ class c_eventer(viewable):
         else:  
           is_done = False
       if is_done:
-        await item.save(self.cond_dict)  
+        await item.save(self.cond_dict)
     if is_done: 
+      self.last_saved_event_end = item.check_out_ts
       async with self.event_dict_lock:
         self.event_dict.pop(i, None)
 

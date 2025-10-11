@@ -374,7 +374,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -641,7 +641,7 @@ class trainerutil(AsyncWebsocketConsumer):
             search_path = modeldir + 'model/' + item.name
             if await aiofiles.os.path.exists(search_path + '.keras'):
               outlist['data'].append(item.name)
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')

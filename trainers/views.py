@@ -75,8 +75,7 @@ def dashboard(request, schoolnr):
       'schoolnr' : schoolnr,
       'model_types' : model_type.objects.all(),
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
-      'show_all_options' : (request.user.is_superuser 
-        and djconf.getconfigbool('is_public_server', False)),
+      'show_all_options' : request.user.is_superuser,
       'delegation_level' : myschool.delegation_level,
     }
     return(HttpResponse(template.render(context)))
