@@ -12,7 +12,6 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-v1.6.1 30.03.2025
 """
 
 import os
@@ -31,12 +30,14 @@ from threading import Lock as t_lock
 from random import random
 from logging import getLogger
 from signal import signal, SIGINT
+from statistics import mean
 from channels.db import database_sync_to_async
 from setproctitle import setproctitle
 from tools.l_sysinfo import sysinfo
 from tools.l_break import (a_break_time, a_break_type, break_type, a_break_auto, 
   BR_SHORT, BR_MEDIUM, BR_LONG, )
 from tools.c_redis import my_redis as safe_redis
+from .redis import my_redis as tf_workers_redis
 
 #***************************************************************************
 #
@@ -213,6 +214,12 @@ class tf_worker(spawn_process):
       self.got_sigint = False
       self.my_output = output_dist(self)
       datapath = await djconf.agetconfig('datapath', 'data/')
+      self.do_tf_debug = await djconf.agetconfigbool('do_tf_debug', True)
+      if self.do_tf_debug:
+        self.tf_debug_count = 9
+        self.buf_size_list = [0]
+        self.block_size_list = [0]
+        self.proc_time_list = [0.0]
       schoolsdir = await djconf.agetconfig('schools_dir', datapath + 'schools/')
       async for schoolline in dbschool.objects.filter(
           active = True, 
@@ -428,7 +435,7 @@ class tf_worker(spawn_process):
           )
         logger.info('***** Testrun for model #' + str(schoolnr)+', type: '
           + self.models[schoolnr]['model_type'])
-      self.active_models += 1
+      self.active_models += 1    
 
   async def process_buffer(self, schoolnr, logger, had_timeout=False):
     mybuffer = self.model_buffers[schoolnr]
@@ -495,18 +502,30 @@ class tf_worker(spawn_process):
               framesinfo[starting],
             ))
           starting = i + 1
-      if self.dbline.savestats > 0: #Later to be written in DB
+      if self.do_tf_debug:
         newtime = time()
-        logtext = 'School: ' + str(schoolnr).zfill(3)
-        logtext += ('  Buffer Size: ' 
-          + str(len(mybuffer)).zfill(5))
-        logtext += ('  Block Size: ' 
-          + str(len(framelist)).zfill(5))
-        logtext += ('  Proc Time: ' 
-          + str(round(newtime - ts_one, 3)).ljust(5, '0'))
-        if had_timeout:
-          logtext += ' T'
-        logger.info(logtext)
+        buf_size = mybuffer.qsize()
+        block_size = len(framelist)
+        proc_time = newtime - ts_one  
+        if self.tf_debug_count >= 9:
+          self.buf_size_10 = mean(self.buf_size_list)
+          self.buf_size_list = [buf_size]
+          self.block_size_10 = mean(self.block_size_list)
+          self.block_size_list = [block_size]
+          self.proc_time_10 = mean(self.proc_time_list)
+          self.proc_time_list = [proc_time]
+          self.tf_debug_count = 0
+        else:
+          self.buf_size_list.append(buf_size)
+          self.block_size_list.append(block_size)
+          self.proc_time_list.append(proc_time)
+          self.tf_debug_count += 1  
+        tf_workers_redis.set_buf_size(self.id, buf_size)
+        tf_workers_redis.set_buf_size_10(self.id, self.buf_size_10)
+        tf_workers_redis.set_block_size(self.id, block_size)
+        tf_workers_redis.set_block_size_10(self.id, self.block_size_10)
+        tf_workers_redis.set_proc_time(self.id, proc_time)
+        tf_workers_redis.set_proc_time_10(self.id, self.proc_time_10)
 
 #***************************************************************************
 #

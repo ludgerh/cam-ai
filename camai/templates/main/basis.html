@@ -196,6 +196,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             <a class="btn btn-primary m-2 back back" href="/tools/logout/">Log Out &#8205; <i class="bi bi-box-arrow-left"></i></a>
             <a class="btn m-2" href="https://cam-ai.de/instructions/" target="_blank" style="color: #475B63;"><i class="bi bi-question-circle"></i></a>
           </div>
+          {% if tf_debug %}
+          <div>
+            AI Queue Size: <span id="buf_size">?</span> (A10: <span id="buf_size_10">?</span>)
+          </div>
+          <div>
+            Data Block Size: <span id="block_size">?</span> (A10: <span id="block_size_10">?</span>)
+          </div>
+          <div>
+            Processing Time: <span id="proc_time">?</span> (A10: <span id="proc_time_10">?</span>)
+          </div>
+          {% endif %}
         </div>
       </div>
     {% else %}
@@ -269,8 +280,23 @@ function updatediscinfo() {
       active_percentage = percentage;
     };
   })
-  .catch(err => {console.log(err);});
 };
+
+{% if tf_debug %}
+function update_tf_info() {
+  healthSocket.sendandwait({
+    'command' : 'get_tf_info',
+  })
+  .then((result) => {
+    $('#buf_size').text(result.buf_size);
+    $('#buf_size_10').text(result.buf_size_10);
+    $('#block_size').text(result.block_size);
+    $('#block_size_10').text(result.block_size_10);
+    $('#proc_time').text(result.proc_time);
+    $('#proc_time_10').text(result.proc_time_10);
+  })
+};
+{% endif %}
 
 $(document).ready(function() {
   if (typeof healthSocket == 'undefined') { 
@@ -283,10 +309,15 @@ $(document).ready(function() {
       healthSocket = result;
       updatediscinfo();
       setInterval(updatediscinfo, 60000);
+{% if tf_debug %}
+      setInterval(update_tf_info, 5000);
+{% endif %}
     })
-    .catch(err => {console.log(err);});
   } else {
     setInterval(updatediscinfo, 60000);
+{% if tf_debug %}
+    setInterval(update_tf_info, 5000);
+{% endif %}
   };
 });
 </script>

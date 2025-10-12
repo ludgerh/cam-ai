@@ -71,6 +71,10 @@ class cam_inst_view(myTemplateView):
       'emulatestatic' : emulatestatic,
       'is_public' : djconf.getconfigbool('is_public_server', False),
       'debug' : settings.DEBUG,
+      'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
+        'do_tf_debug', 
+        True,
+      ),
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
         self.request.user, 'R'
@@ -204,6 +208,10 @@ class addschool(myTemplateView):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
+      'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
+        'do_tf_debug', 
+        True,
+      ),
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
         self.request.user, 'R'
@@ -239,6 +247,10 @@ class linkservers(myTemplateView):
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
+      'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
+        'do_tf_debug', 
+        True,
+      ),
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
         self.request.user, 'R'

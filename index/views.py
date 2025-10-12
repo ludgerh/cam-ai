@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -34,6 +34,7 @@ def index(request, mode='C'):
     'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'mode' : mode,
+    'tf_debug' : request.user.is_superuser and djconf.getconfigbool('do_tf_debug', True),
     'camlist' : access.filter_items(
       stream.objects.filter(active=True).filter(cam_mode_flag__gt=0, demo=0), 'C', 
       request.user, 'R'
@@ -87,6 +88,7 @@ def landing(request):
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
+    'tf_debug' : request.user.is_superuser and djconf.getconfigbool('do_tf_debug', True),
     'camlist' : access.filter_items(
       stream.objects.filter(active=True).filter(cam_mode_flag__gt=0).order_by('-id'), 'C', 
       request.user, 'R'

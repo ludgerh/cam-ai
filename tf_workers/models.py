@@ -30,7 +30,6 @@ class worker(models.Model):
   gpu_sim_loading = models.FloatField(default=0.0)
   gpu_sim = models.FloatField(default=-1.0)
   gpu_nr = models.IntegerField(default=0)
-  savestats = models.FloatField(default=0.0)
   use_websocket = models.BooleanField(default=False)
   use_litert = models.BooleanField(default=True)
   remote_trainer = models.BooleanField(default=False)

@@ -64,6 +64,10 @@ class config(myTemplateView):
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
+      'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
+        'do_tf_debug', 
+        True,
+      ),
       'camlist' : access.filter_items(
         stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
         self.request.user, 'R'

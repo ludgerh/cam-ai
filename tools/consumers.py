@@ -57,6 +57,7 @@ from users.models import userinfo
 from access.models import access_control
 from access.c_access import access
 from users.userinfo import afree_quota
+from tf_workers.redis import my_redis as tf_workers_redis
 from .redis import my_redis as tools_redis
 from .health import my_health_runner
 
@@ -114,7 +115,7 @@ class health(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -133,6 +134,28 @@ class health(AsyncWebsocketConsumer):
           'freestr' : displaybytes(avaible),
         }
         #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
+
+      if params['command'] == 'get_tf_info':
+        if self.scope['user'].is_superuser:
+          outlist['data'] = {
+            'buf_size' : tf_workers_redis.get_buf_size(1),
+            'buf_size_10' : round(tf_workers_redis.get_buf_size_10(1), 4),
+            'block_size' : tf_workers_redis.get_block_size(1),
+            'block_size_10' : round(tf_workers_redis.get_block_size_10(1), 4),
+            'proc_time' : round(tf_workers_redis.get_proc_time(1), 4),
+            'proc_time_10' : round(tf_workers_redis.get_proc_time_10(1), 4),
+          }
+        else:  
+          outlist['data'] = {
+            'buf_size' : 0.0,
+            'buf_size_10' : 0.0,
+            'block_size' : 0.0,
+            'block_size_10' : 0.0,
+            'proc_time' : 0.0,
+            'proc_time_10' : 0.0,
+          }
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
 
     except:
