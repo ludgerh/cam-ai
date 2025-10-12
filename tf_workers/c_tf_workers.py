@@ -151,10 +151,11 @@ class tf_worker(spawn_process):
     super().__init__(buffer_code = 'OOON')
     
   def _safe_maxblock(self) -> int:
-    if self.dbline.use_litert:
-      return(1)
-    else:  
-      return(self.dbline.maxblock)
+    return(self.dbline.maxblock)
+    #if self.dbline.use_litert:
+    #  return(1)
+    #else:  
+    #  return(self.dbline.maxblock)
     
   async def process_received(self, received):  
     result = True
@@ -395,7 +396,7 @@ class tf_worker(spawn_process):
           interpreter = await asyncio.to_thread(
             self.tflite.Interpreter, 
             model_path = model_path, 
-            num_threads = 1,
+            #num_threads = 4,
           )
           await asyncio.to_thread(interpreter.allocate_tensors)
           self.models[schoolnr]['model'] = interpreter

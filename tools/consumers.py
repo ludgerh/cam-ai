@@ -115,7 +115,7 @@ class health(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -155,7 +155,21 @@ class health(AsyncWebsocketConsumer):
             'proc_time' : 0.0,
             'proc_time_10' : 0.0,
           }
-        logger.info('--> ' + str(outlist))
+        if outlist['data']['block_size']:
+          outlist['data']['one_image'] = round(
+            outlist['data']['proc_time'] / outlist['data']['block_size'], 
+            4, 
+          )
+        else:
+          outlist['data']['one_image'] = 0.0 
+        if outlist['data']['block_size_10']:
+          outlist['data']['one_image_10'] = round(
+            outlist['data']['proc_time_10'] / outlist['data']['block_size_10'], 
+            4,
+          )
+        else:
+          outlist['data']['one_image_10'] = 0.0 
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
 
     except:

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -18,6 +18,9 @@ import subprocess
 import os
 import requests
 import json
+import pathlib
+import re
+import shlex
 from time import sleep
 from shutil import move, rmtree, copy
 from zipfile import ZipFile
@@ -85,6 +88,29 @@ db_pass = None
 
 def sql_query(command):
   subprocess.call(['mariadb', '-u', 'root', '-p'+db_pass, '-e', command]) 
+  
+def sh(cmd, **kwargs):
+  return subprocess.run(shlex.split(cmd), check=True, **kwargs)
+
+def write_root_file(path, content, mode="0644"):
+  sh(f"sudo install -d -m 0755 $(dirname {shlex.quote(path)})")
+  p = subprocess.Popen(["sudo", "tee", path], stdin=subprocess.PIPE)
+  p.communicate(input=content.encode("utf-8"))
+  if p.returncode != 0:
+    raise RuntimeError(f"tee failed for {path}")
+  sh(f"sudo chmod {mode} {shlex.quote(path)}")
+  
+  
+def ensure_kv(key, value):
+  pattern = re.compile(rf'^\s*{re.escape(key)}\s*=')
+  found = False
+  for i,l in enumerate(lines):
+    if pattern.match(l):
+      lines[i] = f"{key} = {value}"
+      found = True
+      break
+  if not found:
+    lines.append(f"{key} = {value}")
 
 print('CAM-AI server setup tool')
 hw_os_code = sysinfo()
@@ -93,7 +119,7 @@ print('Hardware & OS codes:', hw_os_code)
 if ((((hw_os_code['hw'] == 'raspi' and 4 <= int(hw_os_code['hw_version']) and 4 <= int(hw_os_code['hw_ram']))
     or hw_os_code['hw'] == 'pc')
     and hw_os_code['dist'] == 'debian')
-    and int(hw_os_code['dist_version']) == 12):
+    and int(hw_os_code['dist_version']) in {12, 13}):
   print('Your system is compatible, we continue...')
 else:
   print('Your system does not meet our specs, see your hardware & OS codes above.')
@@ -229,20 +255,32 @@ if False or run_all:
  
 if False or run_all:  
   print('>>>>> Modifying system config...')
-  subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI setting/d', 
-    '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^timeout/d', '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , 
-    '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$atimeout 180;' , '/etc/dhcp/dhclient.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI setting/d', 
-    '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^vm.overcommit_memory/d', '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '/^net.core.somaxconn/d', '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$avm.overcommit_memory = 1' , 
-    '/etc/sysctl.conf']) 
-  subprocess.call(['sudo', 'sed', '-i', '$anet.core.somaxconn=1024' , '/etc/sysctl.conf']) 
+  if int(hw_os_code['dist_version']) <= 12:
+    subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI setting/d', 
+      '/etc/dhcp/dhclient.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '/^timeout/d', '/etc/dhcp/dhclient.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , 
+      '/etc/dhcp/dhclient.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '$atimeout 180;' , '/etc/dhcp/dhclient.conf'])
+  if  int(hw_os_code['dist_version']) <= 12:  
+    subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI setting/d', 
+      '/etc/sysctl.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '/^vm.overcommit_memory/d', '/etc/sysctl.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '/^net.core.somaxconn/d', '/etc/sysctl.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '$a#***** CAM-AI setting' , '/etc/sysctl.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '$avm.overcommit_memory = 1' , 
+      '/etc/sysctl.conf']) 
+    subprocess.call(['sudo', 'sed', '-i', '$anet.core.somaxconn=1024' , '/etc/sysctl.conf']) 
+  else:
+    # Beispiel: deine sysctl-Datei
+    sysctl_dropin = "/etc/sysctl.d/99-cam-ai.conf"
+    content = """#***** CAM-AI setting
+    vm.overcommit_memory = 1
+    net.core.somaxconn = 1024
+    """
+    write_root_file(sysctl_dropin, content)
+    # neu laden
+    sh("sudo sysctl --system")
   subprocess.call(['sudo', 'sed', '-i', r'/^#\*\*\*\*\* CAM-AI disabled saving/d', 
     '/etc/redis/redis.conf']) 
   subprocess.call(['sudo', 'sed', '-i', '/^save/d', '/etc/redis/redis.conf']) 

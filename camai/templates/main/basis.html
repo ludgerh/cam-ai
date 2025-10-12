@@ -204,7 +204,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             Data Block Size: <span id="block_size">?</span> (A10: <span id="block_size_10">?</span>)
           </div>
           <div>
-            Processing Time: <span id="proc_time">?</span> (A10: <span id="proc_time_10">?</span>)
+            Block Proc Time: <span id="proc_time">?</span> (A10: <span id="proc_time_10">?</span>)
+          </div>
+          <div>
+            Img Proc Time: <span id="one_image">?</span> (A10: <span id="one_image_10">?</span>)
           </div>
           {% endif %}
         </div>
@@ -294,6 +297,8 @@ function update_tf_info() {
     $('#block_size_10').text(result.block_size_10);
     $('#proc_time').text(result.proc_time);
     $('#proc_time_10').text(result.proc_time_10);
+    $('#one_image').text(result.one_image);
+    $('#one_image_10').text(result.one_image_10);
   })
 };
 {% endif %}
