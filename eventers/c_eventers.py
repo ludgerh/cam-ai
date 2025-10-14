@@ -118,9 +118,9 @@ class c_eventer(viewable):
     elif (received[0] == 'set_fpslimit'):
       self.dbline.eve_fpslimit = received[1]
       if received[1] == 0:
-        self.sl.period = 0.0
+        self.period = 0.0
       else:
-        self.sl.period = 1.0 / received[1]
+        self.period = 1.0 / received[1]
     elif (received[0] == 'set_margin'):
       self.dbline.eve_margin = received[1]
     elif (received[0] == 'set_event_time_gap'):
@@ -397,6 +397,7 @@ class c_eventer(viewable):
         if y0 > frame[1].shape[0] - 5 or y0 < 5:
           y0 = item[2] + 30 * self.textheight
         for j in range(len(tag_display_list)):
+
           await asyncio.to_thread(
             cv.putText, 
             newframe[1], 
@@ -483,6 +484,9 @@ class c_eventer(viewable):
     if item.goes_to_school or item.isrecording or item.to_email:
       if not await afree_quota(item.stream_creator):
         self.logger.warning(f'EV{self.id}: Did not save the event because of low quota')
+        self.event_dict.goes_to_school = False
+        self.event_dict.item.isrecording = False
+        self.event_dict.item.to_email = []
         return()
       if item.isrecording:
         async with self.vid_deque_lock:

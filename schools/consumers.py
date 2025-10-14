@@ -46,7 +46,6 @@ from tools.l_break import a_break_type, BR_LONG
 from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers
-from cleanup.models import status_line_school
 from schools.c_schools import get_taglist, check_extratags_async
 from tf_workers.models import school, worker
 from tf_workers.c_tf_workers import tf_worker_client
@@ -838,9 +837,6 @@ class schoolutil(AsyncWebsocketConsumer):
               await access_control.objects.filter(
                 vtype = 'S', 
                 vid = params['schoolnr'], 
-              ).adelete()
-              await status_line_school.objects.filter(
-                school = self.schoolline, 
               ).adelete()
         else:  
           outlist['data'] = {

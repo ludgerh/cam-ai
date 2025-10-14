@@ -22,12 +22,13 @@ from logging import getLogger
 from time import time
 from setproctitle import setproctitle
 from streams.redis import my_redis as streams_redis
-#from psutil import virtual_memory
-
+from tf_workers.redis import my_redis as tf_workers_redis
 from tools.c_spawn import viewable
 
+#from psutil import virtual_memory
+
 class c_detector(viewable):
-  def __init__(self, dbline, myeventer_det_queue, logger, ):
+  def __init__(self, dbline, myeventer_det_queue, worker_id, logger, ):
     from tools.c_tools import c_buffer
     self.type = 'D'
     self.dbline = dbline
@@ -43,6 +44,7 @@ class c_detector(viewable):
       )
     self.myeventer_det_queue = myeventer_det_queue 
     self.scaledown = self.get_scale_down()
+    self.tf_worker_id = worker_id
     super().__init__(logger, )
    
   async def async_runner(self):
@@ -78,6 +80,8 @@ class c_detector(viewable):
       self.warning_done = False
       if self.dbline.det_apply_mask:
         await self.viewer.drawpad.set_mask_local()
+      self.div_ts = 0.0
+      self.div_high = 1.0
       #print('Launch: detector')
       while not self.got_sigint:
         frameline = await self.dataqueue.get(timeout = 2.0)
@@ -141,6 +145,25 @@ class c_detector(viewable):
     if input[2] == 0.0:
       return(None)
     frametime = input[2]
+          
+          
+    if (new_time := time()) - self.div_ts >= 5.0:  
+      if (buffer_size := tf_workers_redis.get_buf_size_10(self.tf_worker_id)) < 2.5:
+        divisor = 1.0  
+      elif buffer_size < 5.0:
+        divisor = 2.0   
+      elif buffer_size < 10.0:
+        divisor = 4.0  
+      else:  
+        divisor = 8.0  
+      self.sl.period = self.sl.period / divisor
+      if divisor > self.div_high:
+        self.div_high = divisor
+        self.logger.warning(f'EV{self.id}: Period divisor = {divisor}')
+      self.div_ts = new_time
+          
+          
+          
     if self.got_sigint or not self.sl.greenlight(frametime):
       return(None)
     if self.run_lock and not self.dbline.cam_virtual_fps: 

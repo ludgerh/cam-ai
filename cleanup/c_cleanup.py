@@ -37,8 +37,7 @@ from tf_workers.models import school
 from streams.models import stream
 from trainers.models import model_type
 from users.models import archive, userinfo
-from .models import (status_line_event, status_line_video, status_line_school,
-  files_to_delete)
+from .models import files_to_delete
 from .redis import my_redis as cleanup_redis
 
 check_interval = 5
@@ -209,14 +208,12 @@ class c_cleanup():
       files_to_delete.objects.all()
     )]
     for streamline in stream.objects.filter(active = True):
-      my_status_events = status_line_event(made = timestamp, stream = streamline)
 # ***** checking temp events
       eventquery = list_from_queryset(
         event.objects.filter(deleted = False, camera = streamline.id, xmax__lte=0)
       )
       events_temp = {item.id for item in eventquery 
         if datetime.timestamp(item.start) < time() - 300.0}
-      my_status_events.events_temp = len(events_temp)
       cleanup_redis.add_to_redis_queue('events_temp', streamline.id, events_temp)
 # ***** checking eventframes vs events
       eventframequery = list_from_queryset(
@@ -236,14 +233,12 @@ class c_cleanup():
       )
       eventset = {item.id for item in eventquery}
       events_frames_correct = eventset & (eventframeset | eventvideoset)
-      my_status_events.events_frames_correct = len(events_frames_correct)
       cleanup_redis.add_to_redis(
         'events_frames_correct', 
         streamline.id, 
         len(events_frames_correct), 
       )
       events_frames_missingframes = eventset - (eventframeset | eventvideoset)
-      my_status_events.events_frames_missingframes = len(events_frames_missingframes)
       cleanup_redis.add_to_redis_queue(
         'events_frames_missingframes', 
         streamline.id, 
@@ -259,30 +254,25 @@ class c_cleanup():
       )
       framedbset = {item.name for item in framedbquery}
       eframes_correct = framefileset & framedbset
-      my_status_events.eframes_correct = len(eframes_correct)
       cleanup_redis.add_to_redis('eframes_correct', streamline.id, len(eframes_correct))
       eframes_missingdb = framefileset - framedbset
-      my_status_events.eframes_missingdb = len(eframes_missingdb)
       cleanup_redis.add_to_redis_queue(
         'eframes_missingdb', 
         streamline.id, 
         eframes_missingdb, 
       )
       eframes_missingfiles = framedbset - framefileset
-      my_status_events.eframes_missingfiles = len(eframes_missingfiles)
       cleanup_redis.add_to_redis_queue(
         'eframes_missingfiles', 
         streamline.id, 
         eframes_missingfiles, 
       )
-      my_status_events.save()
 # ***** checking videos vs files
     files_to_delete_set = {
       '/'.join(item.split('/')[1:]) 
       for item in files_to_delete_list 
       if item.startswith(self.recordingspath.as_posix() + '/')
     }
-    my_status_videos = status_line_video(made = timestamp)
     filelist = list(self.recordingspath.iterdir())
     videos_temp = [item.name for item in filelist if (
       item.name[0] == 'C' 
@@ -290,22 +280,18 @@ class c_cleanup():
       and item.exists()
       and item.stat().st_mtime < (time() - 1800)
     )]
-    my_status_videos.videos_temp = len(videos_temp)
     cleanup_redis.add_to_redis_queue('videos_temp', 0, videos_temp)
     videos_jpg = {item.stem for item in filelist if (item.name[:2] == 'E_') 
       and (item.suffix == '.jpg')
     } - files_to_delete_set
-    my_status_videos.videos_jpg = len(videos_jpg)
     cleanup_redis.add_to_redis('videos_jpg', 0, len(videos_jpg))
     videos_mp4 = {item.stem for item in filelist if (item.name[:2] == 'E_') 
       and (item.suffix == '.mp4')
     } - files_to_delete_set
-    my_status_videos.videos_mp4 = len(videos_mp4)
     cleanup_redis.add_to_redis('videos_mp4', 0, len(videos_mp4))
     videos_webm = {item.stem for item in filelist if (item.name[:2] == 'E_') 
       and (item.suffix == '.webm')
     } - files_to_delete_set
-    my_status_videos.videos_webm = len(videos_webm)
     cleanup_redis.add_to_redis('videos_webm', 0, len(videos_webm))
     fileset = videos_jpg & videos_mp4
     fileset_all = videos_jpg | videos_mp4 | videos_webm
@@ -317,19 +303,14 @@ class c_cleanup():
     for item in mydbset:
       dbset.add(item.videoclip)
     videos_correct = fileset & dbset
-    my_status_videos.videos_correct = len(videos_correct)
     cleanup_redis.add_to_redis('videos_correct', 0, len(videos_correct))
     videos_missingdb = fileset_all - dbset
-    my_status_videos.videos_correct = len(videos_correct)
     videos_missingfiles = dbset - fileset
-    my_status_videos.videos_missingfiles = len(videos_missingfiles)
     cleanup_redis.add_to_redis_queue('videos_temp', 0, videos_temp)
     cleanup_redis.add_to_redis_queue('videos_missingdb', 0, videos_missingdb)
     cleanup_redis.add_to_redis_queue('videos_missingfiles', 0, videos_missingfiles)
-    my_status_videos.save()
 # ***** checking trainframesdb vs files
     for schoolline in list_from_queryset(school.objects.filter(active = True)):
-      my_status_schools = status_line_school(made = timestamp, school = schoolline)
       myschooldir = schoolline.dir
       files_to_delete_list_local = {
         item[len(myschooldir):]
@@ -391,12 +372,12 @@ class c_cleanup():
       dbsetquery = trainframe.objects.filter(deleted = False, school=schoolline.id)
       dbset = {'.'.join(item.name.split('.')[:-1]) for item in dbsetquery}
       schools_correct = fileset & dbset
-      my_status_schools.schools_correct = len(schools_correct)
       schools_missingdb = fileset - dbset
-      my_status_schools.schools_missingdb = len(schools_missingdb)
       schools_missingfiles = dbset - fileset
-      schools_missingbmps = dbset - bmpset
-      my_status_schools.schools_missingfiles = len(schools_missingfiles)
+      if schoolline.delegation_level == 1:
+        schools_missingbmps = dbset - bmpset
+      else:  
+        schools_missingbmps = 0
       cleanup_redis.add_to_redis('schools_correct', schoolline.id, len(schools_correct))
       cleanup_redis.add_to_redis_queue(
         'schools_missingdb', 
@@ -413,7 +394,6 @@ class c_cleanup():
         schoolline.id, 
         schools_missingbmps, 
       )
-      my_status_schools.save()
     #self.logger.info('Cleanup: Getting stream file sizes') 
     for streamline in list_from_queryset(stream.objects.all()): 
       result = get_dir_size(self.schoolframespath / str(streamline.id))

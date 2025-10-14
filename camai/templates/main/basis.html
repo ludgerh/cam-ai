@@ -313,6 +313,7 @@ $(document).ready(function() {
     .then((result) => {
       healthSocket = result;
       updatediscinfo();
+      update_tf_info();
       setInterval(updatediscinfo, 60000);
 {% if tf_debug %}
       setInterval(update_tf_info, 5000);

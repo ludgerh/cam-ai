@@ -57,6 +57,7 @@ class c_stream():
         self.mydetector = c_detector(
           self.dbline, 
           self.myeventer.detectorqueue,
+          my_worker.id,
           self.logger,
         )
         add_viewable(self.mydetector)

@@ -276,7 +276,11 @@ if False or run_all:
     sysctl_dropin = "/etc/sysctl.d/99-cam-ai.conf"
     content = """#***** CAM-AI setting
     vm.overcommit_memory = 1
+    vm.swappiness = 10
+    vm.dirty_ratio = 10
+    vm.dirty_background_ratio = 5
     net.core.somaxconn = 1024
+    vm.transparent_hugepages=never
     """
     write_root_file(sysctl_dropin, content)
     # neu laden

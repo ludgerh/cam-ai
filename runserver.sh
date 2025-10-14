@@ -3,7 +3,7 @@ cd cam-ai
 if [ "$1" = "raspi" ] ; then
   source ~/miniforge3/etc/profile.d/conda.sh
   conda activate tf
-  pip install -r requirements.raspi_12
+  pip install -r requirements.raspi_13
 fi
 if [ "$1" = "pc" ] ; then
   source ~/miniconda3/etc/profile.d/conda.sh
