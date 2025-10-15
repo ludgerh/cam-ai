@@ -90,11 +90,11 @@ def downmodel(request, schoolnr, tokennr, token, model_type = 'K', fit_nr = None
       myschool = school.objects.get(id = schoolnr)
       filename = myschool.dir + 'model/'
       if model_type == 'K':
-        filename += myschool.model_type + '.keras'
+        filename += myschool.model_train_type + '.keras'
       elif model_type == 'L':
-        filename += myschool.model_type + '.tflite'
+        filename += myschool.model_train_type + '.tflite'
       elif model_type == 'Q':
-        filename += 'q_' + myschool.model_type + '.tflite'
+        filename += 'q_' + myschool.model_train_type + '.tflite'
       modelfile = open(filename, 'rb')
       return FileResponse(modelfile)
     elif fitline.status == 'Stopped':   

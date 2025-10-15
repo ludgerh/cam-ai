@@ -243,19 +243,22 @@ class remotetrainer(AsyncWebsocketConsumer):
             }  
             await self.send(json.dumps(result))
             await self.close() 
-        
-      elif indict['code'] == 'delete':
+            
+      elif indict["code"] == "delete":
         if self.mytrainerline.t_type == 2:
           await self.ws.send_str(json.dumps(indict))
           await self.send((await self.ws.receive()).data)
         else:
-          frameline = await trainframe.objects.aget(
-            name=indict['name'], 
+          qs = trainframe.objects.filter(
             school=self.myschoolline.id,
+            name=indict["name"],
+            deleted=False,   # optional, falls Soft-Delete
           )
-          frameline.deleted = True
-          await frameline.asave(update_fields=('deleted', ))
-          await self.send('OK')
+          @transaction.atomic
+          def do_update():
+              return qs.update(deleted=True)
+          affected = await sync_to_async(do_update)()
+          await self.send(json.dumps({"status": "OK", "deleted": affected, }))
         
       elif indict['code'] == 'trainnow':
         if self.mytrainerline.t_type == 2:

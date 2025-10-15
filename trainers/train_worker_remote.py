@@ -42,32 +42,67 @@ from .models import trainframe, download
 from camai.version import version
 
 async def check_downloads(logger, session):
-  new_download = await download.objects.afirst()
-  if new_download is None:
-    return()
-  try:
-    response = await session.get(new_download.dl_url, allow_redirects=True) 
-  except aiohttp.client_exceptions.ConnectionTimeoutError:
-    return() 
-  byte_probe = await response.content.read(16)
-  probe = byte_probe.decode(errors = 'ignore').strip()
-  if probe == 'Stop!':
-    await new_download.adelete()
-    return()
-  if probe == 'Wait!':
-    return()
-  logger.info('DL Probe: ' + probe)
-  if probe.startswith('<html>'):
-    return()
-  datapath = await djconf.agetconfig('datapath', 'data/')
-  dlfile = await djconf.agetconfig('schools_dir', datapath + 'schools/')
-  dlfile += 'model' + str(new_download.school) + '/model/'
-  if new_download.model_kat == 1:
-    dlfile += new_download.model_type + '.keras'
-  else:
-    dlfile += new_download.model_type + '.tflite'
-  logger.info('DL Model: ' + dlfile)
-  tmp = dlfile + ".part"
+  qs = download.objects.all().order_by("id")
+  async for new_download in qs.aiterator():
+    try:
+      try:
+        resp = await session.get(new_download.dl_url, allow_redirects=True)
+      except aiohttp.client_exceptions.ConnectionTimeoutError:
+        continue
+      if resp.status != 200:
+        logger.warning(f"DL HTTP {resp.status} für {new_download.dl_url}")
+        continue
+      byte_probe = await resp.content.read(16)
+      probe = byte_probe.decode("utf-8", errors="ignore").strip()
+      if probe == "Stop!":
+        await new_download.adelete()
+        continue
+      if probe == "Wait!":
+        continue
+      if probe.startswith("<html>"):
+        logger.info(f"DL Probe (HTML): {probe[:60]}")
+        continue
+      datapath = await djconf.agetconfig("datapath", "data/")
+      dlfile = await djconf.agetconfig("schools_dir", datapath + "schools/")
+      dlfile += f"model{new_download.school}/model/"
+      dlfile += f"{new_download.model_type}.{'keras' if new_download.model_kat == 1 else 'tflite'}"
+      logger.info("DL Model: " + dlfile)
+      tmp = dlfile + ".part"
+      try:
+        async with aiofiles.open(tmp, "wb") as f:
+          await f.write(byte_probe)
+          async for chunk in resp.content.iter_chunked(1 << 20):
+              await f.write(chunk)
+          await f.flush()
+          await asyncio.to_thread(os.fsync, f.fileno())
+        dir_fd = os.open(os.path.dirname(dlfile) or ".", os.O_DIRECTORY)
+        try:
+          await asyncio.to_thread(os.replace, tmp, dlfile)
+          await asyncio.to_thread(os.fsync, dir_fd)
+        finally:
+          os.close(dir_fd)
+      except Exception:
+        try:
+          await aiofiles.os.remove(tmp)
+        except Exception:
+          pass
+        continue
+      school_line = await school_db.objects.aget(id=new_download.school)
+      school_line.last_fit += 1
+      school_line.lastmodelfile = timezone.now()
+      await school_line.asave(update_fields=("last_fit", "lastmodelfile"))
+      await new_download.adelete()
+      return(True)
+    finally:
+      try:
+        await resp.release()
+      except Exception:
+        pass
+  return False
+  
+  
+  
+
   async with aiofiles.open(tmp, 'wb') as f:
     await f.write(byte_probe)
     async for chunk in response.content.iter_chunked(1 << 20):  # 1 MiB

@@ -377,7 +377,7 @@ class c_cleanup():
       if schoolline.delegation_level == 1:
         schools_missingbmps = dbset - bmpset
       else:  
-        schools_missingbmps = 0
+        schools_missingbmps = set()
       cleanup_redis.add_to_redis('schools_correct', schoolline.id, len(schools_correct))
       cleanup_redis.add_to_redis_queue(
         'schools_missingdb', 

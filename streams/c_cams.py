@@ -710,12 +710,12 @@ class c_cam(viewable):
       await self.dbline.arefresh_from_db()
       try:
         self.ff_proc.send_signal(SIGINT)
+        self.ff_proc.terminate()
+        await self.ff_proc.wait()
       except ProcessLookupError:
         self.logger.warning(
           f'CA{self.id}: Process does not exist anymore. Cannot send signal'
         )
-      self.ff_proc.terminate()
-      await self.ff_proc.wait()
       self.ff_proc = None
     self.reset_buffer = True
     await self.newprocess() 
