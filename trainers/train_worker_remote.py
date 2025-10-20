@@ -88,9 +88,10 @@ async def check_downloads(logger, session):
           pass
         continue
       school_line = await school_db.objects.aget(id=new_download.school)
-      school_line.last_fit += 1
-      school_line.lastmodelfile = timezone.now()
-      await school_line.asave(update_fields=("last_fit", "lastmodelfile"))
+      if school_line.model_type == school_line.model_train_type:
+        school_line.last_fit += 1
+        school_line.lastmodelfile = timezone.now()
+        await school_line.asave(update_fields=("last_fit", "lastmodelfile"))
       await new_download.adelete()
       return(True)
     finally:
@@ -99,27 +100,6 @@ async def check_downloads(logger, session):
       except Exception:
         pass
   return False
-  
-  
-  
-
-  async with aiofiles.open(tmp, 'wb') as f:
-    await f.write(byte_probe)
-    async for chunk in response.content.iter_chunked(1 << 20):  # 1 MiB
-      await f.write(chunk)
-    await f.flush()
-    await asyncio.to_thread(os.fsync, f.fileno())
-  dir_fd = os.open(os.path.dirname(dlfile) or ".", os.O_DIRECTORY)
-  try:
-    await aioshutil.move(tmp, dlfile) 
-    await asyncio.to_thread(os.fsync, dir_fd)
-  finally:
-    os.close(dir_fd)
-  school_line = await school_db.objects.aget(id = new_download.school)
-  school_line.last_fit += 1
-  school_line.lastmodelfile = timezone.now()
-  await school_line.asave(update_fields=("last_fit", "lastmodelfile"))
-  await new_download.adelete()
 
 class train_once_remote():
 
@@ -154,6 +134,8 @@ class train_once_remote():
     self.logger.info('*** Working on School #'
       +str(self.myschool.id)+', '+self.myschool.name+'...');
     self.logger.info('****************************************************');
+    break_time(60.0)
+    
     from websocket import WebSocket #, enableTrace
     from websocket._exceptions import WebSocketConnectionClosedException
     #enableTrace(True)

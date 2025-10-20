@@ -43,7 +43,7 @@ class img_size(models.Model):
   y = models.IntegerField(default=0) 
 
   def __str__(self):
-    return('img_size, '+self.x+'x'+self.y)
+    return(f"img_size, {self.x}x{self.y}")
 
 class trainframe(models.Model):
   deleted = models.BooleanField(default=False)

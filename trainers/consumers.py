@@ -27,12 +27,14 @@ from math import inf
 from time import time, sleep
 from datetime import datetime
 from logging import getLogger
+from random import randrange
 from traceback import format_exc
 from zipfile import ZipFile
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.forms.models import model_to_dict
+from django.db import transaction
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from camai.version import version
@@ -62,14 +64,17 @@ async def get_trainer_nr(school_line):
   else:  
     result = -1
     length = inf
+    shortest = []
     for item in trainerlist:   
       joblist = trainers[item.id].getqueueinfo() 
       if school_line.id in joblist:
-        result = item.id
-        break
-      if len(joblist) < length:
+        return((item.id, len(trainerlist)))
+      elif len(joblist) < length:
         length = len(joblist)
-        result = item.id
+        shortest = [item.id, ]
+      elif len(joblist) == length:
+        shortest.append(item.id)
+    result = shortest.pop(randrange(len(shortest)))   
   return((result, len(trainerlist)))
 
 #*****************************************************************************
@@ -86,6 +91,8 @@ class remotetrainer(AsyncWebsocketConsumer):
     try:
       self.ws_session = None
       self.frameinfo = {}
+      self.made_dirs = set()
+      self.sizeline = None
       await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
@@ -94,9 +101,14 @@ class remotetrainer(AsyncWebsocketConsumer):
   async def receive(self, text_data =None, bytes_data=None):
     try:
       if bytes_data: 
-        #logger.info('<-- binary')
-        cod_x = self.myschoolline.model_xin
-        cod_y = self.myschoolline.model_yin
+        logger.info('<-- binary')
+        if self.sizeline is None:
+          self.cod_x = self.myschoolline.model_xin
+          self.cod_y = self.myschoolline.model_yin
+          self.sizeline, _ = await sync_to_async(img_size.objects.get_or_create)(
+            x=self.cod_x, 
+            y=self.cod_y, 
+          )
         ram_file = io.BytesIO(bytes_data)
         if self.mytrainerline.t_type == 2:
           zip_buffer = io.BytesIO()  
@@ -109,30 +121,32 @@ class remotetrainer(AsyncWebsocketConsumer):
             for item in myzip.namelist():
               logger.info('(' +str(i)+ ') Unpacking: ' + item)
               i -= 1
-              if item[-4:] == '.bmp':
+              if item.endswith(".bmp"):
                 codpath = (self.myschoolline.dir
-                  + 'coded/' + str(cod_x) + 'x' + str(cod_y) 
+                  + 'coded/' + str(self.cod_x) + 'x' + str(self.cod_y) 
                   + '/' + item[:-4] + '.cod')
                 mydir = path.dirname(codpath) 
-                await aiofiles.os.makedirs(mydir, exist_ok=True)
-                jpgdata = myzip.read(item)
-                imgdata = cv.imdecode(np.frombuffer(
-                  jpgdata, dtype=np.uint8), cv.IMREAD_COLOR)
-                if (imgdata.shape[1] != cod_x or  imgdata.shape[0] != cod_y):
-                  imgdata = cv.resize(imgdata, (cod_x, cod_y))
-                  imgdata = cv.imencode('.jpg', imgdata)[1].tobytes()
-                  async with aiofiles.open(codpath, mode="wb") as f:
-                    await f.write(imgdata)
-                else:
-                  async with aiofiles.open(codpath, mode="wb") as f:
-                    await f.write(jpgdata)
-                jsondata = json.loads(myzip.read(item + '.json'))  
-                try:  
-                  frameline = await trainframe.objects.aget(
-                    name=item, 
-                    school=self.myschoolline.id,
-                  )
-                except trainframe.DoesNotExist:  
+                if mydir not in self.made_dirs:
+                  await aiofiles.os.makedirs(mydir, exist_ok=True)
+                  self.made_dirs.add(mydir)
+                img = await asyncio.to_thread(myzip.read, item)
+                img = await asyncio.to_thread(
+                  cv.imdecode, 
+                  np.frombuffer(img, np.uint8), 
+                  cv.IMREAD_COLOR, 
+                )
+                if img.shape[1] != self.cod_x or  img.shape[0] != self.cod_y:
+                  img = await asyncio.to_thread(cv.resize, img, (self.cod_x, self.cod_y))
+                  img = await asyncio.to_thread(cv.imencode, ".jpg", img)
+                  img = img[1].tobytes()
+                async with aiofiles.open(codpath, mode="wb") as f:
+                  await f.write(img)
+                jsondata = await asyncio.to_thread(json.loads, myzip.read(item + ".json"))
+                qs = (trainframe.objects
+                  .filter(school=self.myschoolline.id, name=item, deleted=False)
+                  .order_by("id"))
+                frameline = await qs.afirst()  # erste Zeile (kleinste id)
+                if frameline is None:
                   frameline = trainframe(
                     made = timezone.make_aware(datetime.fromtimestamp(time())),
                     school = self.myschoolline.id,
@@ -144,12 +158,10 @@ class remotetrainer(AsyncWebsocketConsumer):
                 for j, v in enumerate(jsondata[:10]):
                   setattr(frameline, f"c{j}", v)
                 await frameline.asave()
-                try:
-                  sizeline = await img_size.objects.aget(x=cod_x, y=cod_y)
-                except img_size.DoesNotExist:
-                  sizeline = img_size(x=cod_x, y=cod_y)
-                  await sizeline.asave()
-                await frameline.img_sizes.aadd(sizeline)
+                await sync_to_async(
+                  qs.exclude(id=frameline.id).update
+                )(deleted=True)
+                await frameline.img_sizes.aadd(self.sizeline)
                 await frameline.asave()
         await self.send('OK')
         return()
@@ -157,7 +169,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       if text_data == 'Ping':
         return()
         
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -198,13 +210,9 @@ class remotetrainer(AsyncWebsocketConsumer):
             if json.loads(result) == 'done':
               break
         else:
-          try:
-            sizeline = await img_size.objects.aget(x=self.myschoolline.model_xin,
-              y=self.myschoolline.model_yin)
-          except img_size.DoesNotExist:
-            sizeline = img_size(x=self.myschoolline.model_xin,
-              y=self.myschoolline.model_yin)
-            await sizeline.asave()
+          sizeline, _ = await img_size.objects.aget_or_create(
+              x=self.myschoolline.model_xin, y=self.myschoolline.model_yin
+          )
           query_list = await database_sync_to_async(list)(
             trainframe.objects.filter(
               school=indict['school'],
@@ -215,8 +223,10 @@ class remotetrainer(AsyncWebsocketConsumer):
             result = (item.name, seq_to_int((item.c0, item.c1, item.c2, item.c3, 
               item.c4, item.c5, item.c6, item.c7, item.c8, item.c9)),
               await is_size_in_item(item, sizeline))
-            await self.send(json.dumps(result))
+            await self.send(json.dumps(result)) 
+            logger.info('--> ' + str(result))
           await self.send(json.dumps('done'))
+          logger.info('--> done')
                   
       elif indict['code'] == 'init_trainer':
         if self.mytrainerline.t_type == 2:
@@ -242,6 +252,7 @@ class remotetrainer(AsyncWebsocketConsumer):
               'status' : 'no_quota',
             }  
             await self.send(json.dumps(result))
+            logger.info('--> ' + str(result))
             await self.close() 
             
       elif indict["code"] == "delete":
@@ -252,13 +263,15 @@ class remotetrainer(AsyncWebsocketConsumer):
           qs = trainframe.objects.filter(
             school=self.myschoolline.id,
             name=indict["name"],
-            deleted=False,   # optional, falls Soft-Delete
+            deleted=False,
           )
           @transaction.atomic
           def do_update():
               return qs.update(deleted=True)
           affected = await sync_to_async(do_update)()
-          await self.send(json.dumps({"status": "OK", "deleted": affected, }))
+          result = {"status": "OK", "deleted": affected, }
+          logger.info('--> ' + str(result))
+          await self.send(json.dumps(result))
         
       elif indict['code'] == 'trainnow':
         if self.mytrainerline.t_type == 2:
@@ -312,7 +325,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           elif indict['mode'] == 'check': #obsolete if all clients are beyond v1.8.8a
             fitline = await fit.objects.aget(id=self.lastfit)
             result = fitline.status == 'Done' 
-        #logger.info('--> ' + str(result))
+        logger.info('--> ' + str(result))
         await self.send(json.dumps(result))	
           
       elif indict['code'] == 'close_ws':
@@ -377,7 +390,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -469,40 +482,16 @@ class trainerutil(AsyncWebsocketConsumer):
           datatemp = json.loads(returned.data)['data']
           outlist['data'] = datatemp 
         else:
-          if 'new_click' in params and params['new_click']:
-            self.new_click = True
-          all_fits = fit.objects.filter(school=params['school'])
-          last_fit = await fit.objects.filter(school=params['school']).alast()
-          temp_count = await all_fits.acount()
+          query_set = fit.objects.filter(school=params['school'])
           result = [] 
-          if temp_count:
-            if self.query_working:
-              query_set = all_fits[self.query_count - 1:] 
-              new_epoch = False
-              remove = True
-            else:
-              query_set = all_fits[self.query_count:] 
-              new_epoch = self.query_count < temp_count
-              self.query_count = temp_count
-              remove = False
-            if last_fit.status in {'Working', 'Queuing'}: 
-              self.new_click = False
-              self.status_string = last_fit.status  
-              self.query_working = True
-            else:  
-              if self.new_click:
-                self.status_string = 'Preparing'  
-              else:
-                self.status_string = 'Idle'  
-              self.query_working = False
-            async for item in query_set:
-              fit_dict = model_to_dict(item)
-              fit_dict['made'] = item.made.strftime("%Y-%m-%d")
-              result.append(fit_dict)
-          else:
-            remove = 0
-            new_epoch = False
-          outlist['data'] = (result, remove, new_epoch, self.status_string)
+          async for item in query_set:
+            fit_dict = model_to_dict(item)
+            fit_dict['nr'] = len(result)
+            fit_dict['made'] = item.made.strftime("%Y-%m-%d")
+            fit_dict['replace'] = True
+            result.append(fit_dict)
+            print(fit_dict)
+          outlist['data'] = result
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
@@ -573,7 +562,7 @@ class trainerutil(AsyncWebsocketConsumer):
               'len' : len(joblist), }
           except ValueError:
             outlist['data'] = {'pos' : 0, 'len' : len(joblist), }
-        logger.debug('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))		
 
       elif params['command'] == 'trainnow': 
@@ -628,8 +617,6 @@ class trainerutil(AsyncWebsocketConsumer):
           self.close()						
 
       elif params['command'] == 'getavailmodels':
-      
-  
         if self.trainerline.t_type == 2:
           temp = json.loads(text_data)
           temp['data']['school']=self.schoolline.e_school

@@ -33,7 +33,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   {% if may_write %}
   <div class="h2">
     <button type="button" id="train_button" class="btn btn-primary m-2" 
-      style="width: 180px;" disabled>Train AI now!</button>
+      style="width: 180px;">Train AI now!</button>
   </div>
   <div class="h2">
     School Settings:
@@ -219,7 +219,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 let trainerutilSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-let new_click = false;
 let status_save;
 let not_started = false;
 let training_done = true;
@@ -288,71 +287,49 @@ function refresh_all() {
     return(trainerutilSocket.sendandwait({
       'command' : 'getfitinfo',
       'school' : {{ school.id }},
-      'new_click' : new_click,
     }))
   })
-  .then((result_all) => {
-    new_click = false;
-    result = result_all[0];
-    remove = result_all[1];
-    new_epoch = result_all[2];
-    if (not_started) {
-      not_started = (result_all[3] == 'Idle') || (result_all[3] == 'Preparing');
-    };
-    $('#job_status').text(result_all[3]);
-    if (result_all[3] == 'Preparing') {
-      $('#train_button').prop("disabled",true);
-    };
-    if (remove) {
-      $('#tablebody tr:last').remove();
-    };
-    if (!result.length && {{ delegation_level }} == 1 && !not_started) {
-      $('#train_button').prop("disabled",false);
-    } else {
-      result.forEach(function(item, index) {
-        datestring = item.made;
-        newaddition = '<tr>';
-        newaddition += '<td>' + datestring.slice(8,10) + '.' + datestring.slice(5,7) 
-          + '.'+datestring.slice(0,4) + '</td>';
-        newaddition += '<td>' + (parseInt(item.nr_tr) + parseInt(item.nr_va)) + '</td>';
-        newaddition += '<td>' + item.model_type + '</td>';
-        newaddition += '<td>' + item.model_image_augmentation.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.l_rate_start + '</td>';
-        newaddition += '<td>' + item.l_rate_stop + '</td>';
-        newaddition += '<td>' + item.l_rate_divisor.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.weight_min.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.weight_max.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.weight_boost.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.early_stop_delta_min.toPrecision(2) + '</td>';
-        newaddition += '<td>' + item.early_stop_patience.toPrecision(2) + '</td>';
-        newaddition += '<td>' + Math.round(item.minutes) + '</td>';
-        newaddition += '<td>' + item.epochs + '</td>';
-        newaddition += '<td>' + item.loss.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.binacc.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.recall.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.precision.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.val_loss.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.val_recall.toPrecision(4) + '</td>';
-        newaddition += '<td>' + item.val_precision.toPrecision(4) + '</td>';
-        newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/' 
-          + item.id + '/" target="_blank">' + item.status + '</a></td>';
-        newaddition += '</tr>';
-        $('#tablebody').append(newaddition);
-        status_save = item.status;
-      });
-      if (new_epoch) {
-        $(document).scrollTop($(document).height()); 
-      };  
-      if (status_save == 'Done' || status_save == 'Stopped') {
-        if (training_done && {{ delegation_level }} == 1 && !not_started) {
-          $('#train_button').prop("disabled",false);
-          training_done = false;
-        };  
+  .then((result) => {
+    console.log(result);
+    result.forEach(function(item, index) {
+      datestring = item.made;
+      newaddition = '<tr>';
+      newaddition += '<td>' + datestring.slice(8,10) + '.' + datestring.slice(5,7) 
+        + '.'+datestring.slice(0,4) + '</td>';
+      newaddition += '<td>' + (parseInt(item.nr_tr) + parseInt(item.nr_va)) + '</td>';
+      newaddition += '<td>' + item.model_type + '</td>';
+      newaddition += '<td>' + item.model_image_augmentation.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.l_rate_start + '</td>';
+      newaddition += '<td>' + item.l_rate_stop + '</td>';
+      newaddition += '<td>' + item.l_rate_divisor.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.weight_min.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.weight_max.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.weight_boost.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.early_stop_delta_min.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.early_stop_patience.toPrecision(2) + '</td>';
+      newaddition += '<td>' + Math.round(item.minutes) + '</td>';
+      newaddition += '<td>' + item.epochs + '</td>';
+      newaddition += '<td>' + item.loss.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.binacc.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.recall.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.precision.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.val_loss.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.val_recall.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.val_precision.toPrecision(4) + '</td>';
+      newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/' 
+        + item.id + '/" target="_blank">' + item.status + '</a></td>';
+      newaddition += '</tr>';
+      console.log(item);
+      if ($('#tablebody').children('tr').eq(item.nr).length) {
+        console.log('Exists');
+        $('#tablebody tr').eq(item.nr).replaceWith(newaddition);
       } else {
-        training_done = true;
-      };  
-    };  
+        console.log('Does not');
+        $('#tablebody').append(newaddition);
+      }; 
+      status_save = item.status;
+    });
     setTimeout(refresh_all, 10000);
   })
 };
@@ -386,7 +363,6 @@ $(document).ready(function() {
         });
       })
       $('#train_button').click(function() {
-        new_click = true;
         not_started = true;
         $('.modal-title').text('Synchronizing the Training Data');
         $('.modal-body').text(

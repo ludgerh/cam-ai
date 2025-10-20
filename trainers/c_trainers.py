@@ -40,7 +40,7 @@ from .redis import my_redis as trainers_redis
 async def clean_fits():
   from .models import fit
   async for item in fit.objects.all():
-    if item.status == 'Queuing' or item.status == 'Working':
+    if item.status in {'Waiting', 'Queuing', 'Working', }:
       item.status = 'Stopped'
       await item.asave(update_fields=['status', ])        
 
@@ -329,7 +329,7 @@ class trainer(spawn_process):
             myfit = fit(
               made=timezone.now(), 
               school = s_item.id, 
-              status = 'Queuing',
+              status = 'Waiting',
             )
             await myfit.asave() 
             with self.mylock:
