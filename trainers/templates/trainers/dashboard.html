@@ -29,11 +29,26 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="h2">Using Trainer #<span id="trainer_used">0</span> of 
     <span id="trainer_count">1</span></div>
   <div class="h2">Queue Position: <span id="queue_pos">?</span></div>
-  <div class="h2">Job Status: <span id="job_status">Idle</span></div>
+  <div class="h2">Job Status: <span id="job_status">Done</span></div>
   {% if may_write %}
   <div class="h2">
     <button type="button" id="train_button" class="btn btn-primary m-2" 
-      style="width: 180px;">Train AI now!</button>
+      style="width: 180px; disabled">Train AI now!</button>
+  </div>
+  <div class="container-fluid float-left">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>LR0</th><th>LR1</th>
+          <th>LRa</th><th>WMi</th><th>WMa</th><th>WBo</th><th>ESD</th><th>ESP</th>
+          <th>Min</th><th>Epochs</th><th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
+          <th>val_L</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+      <tbody id="tablebody">
+      </tbody>
+    </table>
   </div>
   <div class="h2">
     School Settings:
@@ -63,7 +78,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       {% endif %}
     </div>  
   </div>
-  {% if show_all_options %}
+    {% if show_all_options %}
     <div class="h2">
       Model Settings:
     </div>
@@ -152,7 +167,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="col-sm-auto h4">
           <label class="m-2" for="stop_lr">Stopping Rate:</label>
           <select id="stop_lr" value="1e-6">
-            <option value="0">No limit</option>
+            <option value="0">No limit</option>$('#job_status').text(result_all[3]);
             <option value="1e-3">1e-3 (0.001)</option>
             <option value="1e-4">1e-4 (0.0001)</option>
             <option value="1e-5">1e-5 (0.00001)</option>
@@ -184,8 +199,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>  
       </div>  
     </div>
-  {% endif %}
+    {% endif %}
 
+  {% endif %}
   <div id="mymodal" class="modal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
@@ -198,30 +214,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       </div>
     </div>
   </div>
-  <div class="container-fluid float-left">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>LR0</th><th>LR1</th>
-          <th>LRa</th><th>WMi</th><th>WMa</th><th>WBo</th><th>ESD</th><th>ESP</th>
-          <th>Min</th><th>Epochs</th><th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
-          <th>val_L</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th><th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-      <tbody id="tablebody">
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
 </main>
 <script >
 
 let trainerutilSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-let status_save;
-let not_started = false;
-let training_done = true;
+let training_start = false
 
 let model_types_dict = {
 {% for item in model_types %}
@@ -276,21 +274,29 @@ function init_bool_var(menu_item, code_string) {
 };
 
 function refresh_all() {
+  if (training_start) {
+    trainerutilSocket.sendandwait({
+        'command' : 'get_count',
+    })
+    .then((result) => {
+      $('#modal0').text(result[0]);
+      $('#modal1').text(result[2]);
+      $('#modal2').text(result[1]);
+    })
+  };
   trainerutilSocket.sendandwait({
-    'command' : 'getqueueinfo',
-  })
-  .then((result) => {
-    if (result.pos) {
-      $('#train_button').prop("disabled",true);
-    };
-    $('#queue_pos').text(result.pos+'/'+result.len);
-    return(trainerutilSocket.sendandwait({
       'command' : 'getfitinfo',
       'school' : {{ school.id }},
-    }))
   })
   .then((result) => {
-    console.log(result);
+    if (result.length) {
+      item = result.at(-1);
+      $('#job_status').text(item.status);
+      if (training_start && item.status != 'Done' && item.status != 'Stopped') {
+        training_start = false;
+        $('#mymodal').modal('hide');
+      };  
+    };
     result.forEach(function(item, index) {
       datestring = item.made;
       newaddition = '<tr>';
@@ -320,17 +326,26 @@ function refresh_all() {
       newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/' 
         + item.id + '/" target="_blank">' + item.status + '</a></td>';
       newaddition += '</tr>';
-      console.log(item);
       if ($('#tablebody').children('tr').eq(item.nr).length) {
-        console.log('Exists');
         $('#tablebody tr').eq(item.nr).replaceWith(newaddition);
       } else {
-        console.log('Does not');
         $('#tablebody').append(newaddition);
+        $('#tablebody tr:last')[0]?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }; 
-      status_save = item.status;
     });
     setTimeout(refresh_all, 10000);
+    return(trainerutilSocket.sendandwait({
+      'command' : 'getqueueinfo',
+    }))
+  })
+  .then((result) => {
+    if (($('#job_status').text() == 'Done' || $('#job_status').text() == 'Stopped')
+        && result.pos == 0 && {{ delegation_level }} == 1 && !training_start) {
+      $('#train_button').prop("disabled", false)
+    } else {
+      $('#train_button').prop("disabled", true)
+    };  
+    $('#queue_pos').text(result.pos+'/'+result.len);
   })
 };
 
@@ -362,11 +377,12 @@ $(document).ready(function() {
           $('#model_type').append('<option value='+item+'>'+item+'</option>');
         });
       })
-      $('#train_button').click(function() {
-        not_started = true;
+      $('#train_button').click(function() { 
+        training_start = true;
         $('.modal-title').text('Synchronizing the Training Data');
-        $('.modal-body').text(
-          'Depending on the amount of new data this may take some minutes...');
+        $('.modal-body').html(
+          'Depending on the amount of new data this may take some minutes...<BR>'
+          + '<span id="modal0">?</span>: <span id="modal1">?</span> / <span id="modal2">?</span>');
         $('#mymodal').modal('show');
         $('#train_button').prop("disabled",true);
         $('#train_button').addClass('btn-warning');
@@ -374,8 +390,7 @@ $(document).ready(function() {
           'command' : 'trainnow',
         })
         .then((result) => {
-          $('#train_button').removeClass('btn-warning');
-          $('#mymodal').modal('hide');
+          $('#train_button').removeClass('btn-warning')
         })
       });
       init_var('#trigger', 'trigger');

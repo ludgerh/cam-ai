@@ -54,6 +54,7 @@ logger = getLogger(logname)
 log_ini(logger, logname)
 default_modeltype = djconf.getconfig('default_modeltype', 'efficientnetv2-b0')
 medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
+counter_dict = {}
 
 async def get_trainer_nr(school_line):
   trainerlist = []
@@ -99,9 +100,10 @@ class remotetrainer(AsyncWebsocketConsumer):
       logger.error(format_exc())
 
   async def receive(self, text_data =None, bytes_data=None):
+    global counter_dict
     try:
       if bytes_data: 
-        logger.info('<-- binary')
+        #logger.info('<-- binary')
         if self.sizeline is None:
           self.cod_x = self.myschoolline.model_xin
           self.cod_y = self.myschoolline.model_yin
@@ -119,7 +121,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           with ZipFile(ram_file) as myzip:
             i = len(myzip.namelist())
             for item in myzip.namelist():
-              logger.info('(' +str(i)+ ') Unpacking: ' + item)
+              #logger.info('(' +str(i)+ ') Unpacking: ' + item)
               i -= 1
               if item.endswith(".bmp"):
                 codpath = (self.myschoolline.dir
@@ -129,18 +131,18 @@ class remotetrainer(AsyncWebsocketConsumer):
                 if mydir not in self.made_dirs:
                   await aiofiles.os.makedirs(mydir, exist_ok=True)
                   self.made_dirs.add(mydir)
-                img = await asyncio.to_thread(myzip.read, item)
+                jpgdata = await asyncio.to_thread(myzip.read, item)
                 img = await asyncio.to_thread(
                   cv.imdecode, 
-                  np.frombuffer(img, np.uint8), 
+                  np.frombuffer(jpgdata, np.uint8), 
                   cv.IMREAD_COLOR, 
                 )
                 if img.shape[1] != self.cod_x or  img.shape[0] != self.cod_y:
                   img = await asyncio.to_thread(cv.resize, img, (self.cod_x, self.cod_y))
-                  img = await asyncio.to_thread(cv.imencode, ".jpg", img)
-                  img = img[1].tobytes()
+                  jpgdata = await asyncio.to_thread(cv.imencode, ".jpg", img)
+                  jpgdata = jpgdata[1].tobytes()
                 async with aiofiles.open(codpath, mode="wb") as f:
-                  await f.write(img)
+                  await f.write(jpgdata)
                 jsondata = await asyncio.to_thread(json.loads, myzip.read(item + ".json"))
                 qs = (trainframe.objects
                   .filter(school=self.myschoolline.id, name=item, deleted=False)
@@ -169,7 +171,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       if text_data == 'Ping':
         return()
         
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -224,9 +226,9 @@ class remotetrainer(AsyncWebsocketConsumer):
               item.c4, item.c5, item.c6, item.c7, item.c8, item.c9)),
               await is_size_in_item(item, sizeline))
             await self.send(json.dumps(result)) 
-            logger.info('--> ' + str(result))
+            #logger.info('--> ' + str(result))
           await self.send(json.dumps('done'))
-          logger.info('--> done')
+          #logger.info('--> done')
                   
       elif indict['code'] == 'init_trainer':
         if self.mytrainerline.t_type == 2:
@@ -252,17 +254,37 @@ class remotetrainer(AsyncWebsocketConsumer):
               'status' : 'no_quota',
             }  
             await self.send(json.dumps(result))
-            logger.info('--> ' + str(result))
+            #logger.info('--> ' + str(result))
             await self.close() 
             
-      elif indict["code"] == "delete":
+      elif indict["code"] == 'set_counter_total':
+        if self.mytrainerline.t_type == 2:
+          await self.ws.send_str(json.dumps(indict))
+          await self.send((await self.ws.receive()).data)
+        else:
+          counter_dict[self.myschoolline.id] = [indict['action'], indict['count'], 0]
+          result = {"status": "OK", }
+          #logger.info('--> ' + str(result))
+          await self.send(json.dumps(result))
+            
+      elif indict["code"] == 'set_counter':
+        if self.mytrainerline.t_type == 2:
+          await self.ws.send_str(json.dumps(indict))
+          await self.send((await self.ws.receive()).data)
+        else:
+          counter_dict[self.myschoolline.id][2] = indict['value']
+          result = {"status": "OK", }
+          #logger.info('--> ' + str(result))
+          await self.send(json.dumps(result))
+          
+      elif indict["code"] == 'delete':
         if self.mytrainerline.t_type == 2:
           await self.ws.send_str(json.dumps(indict))
           await self.send((await self.ws.receive()).data)
         else:
           qs = trainframe.objects.filter(
             school=self.myschoolline.id,
-            name=indict["name"],
+            name=indict['name'],
             deleted=False,
           )
           @transaction.atomic
@@ -270,7 +292,7 @@ class remotetrainer(AsyncWebsocketConsumer):
               return qs.update(deleted=True)
           affected = await sync_to_async(do_update)()
           result = {"status": "OK", "deleted": affected, }
-          logger.info('--> ' + str(result))
+          #logger.info('--> ' + str(result))
           await self.send(json.dumps(result))
         
       elif indict['code'] == 'trainnow':
@@ -325,7 +347,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           elif indict['mode'] == 'check': #obsolete if all clients are beyond v1.8.8a
             fitline = await fit.objects.aget(id=self.lastfit)
             result = fitline.status == 'Done' 
-        logger.info('--> ' + str(result))
+        #logger.info('--> ' + str(result))
         await self.send(json.dumps(result))	
           
       elif indict['code'] == 'close_ws':
@@ -369,10 +391,8 @@ class trainerutil(AsyncWebsocketConsumer):
       self.status_string = 'Idle'
       await self.accept()
       self.trainer_nr = None
-      self.query_count = 0
-      self.query_working = False
       self.ws_session = None
-      self.new_click = False
+      self.list_of_dicts = []
       
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
@@ -390,7 +410,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -483,14 +503,19 @@ class trainerutil(AsyncWebsocketConsumer):
           outlist['data'] = datatemp 
         else:
           query_set = fit.objects.filter(school=params['school'])
+          i = 0
           result = [] 
           async for item in query_set:
             fit_dict = model_to_dict(item)
-            fit_dict['nr'] = len(result)
+            fit_dict['nr'] = i
             fit_dict['made'] = item.made.strftime("%Y-%m-%d")
-            fit_dict['replace'] = True
-            result.append(fit_dict)
-            print(fit_dict)
+            if len(self.list_of_dicts) <= i or fit_dict != self.list_of_dicts[i]:
+              if len(self.list_of_dicts) > i:
+                self.list_of_dicts[i] = fit_dict
+              else:  
+                self.list_of_dicts.append(fit_dict)
+              result.append(fit_dict)
+            i += 1  
           outlist['data'] = result
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
@@ -518,7 +543,7 @@ class trainerutil(AsyncWebsocketConsumer):
             })
           outlist['data'] = result
       
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))								
 
       elif params['command'] == 'getparams':
@@ -545,7 +570,7 @@ class trainerutil(AsyncWebsocketConsumer):
           } 
             
           outlist['data'] = result
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))				
 
       elif params['command'] == 'getqueueinfo':
@@ -562,7 +587,7 @@ class trainerutil(AsyncWebsocketConsumer):
               'len' : len(joblist), }
           except ValueError:
             outlist['data'] = {'pos' : 0, 'len' : len(joblist), }
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))		
 
       elif params['command'] == 'trainnow': 
@@ -595,7 +620,7 @@ class trainerutil(AsyncWebsocketConsumer):
             outlist['data'] = getattr(schoolline, params['item'])
           except AttributeError:
             outlist['data'] = 0
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))						
 
       elif params['command'] == 'set_from_dashboard':
@@ -611,7 +636,7 @@ class trainerutil(AsyncWebsocketConsumer):
             if json.loads(returned.data)['data'] != 'OK':
               self.close()	
           outlist['data'] = 'OK'
-          logger.debug('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
         else:
           self.close()						
@@ -633,6 +658,19 @@ class trainerutil(AsyncWebsocketConsumer):
               outlist['data'].append(item.name)
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
+        
+      elif params['command'] == 'get_count':
+        if self.trainerline.t_type == 2:
+          temp = json.loads(text_data)
+          temp['data']['school']=self.schoolline.e_school
+          await self.ws.send_str(json.dumps(temp))
+          returned = await self.ws.receive()
+          outlist['data'] = json.loads(returned.data)['data']
+        else: 
+          outlist['data'] = counter_dict[self.schoolline.id]
+          #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
+        
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())

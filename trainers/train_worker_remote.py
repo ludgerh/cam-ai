@@ -134,7 +134,6 @@ class train_once_remote():
     self.logger.info('*** Working on School #'
       +str(self.myschool.id)+', '+self.myschool.name+'...');
     self.logger.info('****************************************************');
-    break_time(60.0)
     
     from websocket import WebSocket #, enableTrace
     from websocket._exceptions import WebSocketConnectionClosedException
@@ -202,12 +201,19 @@ class train_once_remote():
     count = len(temp_set)
     for item in (temp_set):
       if remotedict[item] != localdict[item][10]:
-        self.logger.info('(' + str(count) + ') Changed, deleting: ' + item)
+        self.logger.info('(' + str(count) + ') Changed: ' + item)
         remoteset.discard(item)
         remoteset_with_size.discard(item)
       count -= 1  
       self.send_ping()
     temp_set = remoteset - localset
+    outdict = {
+      'code' : 'set_counter_total',
+      'action' : 'Deleting',
+      'count' : len(temp_set),
+    }
+    self.ws.send(json.dumps(outdict), opcode=1)
+    self.ws.recv()
     count = len(temp_set)
     for item in (temp_set):
       self.logger.info('(' + str(count) + ') Deleting: ' + item)
@@ -215,7 +221,7 @@ class train_once_remote():
         'code' : 'delete',
         'name' : item,
       }
-      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      self.ws.send(json.dumps(outdict), opcode=1)
       i = 0
       while i < 20:
         try:
@@ -224,12 +230,30 @@ class train_once_remote():
         except TimeoutError:
           i += 1
       count -= 1
-      self.send_ping()
+      outdict = {
+        'code' : 'set_counter',
+        'value' : count,
+      }
+      self.ws.send(json.dumps(outdict), opcode=1)
+      self.ws.recv()
     datalist = list(localset - remoteset_with_size) 
+    outdict = {
+      'code' : 'set_counter_total',
+      'action' : 'Sending',
+      'count' : len(datalist),
+    }
+    self.ws.send(json.dumps(outdict), opcode=1)
+    self.ws.recv()
     count = len(datalist)
     start = 0
     step = 100
     for i in range(start, len(datalist), step):
+      outdict = {
+        'code' : 'set_counter',
+        'value' : count,
+      }
+      self.ws.send(json.dumps(outdict), opcode=1)
+      self.ws.recv()
       sublist = datalist[i:i+step]
       zip_buffer = io.BytesIO()   
       with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
