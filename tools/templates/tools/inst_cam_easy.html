@@ -124,8 +124,6 @@ let client_ip;
 let mynetwork;
 let myip;
 
-let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-
 {% if not is_public %} 
 function collect_netlist() {
   $('#netlist').empty();

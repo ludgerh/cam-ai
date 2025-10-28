@@ -23,15 +23,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js"></script>
 {% endif %}
+  
 <main>
   <div class="h2">
-    We are going to zip your database and your data directory for you. Do you want to proceed?
-    <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
-  </div> 
-  <div class="h2 d-none" id="line2">
-    Preparing the download. Please wait...
-  </div>  
-  <div class="h2 d-none" id="line3">?</div>  
+  {{ message }}
+  </div>
 </main>
   
 <script>
@@ -39,32 +35,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let tools_asyncSocket;
 
 $(document).ready(function() {
-  WSAsync(
-    ws_scheme + '//'
-    + window.location.host
-    + '/ws/aadmintools/'
-  )
-  .then((result) => {
-    tools_asyncSocket = result;
-    $('#continue-button').click(function() {
-      $('#continue-button').prop('disabled', true);
-      $('#line2').removeClass("d-none");
-      $('#line3').removeClass("d-none");
-      mycallback = function (param) {
-        result = JSON.parse(param)
-        $('#line3').text(result.data);
-      }
-      tools_asyncSocket.sendandwait({
-        'command' : 'backup',
-      }, mycallback)
-      .then((result) => {
-        $('#line3').text('Starting download. When done, find the ZIP file in your download directory...');
-        console.log(window.location.host);
-        window.location.href = window.location.protocol + '//' + window.location.host + '/tools/downbackup/backup.zip';
-      })
-    });
-  })
-  .catch(err => {console.log(err);});
 });
 
 </script>  

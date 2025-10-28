@@ -21,6 +21,8 @@ from shutil import move
 from time import sleep
 from requests import get as rget
 from subprocess import Popen, PIPE
+from pathlib import Path
+from zipfile import ZipFile
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.contrib.auth import logout
@@ -29,10 +31,11 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from django.forms.models import model_to_dict
 from globals.c_globals import viewables
 from camai.c_settings import safe_import
+from camai.version import version
 from tools.l_tools import djconf
 from startup.redis import my_redis as startup_redis
 from streams.models import stream
@@ -47,6 +50,10 @@ from .models import camurl
 #from pprint import pprint
 
 emulatestatic = safe_import('emulatestatic') 
+localaccess = safe_import('localaccess') 
+import_filename = None
+import_filepath = None
+
 datapath = djconf.getconfig('datapath', 'data/')
 virt_cam_path = djconf.getconfig('virt_cam_path', datapath + 'virt_cam_path/')
 os.makedirs(virt_cam_path, exist_ok = True)
@@ -54,17 +61,7 @@ long_brake = djconf.getconfigfloat('long_brake', 1.0)
 
 class myTemplateView(LoginRequiredMixin, TemplateView):
 
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
-      
-class cam_inst_view(myTemplateView):   
-
   def get_context_data(self, **kwargs):
-    streamlimit = userinfo.objects.get(user = self.request.user.id).allowed_streams
-    streamcount = stream.objects.filter(creator = self.request.user.id, active = True, ).count()
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -95,6 +92,22 @@ class cam_inst_view(myTemplateView):
         school.objects.filter(active=True), 'S', 
         self.request.user, 'W'
       ),
+    })
+    return context
+
+  def get(self, request, *args, **kwargs):
+    if self.request.user.is_superuser:
+      return(super().get(request, *args, **kwargs))
+    else:
+      return(HttpResponse('No Access'))
+      
+class cam_inst_view(myTemplateView):   
+
+  def get_context_data(self, **kwargs):
+    streamlimit = userinfo.objects.get(user = self.request.user.id).allowed_streams
+    streamcount = stream.objects.filter(creator = self.request.user.id, active = True, ).count()
+    context = super().get_context_data(**kwargs)
+    context.update({
       'streamlimit' : streamlimit,
       'streamcount' : streamcount,
       'mayadd' : (streamlimit > streamcount),
@@ -205,33 +218,6 @@ class addschool(myTemplateView):
     schoolcount = school.objects.filter(creator = self.request.user.id, active = True, ).count()
     context = super().get_context_data(**kwargs)
     context.update({
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
-      'debug' : settings.DEBUG,
-      'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
-        'do_tf_debug', 
-        True,
-      ),
-      'camlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        self.request.user, 'R'
-      ),
-      'detectorlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        self.request.user, 'R'
-      ),
-      'eventerlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        self.request.user, 'R'
-      ),
-      'schoollist' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'R'
-      ),
-      'schoollist_write' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'W'
-      ),
       'schoollimit' : schoollimit,
       'schoolcount' : schoolcount,
       'mayadd'      : schoollimit > schoolcount,
@@ -245,32 +231,6 @@ class linkservers(myTemplateView):
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
     context.update({
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
-      'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
-        'do_tf_debug', 
-        True,
-      ),
-      'camlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(cam_mode_flag__gt=0), 'C', 
-        self.request.user, 'R'
-      ),
-      'detectorlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(det_mode_flag__gt=0), 'D', 
-        self.request.user, 'R'
-      ),
-      'eventerlist' : access.filter_items(
-        stream.objects.filter(active=True).filter(eve_mode_flag__gt=0), 'E', 
-        self.request.user, 'R'
-      ),
-      'schoollist' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'R'
-      ),
-      'schoollist_write' : access.filter_items(
-        school.objects.filter(active=True), 'S', 
-        self.request.user, 'W'
-      ),
       'workerlist' : worker.objects.filter(active=True),
       'trainerlist' : trainer.objects.filter(active=True),
     })
@@ -278,14 +238,6 @@ class linkservers(myTemplateView):
 
 class shutdown(myTemplateView):
   template_name = 'tools/shutdown.html'
-
-  def get_context_data(self, **kwargs):
-    context = super().get_context_data(**kwargs)
-    context.update({
-      'emulatestatic' : emulatestatic,
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
-    })
-    return context
       
 class upgrade(myTemplateView):
   template_name = 'tools/upgrade.html'
@@ -297,8 +249,6 @@ class upgrade(myTemplateView):
       response = json.loads(response.text)
     context = super().get_context_data(**kwargs)
     context.update({
-      'emulatestatic' : emulatestatic,
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
       'new_version' : response['tag_name'][1:],
       'zip_url' : response['zipball_url']
     })
@@ -306,53 +256,127 @@ class upgrade(myTemplateView):
       
 class backup(myTemplateView):
   template_name = 'tools/backup.html'
+    
+def downbackup(request):
+  if not request.user.is_superuser:
+    return HttpResponse('No Access.', status=403)
+  if localaccess:
+    basepath = os.getcwd() 
+    os.chdir('..')
+    path = 'temp/backup/CAM-AI-backup-' + version + '.zip'
+    response = FileResponse(
+      open(path, 'rb'), 
+      as_attachment=True, 
+      filename='CAM-AI-backup-' + version + '.zip',
+    )
+    os.chdir(basepath)  
+  else:     
+    response = HttpResponse()
+    response['Content-Disposition'] = 'attachment; filename=CAM-AI-backup-' + version + '.zip'
+    response['X-Accel-Redirect'] = '/protected/backup/CAM-AI-backup-' + version + '.zip'
+  return(response)
 
+      
+class restore(myTemplateView):
+  template_name = 'tools/restore.html'
+    
+  def dispatch(self, request, *args, **kwargs):
+    if not request.user.is_superuser:
+      return HttpResponse('No Access.', status=403)
+    return super().dispatch(request, *args, **kwargs)
+    
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
     context.update({
-      'emulatestatic' : emulatestatic,
-      'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'phase' : 0,
     })
     return context
-    
-def downbackup(request):
-  if request.user.is_superuser:
-    response = HttpResponse()
-    response['Content-Disposition'] = 'attachment; filename=backup.zip'
-    response['X-Accel-Redirect'] = '/protected/backup/backup.zip'  
-    return response
-  else:
-    return HttpResponse('No Access.')
 
-      
-#class restore(myTemplateView):
-#  template_name = 'tools/restore.html'
-
-#  def get_context_data(self, **kwargs):
-#    context = super().get_context_data(**kwargs)
-#    context.update({
-#      'emulatestatic' : emulatestatic,
-#      'version' : djconf.getconfig('version', 'X.Y.Z'),
-#    })
-#    return context
-
- # def get(self, request, *args, **kwargs):
- #   if self.request.user.is_superuser:
- #     return(super().get(request, *args, **kwargs))
- #   else:
- #     return(HttpResponse('No Access'))
-      
-
-def restore(request):
-  if request.method == 'POST' and request.FILES['myfile']:
+  def post(self, request, *args, **kwargs):
+    global import_filename, import_filepath
+    if 'myfile' not in request.FILES:
+      return self.get(request, *args, **kwargs)
     myfile = request.FILES['myfile']
-    fs = FileSystemStorage()
-    filename = fs.save(myfile.name, myfile)
-    uploaded_file_url = fs.url(filename)
-    return render(request, 'tools/restore.html', {
-        'uploaded_file_url': uploaded_file_url
+    upload_dir = Path(settings.BASE_DIR) / 'temp' / 'backup'
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    fs = FileSystemStorage(location=str(upload_dir), base_url=None)
+    import_filename = fs.save(myfile.name, myfile)
+    import_filepath = fs.path(import_filename)
+    context = self.get_context_data()
+    context.update({
+      'phase' : 1,
     })
-  return render(request, 'tools/restore.html')
+    return self.render_to_response(context)
+    
+class process_restore(myTemplateView):  
+  template_name = 'tools/process_restore.html'  
+    
+  def dispatch(self, request, *args, **kwargs):
+    if not request.user.is_superuser:
+      return HttpResponse('No Access.', status=403)
+    return super().dispatch(request, *args, **kwargs)
+    
+  def post(self, request, *args, **kwargs):
+    post_dict = request.POST.dict()
+    #print('*****', import_filename, import_filepath)
+    #print(post_dict)
+    check_files = 'check_files' in post_dict and post_dict['check_files'] == 'on'
+    check_db = 'check_db' in post_dict and post_dict['check_db'] == 'on'
+    context = self.get_context_data()
+    safe_name = Path(import_filename).name
+    zip_file = settings.BASE_DIR / 'temp' / 'backup' / safe_name
+    if not zip_file.exists():
+      context.update({
+        'code' : 1,
+        'message' : 'Zip-File missing...',
+      })
+      return self.render_to_response(context)
+    unpack_dir = settings.BASE_DIR / 'temp' / 'unpack' / 'data'
+    unpack_dir.mkdir(parents=True, exist_ok=True)
+    with ZipFile(zip_file) as zf:
+      zf.extractall(unpack_dir)
+    zip_file.unlink(missing_ok=True) 
+    version_file = unpack_dir / 'version.py' 
+    try:
+      with version_file.open(encoding="utf-8", errors="ignore") as f:
+        line = next((ln for ln in f if ln.startswith("version")), None)
+    except FileNotFoundError:   
+      context.update({
+        'code' : 2,
+        'message' : 'Version-File missing...',
+      })
+      return self.render_to_response(context)
+    if line is None:   
+      context.update({
+        'code' : 3,
+        'message' : 'Version-File not correct...',
+      })
+      return self.render_to_response(context)
+    a = line.find("'")
+    b = line.find("'", a+1)
+    new_version = line[a+1:b] if a != -1 and b != -1 else ''
+    if new_version != version:   
+      context.update({
+        'code' : 4,
+        'message' : 'Version mismatch: (' + new_version + ' <> ' + version +')'
+      })
+      return self.render_to_response(context)
+    
+    print('*****', new_version)
+    
+    
+    zip_file.unlink(missing_ok=True)  
+    context.update({
+      'code' : 0,
+      'message' : 'OK',
+    })
+    return self.render_to_response(context)
+    
+def xprocess_restore(request):
+  if not request.user.is_superuser:
+    return HttpResponse('No Access.', status=403) 
+  startup_redis.set_shutdown_command(20) 
+  return redirect('/')
   
 def logout_and_redirect(request):
   logout(request)

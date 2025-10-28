@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -13,7 +13,6 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-Printed: index.html v1.1.17 22.02.2024
 {% endcomment %}
 {% block content %}
 {% if emulatestatic %}
@@ -64,7 +63,6 @@ Printed: index.html v1.1.17 22.02.2024
 </main>
 <script >
 
-let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let c_view_Socket;
 let trigger_Socket;
 let displaywidth = 375 // Screen width IPhone 7

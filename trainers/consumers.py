@@ -667,7 +667,10 @@ class trainerutil(AsyncWebsocketConsumer):
           returned = await self.ws.receive()
           outlist['data'] = json.loads(returned.data)['data']
         else: 
-          outlist['data'] = counter_dict[self.schoolline.id]
+          try:
+            outlist['data'] = counter_dict[self.schoolline.id]
+          except KeyError:
+            outlist['data'] = ('?', 0, 0)
           #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         

@@ -266,7 +266,7 @@ class train_once_remote():
           zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
           jsondata = json.dumps(localdict[item]).encode()
           zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
-          self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
+          #self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
           count -= 1  
       zip_buffer.seek(0)
       zip_content = zip_buffer.read()

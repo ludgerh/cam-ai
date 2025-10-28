@@ -51,7 +51,7 @@ class school(models.Model):
   delegation_level = models.IntegerField(default=1)
   encrypted = models.BooleanField(default=True)
   dir = models.CharField(max_length=256, default='data/schools/model1/')
-  trigger = models.IntegerField(default=500)
+  trigger = models.IntegerField(default=1000000)
   last_fit = models.IntegerField(default=0)
   lastmodelfile = models.DateTimeField(
     default=timezone.make_aware(datetime(1900, 1, 1)))
@@ -62,6 +62,7 @@ class school(models.Model):
   ignore_checked = models.BooleanField(default=True)
   trainer_nr = models.IntegerField(default=1)
   donate_pics = models.BooleanField(default=False)
+  load_last_model = models.BooleanField(default=True)
   save_new_model = models.BooleanField(default=True)
   model_type = models.CharField(max_length=50, default='efficientnetv2-b0')
   model_train_type = models.CharField(max_length=50, default='efficientnetv2-b0')

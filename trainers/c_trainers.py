@@ -75,22 +75,25 @@ class trainer(spawn_process):
     with self.glob_lock:
       if trainers_redis.get_predict_proc_active(school_nr): 
         return()
-      trainers_redis.set_predict_proc_active(school_nr, True)
     from .models import trainframe
     from tf_workers.models import school
     school_dbline = await school.objects.aget(id = school_nr)
-    framelines = (trainframe.objects
-      .filter(school = school_nr, deleted = False)
-      .exclude(last_fit=school_dbline.last_fit)[:1000])
+    base_qs = (trainframe.objects
+      .filter(school=school_nr, deleted=False)
+      .exclude(last_fit=school_dbline.last_fit))
+    total_count = await base_qs.acount()
+    framelines = base_qs[:1000]
     if self.got_sigint:
       return()  
     frames = []
     async for item in framelines.aiterator():
       frames.append(item)
     if frames: 
-      self.logger.info(
-        f'TR{self.id}: Re-inferencing {len(frames)} frames of school #{school_nr}'
-      )  
+      if not trainers_redis.get_predict_proc_started(school_nr): 
+        trainers_redis.set_predict_proc_started(school_nr, True)
+        self.logger.info(
+          f'TR{self.id}: Re-inferencing {total_count} frames of school #{school_nr}'
+        )  
       for chunk in _chunked(frames, CHUNK_SIZE):
         if self.got_sigint:
           return()  
@@ -141,9 +144,12 @@ class trainer(spawn_process):
           )
         time_diff = time() - ts1
         await asyncio.sleep(time_diff * 2.0)
-      self.logger.info(
-        f'TR{self.id}: Finished re-inferencing of school #{school_nr}'
-      )  
+      if len(frames) >= total_count:  
+        trainers_redis.set_predict_proc_started(school_nr, False)
+        self.logger.info(
+          f'TR{self.id}: Finished re-inferencing {total_count} frames '
+          + f'of school #{school_nr}'
+        )  
     trainers_redis.set_predict_proc_active(school_nr, False)
     
               

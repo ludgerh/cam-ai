@@ -193,7 +193,6 @@ function refresh_all() {
     }));
   })
   .then((result) => {
-    result = result[0];
     if ((result.length != fit_length) || (last_status != result[result.length - 1].fields.status)) {
       graph_labels.length = 0;
       graph_data.datasets[0].data.length = 0;

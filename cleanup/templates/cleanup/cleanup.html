@@ -217,8 +217,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 let cleanupSocket;
 
-let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-
 function updateevents(streamnr) {
   cleanupSocket.sendandwait({
     'command' : 'checkevents',

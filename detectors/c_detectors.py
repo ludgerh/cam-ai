@@ -81,7 +81,7 @@ class c_detector(viewable):
       if self.dbline.det_apply_mask:
         await self.viewer.drawpad.set_mask_local()
       self.div_ts = 0.0
-      self.div_high = 1.0
+      self.div_old = 1.0
       #print('Launch: detector')
       while not self.got_sigint:
         frameline = await self.dataqueue.get(timeout = 2.0)
@@ -156,10 +156,10 @@ class c_detector(viewable):
         divisor = 4.0  
       else:  
         divisor = 8.0  
-      self.sl.period = self.sl.period / divisor
-      if divisor > self.div_high:
-        self.div_high = divisor
-        self.logger.warning(f'EV{self.id}: Period divisor = {divisor}')
+      self.sl.period = divisor / self.dbline.det_fpslimit
+      if divisor != self.div_old:
+        self.div_old = divisor
+        self.logger.warning(f'DE{self.id}: Fpm divisor = {divisor}')
       self.div_ts = new_time
           
           

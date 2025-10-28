@@ -504,10 +504,9 @@ class tf_worker(spawn_process):
             ))
           starting = i + 1
       if self.do_tf_debug:
-        newtime = time()
         buf_size = mybuffer.qsize()
         block_size = len(framelist)
-        proc_time = newtime - ts_one  
+        proc_time = time() - ts_one  
         if self.tf_debug_count >= 9:
           self.buf_size_10 = mean(self.buf_size_list)
           self.buf_size_list = [buf_size]

@@ -167,7 +167,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                     <li><a class="dropdown-item" href="/tools/linkservers/">Link Server(s)</a></li>
                     <li><a class="dropdown-item" href="/admin/">Database Admin</a></li>
                     <li><a class="dropdown-item" href="/tools/backup/">Backup Server</a></li> 
-      {#              <li><a class="dropdown-item" href="/tools/restore/">Restore Server</a></li> #}
+                    <li><a class="dropdown-item" href="/tools/restore/">Restore Server</a></li>
                     <li><a class="dropdown-item" href="/tools/upgrade/">Upgrade Server</a></li>
                     <li><a class="dropdown-item" href="/tools/sendlogs/">Send Logfiles</a></li>
                     <li><a class="dropdown-item" href="/tools/shutdown/">Shutdown Server</a></li>
@@ -249,6 +249,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 {% if user.is_authenticated %}
 <script>
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let active_bg = 'bg-success';
 let active_percentage = 1;
 if (typeof healthSocket == 'undefined') { 

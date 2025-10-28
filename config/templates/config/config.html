@@ -64,8 +64,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </main>
 <script>
 
-let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
-
 $(document).ready(function() {
   $('#smtp_item').on('show.bs.collapse', function () {
     {% if info %}

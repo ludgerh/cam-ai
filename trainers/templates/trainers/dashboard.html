@@ -72,6 +72,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>  
         <div class="col-sm-auto h4">
           <input style="width: 24px; height: 24px;" 
+            type="checkbox" id="load_last_model" class="m-2">
+          <label class="m-2" for="load_last_model">Load last Model</label>
+        </div>  
+        <div class="col-sm-auto h4">
+          <input style="width: 24px; height: 24px;" 
             type="checkbox" id="save_new_model" class="m-2">
           <label class="m-2" for="save_new_model">Save new Model</label>
         </div>  
@@ -279,9 +284,15 @@ function refresh_all() {
         'command' : 'get_count',
     })
     .then((result) => {
-      $('#modal0').text(result[0]);
-      $('#modal1').text(result[2]);
-      $('#modal2').text(result[1]);
+      if (result[2]) {
+        $('#modal0').text(result[0]);
+        $('#modal1').text(result[2]);
+        $('#modal2').text(result[1]);
+      } else {  
+        $('#modal0').text(' ');
+        $('#modal1').text(' ');
+        $('#modal2').text('Please wait...');
+      }  
     })
   };
   trainerutilSocket.sendandwait({
@@ -382,7 +393,7 @@ $(document).ready(function() {
         $('.modal-title').text('Synchronizing the Training Data');
         $('.modal-body').html(
           'Depending on the amount of new data this may take some minutes...<BR>'
-          + '<span id="modal0">?</span>: <span id="modal1">?</span> / <span id="modal2">?</span>');
+          + '<span id="modal0"> </span>: <span id="modal1"> </span> / <span id="modal2">Please wait</span>');
         $('#mymodal').modal('show');
         $('#train_button').prop("disabled",true);
         $('#train_button').addClass('btn-warning');
@@ -396,6 +407,7 @@ $(document).ready(function() {
       init_var('#trigger', 'trigger');
       init_bool_var('#cbignorecheck', 'ignore_checked');
       init_bool_var('#cbdonate', 'donate_pics');
+      init_bool_var('#load_last_model', 'load_last_model');
       init_bool_var('#save_new_model', 'save_new_model');
       init_var('#model_type', 'model_type');
       init_var('#model_train_type', 'model_train_type');

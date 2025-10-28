@@ -27,7 +27,6 @@ from asgiref.sync import sync_to_async
 from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
-from os import makedirs, path as ospath, system as ossystem, getcwd, chdir, remove, nice
 from shutil import rmtree
 from time import sleep
 from setproctitle import setproctitle
@@ -40,6 +39,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'camai.settings')
 django.setup()
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -47,6 +47,7 @@ from channels.db import database_sync_to_async
 from tools.l_tools import djconf, displaybytes
 from tools.l_smtp import l_smtp, l_msg
 from camai.c_settings import safe_import
+from camai.version import version
 from tools.c_logger import log_ini
 from startup.redis import my_redis as startup_redis
 from tools.c_tools import aget_smtp_conf
@@ -61,6 +62,7 @@ from tf_workers.redis import my_redis as tf_workers_redis
 from .redis import my_redis as tools_redis
 from .health import my_health_runner
 
+db_database = safe_import('db_database') 
 db_password = safe_import('db_password') 
 hw_type = safe_import('hw_type') 
 os_version = safe_import('os_version') 
@@ -89,14 +91,14 @@ logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
 recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
 textpath = djconf.getconfig('textpath', datapath + 'texts/')
 smtp_email = djconf.getconfig('smtp_email', forcedb=False)
-if not ospath.exists(textpath):
-  makedirs(textpath)
+if not os.path.exists(textpath):
+  os.makedirs(textpath)
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
-basepath = getcwd() 
-chdir('..')
-if not ospath.exists('temp'):
-  makedirs('temp')
-chdir(basepath)
+basepath = os.getcwd() 
+os.chdir('..')
+if not os.path.exists('temp'):
+  os.makedirs('temp')
+os.chdir(basepath)
 
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 
@@ -181,22 +183,33 @@ class health(AsyncWebsocketConsumer):
 # tools_async
 #*****************************************************************************
         
-def compress_backup(count):
+def compress_backup(idx):
   setproctitle('CAM-AI-Backup-Compression')
-  nice(19)
-  basepath = getcwd() 
-  chdir('..')
-  if ospath.exists('temp/backup'):
-    rmtree('temp/backup')
-  makedirs('temp/backup') 
-  tools_redis.set_zip_info(count, 'Compressing Database...')
-  cmd = 'mariadb-dump --password=' + db_password + ' '
-  cmd += '--user=CAM-AI --host=localhost --all-databases '
-  cmd += '> temp/backup/db.sql'
-  subprocess.call(cmd, shell=True, executable='/bin/bash')
-  with ZipFile('temp/backup/backup.zip', "w", ZIP_DEFLATED) as zip_file:
+  os.nice(19)
+  basepath = os.getcwd() 
+  os.chdir('..')
+  os.makedirs('temp/backup', exist_ok=True) 
+  if os.path.exists('temp/backup/CAM-AI-backup-' + version + '.zip'):
+    os.remove('temp/backup/CAM-AI-backup-' + version + '.zip')
+  tools_redis.set_zip_info(idx, 'Compressing Database...')
+  cmd = [
+    'mariadb-dump',
+    '--password=' + db_password,
+    '--user=CAM-AI',
+    '--host=localhost',
+    '--single-transaction',
+    '--quick',
+    '--skip-lock-tables',
+     db_database,
+  ]
+  out = Path("temp/backup/db.sql")
+  with out.open("wb") as f:
+    subprocess.run(cmd, check=True, stdout=f)
+  with ZipFile('temp/backup/CAM-AI-backup-' + version + '.zip', "w", ZIP_DEFLATED) as zip_file:
     zip_file.write('temp/backup/db.sql', 'db.sql')
-  remove('temp/backup/db.sql')
+  with ZipFile('temp/backup/CAM-AI-backup-' + version + '.zip', "w", ZIP_DEFLATED) as zip_file:
+    zip_file.write(Path(settings.BASE_DIR) / 'camai' / 'version.py', 'version.py')
+  os.remove('temp/backup/db.sql')
   dirpath = Path(basepath + '/' + datapath)
   glob_list = []
   for item in dirpath.rglob("*"):
@@ -210,15 +223,15 @@ def compress_backup(count):
   total =  len(glob_list)
   count = 0
   transmitted = 0
-  with ZipFile('temp/backup/backup.zip', "a", ZIP_DEFLATED) as zip_file:
+  with ZipFile('temp/backup/CAM-AI-backup-' + version + '.zip', "a", ZIP_DEFLATED) as zip_file:
     for entry in glob_list:
       count += 1
       zip_file.write(entry, entry.relative_to(dirpath))
       percentage = (count / total * 100)
       if percentage >= transmitted + 0.1:
-        tools_redis.set_zip_info(count, str(round(percentage, 1)) + '% compressed')
+        tools_redis.set_zip_info(idx, str(round(percentage, 1)) + '% compressed')
         transmitted = percentage
-  chdir(basepath)
+  os.chdir(basepath)
   
 class admin_tools_async(AsyncWebsocketConsumer):
 
@@ -243,7 +256,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -262,7 +275,11 @@ class admin_tools_async(AsyncWebsocketConsumer):
             return()
         quota =  await self.check_create_school_priv(userline)
         if quota[0] >= quota[1]:
-          outlist['data'] = {'status' : 'nomoreschools', 'quota' : quota, 'domain' : myserver}
+          outlist['data'] = {
+            'status' : 'nomoreschools', 
+            'quota' : quota, 
+            'domain' : myserver,
+          }
           await self.send(json.dumps(outlist))
           return()
         schoolline = school()
@@ -435,14 +452,14 @@ class admin_tools_async(AsyncWebsocketConsumer):
       
       elif params['command'] == 'backup':
         if self.scope['user'].is_superuser:
-          count = 0
-          while count in self.backup_proc_dict:
-            count += 1 
-          tools_redis.purge_zip_info(count) 
-          self.backup_proc_dict[count] = Process(target=compress_backup, args=[count])
-          self.backup_proc_dict[count].start()
-          while self.backup_proc_dict[count].is_alive():
-            if (my_info := tools_redis.get_zip_info(count)):
+          idx = 0
+          while idx in self.backup_proc_dict:
+            idx += 1 
+          tools_redis.purge_zip_info(idx) 
+          self.backup_proc_dict[idx] = Process(target=compress_backup, args=[idx])
+          self.backup_proc_dict[idx].start()
+          while self.backup_proc_dict[idx].is_alive():
+            if (my_info := tools_redis.get_zip_info(idx)):
               outlist['data'] = my_info.decode("utf-8")
               outlist['callback'] = True
               await self.send(json.dumps(outlist))	
@@ -450,6 +467,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
               await asleep(long_brake) 
           outlist['data'] = 'OK'
           del outlist['callback']
+          del self.backup_proc_dict[idx]
           #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	
         else:
@@ -497,8 +515,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'upgrade':
         if not self.scope['user'].is_superuser:
           await self.close()
-        basepath = getcwd() 
-        chdir('..')
+        basepath = os.getcwd() 
+        os.chdir('..')
         async with aiohttp.ClientSession() as session:
           async with session.get(params['url']) as result:
             response = await result.content.read()
@@ -533,7 +551,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await aioshutil.move('temp/backup/' + datapath, basepath + '/' + datapath)
         if await aiofiles.os.path.exists('temp/backup/plugins/'):
           await aioshutil.move('temp/backup/plugins/', basepath + '/plugins/')
-        chdir(basepath)
+        os.chdir(basepath)
         if hw_type == 'raspi':
           cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
         if hw_type == 'pc':
@@ -542,7 +560,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
         cmd += 'pip install --upgrade pip; '
         cmd += 'pip install -r requirements.' + hw_type + '_' + os_version + '; '
         cmd += 'python manage.py migrate; '
-        #result = subprocess.check_output(cmd, shell=True, executable='/bin/bash').decode()
         p = await asyncio.create_subprocess_shell(
           cmd, 
           stdout=asyncio.subprocess.PIPE, 
