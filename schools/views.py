@@ -91,7 +91,7 @@ def classroom(request, streamnr):
     return(HttpResponse('No Access'))
 
 @login_required
-def upload_file(request, schoolnr):
+def imexport(request, schoolnr):
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
@@ -114,7 +114,7 @@ def upload_file(request, schoolnr):
     context['file_name'] = uploaded_file.name
     return render(request, 'schools/upload_success.html', context)
   else:
-    return render(request, 'schools/upload_file.html', context)
+    return render(request, 'schools/imexport.html', context)
 
 #mode == 0: Classroom Dir, mode == 1: Model Dir
 #mode == 2: Archive Image, mode == 3: Archive video 

@@ -14,6 +14,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+from pathlib import Path
 from django.contrib.auth.decorators import login_required
 from django.template import loader
 from django.conf import settings
@@ -83,24 +84,28 @@ def dashboard(request, schoolnr):
     return(HttpResponse('No Access'))
     
 def downmodel(request, schoolnr, tokennr, token, model_type = 'K', fit_nr = None): 
-  if checktoken((tokennr, token), 'MOD', schoolnr):
-    if fit_nr:
-      fitline = fit.objects.get(id=fit_nr)
-    if fitline.status == 'Done':    
-      myschool = school.objects.get(id = schoolnr)
-      filename = myschool.dir + 'model/'
-      if model_type == 'K':
-        filename += myschool.model_train_type + '.keras'
-      elif model_type == 'L':
-        filename += myschool.model_train_type + '.tflite'
-      elif model_type == 'Q':
-        filename += 'q_' + myschool.model_train_type + '.tflite'
-      modelfile = open(filename, 'rb')
-      return FileResponse(modelfile)
-    elif fitline.status == 'Stopped':   
-      return(HttpResponse('Stop!')) 
-    else:  
-      return(HttpResponse('Wait!'))
-  else:
-    return(HttpResponse('No Access.'))
+  if not checktoken((tokennr, token), 'MOD', schoolnr):
+    return HttpResponse('No Access.')
+  if not fit_nr:
+    return HttpResponse('No Access.')
+  try:
+    fitline = fit.objects.get(id=fit_nr)
+  except fit.DoesNotExist:
+    return HttpResponse('Stop!')
+  if fitline.status == 'Done':    
+    myschool = school.objects.get(id = schoolnr)
+    base = Path(myschool.dir) / 'model'
+    if model_type == 'K':
+      path = base / f'{myschool.model_train_type}.keras'
+    elif model_type == 'L':
+      path = base / f'{myschool.model_train_type}.tflite'
+    elif model_type == 'Q':
+      path = base / f'q_{myschool.model_train_type}.tflite'
+    else:
+      return HttpResponse('No Access.')
+    return FileResponse(path.open('rb'), as_attachment=True, filename=path.name)
+  elif fitline.status == 'Stopped':   
+    return(HttpResponse('Stop!')) 
+  else:  
+    return(HttpResponse('Wait!'))
 

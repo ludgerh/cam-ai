@@ -16,11 +16,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 import os
+import subprocess
+import shutil
 import cv2 as cv
-from shutil import move
+from asgiref.sync import async_to_sync
 from time import sleep
 from requests import get as rget
-from subprocess import Popen, PIPE
 from pathlib import Path
 from zipfile import ZipFile
 from django.conf import settings
@@ -33,8 +34,9 @@ from django.views.generic.base import TemplateView
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, FileResponse
 from django.forms.models import model_to_dict
-from globals.c_globals import viewables
+from globals.c_globals import viewables, trainers, tf_workers
 from camai.c_settings import safe_import
+from camai.passwords import db_password
 from camai.version import version
 from tools.l_tools import djconf
 from startup.redis import my_redis as startup_redis
@@ -49,8 +51,9 @@ from .models import camurl
 #from .forms import UploadFileForm
 #from pprint import pprint
 
-emulatestatic = safe_import('emulatestatic') 
-localaccess = safe_import('localaccess') 
+emulatestatic = safe_import('emulatestatic')
+db_database = safe_import('db_database')
+no_nginx = safe_import('localaccess') or not safe_import('mydomain')
 import_filename = None
 import_filepath = None
 
@@ -139,7 +142,7 @@ class inst_virt_cam(cam_inst_view):
     file_path = fs.path(filename)
     cmds = ['ffprobe', '-v', 'fatal']
     cmds += ['-print_format', 'json', '-show_streams', file_path]
-    p = Popen(cmds, stdout=PIPE)
+    p = subprocess.Popen(cmds, stdout = subprocess.PIPE)
     output, _ = p.communicate()
     probe = json.loads(output)
     #pprint(probe)
@@ -158,7 +161,7 @@ class inst_virt_cam(cam_inst_view):
     newstream = stream()
     newstream.save()
     filename = 'virt_cam_' + str(newstream.id) + '.' + filename.split('.')[-1]
-    move(file_path, virt_cam_path + filename)
+    shutil.move(file_path, virt_cam_path + filename)
     newstream.cam_url = filename
     newstream.eve_school = school.objects.filter(active=True).first()
     newstream.creator = request.user
@@ -260,16 +263,9 @@ class backup(myTemplateView):
 def downbackup(request):
   if not request.user.is_superuser:
     return HttpResponse('No Access.', status=403)
-  if localaccess:
-    basepath = os.getcwd() 
-    os.chdir('..')
-    path = 'temp/backup/CAM-AI-backup-' + version + '.zip'
-    response = FileResponse(
-      open(path, 'rb'), 
-      as_attachment=True, 
-      filename='CAM-AI-backup-' + version + '.zip',
-    )
-    os.chdir(basepath)  
+  if no_nginx:
+    path = Path(settings.BASE_DIR).parent / "temp" / "backup" / f"CAM-AI-backup-{version}.zip"
+    response = FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
   else:     
     response = HttpResponse()
     response['Content-Disposition'] = 'attachment; filename=CAM-AI-backup-' + version + '.zip'
@@ -353,22 +349,33 @@ class process_restore(myTemplateView):
       })
       return self.render_to_response(context)
     a = line.find("'")
-    b = line.find("'", a+1)
-    new_version = line[a+1:b] if a != -1 and b != -1 else ''
+    b = line.find("'", a + 1)
+    new_version = line[a + 1:b] if a != -1 and b != -1 else ''
     if new_version != version:   
       context.update({
         'code' : 4,
         'message' : 'Version mismatch: (' + new_version + ' <> ' + version +')'
       })
       return self.render_to_response(context)
-    
-    print('*****', new_version)
-    
-    
+    for item in viewables.values():
+      async_to_sync(item['stream'].stop)()
+    if check_db:
+      cmd = ['mariadb', '--user=CAM-AI', '--host=localhost', db_database]
+      env = dict(os.environ, MYSQL_PWD = db_password)
+      with open(unpack_dir / 'db.sql', 'rb') as f:
+          subprocess.run(cmd, check=True, stdin=f, env=env)
+    if check_files:
+      path_to_exchange = Path(settings.BASE_DIR) / datapath
+      shutil.move(path_to_exchange, settings.BASE_DIR / 'temp/home/cam_ai/data.old')
+      shutil.move(unpack_dir, path_to_exchange)
+      shutil.rmtree(settings.BASE_DIR / 'temp/home/cam_ai/data.old')
+    (path_to_exchange / 'db.sql').unlink(missing_ok=True)  
+    (path_to_exchange / 'version.py').unlink(missing_ok=True)  
     zip_file.unlink(missing_ok=True)  
+    startup_redis.set_shutdown_command(20)
     context.update({
       'code' : 0,
-      'message' : 'OK',
+      'message' : 'OK, please wait one minute for restart...',
     })
     return self.render_to_response(context)
     

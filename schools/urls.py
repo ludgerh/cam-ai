@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -20,7 +20,7 @@ from . import views
 urlpatterns = [
 	path('images/<int:schoolnr>/', views.images, name='images'),
 	path('classroom/<int:streamnr>/', views.classroom, name='classroom'),
-	path('upload/<int:schoolnr>/', views.upload_file, name='upload_file'),
+	path('imexport/<int:schoolnr>/', views.imexport, name='imexport'),
 	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>'
     + '/<int:x>/<int:y>/', views.getbmp, name='getbmp'),
 	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>'

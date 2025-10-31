@@ -94,12 +94,7 @@ smtp_email = djconf.getconfig('smtp_email', forcedb=False)
 if not os.path.exists(textpath):
   os.makedirs(textpath)
 schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
-basepath = os.getcwd() 
-os.chdir('..')
-if not os.path.exists('temp'):
-  os.makedirs('temp')
-os.chdir(basepath)
-
+(Path(settings.BASE_DIR).parent / 'temp').mkdir(parents=True, exist_ok=True)
 long_brake = djconf.getconfigfloat('long_brake', 1.0)
 
 #*****************************************************************************
@@ -186,11 +181,13 @@ class health(AsyncWebsocketConsumer):
 def compress_backup(idx):
   setproctitle('CAM-AI-Backup-Compression')
   os.nice(19)
-  basepath = os.getcwd() 
-  os.chdir('..')
-  os.makedirs('temp/backup', exist_ok=True) 
-  if os.path.exists('temp/backup/CAM-AI-backup-' + version + '.zip'):
-    os.remove('temp/backup/CAM-AI-backup-' + version + '.zip')
+  base_path = Path(settings.BASE_DIR)
+  parent_path = base_path.parent
+  save_path = parent_path /'temp' / 'backup'
+  complete_recordings_path = base_path / recordingspath
+  save_path.mkdir(parents=True, exist_ok=True)
+  zip_path = save_path / f"CAM-AI-backup-{version}.zip"
+  zip_path.unlink(missing_ok=True) 
   tools_redis.set_zip_info(idx, 'Compressing Database...')
   cmd = [
     'mariadb-dump',
@@ -202,36 +199,36 @@ def compress_backup(idx):
     '--skip-lock-tables',
      db_database,
   ]
-  out = Path("temp/backup/db.sql")
-  with out.open("wb") as f:
+  sql_path = save_path / 'db.sql'
+  with sql_path.open("wb") as f:
     subprocess.run(cmd, check=True, stdout=f)
-  with ZipFile('temp/backup/CAM-AI-backup-' + version + '.zip', "w", ZIP_DEFLATED) as zip_file:
-    zip_file.write('temp/backup/db.sql', 'db.sql')
-  with ZipFile('temp/backup/CAM-AI-backup-' + version + '.zip', "w", ZIP_DEFLATED) as zip_file:
-    zip_file.write(Path(settings.BASE_DIR) / 'camai' / 'version.py', 'version.py')
-  os.remove('temp/backup/db.sql')
-  dirpath = Path(basepath + '/' + datapath)
+  with ZipFile(zip_path, "w", ZIP_DEFLATED) as zip_file:
+    zip_file.write(sql_path, sql_path.name)
+  with ZipFile(zip_path, "a", ZIP_DEFLATED) as zip_file:
+    zip_file.write(base_path / 'camai' / 'version.py', 'version.py')
+  sql_path.unlink(missing_ok=True) 
+  data_path = base_path / datapath
   glob_list = []
-  for item in dirpath.rglob("*"):
-    if not (
-      str(item.relative_to(dirpath)).startswith('static')
-      or (str(item.relative_to(dirpath)).startswith(
-        str(recordingspath.relative_to(Path(datapath)))+'/C'
-      ))
-    ) : 
-      glob_list.append(item)
+  for item in data_path.rglob('*'):
+    if item == complete_recordings_path:
+      continue
+    rel = item.relative_to(data_path)
+    if rel.parts and rel.parts[0] == "static":
+      continue
+    if item.is_relative_to(complete_recordings_path) and item.name.startswith('C'):
+      continue
+    glob_list.append(item)
   total =  len(glob_list)
   count = 0
   transmitted = 0
-  with ZipFile('temp/backup/CAM-AI-backup-' + version + '.zip', "a", ZIP_DEFLATED) as zip_file:
-    for entry in glob_list:
+  with ZipFile(zip_path, "a", ZIP_DEFLATED) as zip_file:
+    for item in glob_list:
       count += 1
-      zip_file.write(entry, entry.relative_to(dirpath))
+      zip_file.write(item, item.relative_to(data_path))
       percentage = (count / total * 100)
       if percentage >= transmitted + 0.1:
         tools_redis.set_zip_info(idx, str(round(percentage, 1)) + '% compressed')
         transmitted = percentage
-  os.chdir(basepath)
   
 class admin_tools_async(AsyncWebsocketConsumer):
 

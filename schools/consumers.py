@@ -191,14 +191,14 @@ class schooldbutil(AsyncWebsocketConsumer):
           logger.error('*** File not found: %s', imagepath)
           raise  # lasse den Fehler nach oben gehen
         except asyncio.CancelledError:
-          logger.warning(
-            f'SC{school_nr}: {imagepath}: Getpredictions was cancelled'
-          )  
-          await self.close()
+          cancelled = True
           raise
         finally:
+          if cancelled:
+            logger.info(
+              f'SC{school_nr}: {imagepath}: Getpredictions cancelled (client disconnect)'
+            )  
           i_global += 1
-      #logger.info('00000 ' + str(code_list))
       await self.tf_worker.ask_pred(
         school_nr, 
         imglist, 
@@ -220,7 +220,7 @@ class schooldbutil(AsyncWebsocketConsumer):
             cache_entry['fit'] = school_dbline.last_fit
           except asyncio.TimeoutError:
             logger.error(
-              f'SC{school_nr}: Getpredictions was cancelled'
+              f'SC{school_nr}: Timeout during Getpredictions'
             )  
             frame_dict['prediction'] = None
         elif code == 'R':
@@ -754,6 +754,10 @@ class schooldbutil(AsyncWebsocketConsumer):
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
+     
+    except asyncio.CancelledError:
+      # Client went away. That is normal
+      return()
         
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
