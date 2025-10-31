@@ -142,6 +142,7 @@ class schooldbutil(AsyncWebsocketConsumer):
   async def predictions_from_tfw(self, frames, school_nr, is_tagger):
     school_dbline = self.school_lines[school_nr]
     i_global = 0  # for periodic sleep()
+    cancelled = False
     for chunk in _chunked(frames, CHUNK_SIZE):
       imglist = []
       code_list = []
