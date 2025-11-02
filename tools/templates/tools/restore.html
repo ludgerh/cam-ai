@@ -46,12 +46,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <form class="h2" action="{% url 'tools:process_restore' %}" 
         id="import-form" method="post" enctype="multipart/form-data">
       {% csrf_token %}
-        <input type="checkbox" id="check_files" name="check_files" checked>
-        Import files?<BR>
-        <input type="checkbox" id="check_db" name="check_db" checked>
-        Import database content?<BR><BR>
-        Important: Only click import, if you know what you are doing.
-        The process will overwrite your CAM-AI servers data!
+      <input type="hidden" name="job_type" value="restore">
+      <input type="checkbox" id="check_files" name="check_files" checked>
+      Import files?<BR>
+      <input type="checkbox" id="check_db" name="check_db" checked>
+      Import database content?<BR><BR>
+      Important: Only click import, if you know what you are doing.
+      The process will overwrite your CAM-AI servers data!
       <button id="import-btn" type="submit">Import</button>
     </form>
     <div class="h2 d-none" id="line2">

@@ -20,7 +20,6 @@ import subprocess
 import shutil
 import cv2 as cv
 from asgiref.sync import async_to_sync
-from time import sleep
 from requests import get as rget
 from pathlib import Path
 from zipfile import ZipFile
@@ -39,13 +38,14 @@ from camai.c_settings import safe_import
 from camai.passwords import db_password
 from camai.version import version
 from tools.l_tools import djconf
+from tools.l_break import break_type, BR_LONG
 from startup.redis import my_redis as startup_redis
 from streams.models import stream
 from eventers.models import evt_condition
 from users.models import userinfo
 from access.c_access import access
 from tf_workers.models import school, worker
-from trainers.models import trainer
+from trainers.models import trainer, trainframe, trainframe_imex
 from .models import camurl
 
 #from .forms import UploadFileForm
@@ -57,10 +57,19 @@ no_nginx = safe_import('localaccess') or not safe_import('mydomain')
 import_filename = None
 import_filepath = None
 
-datapath = djconf.getconfig('datapath', 'data/')
-virt_cam_path = djconf.getconfig('virt_cam_path', datapath + 'virt_cam_path/')
-os.makedirs(virt_cam_path, exist_ok = True)
-long_brake = djconf.getconfigfloat('long_brake', 1.0)
+data_dir = djconf.getconfig('datapath', 'data/')
+data_path = Path(data_dir)
+if not data_path.is_absolute():
+  data_path = Path(settings.BASE_DIR) / data_dir
+schools_dir = djconf.getconfig('schools_dir', 'schools/')  
+schools_path = Path(schools_dir)
+if not schools_path.is_absolute():
+  schools_path = data_path / schools_dir
+virt_cam_dir = djconf.getconfig('virt_cam_path', 'virt_cam_path/')  
+virt_cam_path = Path(virt_cam_dir)
+if not virt_cam_path.is_absolute():
+  virt_cam_path = data_path / virt_cam_path
+virt_cam_path.mkdir(parents=True, exist_ok=True)
 
 class myTemplateView(LoginRequiredMixin, TemplateView):
 
@@ -161,11 +170,11 @@ class inst_virt_cam(cam_inst_view):
     newstream = stream()
     newstream.save()
     filename = 'virt_cam_' + str(newstream.id) + '.' + filename.split('.')[-1]
-    shutil.move(file_path, virt_cam_path + filename)
+    shutil.move(file_path, virt_cam_path / filename)
     newstream.cam_url = filename
     newstream.eve_school = school.objects.filter(active=True).first()
     newstream.creator = request.user
-    cap = cv.VideoCapture(virt_cam_path + filename)
+    cap = cv.VideoCapture(virt_cam_path / filename)
     newstream.cam_xres = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
     newstream.cam_yres = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
     newstream.cam_virtual_fps = cap.get(cv.CAP_PROP_FPS)
@@ -188,10 +197,10 @@ class inst_virt_cam(cam_inst_view):
       myaccess.save()
       access.read_list_async()
     while startup_redis.get_start_stream_busy():
-      sleep(long_brake)
+      break_type(BR_LONG)
     startup_redis.set_start_stream_busy(newstream.id)
     while (not (newstream.id in viewables and 'stream' in viewables[newstream.id])):
-      sleep(long_brake)
+      break_type(BR_LONG)
     evt_condition.objects.filter(eventer = newstream).delete()
     new_condition = evt_condition(reaction = 1, eventer = newstream, y = 1)
     my_eventer = viewables[newstream.id]['E']
@@ -225,8 +234,25 @@ class addschool(myTemplateView):
       'schoolcount' : schoolcount,
       'mayadd'      : schoollimit > schoolcount,
       'is_linked'   : len(trainer.objects.get(id=1).wsname) > 0,
+      'phase' : 0,
     })
     return context
+
+  def post(self, request, *args, **kwargs):
+    global import_filename, import_filepath
+    if 'myfile' not in request.FILES:
+      return self.get(request, *args, **kwargs)
+    myfile = request.FILES['myfile']
+    upload_dir = Path(settings.BASE_DIR) / 'temp' / 'backup'
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    fs = FileSystemStorage(location=str(upload_dir), base_url=None)
+    import_filename = fs.save(myfile.name, myfile)
+    import_filepath = fs.path(import_filename)
+    context = self.get_context_data()
+    context.update({
+      'phase' : 1,
+    })
+    return self.render_to_response(context)
 
 class linkservers(myTemplateView):
   template_name = 'tools/linkservers.html'
@@ -260,16 +286,20 @@ class upgrade(myTemplateView):
 class backup(myTemplateView):
   template_name = 'tools/backup.html'
     
-def downbackup(request):
+def downbackup(request, school_nr = None):
   if not request.user.is_superuser:
     return HttpResponse('No Access.', status=403)
+  if school_nr:
+    down_file_name = f'CAM-AI-school-{school_nr}.zip'
+  else:  
+    down_file_name = f'CAM-AI-backup-{version}.zip'
   if no_nginx:
-    path = Path(settings.BASE_DIR).parent / "temp" / "backup" / f"CAM-AI-backup-{version}.zip"
-    response = FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
+    path = Path(settings.BASE_DIR).parent / 'temp' / 'backup' / down_file_name
+    response = FileResponse(open(path, 'rb'), as_attachment=True, filename=path.name)
   else:     
     response = HttpResponse()
-    response['Content-Disposition'] = 'attachment; filename=CAM-AI-backup-' + version + '.zip'
-    response['X-Accel-Redirect'] = '/protected/backup/CAM-AI-backup-' + version + '.zip'
+    response['Content-Disposition'] = 'attachment; filename=' + down_file_name
+    response['X-Accel-Redirect'] = '/protected/backup/' + down_file_name
   return(response)
 
       
@@ -314,10 +344,13 @@ class process_restore(myTemplateView):
     
   def post(self, request, *args, **kwargs):
     post_dict = request.POST.dict()
-    #print('*****', import_filename, import_filepath)
-    #print(post_dict)
-    check_files = 'check_files' in post_dict and post_dict['check_files'] == 'on'
-    check_db = 'check_db' in post_dict and post_dict['check_db'] == 'on'
+    job_type = post_dict['job_type']
+    if job_type == 'restore':
+      check_files = 'check_files' in post_dict and post_dict['check_files'] == 'on'
+      check_db = 'check_db' in post_dict and post_dict['check_db'] == 'on'
+    elif job_type == 'import':
+      check_models = 'check_models' in post_dict and post_dict['check_models'] == 'on'
+      check_frames = 'check_frames' in post_dict and post_dict['check_frames'] == 'on'
     context = self.get_context_data()
     safe_name = Path(import_filename).name
     zip_file = settings.BASE_DIR / 'temp' / 'backup' / safe_name
@@ -332,58 +365,127 @@ class process_restore(myTemplateView):
     with ZipFile(zip_file) as zf:
       zf.extractall(unpack_dir)
     zip_file.unlink(missing_ok=True) 
-    version_file = unpack_dir / 'version.py' 
+    version_file = unpack_dir / 'upload.cfg' 
     try:
-      with version_file.open(encoding="utf-8", errors="ignore") as f:
-        line = next((ln for ln in f if ln.startswith("version")), None)
+      with version_file.open(encoding='utf-8', errors='ignore') as f:
+        version_line = next((ln for ln in f if ln.startswith('version')), None)
+      if job_type == 'import':
+        with version_file.open(encoding='utf-8', errors='ignore') as f:
+          name_line = next((ln for ln in f if ln.startswith('schoolname')), None)
+      else:  
+        name_line = 'irrelevant'  
     except FileNotFoundError:   
       context.update({
         'code' : 2,
         'message' : 'Version-File missing...',
       })
       return self.render_to_response(context)
-    if line is None:   
+    if version_line is None or name_line is None:   
       context.update({
         'code' : 3,
         'message' : 'Version-File not correct...',
       })
       return self.render_to_response(context)
-    a = line.find("'")
-    b = line.find("'", a + 1)
-    new_version = line[a + 1:b] if a != -1 and b != -1 else ''
+    a = version_line.find("'")
+    b = version_line.find("'", a + 1)
+    new_version = version_line[a + 1:b] if a != -1 and b != -1 else ''
+    a = name_line.find("'")
+    b = name_line.find("'", a + 1)
+    new_name = name_line[a + 1:b] if a != -1 and b != -1 else ''
     if new_version != version:   
       context.update({
         'code' : 4,
         'message' : 'Version mismatch: (' + new_version + ' <> ' + version +')'
       })
       return self.render_to_response(context)
-    for item in viewables.values():
-      async_to_sync(item['stream'].stop)()
-    if check_db:
-      cmd = ['mariadb', '--user=CAM-AI', '--host=localhost', db_database]
-      env = dict(os.environ, MYSQL_PWD = db_password)
-      with open(unpack_dir / 'db.sql', 'rb') as f:
-          subprocess.run(cmd, check=True, stdin=f, env=env)
-    if check_files:
-      path_to_exchange = Path(settings.BASE_DIR) / datapath
-      shutil.move(path_to_exchange, settings.BASE_DIR / 'temp/home/cam_ai/data.old')
-      shutil.move(unpack_dir, path_to_exchange)
-      shutil.rmtree(settings.BASE_DIR / 'temp/home/cam_ai/data.old')
-    (path_to_exchange / 'db.sql').unlink(missing_ok=True)  
-    (path_to_exchange / 'version.py').unlink(missing_ok=True)  
+    if job_type == 'restore':
+      for item in viewables.values():
+        async_to_sync(item['stream'].stop)()
+      if check_db:
+        cmd = ['mariadb', '--user=CAM-AI', '--host=localhost', db_database]
+        env = dict(os.environ, MYSQL_PWD = db_password)
+        with open(unpack_dir / 'db.sql', 'rb') as f:
+            subprocess.run(cmd, check=True, stdin=f, env=env)
+      if check_files:
+        path_to_exchange = Path(settings.BASE_DIR) / datapath
+        shutil.move(path_to_exchange, settings.BASE_DIR / 'temp/home/cam_ai/data.old')
+        shutil.move(unpack_dir, path_to_exchange)
+        shutil.rmtree(settings.BASE_DIR / 'temp/home/cam_ai/data.old')
+    elif job_type == 'import':
+      while True:
+        try:
+          school_line = school.objects.get(name = 'temp123school456name789magic')
+          break
+        except school.DoesNotExist: 
+          break_type(BR_LONG)
+      school_line.name = new_name
+      this_school_path = schools_path / f'model{school_line.id}'
+      school_line.dir = str(this_school_path) + '/'
+      school_line.save(update_fields=('name', 'dir', ))
+      this_school_path.mkdir(parents=True, exist_ok=True)
+      model_path = this_school_path / 'model'
+      frames_path = this_school_path / 'frames'
+      if check_models:  
+        if (unpack_dir / 'model').exists():
+          shutil.move(unpack_dir / 'model', this_school_path / 'model')
+      if check_frames:
+        if (unpack_dir / 'frames').exists():
+          shutil.move(unpack_dir / 'frames', this_school_path / 'frames')
+          
+        load = f"load data local infile '{unpack_dir / "db.dat"}' "
+        load += "into table trainers_trainframe "
+        load += "character set utf8mb4 "
+        load += "fields terminated by '\t' escaped by '\\' "
+        load += "lines terminated by '\n' "
+        load += "("
+        for item in trainframe_imex[:-1]:
+          load += item + ','
+        load += trainframe_imex[-1] + ');'
+        
+        data_file = unpack_dir / "db.dat"
+        cols = ",".join(trainframe_imex)  # z.B. made,encrypted,...
+        load = rf"""load data local infile '{data_file}'
+          into table trainers_trainframe
+          character set utf8mb4
+          fields terminated by '\t' escaped by '\\'
+          lines terminated by '\n'
+          ({cols});
+        """
+        cmd = [
+          'mariadb',
+          '--user=CAM-AI',
+          '--host=localhost',
+          '--database', db_database,  
+          '--local-infile=1',
+          '--default-character-set=utf8mb4',
+          '-e',
+          load,
+        ]
+        env = dict(os.environ, MYSQL_PWD = db_password)
+        subprocess.run(
+          cmd, 
+          check=True, 
+          env=env, 
+          stdout=subprocess.DEVNULL, 
+          stderr=subprocess.DEVNULL,
+        )
+        trainframe.objects.filter(school=0).update(school=school_line.id)
     zip_file.unlink(missing_ok=True)  
-    startup_redis.set_shutdown_command(20)
-    context.update({
-      'code' : 0,
-      'message' : 'OK, please wait one minute for restart...',
-    })
+    if job_type == 'restore':
+      (path_to_exchange / 'db.sql').unlink(missing_ok=True) 
+      (path_to_exchange / 'db.dat').unlink(missing_ok=True)  
+      (path_to_exchange / 'upload.cfg').unlink(missing_ok=True)  
+      startup_redis.set_shutdown_command(20)
+      context.update({
+        'code' : 0,
+        'message' : 'OK, please wait one minute for restart...',
+      })
+    elif job_type == 'import':  
+      context.update({
+        'code' : 10,
+        'message' : 'Done importing school. You can continue...',
+      })
     return self.render_to_response(context)
-    
-def xprocess_restore(request):
-  if not request.user.is_superuser:
-    return HttpResponse('No Access.', status=403) 
-  startup_redis.set_shutdown_command(20) 
-  return redirect('/')
   
 def logout_and_redirect(request):
   logout(request)

@@ -41,6 +41,7 @@ urlpatterns = [
 	path('backup/', views.backup.as_view(), name='backup'),
 	path('restore/', views.restore.as_view(), name='restore'),
 	path('downbackup/backup.zip', views.downbackup, name='downbackup'),
+	path('downbackup/backup.zip/<int:school_nr>/', views.downbackup, name='downbackup'),
 	path('process_restore', views.process_restore.as_view(), name='process_restore'),
 	path('logout/', views.logout_and_redirect, name='logout_and_redirect'),
 ]

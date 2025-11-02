@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endif %}
 
 <main>
-
-
   <div class="accordion">
     <div class="accordion-item" id="accordionitem1">
       <h2 class="accordion-header" id="panels-headingOne">
@@ -82,16 +80,45 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       </div>
     </div>
   </div>
-        
-
 </main>
 
 <script>
+
+let tools_asyncSocket;
+let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 
 $(document).ready(function() {
   $("#importButton").click(function() {
     $('#please_wait').removeClass("d-none");
   });
+  WSAsync(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/aadmintools/'
+  )
+  .then((result) => {
+    tools_asyncSocket = result;
+    $('#continue-button').click(function() {
+      $('#continue-button').prop('disabled', true);
+      $('#line2').removeClass("d-none");
+      $('#line3').removeClass("d-none");
+      mycallback = function (param) {
+        result = JSON.parse(param)
+        $('#line3').text(result.data);
+      }
+      tools_asyncSocket.sendandwait({
+        'command' : 'backup',
+        'school_nr' : {{ school }},
+      }, mycallback)
+      .then((result) => {
+        $('#line3').text('Starting download. When done, find the ZIP file in your download directory...');
+        console.log(window.location.host);
+        window.location.href = window.location.protocol + '//' 
+          + window.location.host 
+          + '/tools/downbackup/backup.zip/{{ school }}/';
+      })
+    });
+  })
 });
 
 </script>

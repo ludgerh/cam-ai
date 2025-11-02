@@ -26,38 +26,130 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endif %}
 {% if mayadd %}
   {% if is_linked %}
-    <div class="mb-3 m-2">
-      <label for="schoolname" class="form-label h4">Name of the new school:</label>
-      <input type="text" class="form-control" id="schoolname">
-    </div>
-    <div class="mb-3 m-2 h4" id="status"></div>
-    <div>
-      <button class="btn btn-primary m-2 make-button" type="button">Make new school</button>
-    </div>
+    <main>
+      {% if phase == 0 %}
+        <div class="accordion">
+          <div class="accordion-item" id="accordionitem1">
+            <h2 class="accordion-header" id="panels-headingOne">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                  data-bs-target="#panels-collapseOne" 
+                  aria-expanded="false" 
+                  aria-controls="panels-collapseOne">
+                <h4>Create new, empty school</h4>
+              </button>
+            </h2>
+            <div id="panels-collapseOne" class="accordion-collapse collapse" 
+                aria-labelledby="panels-headingOne">
+              <div class="accordion-body">
+                <div class="mb-3 m-2">
+                  {% csrf_token %}
+                  <label for="schoolname" class="form-label h4">Name of the new school:</label>
+                  <input type="text" class="form-control" id="schoolname">
+                </div>
+                <div class="mb-3 m-2 h4" id="status"></div>
+                <div>
+                  <button class="btn btn-primary m-2 make-button" type="button">Make new school</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="accordion-item" id="accordionitem2">
+            <h2 class="accordion-header" id="panels-headingTwo">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                  data-bs-target="#panels-collapseTwo" aria-expanded="false" 
+                  aria-controls="panels-collapseTwo">
+                <h4>Import school from file</h4>
+              </button>
+            </h2>
+            <div id="panels-collapseTwo" class="accordion-collapse collapse" 
+                aria-labelledby="panels-headingTwo">
+              <div class="accordion-body">
+                <div class="h2">
+                  Select the backup ZIP file containing the school.
+                </div> 
+                <form class="h2" id="upload-form" method="post" enctype="multipart/form-data">
+                  {% csrf_token %}
+                  <input id="fileselector" type="file" name="myfile">
+                  <button id="upload-btn" type="submit">Upload</button>
+                </form>
+                <div class="h2 d-none" id="line2">
+                  Sending the upload. Please wait...
+                </div>  
+                <div class="h2 d-none" id="line3">?</div> 
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+      {% if phase == 1 %}
+        <div class="h2">
+          We received the ZIP File. Select what you want to import:<BR>
+        </div> 
+        <form class="h2" action="{% url 'tools:process_restore' %}" 
+            id="import-form" method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="job_type" value="import">
+          <input type="checkbox" id="check_models" name="check_models" checked>
+          Import models?<BR>
+          <input type="checkbox" id="check_frames" name="check_frames" checked>
+          Import images?<BR><BR>
+          Important: Only click import, if you know what you are doing.<BR>
+          The process will create a new school on your server!
+          <button id="import-btn" type="submit">Import</button>
+        </form>
+        <div class="h2 d-none" id="line2">
+          Processing the upload. Please wait...
+        </div>  
+      {% endif %}
+    </main>  
     <script>
 
-    let aadmintoolsSocket;
-
     $(document).ready(function() {
-      WSAsync(
-        ws_scheme + '//'
-        + window.location.host
-        + '/ws/aadmintools/'
-      )
-      .then((result) => {
-        aadmintoolsSocket = result;
-        $('.make-button').click(function() {
-          $('.make-button').addClass('btn-warning');
-          aadmintoolsSocket.sendandwait({
+    {% if phase == 0 %}
+      $('#upload-form').on('submit', function () {
+        $('#line2').removeClass('d-none');
+        $('#line3').addClass('d-none');
+        $('#upload-btn').prop('disabled', true);
+      });
+    {% endif %}
+    {% if phase == 1 %}
+      $('#import-form').on('submit', async function () {
+        const $btn = $(this);
+        try {
+          $btn.prop('disabled', true);
+          $('#line2').removeClass('d-none');
+          $('#line3').addClass('d-none');
+          $('#import-btn').prop('disabled', true);
+          const result = await aadmintoolsSocket.sendandwait({
             'command' : 'makeschool',
-            'name' : $('#schoolname').val(),
+            'name' : 'temp123school456name789magic',
             'delegation_level' : 1,
-          })  
-          .then((result) => {
+          });
+        } catch (err) {
+          console.error(err);
+        } finally {
+          $btn.prop('disabled', false);
+        }
+      });
+    {% endif %}
+      (async () => {
+        aadmintoolsSocket = await WSAsync(
+          ws_scheme + '//'
+          + window.location.host
+          + '/ws/aadmintools/'
+        ); 
+        $('.make-button').on('click', async function () {
+          const $btn = $(this);
+          try {
+            $btn.prop('disabled', true);
+            const result = await aadmintoolsSocket.sendandwait({
+              'command' : 'makeschool',
+              'name' : $('#schoolname').val(),
+              'delegation_level' : 1,
+            });
             console.log(result);
             if (result.status == 'OK'){
               $('#status').html('&#10003;');
-              $('.make-button').removeClass('btn-warning');
             };
             if (result.status == 'noauth'){
               $('#status').text('Error: No valid login on on this server: ' + result.domain);
@@ -68,22 +160,32 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             if (result.status == 'nomorequota'){
               $('#status').text('Error: No more volume quota on this server: ' + result.domain);
             };
-          })
-        });
-      })  
+          } catch (err) {
+            console.error(err);
+            $('#status').text('Request failed.');
+          } finally {
+            $btn.prop('disabled', false);
+          }
+        })
+      })()
     });
     </script>
   {% else %}
+    <main>
     <div class="h2 m-2">
     You cannot create your own schools while you are not linked to any CAM-AI-Server.<br>
     Please get an account and link to server...
+    </div>
+    </main>
   {% endif %}
 {% else %}
-  <div class="h2 m-2">
-  You can create {{ schoollimit }} schools.<br>
-  You already have {{ schoolcount }}.<br>
-  Please delete one or more to create a new one...
-  </div>
+  <main>
+    <div class="h2 m-2">
+    You can create {{ schoollimit }} schools.<br>
+    You already have {{ schoolcount }}.<br>
+    Please delete one or more to create a new one...
+    </div>
+  </main>
 {% endif %}
 
 {% endblock %}

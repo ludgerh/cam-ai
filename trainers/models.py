@@ -44,11 +44,18 @@ class img_size(models.Model):
 
   def __str__(self):
     return(f"img_size, {self.x}x{self.y}")
+    
+trainframe_imex = ['made', 'encrypted', 'name', 'code']
+for i in range(10):
+  trainframe_imex.append(f'c{i}') 
+trainframe_imex.append('checked') 
+for i in range(10):
+  trainframe_imex.append(f'pred{i}') 
 
 class trainframe(models.Model):
   deleted = models.BooleanField(default=False)
   made = models.DateTimeField()
-  school = models.IntegerField()
+  school = models.IntegerField(default=0)
   encrypted = models.BooleanField(default=True)
   name = models.CharField(max_length=256)
   code = models.CharField(max_length=2)

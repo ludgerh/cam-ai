@@ -52,7 +52,7 @@ from tools.c_logger import log_ini
 from startup.redis import my_redis as startup_redis
 from tools.c_tools import aget_smtp_conf
 from tf_workers.models import school, worker
-from trainers.models import trainer
+from trainers.models import trainer, trainframe_imex
 from streams.models import stream as dbstream
 from users.models import userinfo
 from access.models import access_control
@@ -178,7 +178,7 @@ class health(AsyncWebsocketConsumer):
 # tools_async
 #*****************************************************************************
         
-def compress_backup(idx):
+def compress_backup(idx, school_nr):
   setproctitle('CAM-AI-Backup-Compression')
   os.nice(19)
   base_path = Path(settings.BASE_DIR)
@@ -186,38 +186,77 @@ def compress_backup(idx):
   save_path = parent_path /'temp' / 'backup'
   complete_recordings_path = base_path / recordingspath
   save_path.mkdir(parents=True, exist_ok=True)
-  zip_path = save_path / f"CAM-AI-backup-{version}.zip"
+  if school_nr:
+    zip_path = save_path / f'CAM-AI-school-{school_nr}.zip'
+  else:
+    zip_path = save_path / f'CAM-AI-backup-{version}.zip'
   zip_path.unlink(missing_ok=True) 
   tools_redis.set_zip_info(idx, 'Compressing Database...')
-  cmd = [
-    'mariadb-dump',
-    '--password=' + db_password,
-    '--user=CAM-AI',
-    '--host=localhost',
-    '--single-transaction',
-    '--quick',
-    '--skip-lock-tables',
-     db_database,
-  ]
-  sql_path = save_path / 'db.sql'
+  env = dict(os.environ, MYSQL_PWD=db_password)
+  if school_nr:
+    sel = 'select '
+    sel += ",".join(trainframe_imex)
+    sel += f' from trainers_trainframe where deleted=0 and school={school_nr};' 
+    cmd = [
+      'mariadb',
+      '--user=CAM-AI',
+      '--host=localhost',
+      '-N',
+      '-e',
+      sel,
+      db_database,
+    ]
+    sql_path = save_path / 'db.dat'
+  else:
+    cmd = [
+      'mariadb-dump',
+      '--user=CAM-AI',
+      '--host=localhost',
+      '--single-transaction',
+      '--quick',
+      '--skip-lock-tables',
+      db_database,
+    ]
+    sql_path = save_path / 'db.sql'
   with sql_path.open("wb") as f:
-    subprocess.run(cmd, check=True, stdout=f)
+    subprocess.run(cmd, check=True, env=env, stdout=f)
   with ZipFile(zip_path, "w", ZIP_DEFLATED) as zip_file:
     zip_file.write(sql_path, sql_path.name)
+  conf_path = save_path / 'upload.cfg'  
+  if school_nr:
+    school_line = school.objects.get(id = school_nr)
+    school_name = school_line.name
+  else:
+    school_name = 'none'  
+  conf_path.write_text(
+    f"version = '{version}'\n" + f"schoolname = '{school_name}'\n", 
+    encoding='utf-8'
+  )
   with ZipFile(zip_path, "a", ZIP_DEFLATED) as zip_file:
-    zip_file.write(base_path / 'camai' / 'version.py', 'version.py')
+    zip_file.write(conf_path, conf_path.name)
   sql_path.unlink(missing_ok=True) 
-  data_path = base_path / datapath
+  conf_path.unlink(missing_ok=True) 
+  if school_nr:
+    if Path(schoolsdir).is_absolute():
+      data_path = Path(schoolsdir) / f'model{school_nr}'
+    else:
+      data_path = Path(settings.BASE_DIR) / schoolsdir / f'model{school_nr}' 
+  else:
+    data_path = base_path / datapath
   glob_list = []
-  for item in data_path.rglob('*'):
-    if item == complete_recordings_path:
-      continue
-    rel = item.relative_to(data_path)
-    if rel.parts and rel.parts[0] == "static":
-      continue
-    if item.is_relative_to(complete_recordings_path) and item.name.startswith('C'):
-      continue
-    glob_list.append(item)
+  if school_nr:
+    for item in data_path.rglob('*'):
+      glob_list.append(item)
+  else:
+    for item in data_path.rglob('*'):
+      if item == complete_recordings_path:
+        continue
+      rel = item.relative_to(data_path)
+      if rel.parts and rel.parts[0] == "static":
+        continue
+      if item.is_relative_to(complete_recordings_path) and item.name.startswith('C'):
+        continue
+      glob_list.append(item)
   total =  len(glob_list)
   count = 0
   transmitted = 0
@@ -253,7 +292,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -448,12 +487,17 @@ class admin_tools_async(AsyncWebsocketConsumer):
 #*****************************************************************************
       
       elif params['command'] == 'backup':
+        if 'school_nr' not in params:
+          params['school_nr'] = None
         if self.scope['user'].is_superuser:
           idx = 0
           while idx in self.backup_proc_dict:
             idx += 1 
           tools_redis.purge_zip_info(idx) 
-          self.backup_proc_dict[idx] = Process(target=compress_backup, args=[idx])
+          self.backup_proc_dict[idx] = Process(
+            target=compress_backup, 
+            args=[idx, params['school_nr']],
+          )
           self.backup_proc_dict[idx].start()
           while self.backup_proc_dict[idx].is_alive():
             if (my_info := tools_redis.get_zip_info(idx)):
