@@ -26,6 +26,7 @@ from os import path, makedirs
 from math import inf
 from time import time, sleep
 from datetime import datetime
+from multiprocessing import Process
 from logging import getLogger
 from random import randrange
 from traceback import format_exc
@@ -44,8 +45,9 @@ from access.c_access import access
 from tools.tokens import maketoken_async
 from tf_workers.models import school
 from users.userinfo import afree_quota
-from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
 from globals.c_globals import trainers
+from .models import trainframe, fit, epoch, trainer as dbtrainer, img_size, model_type
+from .train_worker_remote import train_once_remote
 
 from random import randint
 
@@ -171,7 +173,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       if text_data == 'Ping':
         return()
         
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -319,19 +321,25 @@ class remotetrainer(AsyncWebsocketConsumer):
               model_type = default_modeltype
             result = model_type
           elif indict['mode'] == 'sync':
-            while True:
-              try:
-                fitline = (
-                  await fit.objects.filter(school = self.myschoolline.id).alatest('id')
-                )  
-                fitline = fitline.id
-              except fit.DoesNotExist:
-                fitline = 0
-              if fitline > self.lastfit:
-                self.lastfit = fitline
-                break
-              else:
-                await asyncio.sleep(1.0)
+            if 'dl_only' in indict and indict['dl_only']:
+              self.lastfit = (await fit.objects.filter(
+                school = self.myschoolline.id,
+                status = 'Done', 
+              ).alatest('id')).id
+            else:
+              while True:
+                try:
+                  fitline = (
+                    await fit.objects.filter(school = self.myschoolline.id).alatest('id')
+                  )  
+                  fitline = fitline.id
+                except fit.DoesNotExist:
+                  fitline = 0
+                if fitline > self.lastfit:
+                  self.lastfit = fitline
+                  break
+                else:
+                  await asyncio.sleep(1.0)
             mytoken = await maketoken_async(
               'MOD', self.myschoolline.id, 
               'Download School #'+str(self.myschoolline.id)
@@ -410,7 +418,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -445,6 +453,7 @@ class trainerutil(AsyncWebsocketConsumer):
             returned = await self.ws.receive() 
             result = json.loads(returned.data)['data']
             if result == 'OK' or ('status' in result and result['status'] == 'OK'):
+              result['t_type'] = self.trainerline.t_type
               outlist['data'] = result  
             else:
               await self.close()	
@@ -454,6 +463,7 @@ class trainerutil(AsyncWebsocketConsumer):
               'status' : 'OK',
               'trainer' : self.trainer_nr,
               'count' : count,
+              't_type' : self.trainerline.t_type,
             }
         else: #Proper error description to both consoles!!!
           await self.close()
@@ -591,14 +601,37 @@ class trainerutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))		
 
       elif params['command'] == 'trainnow': 
-        if self.maywrite:
-          schoolline = await school.objects.aget(id=self.schoolnr)
-          await sync_to_async(schoolline.trainers.add)(self.trainerline)
+        if not self.maywrite:
+          self.close()	
+        schoolline = await school.objects.aget(id=self.schoolnr)
+        await sync_to_async(schoolline.trainers.add)(self.trainerline)
+        outlist['data'] = 'OK' 
+        #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
+
+      elif params['command'] == 'dl_only': 
+        if not self.maywrite:
+          self.close()	
+        my_trainer = train_once_remote(
+            myschool = await school.objects.aget(id=self.schoolnr), 
+            dbline = self.trainerline,
+            dl_only = True,
+        )
+        train_process = Process(target = my_trainer.run)
+        train_process.start()
+        try:
+          await asyncio.wait_for(asyncio.to_thread(train_process.join), timeout=120.0)
+        except asyncio.TimeoutError:
+          logging.warning("Trainer-Process timeout → terminate()")
+          train_process.terminate()
+          await asyncio.to_thread(train_process.join)
+        rc = train_process.exitcode
+        if rc == 0:
           outlist['data'] = 'OK' 
-          #logger.info('--> ' + str(outlist))
-          await self.send(json.dumps(outlist))	
         else:
-          self.close()		
+          outlist['data'] = f'FAILED (exitcode={rc})'
+        logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
           
       elif params['command'] == 'get_for_dashboard':  	
         if self.trainerline.t_type == 2:

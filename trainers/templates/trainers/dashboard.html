@@ -33,7 +33,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   {% if may_write %}
   <div class="h2">
     <button type="button" id="train_button" class="btn btn-primary m-2" 
-      style="width: 180px; disabled">Train AI now!</button>
+      style="width: 180px" disabled>Train AI now</button>
+    <button type="button" id="dl_only_button" class="btn btn-primary m-2 d-none" 
+      style="width: 180px" disabled>Download Model</button>
   </div>
   <div class="container-fluid float-left">
     <table class="table">
@@ -64,12 +66,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           type="checkbox" id="cbignorecheck" class="m-2">
         <label class="m-2" for="cbignorecheck">Ignore check-in</label>
       </div>  
-      {% if show_all_options %}
+      {% if user.is_superuser %}
+        <!--
         <div class="col-sm-auto h4">
           <input style="width: 24px; height: 24px;" 
             type="checkbox" id="cbdonate" class="m-2">
           <label class="m-2" for="cbdonate">Donate images and tagging</label>
         </div>  
+        -->
         <div class="col-sm-auto h4">
           <input style="width: 24px; height: 24px;" 
             type="checkbox" id="load_last_model" class="m-2">
@@ -83,7 +87,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       {% endif %}
     </div>  
   </div>
-    {% if show_all_options %}
+    {% if user.is_superuser %}
     <div class="h2">
       Model Settings:
     </div>
@@ -274,7 +278,7 @@ function init_bool_var(menu_item, code_string) {
         'item' : code_string,
         'value' : $(menu_item).prop('checked'),
       })
-    });
+    })
   })
 };
 
@@ -351,10 +355,12 @@ function refresh_all() {
   })
   .then((result) => {
     if (($('#job_status').text() == 'Done' || $('#job_status').text() == 'Stopped')
-        && result.pos == 0 && {{ delegation_level }} == 1 && !training_start) {
+        && result.pos == 0 && !training_start) {
       $('#train_button').prop("disabled", false)
+      $('#dl_only_button').prop("disabled", false)
     } else {
       $('#train_button').prop("disabled", true)
+      $('#dl_only_button').prop("disabled", true)
     };  
     $('#queue_pos').text(result.pos+'/'+result.len);
   })
@@ -376,6 +382,9 @@ $(document).ready(function() {
   })
   .then((result) => {
     if (result.status == 'OK') {
+      if (result.t_type == 2) {
+        $('#dl_only_button').removeClass('d-none')
+      };
       $('#trainer_used').text(result.trainer);
       $('#trainer_count').text(result.count);
 {% if may_write %}
@@ -396,12 +405,26 @@ $(document).ready(function() {
           + '<span id="modal0"> </span>: <span id="modal1"> </span> / <span id="modal2">Please wait</span>');
         $('#mymodal').modal('show');
         $('#train_button').prop("disabled",true);
+        $('#dl_only_button').prop("disabled",true);
         $('#train_button').addClass('btn-warning');
         trainerutilSocket.sendandwait({
           'command' : 'trainnow',
         })
         .then((result) => {
           $('#train_button').removeClass('btn-warning')
+        })
+      });
+      $('#dl_only_button').click(function() { 
+        $('#train_button').prop("disabled",true);
+        $('#dl_only_button').prop("disabled",true);
+        $('#dl_only_button').addClass('btn-warning');
+        trainerutilSocket.sendandwait({
+          'command' : 'dl_only',
+        })
+        .then((result) => {
+          $('#train_button').prop("disabled",false);
+          $('#dl_only_button').prop("disabled",false);
+          $('#dl_only_button').removeClass('btn-warning')
         })
       });
       init_var('#trigger', 'trigger');

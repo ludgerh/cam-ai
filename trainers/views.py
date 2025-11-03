@@ -65,7 +65,7 @@ def epochs(request, schoolnr, fitnr):
 
 def dashboard(request, schoolnr):
   if access.check('S', schoolnr, request.user, 'R'):
-    myschool = school.objects.get(pk = schoolnr)
+    myschool = school.objects.get(id = schoolnr)
     template = loader.get_template('trainers/dashboard.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -73,11 +73,8 @@ def dashboard(request, schoolnr):
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'school' : myschool,
-      'schoolnr' : schoolnr,
       'model_types' : model_type.objects.all(),
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
-      'show_all_options' : request.user.is_superuser,
-      'delegation_level' : myschool.delegation_level,
     }
     return(HttpResponse(template.render(context)))
   else:

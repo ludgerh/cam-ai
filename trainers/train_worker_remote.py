@@ -103,9 +103,10 @@ async def check_downloads(logger, session):
 
 class train_once_remote():
 
-  def __init__(self, myschool, dbline, myfit = None):
+  def __init__(self, myschool, dbline, myfit = None, dl_only = False):
     self.myschool = myschool
     self.myfit = myfit
+    self.dl_only = dl_only
     self.tainer_id = dbline.id
     self.wsurl = dbline.wsserver+'ws/remotetrainer/'
     self.wsname = dbline.wsname
@@ -130,10 +131,12 @@ class train_once_remote():
     self.logname = 'rem_train #'+str(self.tainer_id)
     self.logger = getLogger(self.logname)
     log_ini(self.logger, self.logname)
-    self.logger.info('****************************************************');
+    self.logger.info('****************************************************')
     self.logger.info('*** Working on School #'
-      +str(self.myschool.id)+', '+self.myschool.name+'...');
-    self.logger.info('****************************************************');
+      +str(self.myschool.id)+', '+self.myschool.name+'...')
+    if self.dl_only:
+      self.logger.info('*** Download Only')  
+    self.logger.info('****************************************************')
     
     from websocket import WebSocket #, enableTrace
     from websocket._exceptions import WebSocketConnectionClosedException
@@ -155,7 +158,7 @@ class train_once_remote():
         self.logger.warning('Socket error while pushing initialization data '
           + 'to training server')
         sleep(djconf.getconfigfloat('medium_brake', 0.1))
-    self.ws.recv()    
+    self.ws.recv() 
     outdict = {
       'code' : 'init_trainer',
       'school' : self.myschool.e_school,
@@ -165,131 +168,133 @@ class train_once_remote():
     result = json.loads(self.ws.recv())
     if result['status'] != 'OK':
       return(1)
-    model_in_dims = result['dims']
-    outdict = {
-      'code' : 'namecheck',
-      'school' : self.myschool.e_school,
-    } 
-    self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-    remoteset = set()
-    remoteset_with_size = set()
-    remotedict = {}
-    while True:
-      if (item := json.loads(self.ws.recv())) == 'done':
-        break
-      remotedict[item[0]] = item[1]
-      remoteset.add(item[0])
-      if item[2]:
-        remoteset_with_size.add(item[0])
-    self.ws_ts = time()
-    filterdict = {
-      'school' : self.myschool.id, 
-      'deleted' : False,
-    }
-    if not self.myschool.ignore_checked:
-      filterdict['checked'] = True
-    localsearch = list_from_queryset(trainframe.objects.filter(**filterdict))
-    localset = set()
-    localdict = {}
-    for item in localsearch:
-      localdict[item.name] = [item.c0, item.c1, item.c2, item.c3, item.c4, 
-        item.c5, item.c6, item.c7, item.c8, item.c9, ]
-      localdict[item.name] += [seq_to_int(localdict[item.name])]
-      localdict[item.name] += [item.code]
-      localset.add(item.name)
-    temp_set = remoteset & localset
-    count = len(temp_set)
-    for item in (temp_set):
-      if remotedict[item] != localdict[item][10]:
-        self.logger.info('(' + str(count) + ') Changed: ' + item)
-        remoteset.discard(item)
-        remoteset_with_size.discard(item)
-      count -= 1  
-      self.send_ping()
-    temp_set = remoteset - localset
-    outdict = {
-      'code' : 'set_counter_total',
-      'action' : 'Deleting',
-      'count' : len(temp_set),
-    }
-    self.ws.send(json.dumps(outdict), opcode=1)
-    self.ws.recv()
-    count = len(temp_set)
-    for item in (temp_set):
-      self.logger.info('(' + str(count) + ') Deleting: ' + item)
+    model_in_dims = result['dims'] 
+    if not self.dl_only:
       outdict = {
-        'code' : 'delete',
-        'name' : item,
-      }
-      self.ws.send(json.dumps(outdict), opcode=1)
-      i = 0
-      while i < 20:
-        try:
-          self.ws.recv()
+        'code' : 'namecheck',
+        'school' : self.myschool.e_school,
+      } 
+      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      remoteset = set()
+      remoteset_with_size = set()
+      remotedict = {}
+      while True:
+        if (item := json.loads(self.ws.recv())) == 'done':
           break
-        except TimeoutError:
-          i += 1
-      count -= 1
+        remotedict[item[0]] = item[1]
+        remoteset.add(item[0])
+        if item[2]:
+          remoteset_with_size.add(item[0])
+      self.ws_ts = time()
+      filterdict = {
+        'school' : self.myschool.id, 
+        'deleted' : False,
+      }
+      if not self.myschool.ignore_checked:
+        filterdict['checked'] = True
+      localsearch = list_from_queryset(trainframe.objects.filter(**filterdict))
+      localset = set()
+      localdict = {}
+      for item in localsearch:
+        localdict[item.name] = [item.c0, item.c1, item.c2, item.c3, item.c4, 
+          item.c5, item.c6, item.c7, item.c8, item.c9, ]
+        localdict[item.name] += [seq_to_int(localdict[item.name])]
+        localdict[item.name] += [item.code]
+        localset.add(item.name)
+      temp_set = remoteset & localset
+      count = len(temp_set)
+      for item in (temp_set):
+        if remotedict[item] != localdict[item][10]:
+          self.logger.info('(' + str(count) + ') Changed: ' + item)
+          remoteset.discard(item)
+          remoteset_with_size.discard(item)
+        count -= 1  
+        self.send_ping()
+      temp_set = remoteset - localset
       outdict = {
-        'code' : 'set_counter',
-        'value' : count,
+        'code' : 'set_counter_total',
+        'action' : 'Deleting',
+        'count' : len(temp_set),
       }
       self.ws.send(json.dumps(outdict), opcode=1)
       self.ws.recv()
-    datalist = list(localset - remoteset_with_size) 
-    outdict = {
-      'code' : 'set_counter_total',
-      'action' : 'Sending',
-      'count' : len(datalist),
-    }
-    self.ws.send(json.dumps(outdict), opcode=1)
-    self.ws.recv()
-    count = len(datalist)
-    start = 0
-    step = 100
-    for i in range(start, len(datalist), step):
+      count = len(temp_set)
+      for item in (temp_set):
+        self.logger.info('(' + str(count) + ') Deleting: ' + item)
+        outdict = {
+          'code' : 'delete',
+          'name' : item,
+        }
+        self.ws.send(json.dumps(outdict), opcode=1)
+        i = 0
+        while i < 20:
+          try:
+            self.ws.recv()
+            break
+          except TimeoutError:
+            i += 1
+        count -= 1
+        outdict = {
+          'code' : 'set_counter',
+          'value' : count,
+        }
+        self.ws.send(json.dumps(outdict), opcode=1)
+        self.ws.recv()
+      datalist = list(localset - remoteset_with_size) 
       outdict = {
-        'code' : 'set_counter',
-        'value' : count,
+        'code' : 'set_counter_total',
+        'action' : 'Sending',
+        'count' : len(datalist),
       }
       self.ws.send(json.dumps(outdict), opcode=1)
       self.ws.recv()
-      sublist = datalist[i:i+step]
-      zip_buffer = io.BytesIO()   
-      with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
-        for item in sublist:
-          imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
-          if (imagedata.shape[1] > model_in_dims[0] 
-              or imagedata.shape[0] > model_in_dims[1]):
-            imagedata = cv.resize(imagedata, model_in_dims)
-          imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
-          zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
-          jsondata = json.dumps(localdict[item]).encode()
-          zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
-          #self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
-          count -= 1  
-      zip_buffer.seek(0)
-      zip_content = zip_buffer.read()
-      self.ws.send_binary(zip_content)
-      self.ws.recv()
-      self.send_ping()
-    outdict = {
-      'code' : 'checkfitdone',
-      'mode' : 'init',
-      'school' : self.myschool.e_school,
-    }
-    self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-    temp = self.ws.recv()
-    model_type = json.loads(temp)
-    outdict = {
-      'code' : 'trainnow',
-    } 
-    self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
-    self.logger.info('Sent trigger for train_now... ')
+      count = len(datalist)
+      start = 0
+      step = 100
+      for i in range(start, len(datalist), step):
+        outdict = {
+          'code' : 'set_counter',
+          'value' : count,
+        }
+        self.ws.send(json.dumps(outdict), opcode=1)
+        self.ws.recv()
+        sublist = datalist[i:i+step]
+        zip_buffer = io.BytesIO()   
+        with ZipFile(zip_buffer, 'a', ZIP_DEFLATED) as zip_file:
+          for item in sublist:
+            imagedata = cv.imread(self.myschool.dir + 'frames/' + item)
+            if (imagedata.shape[1] > model_in_dims[0] 
+                or imagedata.shape[0] > model_in_dims[1]):
+              imagedata = cv.resize(imagedata, model_in_dims)
+            imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
+            zip_file.writestr(item, io.BytesIO(imagedata).getvalue())
+            jsondata = json.dumps(localdict[item]).encode()
+            zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
+            #self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
+            count -= 1  
+        zip_buffer.seek(0)
+        zip_content = zip_buffer.read()
+        self.ws.send_binary(zip_content)
+        self.ws.recv()
+        self.send_ping()
+      outdict = {
+        'code' : 'checkfitdone',
+        'mode' : 'init',
+        'school' : self.myschool.e_school,
+      }
+      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      temp = self.ws.recv()
+      model_type = json.loads(temp)
+      outdict = {
+        'code' : 'trainnow',
+      } 
+      self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
+      self.logger.info('Sent trigger for train_now... ')
     outdict = {
       'code' : 'checkfitdone',
       'mode' : 'sync',
       'school' : self.myschool.e_school,
+      'dl_only' : self.dl_only,
     }
     self.ws.send(json.dumps(outdict), opcode=1) #1 = Text
     result = json.loads(self.ws.recv())
