@@ -382,6 +382,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'linkserver-c':
         if not self.scope['user'].is_superuser:
           await self.close()
+          return()
         if params['user']:  
           from aiohttp import ClientSession
           async with ClientSession() as session:
@@ -461,6 +462,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         outlist['data'] = {} 
         if not self.scope['user'].is_superuser:
           await self.close() 
+          return()
         from aiohttp import ClientSession
         from aiohttp.client_exceptions import ClientConnectorError
         try:
@@ -489,30 +491,30 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'backup':
         if 'school_nr' not in params:
           params['school_nr'] = None
-        if self.scope['user'].is_superuser:
-          idx = 0
-          while idx in self.backup_proc_dict:
-            idx += 1 
-          tools_redis.purge_zip_info(idx) 
-          self.backup_proc_dict[idx] = Process(
-            target=compress_backup, 
-            args=[idx, params['school_nr']],
-          )
-          self.backup_proc_dict[idx].start()
-          while self.backup_proc_dict[idx].is_alive():
-            if (my_info := tools_redis.get_zip_info(idx)):
-              outlist['data'] = my_info.decode("utf-8")
-              outlist['callback'] = True
-              await self.send(json.dumps(outlist))	
-            else:  
-              await asleep(long_brake) 
-          outlist['data'] = 'OK'
-          del outlist['callback']
-          del self.backup_proc_dict[idx]
-          #logger.info('--> ' + str(outlist))
-          await self.send(json.dumps(outlist))	
-        else:
+        if not self.scope['user'].is_superuser:
           await self.close()
+          return()
+        idx = 0
+        while idx in self.backup_proc_dict:
+          idx += 1 
+        tools_redis.purge_zip_info(idx) 
+        self.backup_proc_dict[idx] = Process(
+          target=compress_backup, 
+          args=[idx, params['school_nr']],
+        )
+        self.backup_proc_dict[idx].start()
+        while self.backup_proc_dict[idx].is_alive():
+          if (my_info := tools_redis.get_zip_info(idx)):
+            outlist['data'] = my_info.decode("utf-8")
+            outlist['callback'] = True
+            await self.send(json.dumps(outlist))	
+          else:  
+            await asleep(long_brake) 
+        outlist['data'] = 'OK'
+        del outlist['callback']
+        del self.backup_proc_dict[idx]
+        #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'linkserver-s':
         outlist['data'] = {}
@@ -546,6 +548,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'shutdown':
         if not self.scope['user'].is_superuser:
           await self.close()
+          return()
         startup_redis.set_shutdown_command(10)
         #while startup_redis.get_shutdown_command() != 11:
         #  await asleep(long_brake) 
@@ -556,6 +559,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
       elif params['command'] == 'upgrade':
         if not self.scope['user'].is_superuser:
           await self.close()
+          return()
         basepath = os.getcwd() 
         os.chdir('..')
         async with aiohttp.ClientSession() as session:

@@ -70,6 +70,8 @@ virt_cam_path = Path(virt_cam_dir)
 if not virt_cam_path.is_absolute():
   virt_cam_path = data_path / virt_cam_path
 virt_cam_path.mkdir(parents=True, exist_ok=True)
+down_backup_path = Path(settings.BASE_DIR).parent / 'temp' / 'backup'
+shutil.rmtree(down_backup_path, ignore_errors=True)
 
 class myTemplateView(LoginRequiredMixin, TemplateView):
 
@@ -294,8 +296,11 @@ def downbackup(request, school_nr = None):
   else:  
     down_file_name = f'CAM-AI-backup-{version}.zip'
   if no_nginx:
-    path = Path(settings.BASE_DIR).parent / 'temp' / 'backup' / down_file_name
-    response = FileResponse(open(path, 'rb'), as_attachment=True, filename=path.name)
+    response = FileResponse(
+      open(down_backup_path / down_file_name, 'rb'), 
+      as_attachment = True, 
+      filename = down_file_name,
+    )
   else:     
     response = HttpResponse()
     response['Content-Disposition'] = 'attachment; filename=' + down_file_name
@@ -432,7 +437,8 @@ class process_restore(myTemplateView):
         if (unpack_dir / 'frames').exists():
           shutil.move(unpack_dir / 'frames', this_school_path / 'frames')
           
-        load = f"load data local infile '{unpack_dir / "db.dat"}' "
+        data_file = unpack_dir / 'db.dat'
+        load = f"load data local infile '{data_file}' "
         load += "into table trainers_trainframe "
         load += "character set utf8mb4 "
         load += "fields terminated by '\t' escaped by '\\' "
