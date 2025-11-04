@@ -173,7 +173,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       if text_data == 'Ping':
         return()
         
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
@@ -418,7 +418,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -630,7 +630,7 @@ class trainerutil(AsyncWebsocketConsumer):
           outlist['data'] = 'OK' 
         else:
           outlist['data'] = f'FAILED (exitcode={rc})'
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
           
       elif params['command'] == 'get_for_dashboard':  	
