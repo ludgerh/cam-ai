@@ -412,7 +412,7 @@ class process_restore(myTemplateView):
         with open(unpack_dir / 'db.sql', 'rb') as f:
             subprocess.run(cmd, check=True, stdin=f, env=env)
       if check_files:
-        path_to_exchange = Path(settings.BASE_DIR) / datapath
+        path_to_exchange = Path(settings.BASE_DIR) / data_path
         shutil.move(path_to_exchange, settings.BASE_DIR / 'temp/home/cam_ai/data.old')
         shutil.move(unpack_dir, path_to_exchange)
         shutil.rmtree(settings.BASE_DIR / 'temp/home/cam_ai/data.old')
