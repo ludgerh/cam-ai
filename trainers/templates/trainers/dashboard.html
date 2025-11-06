@@ -229,6 +229,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let trainerutilSocket;
 let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let training_start = false
+let trainer_t_type;
 
 let model_types_dict = {
 {% for item in model_types %}
@@ -355,7 +356,8 @@ function refresh_all() {
   })
   .then((result) => {
     if (($('#job_status').text() == 'Done' || $('#job_status').text() == 'Stopped')
-        && result.pos == 0 && !training_start) {
+        && result.pos == 0 && !training_start 
+        && (trainer_t_type == 1 || {{ school.delegation_level }} == 1)) {
       $('#train_button').prop("disabled", false)
       $('#dl_only_button').prop("disabled", false)
     } else {
@@ -382,7 +384,8 @@ $(document).ready(function() {
   })
   .then((result) => {
     if (result.status == 'OK') {
-      if (result.t_type == 2) {
+      trainer_t_type = result.t_type;
+      if (trainer_t_type == 2) {
         $('#dl_only_button').removeClass('d-none')
       };
       $('#trainer_used').text(result.trainer);
