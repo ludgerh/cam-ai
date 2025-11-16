@@ -32,7 +32,9 @@ from django.utils import timezone
 from django.forms.models import model_to_dict
 from globals.c_globals import tf_workers
 from tf_workers.c_tf_workers import tf_worker_client
+from tf_workers.redis import my_redis as tf_workers_redis
 from tools.l_break import a_break_time, a_break_type, BR_LONG
+from tools.l_sysinfo import is_raspi
 from .redis import my_redis as trainers_redis
 
 #from threading import enumerate 
@@ -55,7 +57,7 @@ def decode_and_convert_image(myimage_bytes):
 
 from tools.c_spawn import spawn_process
 
-CHUNK_SIZE = 32
+CHUNK_SIZE = 8
 
 def _chunked(seq, n):
   for i in range(0, len(seq), n):
@@ -75,82 +77,86 @@ class trainer(spawn_process):
     with self.glob_lock:
       if trainers_redis.get_predict_proc_active(school_nr): 
         return()
-    from .models import trainframe
-    from tf_workers.models import school
-    school_dbline = await school.objects.aget(id = school_nr)
-    base_qs = (trainframe.objects
-      .filter(school=school_nr, deleted=False)
-      .exclude(last_fit=school_dbline.last_fit))
-    total_count = await base_qs.acount()
-    framelines = base_qs[:1000]
-    if self.got_sigint:
-      return()  
-    frames = []
-    async for item in framelines.aiterator():
-      frames.append(item)
-    if frames: 
-      if not trainers_redis.get_predict_proc_started(school_nr): 
-        trainers_redis.set_predict_proc_started(school_nr, True)
-        self.logger.info(
-          f'TR{self.id}: Re-inferencing {total_count} frames of school #{school_nr}'
-        )  
-      for chunk in _chunked(frames, CHUNK_SIZE):
-        if self.got_sigint:
-          return()  
-        ts1 = time()
-        imglist = []
-        frame_ids = []
-        for item in chunk:
-          await asyncio.sleep(0)
-          imagepath = school_dbline.dir + 'frames/' + item.name 
-          try:
-            async with aiofiles.open(imagepath, mode = "rb") as f:
-              myimage = await f.read()
-            myimage = await asyncio.to_thread(decode_and_convert_image, myimage) 
-            frame_ids.append(item.id) 
-            imglist.append(myimage)
-          except FileNotFoundError:
-            self.logger.warning(
-              f'TR{self.id}: School #{school_nr}: {imagepath} not found'
-            )  
-        await self.tf_worker.ask_pred(
-          school_nr, 
-          imglist, 
-          self.tf_w_index,
-        )
-        received = []
-        for idx in frame_ids:
-          await asyncio.sleep(0)
-          if not received:
-            while True:
-              try:
-                received = (await asyncio.wait_for(
-                  self.tf_worker.get_from_outqueue(self.tf_w_index),
-                  timeout=60
-                )).tolist()
-                break
-              except TimeoutError: 
-                self.logger.warning(
-                  f'TR{self.id}: School #{school_nr}: Inferencing timeout'
-                )  
-                await a_break_type(BR_LONG)
-          prediction = received.pop(0) 
-          frameline = await trainframe.objects.aget(id = idx)
-          frameline.last_fit = school_dbline.last_fit
-          for i in range(10):
-            setattr(frameline, f"pred{i}", prediction[i])
-          await frameline.asave(
-            update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
+      trainers_redis.set_predict_proc_active(school_nr, True)
+    try:  
+      from .models import trainframe
+      from tf_workers.models import school
+      school_dbline = await school.objects.aget(id = school_nr)
+      base_qs = (trainframe.objects
+        .filter(school=school_nr, deleted=False)
+        .exclude(last_fit=school_dbline.last_fit))
+      total_count = await base_qs.acount()
+      framelines = base_qs[:1000]
+      if self.got_sigint:
+        return()  
+      frames = []
+      async for item in framelines.aiterator():
+        frames.append(item)
+      if frames: 
+        if not trainers_redis.get_predict_proc_started(school_nr): 
+          trainers_redis.set_predict_proc_started(school_nr, True)
+          self.logger.info(
+            f'TR{self.id}: Re-inferencing {total_count} frames of school #{school_nr}'
+          )  
+        for chunk in _chunked(frames, CHUNK_SIZE):
+          if self.got_sigint:
+            return()  
+          if is_raspi():
+            while tf_workers_redis.get_buf_size_10(self.tf_worker.id) > 2.0:
+              await a_break_type(BR_LONG)
+          imglist = []
+          chunk_frames = []
+          for item in chunk:
+            await asyncio.sleep(0)
+            imagepath = school_dbline.dir + 'frames/' + item.name 
+            try:
+              async with aiofiles.open(imagepath, mode = "rb") as f:
+                myimage = await f.read()
+              myimage = await asyncio.to_thread(decode_and_convert_image, myimage)
+              imglist.append(myimage)
+              chunk_frames.append(item)
+            except FileNotFoundError:
+              self.logger.warning(
+                f'TR{self.id}: School #{school_nr}: {imagepath} not found'
+              )  
+          if imglist:    
+            await self.tf_worker.ask_pred(
+              school_nr, 
+              imglist, 
+              self.tf_w_index,
+            )
+          received = []
+          for frameline in chunk_frames:
+            await asyncio.sleep(0)
+            if not received:
+              while True:
+                try:
+                  received = (await asyncio.wait_for(
+                    self.tf_worker.get_from_outqueue(self.tf_w_index),
+                    timeout=60
+                  )).tolist()
+                  break
+                except TimeoutError: 
+                  self.logger.warning(
+                    f'TR{self.id}: School #{school_nr}: Inferencing timeout'
+                  )  
+                  await a_break_type(BR_LONG)
+            prediction = received.pop(0) 
+            frameline.last_fit = school_dbline.last_fit
+            for i in range(10):
+              setattr(frameline, f"pred{i}", prediction[i])
+          await trainframe.objects.abulk_update(
+            chunk_frames,
+            ["last_fit"] + [f"pred{i}" for i in range(10)],
           )
-        time_diff = time() - ts1
-        await asyncio.sleep(time_diff * 2.0)
-      if len(frames) >= total_count:  
-        trainers_redis.set_predict_proc_started(school_nr, False)
-        self.logger.info(
-          f'TR{self.id}: Finished re-inferencing {total_count} frames '
-          + f'of school #{school_nr}'
-        )  
-    trainers_redis.set_predict_proc_active(school_nr, False)
+        if len(frames) >= total_count:  
+          trainers_redis.set_predict_proc_started(school_nr, False)
+          self.logger.info(
+            f'TR{self.id}: Finished re-inferencing {total_count} frames '
+            + f'of school #{school_nr}'
+          )  
+    finally:
+      trainers_redis.set_predict_proc_active(school_nr, False)
     
               
   async def async_runner(self): 
@@ -243,8 +249,6 @@ class trainer(spawn_process):
             train_process = Process(target = my_trainer.run)
             train_process.start()
             self.process_dict[train_process.pid] = ((train_process, myschool))
-          if myschool.delegation_level <= 1:  
-            await self.update_predictions(myschool.id, myschool.last_fit) 
           with self.mylock:
             self.job_queue_list.remove(myschool.id)
           trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
@@ -283,8 +287,8 @@ class trainer(spawn_process):
         schoollines = await sync_to_async(list)(school.objects.filter(active=True))
         for s_item in schoollines:
           await s_item.arefresh_from_db()
-          if s_item.delegation_level == 1:  
-            await self.update_predictions(s_item.id, s_item.last_fit) 
+          if s_item.delegation_level == 1:
+            asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
           if s_item.id in self.school_cache:
             school_change = (
               await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]

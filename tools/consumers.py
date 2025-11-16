@@ -23,6 +23,7 @@ import aiohttp
 import aioshutil
 import io
 import os
+from contextlib import suppress
 from asgiref.sync import sync_to_async
 from asyncio import sleep as asleep
 from pathlib import Path
@@ -46,6 +47,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from tools.l_tools import djconf, displaybytes
 from tools.l_smtp import l_smtp, l_msg
+from tools.l_break import break_type, a_break_type, BR_LONG
 from camai.c_settings import safe_import
 from camai.version import version
 from tools.c_logger import log_ini
@@ -62,40 +64,43 @@ from tf_workers.redis import my_redis as tf_workers_redis
 from .redis import my_redis as tools_redis
 from .health import my_health_runner
 
-db_database = safe_import('db_database') 
-db_password = safe_import('db_password') 
-hw_type = safe_import('hw_type') 
-os_version = safe_import('os_version') 
-mydomain = safe_import('mydomain') 
+DB_DATABASE = safe_import('db_database') 
+DB_PASSWORD = safe_import('db_password') 
+HW_TYPE = safe_import('hw_type') 
+OS_VERSION = safe_import('os_version') 
+MYDOMAIN = safe_import('mydomain') 
 
 OUT = 0
 IN = 1
 
-if mydomain:
-  myserver = mydomain
+if MYDOMAIN:
+  myserver = MYDOMAIN
 else:
   myserver = 'localhost'  
 
-using_websocket = worker.objects.get(id = 1).use_websocket
-remote_trainer = worker.objects.get(id=1).remote_trainer
+USING_WEBSOCKET = worker.objects.get(id = 1).use_websocket
 if school.objects.count():
-  model_type = school.objects.first().model_type
+  MODEL_TYPE = school.objects.first().model_type
 else:
-  model_type = 'NotDefined'
+  MODEL_TYPE = 'NotDefined'
 
-logname = 'ws_tools'
-logger = getLogger(logname)
-log_ini(logger, logname)
-datapath = djconf.getconfig('datapath', 'data/')
-logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
-recordingspath = Path(djconf.getconfig('recordingspath', datapath + 'recordings/'))
-textpath = djconf.getconfig('textpath', datapath + 'texts/')
+LOGNAME = 'ws_tools'
+logger = getLogger(LOGNAME)
+log_ini(logger, LOGNAME)
+BASE_PATH = Path(settings.BASE_DIR)
+DATAPATH = djconf.getconfigpath('datapath', default = 'data/', base = BASE_PATH)
+LOGPATH = djconf.getconfigpath('logdir', default = 'logs/', base = DATAPATH)
+RECORDINGSPATH = djconf.getconfigpath(
+  'recordingspath', 
+  default = 'recordings/', 
+  base = DATAPATH,
+)
+TEXTPATH = djconf.getconfigpath('textpath', default = 'texts/', base = DATAPATH)
 smtp_email = djconf.getconfig('smtp_email', forcedb=False)
-if not os.path.exists(textpath):
-  os.makedirs(textpath)
-schoolsdir = djconf.getconfig('schools_dir', datapath + 'schools/')
-(Path(settings.BASE_DIR).parent / 'temp').mkdir(parents=True, exist_ok=True)
-long_brake = djconf.getconfigfloat('long_brake', 1.0)
+TEXTPATH.mkdir(parents=True, exist_ok=True)
+SCHOOLSPATH = djconf.getconfigpath('schools_dir', default = 'schools/', base = DATAPATH)
+PARENTPATH = BASE_PATH.parent
+(PARENTPATH / 'temp').mkdir(parents=True, exist_ok=True)
 
 #*****************************************************************************
 # health
@@ -107,7 +112,7 @@ class health(AsyncWebsocketConsumer):
     try:
       await self.accept()
     except:
-      logger.error('Error in consumer: ' + logname + ' (health)')
+      logger.error('Error in consumer: ' + LOGNAME + ' (health)')
       logger.error(format_exc())
 
   async def receive(self, text_data):
@@ -170,7 +175,7 @@ class health(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))	
 
     except:
-      logger.error('Error in consumer: ' + logname + ' (health)')
+      logger.error('Error in consumer: ' + LOGNAME + ' (health)')
       logger.error(format_exc())
 
 
@@ -181,10 +186,7 @@ class health(AsyncWebsocketConsumer):
 def compress_backup(idx, school_nr):
   setproctitle('CAM-AI-Backup-Compression')
   os.nice(19)
-  base_path = Path(settings.BASE_DIR)
-  parent_path = base_path.parent
-  save_path = parent_path /'temp' / 'backup'
-  complete_recordings_path = base_path / recordingspath
+  save_path = PARENTPATH /'temp' / 'backup'
   save_path.mkdir(parents=True, exist_ok=True)
   if school_nr:
     zip_path = save_path / f'CAM-AI-school-{school_nr}.zip'
@@ -192,7 +194,7 @@ def compress_backup(idx, school_nr):
     zip_path = save_path / f'CAM-AI-backup-{version}.zip'
   zip_path.unlink(missing_ok=True) 
   tools_redis.set_zip_info(idx, 'Compressing Database...')
-  env = dict(os.environ, MYSQL_PWD=db_password)
+  env = dict(os.environ, MYSQL_PWD = DB_PASSWORD)
   if school_nr:
     sel = 'select '
     sel += ",".join(trainframe_imex)
@@ -204,7 +206,7 @@ def compress_backup(idx, school_nr):
       '-N',
       '-e',
       sel,
-      db_database,
+      DB_DATABASE,
     ]
     sql_path = save_path / 'db.dat'
   else:
@@ -215,7 +217,7 @@ def compress_backup(idx, school_nr):
       '--single-transaction',
       '--quick',
       '--skip-lock-tables',
-      db_database,
+      DB_DATABASE,
     ]
     sql_path = save_path / 'db.sql'
   with sql_path.open("wb") as f:
@@ -225,36 +227,39 @@ def compress_backup(idx, school_nr):
   conf_path = save_path / 'upload.cfg'  
   if school_nr:
     school_line = school.objects.get(id = school_nr)
-    school_name = school_line.name
+    conf_path.write_text(
+      f'version = {version}\n' 
+        + f'schoolname = {school_line.name}\n'
+        + f'delegation_level = {school_line.delegation_level}\n', 
+      encoding='utf-8'
+    )
   else:
     school_name = 'none'  
-  conf_path.write_text(
-    f"version = '{version}'\n" + f"schoolname = '{school_name}'\n", 
-    encoding='utf-8'
-  )
+    conf_path.write_text(
+      f'version = {version}\n' 
+        + f'schoolname = none\n', 
+      encoding='utf-8'
+    )
   with ZipFile(zip_path, "a", ZIP_DEFLATED) as zip_file:
     zip_file.write(conf_path, conf_path.name)
   sql_path.unlink(missing_ok=True) 
   conf_path.unlink(missing_ok=True) 
   if school_nr:
-    if Path(schoolsdir).is_absolute():
-      data_path = Path(schoolsdir) / f'model{school_nr}'
-    else:
-      data_path = Path(settings.BASE_DIR) / schoolsdir / f'model{school_nr}' 
+    path_to_upload = SCHOOLSPATH / f'model{school_nr}'
   else:
-    data_path = base_path / datapath
+    path_to_upload = DATAPATH
   glob_list = []
   if school_nr:
-    for item in data_path.rglob('*'):
+    for item in path_to_upload.rglob('*'):
       glob_list.append(item)
   else:
-    for item in data_path.rglob('*'):
-      if item == complete_recordings_path:
+    for item in path_to_upload.rglob('*'):
+      if item == RECORDINGSPATH:
         continue
-      rel = item.relative_to(data_path)
+      rel = item.relative_to(path_to_upload)
       if rel.parts and rel.parts[0] == "static":
         continue
-      if item.is_relative_to(complete_recordings_path) and item.name.startswith('C'):
+      if item.is_relative_to(RECORDINGSPATH) and item.name.startswith('C'):
         continue
       glob_list.append(item)
   total =  len(glob_list)
@@ -263,7 +268,7 @@ def compress_backup(idx, school_nr):
   with ZipFile(zip_path, "a", ZIP_DEFLATED) as zip_file:
     for item in glob_list:
       count += 1
-      zip_file.write(item, item.relative_to(data_path))
+      zip_file.write(item, item.relative_to(path_to_upload))
       percentage = (count / total * 100)
       if percentage >= transmitted + 0.1:
         tools_redis.set_zip_info(idx, str(round(percentage, 1)) + '% compressed')
@@ -277,7 +282,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
     try:
       await self.accept()
     except:
-      logger.error('Error in consumer: ' + logname + ' (admin_tools_async)')
+      logger.error('Error in consumer: ' + LOGNAME + ' (admin_tools_async)')
       logger.error(format_exc())
     
   async def check_create_school_priv(self, user):
@@ -290,7 +295,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
       schoolcount = await school.objects.filter(creator=user, active=True).acount()
       return((schoolcount, limit))
 
-  async def receive(self, text_data):
+  async def receive(self, text_data =None):
     try:
       #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
@@ -324,7 +329,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await schoolline.asave() 
         t_query = trainer.objects.filter(active = True)
         trainerline = await t_query.afirst()
-        schoolline.dir = schoolsdir + 'model' + str(schoolline.id) + '/'
+        schoolline.dir = str(SCHOOLSPATH / f'model{schoolline.id}') + os.sep
         await schoolline.asave(update_fields=('dir', ))
         await aiofiles.os.makedirs(schoolline.dir+'frames', exist_ok=True)
         await aiofiles.os.makedirs(schoolline.dir+'model', exist_ok=True)
@@ -346,10 +351,12 @@ class admin_tools_async(AsyncWebsocketConsumer):
         if trainerline.t_type in {1, 2, 3} and resultdict['status'] == 'OK':
           if await afree_quota(userline):
             for ext in ('.keras', '.tflite'):
-              filename = model_type + ext
-              if await aiofiles.os.path.exists(schoolsdir + 'model1/model/' + filename):
-                await aioshutil.copy(schoolsdir + 'model1/model/' + filename,
-                  schoolline.dir + 'model/' + filename)
+              filename = f'{MODEL_TYPE}{ext}'
+              with suppress(FileNotFoundError):
+                await aioshutil.copy(
+                  SCHOOLSPATH / 'model1' / 'model' / filename,
+                  Path(schoolline.dir) / 'model' / filename,
+                )
           else:
             resultdict = {'status' : 'nomorequota', 'domain' : myserver}
         if resultdict['status'] == 'OK':
@@ -361,7 +368,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
             await schoolline.asave(update_fields = ('e_school', ))
           else:
             resultdict['quota'] = (quota[0] + 1, quota[1])
-            schoolline.model_type = model_type
+            schoolline.model_type = MODEL_TYPE
             await schoolline.asave(update_fields = ('model_type', ))
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
@@ -402,12 +409,12 @@ class admin_tools_async(AsyncWebsocketConsumer):
             if resultdict['data']['status'] == 'new': 
               myworker = await worker.objects.aget(id=params['item_nr'])
               myworker.gpu_sim=-1
-              myworker.use_websocket=using_websocket
-              myworker.wsserver=params['server']
-              myworker.wsname=resultdict['data']['user']
-              myworker.wspass=params['pass']
-              myworker.wsid=resultdict['data']['idx']
-              await myworker.asave(update_fields=(
+              myworker.use_websocket = USING_WEBSOCKET
+              myworker.wsserver = params['server']
+              myworker.wsname = resultdict['data']['user']
+              myworker.wspass = params['pass']
+              myworker.wsid = resultdict['data']['idx']
+              await myworker.asave(update_fields = (
                 'gpu_sim',
                 'use_websocket',
                 'wsserver',
@@ -416,7 +423,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 'wsid',
               ))
               while startup_redis.get_start_worker_busy():
-                sleep(long_brake)
+                brake_type(BR_LONG)
               startup_redis.set_start_worker_busy(params['item_nr'])
               myschools = school.objects.filter(tf_worker=params['item_nr'])
               streamlist = []
@@ -426,7 +433,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
                   streamlist.append(item2.id)
               for i in streamlist:
                 while startup_redis.get_start_stream_busy(): 
-                  sleep(long_brake)
+                  brake_type(BR_LONG)
                 startup_redis.set_start_stream_busy(i)
           elif params['type'] == 't': #Trainer
             if resultdict['data']['status'] == 'new': 
@@ -442,7 +449,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 'wsid',
               ))
               while startup_redis.get_start_trainer_busy():
-                sleep(long_brake)
+                brake_type(BR_LONG)
               startup_redis.set_start_trainer_busy(mytrainer.id)
           outlist['data'] = resultdict['data']['status'] 
         else:
@@ -509,7 +516,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
             outlist['callback'] = True
             await self.send(json.dumps(outlist))	
           else:  
-            await asleep(long_brake) 
+            await a_break_type(BR_LONG)
         outlist['data'] = 'OK'
         del outlist['callback']
         del self.backup_proc_dict[idx]
@@ -535,12 +542,12 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))	
         
       elif params['command'] == 'getinfo':
-        filename = textpath+'serverinfo.html'
+        filename = TEXTPATH / 'serverinfo.html'
         try:
           async with aiofiles.open(filename, mode='r', encoding='UTF-8') as f:
             result = await f.read()
         except FileNotFoundError:
-          result = 'No Info: ' + textpath + 'serverinfo.html does not exist...'
+          result = 'No Info: serverinfo.html does not exist...'
         outlist['data'] = result
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
@@ -551,7 +558,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           return()
         startup_redis.set_shutdown_command(10)
         #while startup_redis.get_shutdown_command() != 11:
-        #  await asleep(long_brake) 
+        #  await a_brake_type(BR_LONG)
         outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
@@ -560,50 +567,50 @@ class admin_tools_async(AsyncWebsocketConsumer):
         if not self.scope['user'].is_superuser:
           await self.close()
           return()
-        basepath = os.getcwd() 
-        os.chdir('..')
+        expand_path = PARENTPATH / 'temp' / 'expanded'  
+        backup_path = PARENTPATH / 'temp' / 'backup'  
         async with aiohttp.ClientSession() as session:
           async with session.get(params['url']) as result:
             response = await result.content.read()
         with ZipFile(io.BytesIO(response)) as z:
-          z.extractall("temp/expanded")
+          z.extractall(expand_path)
         if params['special']:
-          zipresult = glob('temp/expanded/cam-ai-*')[0]
+          zipresult = next(expand_path.glob('cam-ai-*'), None)
         else:
-          zipresult = glob('temp/expanded/ludgerh-cam-ai-*')[0]
-        if await aiofiles.os.path.exists('temp/backup'):
-          await aioshutil.rmtree('temp/backup')
-        await aioshutil.move(basepath, 'temp/backup') 
-        await aioshutil.move(zipresult, basepath) 
+          zipresult = next(expand_path.glob('ludgerh-cam-ai-*'), None)
+        with suppress(FileNotFoundError):
+          await aioshutil.rmtree(backup_path)
+        await aioshutil.move(BASE_PATH, backup_path) 
+        await aioshutil.move(zipresult, BASE_PATH) 
         await aioshutil.copy(
-          'temp/backup/camai/passwords.py', 
-          basepath + '/camai/passwords.py'
+          backup_path / 'camai' / 'passwords.py', 
+          BASE_PATH / 'camai' / 'passwords.py',
         )
-        if await aiofiles.os.path.exists(
-          'temp/backup/accounts/templates/registration/privacy.html'
-        ):
+        with suppress(FileNotFoundError):
           await aioshutil.copy(
-            'temp/backup/accounts/templates/registration/privacy.html', 
-            basepath + '/accounts/templates/registration/privacy.html'
+            backup_path / 'accounts' / 'templates' / 'registration' / 'privacy.html',
+            BASE_PATH / 'accounts' / 'templates' / 'registration' / 'privacy.html',
           )
-        if await aiofiles.os.path.exists(
-          'temp/backup/accounts/templates/registration/terms.html'
-        ):
+        with suppress(FileNotFoundError):
           await aioshutil.copy(
-            'temp/backup/accounts/templates/registration/terms.html', 
-            basepath + '/accounts/templates/registration/terms.html'
+            backup_path / 'accounts' / 'templates' / 'registration' / 'terms.html',
+            BASE_PATH / 'accounts' / 'templates' / 'registration' / 'terms.html',
           )
-        await aioshutil.move('temp/backup/' + datapath, basepath + '/' + datapath)
-        if await aiofiles.os.path.exists('temp/backup/plugins/'):
-          await aioshutil.move('temp/backup/plugins/', basepath + '/plugins/')
-        os.chdir(basepath)
-        if hw_type == 'raspi':
+        with suppress(FileNotFoundError):
+          await aioshutil.move(
+            backup_path / 'plugins',
+            BASE_PATH / 'plugins',
+          )
+        datapath_rel = DATAPATH.relative_to(BASE_PATH) #not complete if DATAPATH absolute
+        await aioshutil.move(backup_path / datapath_rel, DATAPATH)
+        
+        if HW_TYPE == 'raspi':
           cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
-        if hw_type == 'pc':
+        if HW_TYPE == 'pc':
           cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
         cmd += 'conda activate tf; '
         cmd += 'pip install --upgrade pip; '
-        cmd += 'pip install -r requirements.' + hw_type + '_' + os_version + '; '
+        cmd += 'pip install -r requirements.' + HW_TYPE + '_' + OS_VERSION + '; '
         cmd += 'python manage.py migrate; '
         p = await asyncio.create_subprocess_shell(
           cmd, 
@@ -618,7 +625,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while True:
-          await asleep(long_brake)
+          await a_brake_type(BR_LONG)
           
       elif params['command'] == 'sendlogs':
         smtp_conf = await aget_smtp_conf(extended_from = False)
@@ -633,8 +640,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
           params['message'],
           html = params['message'].replace('\n', '<br>'),
         )
-        my_msg.attach_file(logpath + 'c_server.err') 
-        my_msg.attach_file(logpath + 'c_server.log')  
+        my_msg.attach_file(LOGPATH + 'c_server.err') 
+        my_msg.attach_file(LOGPATH + 'c_server.log')  
         await my_smtp.sendmail(
           smtp_conf['sender_email'],
           'support@cam-ai.de',
@@ -646,7 +653,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await my_smtp.quit()
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))	
+        await self.send(json.dumps(outlist))
     except:
-      logger.error('Error in consumer: ' + logname + ' (admin_tools_async)')
+      logger.error('Error in consumer: ' + LOGNAME + ' (admin_tools_async)')
       logger.error(format_exc())

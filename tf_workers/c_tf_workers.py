@@ -217,8 +217,12 @@ class tf_worker(spawn_process):
       datapath = await djconf.agetconfig('datapath', 'data/')
       self.do_tf_debug = await djconf.agetconfigbool('do_tf_debug', True)
       if self.do_tf_debug:
-        self.tf_debug_count = 9
-        self.buf_size_list = [0]
+        tf_debug_buf_count = 9
+        self.tf_debug_block_count = 9
+        tf_debug_ts = 0.0
+        buf_size = 0
+        buf_size_10 = 0.0
+        buf_size_list = [0]
         self.block_size_list = [0]
         self.proc_time_list = [0.0]
       schoolsdir = await djconf.agetconfig('schools_dir', datapath + 'schools/')
@@ -315,6 +319,17 @@ class tf_worker(spawn_process):
             schoolnr = 1
           if schoolnr in self.model_buffers:
             break
+        if self.do_tf_debug and time() - tf_debug_ts >= 1.0:
+          buf_size = self.model_buffers[schoolnr].qsize()
+          if tf_debug_buf_count >= 9:
+            buf_size_10 = mean(buf_size_list)
+            buf_size_list = [buf_size]
+            tf_debug_buf_count = 0
+          else:
+            buf_size_list.append(buf_size)
+            tf_debug_buf_count += 1  
+          tf_workers_redis.set_buf_size(self.id, buf_size)
+          tf_workers_redis.set_buf_size_10(self.id, buf_size_10)
         if not self.got_sigint:
           if self.model_buffers[schoolnr].pause:
             await a_break_type(BR_LONG)
@@ -504,24 +519,18 @@ class tf_worker(spawn_process):
             ))
           starting = i + 1
       if self.do_tf_debug:
-        buf_size = mybuffer.qsize()
         block_size = len(framelist)
         proc_time = time() - ts_one  
-        if self.tf_debug_count >= 9:
-          self.buf_size_10 = mean(self.buf_size_list)
-          self.buf_size_list = [buf_size]
+        if self.tf_debug_block_count >= 9:
           self.block_size_10 = mean(self.block_size_list)
           self.block_size_list = [block_size]
           self.proc_time_10 = mean(self.proc_time_list)
           self.proc_time_list = [proc_time]
-          self.tf_debug_count = 0
+          self.tf_debug_block_count = 0
         else:
-          self.buf_size_list.append(buf_size)
           self.block_size_list.append(block_size)
           self.proc_time_list.append(proc_time)
-          self.tf_debug_count += 1  
-        tf_workers_redis.set_buf_size(self.id, buf_size)
-        tf_workers_redis.set_buf_size_10(self.id, self.buf_size_10)
+          self.tf_debug_block_count += 1  
         tf_workers_redis.set_block_size(self.id, block_size)
         tf_workers_redis.set_block_size_10(self.id, self.block_size_10)
         tf_workers_redis.set_proc_time(self.id, proc_time)

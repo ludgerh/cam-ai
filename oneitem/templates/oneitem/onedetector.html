@@ -175,8 +175,7 @@ $(document).ready(function() {
   })
 	.then((result) => {
     trigger_Socket = result;
-    return(trigger_Socket.sendandwait({{# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de #}
-{# More information and complete source: https://github.com/ludgerh/cam-ai #}
+    return(trigger_Socket.sendandwait({
 	    'command' : 'starttrigger',
 	    'mode' : 'D',
       'idx' : {{ dbline.id }},

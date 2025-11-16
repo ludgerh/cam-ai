@@ -1,4 +1,5 @@
 """
+Original path: tools/views.py
 Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -54,24 +55,20 @@ from .models import camurl
 emulatestatic = safe_import('emulatestatic')
 db_database = safe_import('db_database')
 no_nginx = safe_import('localaccess') or not safe_import('mydomain')
-import_filename = None
-import_filepath = None
 
-data_dir = djconf.getconfig('datapath', 'data/')
-data_path = Path(data_dir)
-if not data_path.is_absolute():
-  data_path = Path(settings.BASE_DIR) / data_dir
-schools_dir = djconf.getconfig('schools_dir', 'schools/')  
-schools_path = Path(schools_dir)
-if not schools_path.is_absolute():
-  schools_path = data_path / schools_dir
-virt_cam_dir = djconf.getconfig('virt_cam_path', 'virt_cam_path/')  
-virt_cam_path = Path(virt_cam_dir)
-if not virt_cam_path.is_absolute():
-  virt_cam_path = data_path / virt_cam_path
-virt_cam_path.mkdir(parents=True, exist_ok=True)
-down_backup_path = Path(settings.BASE_DIR).parent / 'temp' / 'backup'
-shutil.rmtree(down_backup_path, ignore_errors=True)
+BASE_PATH = Path(settings.BASE_DIR)
+DATAPATH = djconf.getconfigpath('datapath', default = 'data/', base = BASE_PATH)
+SCHOOLSPATH = djconf.getconfigpath('schools_dir', default = 'schools/', base = DATAPATH)
+VIRT_CAM_PATH = djconf.getconfigpath(
+  'virt_cam_path', 
+  default = 'virt_cam_path/', 
+  base = DATAPATH,
+) 
+VIRT_CAM_PATH.mkdir(parents=True, exist_ok=True)
+PARENTPATH = BASE_PATH.parent
+(PARENTPATH / 'temp').mkdir(parents=True, exist_ok=True)
+DOWN_BACKUP_PATH = PARENTPATH / 'temp' / 'backup'
+shutil.rmtree(DOWN_BACKUP_PATH, ignore_errors=True)
 
 class myTemplateView(LoginRequiredMixin, TemplateView):
 
@@ -172,11 +169,11 @@ class inst_virt_cam(cam_inst_view):
     newstream = stream()
     newstream.save()
     filename = 'virt_cam_' + str(newstream.id) + '.' + filename.split('.')[-1]
-    shutil.move(file_path, virt_cam_path / filename)
+    shutil.move(file_path, VIRT_CAM_PATH / filename)
     newstream.cam_url = filename
     newstream.eve_school = school.objects.filter(active=True).first()
     newstream.creator = request.user
-    cap = cv.VideoCapture(virt_cam_path / filename)
+    cap = cv.VideoCapture(VIRT_CAM_PATH / filename)
     newstream.cam_xres = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
     newstream.cam_yres = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
     newstream.cam_virtual_fps = cap.get(cv.CAP_PROP_FPS)
@@ -236,25 +233,8 @@ class addschool(myTemplateView):
       'schoolcount' : schoolcount,
       'mayadd'      : schoollimit > schoolcount,
       'is_linked'   : len(trainer.objects.get(id=1).wsname) > 0,
-      'phase' : 0,
     })
     return context
-
-  def post(self, request, *args, **kwargs):
-    global import_filename, import_filepath
-    if 'myfile' not in request.FILES:
-      return self.get(request, *args, **kwargs)
-    myfile = request.FILES['myfile']
-    upload_dir = Path(settings.BASE_DIR) / 'temp' / 'backup'
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    fs = FileSystemStorage(location=str(upload_dir), base_url=None)
-    import_filename = fs.save(myfile.name, myfile)
-    import_filepath = fs.path(import_filename)
-    context = self.get_context_data()
-    context.update({
-      'phase' : 1,
-    })
-    return self.render_to_response(context)
 
 class linkservers(myTemplateView):
   template_name = 'tools/linkservers.html'
@@ -297,7 +277,7 @@ def downbackup(request, school_nr = None):
     down_file_name = f'CAM-AI-backup-{version}.zip'
   if no_nginx:
     response = FileResponse(
-      open(down_backup_path / down_file_name, 'rb'), 
+      open(DOWN_BACKUP_PATH / down_file_name, 'rb'), 
       as_attachment = True, 
       filename = down_file_name,
     )
@@ -348,7 +328,15 @@ class process_restore(myTemplateView):
     return super().dispatch(request, *args, **kwargs)
     
   def post(self, request, *args, **kwargs):
+    context = self.get_context_data()
     post_dict = request.POST.dict()
+    #print(post_dict)
+    if post_dict['status'] != 'OK':
+      context.update({
+        'code' : 5,
+        'message' : 'Remote server said: ' +  post_dict['status'],
+      })
+      return self.render_to_response(context)
     job_type = post_dict['job_type']
     if job_type == 'restore':
       check_files = 'check_files' in post_dict and post_dict['check_files'] == 'on'
@@ -356,9 +344,8 @@ class process_restore(myTemplateView):
     elif job_type == 'import':
       check_models = 'check_models' in post_dict and post_dict['check_models'] == 'on'
       check_frames = 'check_frames' in post_dict and post_dict['check_frames'] == 'on'
-    context = self.get_context_data()
-    safe_name = Path(import_filename).name
-    zip_file = settings.BASE_DIR / 'temp' / 'backup' / safe_name
+    safe_name = Path(post_dict['file_name']).name
+    zip_file = DOWN_BACKUP_PATH / safe_name
     if not zip_file.exists():
       context.update({
         'code' : 1,
@@ -372,35 +359,31 @@ class process_restore(myTemplateView):
     zip_file.unlink(missing_ok=True) 
     version_file = unpack_dir / 'upload.cfg' 
     try:
+      file_meta = {}
       with version_file.open(encoding='utf-8', errors='ignore') as f:
-        version_line = next((ln for ln in f if ln.startswith('version')), None)
-      if job_type == 'import':
-        with version_file.open(encoding='utf-8', errors='ignore') as f:
-          name_line = next((ln for ln in f if ln.startswith('schoolname')), None)
-      else:  
-        name_line = 'irrelevant'  
+        for line in f:
+          line = line.strip()
+          if not line or line.startswith('#'):
+            continue
+          if '=' in line:
+            key, value = line.split('=', 1)
+            file_meta[key.strip()] = value.strip()
     except FileNotFoundError:   
       context.update({
         'code' : 2,
         'message' : 'Version-File missing...',
       })
       return self.render_to_response(context)
-    if version_line is None or name_line is None:   
+    if 'version' not in file_meta:   
       context.update({
         'code' : 3,
         'message' : 'Version-File not correct...',
       })
       return self.render_to_response(context)
-    a = version_line.find("'")
-    b = version_line.find("'", a + 1)
-    new_version = version_line[a + 1:b] if a != -1 and b != -1 else ''
-    a = name_line.find("'")
-    b = name_line.find("'", a + 1)
-    new_name = name_line[a + 1:b] if a != -1 and b != -1 else ''
-    if new_version != version:   
+    if file_meta['version'] != version:   
       context.update({
         'code' : 4,
-        'message' : 'Version mismatch: (' + new_version + ' <> ' + version +')'
+        'message' : 'Version mismatch: (' + file_meta['version'] + ' <> ' + version +')'
       })
       return self.render_to_response(context)
     if job_type == 'restore':
@@ -412,9 +395,9 @@ class process_restore(myTemplateView):
         with open(unpack_dir / 'db.sql', 'rb') as f:
             subprocess.run(cmd, check=True, stdin=f, env=env)
       if check_files:
-        path_to_exchange = Path(settings.BASE_DIR) / data_path
-        shutil.move(path_to_exchange, settings.BASE_DIR / 'temp/home/cam_ai/data.old')
-        shutil.move(unpack_dir, path_to_exchange)
+        path_to_exchange = DATAPATH
+        shutil.move(DATAPATH, settings.BASE_DIR / 'temp/home/cam_ai/data.old')
+        shutil.move(unpack_dir, DATAPATH)
         shutil.rmtree(settings.BASE_DIR / 'temp/home/cam_ai/data.old')
     elif job_type == 'import':
       while True:
@@ -423,10 +406,12 @@ class process_restore(myTemplateView):
           break
         except school.DoesNotExist: 
           break_type(BR_LONG)
-      school_line.name = new_name
-      this_school_path = schools_path / f'model{school_line.id}'
+      school_line.name = file_meta['schoolname']
+      #print(file_meta)
+      school_line.delegation_level = int(file_meta['delegation_level'])
+      this_school_path = SCHOOLSPATH / f'model{school_line.id}'
       school_line.dir = str(this_school_path) + '/'
-      school_line.save(update_fields=('name', 'dir', ))
+      school_line.save(update_fields=('name', 'dir', 'delegation_level', ))
       this_school_path.mkdir(parents=True, exist_ok=True)
       model_path = this_school_path / 'model'
       frames_path = this_school_path / 'frames'
@@ -509,3 +494,4 @@ class sendlogs(LoginRequiredMixin, TemplateView):
       'smtp_account' : djconf.getconfig('smtp_account', forcedb=False),
     })
     return context
+

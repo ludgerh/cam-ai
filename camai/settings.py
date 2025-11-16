@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -195,18 +195,10 @@ DATABASES = {
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+  {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
+  {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
+  {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
+  {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
 ]
 
 
@@ -255,3 +247,4 @@ EMAIL_HOST_PASSWORD = smtp_password
 EMAIL_HOST_USER = smtp_account
 EMAIL_PORT = smtp_port
 EMAIL_FROM = smtp_email
+

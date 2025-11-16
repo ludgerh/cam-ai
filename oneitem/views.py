@@ -68,7 +68,7 @@ class OneCamView(View):
       'version': djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic': emulatestatic,
       'debug': settings.DEBUG,
-      'tf_debug' : request.user.is_superuser and djconf.getconfigbool(
+      'tf_debug' : request.user.is_superuser and djconf.agetconfigbool(
         'do_tf_debug', 
         True,
       ),
@@ -149,7 +149,7 @@ class OneDetView(View):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'tf_debug' : request.user.is_superuser and djconf.getconfigbool(
+      'tf_debug' : request.user.is_superuser and djconf.agetconfigbool(
         'do_tf_debug', 
         True,
       ),
@@ -249,7 +249,7 @@ class OneEveView(View):
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
-      'tf_debug' : request.user.is_superuser and djconf.getconfigbool(
+      'tf_debug' : request.user.is_superuser and djconf.agetconfigbool(
         'do_tf_debug', 
         True,
       ),

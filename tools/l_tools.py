@@ -19,7 +19,9 @@ import aiofiles.os
 import os
 import psutil
 import numpy as np
+from pathlib import Path
 from time import sleep
+from pathlib import Path
 from os import path, getpid, scandir
 from threading import Thread
 from queue import Queue, Empty
@@ -101,12 +103,12 @@ class djconfig():
         return(self.mycache[param])   
     try:
       result = setting.objects.get(setting = param).value
+      if self.redis:
+        self.myredis.set('djconfig:'+param, result)
+      else:
+        self.mycache[param] = result
     except setting.DoesNotExist:
       result = default
-    if self.redis:
-      self.myredis.set('djconfig:'+param, result)
-    else:
-      self.mycache[param] = result
     return(result)
 
   async def agetconfig(self, param, default=None, forcedb=False):
@@ -118,12 +120,12 @@ class djconfig():
         return(self.mycache[param])   
     try:
       result = (await setting.objects.aget(setting = param)).value
+      if self.redis:
+        self.myredis.set('djconfig:'+param, result)
+      else:
+        self.mycache[param] = result
     except setting.DoesNotExist:
       result = default
-    if self.redis:
-      self.myredis.set('djconfig:'+param, result)
-    else:
-      self.mycache[param] = result
     return(result)
 
   def delconfig(self, param): 
@@ -200,6 +202,51 @@ class djconfig():
 	      return(None)
     else:
       return(default)
+      
+  def getconfigpath(
+    self,
+    name: str,
+    default: str = None,
+    base: str | Path | None = None,
+    must_exist: bool = False,
+    resolve: bool = True,
+  ) -> Path:
+    """Reads Path-String, makes it absolut and returns Path""" 
+    raw = self.getconfig(name, default)
+    p = Path(os.path.expandvars(raw)).expanduser()  
+    if not p.is_absolute():
+      if base is None:
+        b = Path.cwd()
+      else:  
+        b = Path(base)
+      p = b / p  
+    if resolve:
+      p = p.resolve()
+    if must_exist and not p.exists():
+        raise FileNotFoundError(f"Pfad nicht gefunden: {p}")
+    return p
+    
+  async def agetconfigpath(
+    self,
+    name: str,
+    default: str = None,
+    base: str | Path | None = None,
+    must_exist: bool = False,
+    resolve: bool = True,
+  ) -> Path:
+    raw = await self.agetconfig(name, default)
+    p = Path(os.path.expandvars(raw)).expanduser()
+    if not p.is_absolute():
+      if base is None:
+        b = Path.cwd()
+      else:  
+        b = Path(base)
+      p = b / p  
+    if resolve:
+      p = p.resolve(strict=False)
+    if must_exist and not p.exists():
+      raise FileNotFoundError(f"Pfad nicht gefunden: {p}")
+    return p
 
 djconf = djconfig()
 

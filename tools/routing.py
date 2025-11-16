@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -16,10 +16,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from django.urls import re_path
 
-from . import consumers, consumer_caminst
+from . import consumers, consumer_caminst, upload_consumer
 
 websocket_urlpatterns = [
   re_path(r'ws/health/$', consumers.health.as_asgi()),
   re_path(r'ws/aadmintools/$', consumers.admin_tools_async.as_asgi()),
   re_path(r'ws/acaminst/$', consumer_caminst.acaminst.as_asgi()),
+  re_path(r'ws/uploads/$', upload_consumer.uploads_async_consumer.as_asgi()),
 ]

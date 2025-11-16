@@ -14,13 +14,14 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-from shutil import disk_usage
 import aiofiles
 import aiofiles.os
+from asgiref.sync import sync_to_async
+from shutil import disk_usage
 from logging import getLogger
 from eventers.models import event, event_frame
 from users.models import userinfo
-from .c_logger import log_ini
+from .c_logger import alog_ini
 from .l_tools import djconf
 from .l_break import a_break_time
 from .l_smtp import l_smtp, l_msg
@@ -71,7 +72,10 @@ class health_runner():
     self.totaldiscspace, self.useddiscspace, self.freediscspace = disk_usage("/")
     userlines = userinfo.objects.filter(user__is_superuser = True)
     if self.useddiscspace > self.totaldiscspace * 0.95:
-      async for userline in userlines:
+      userlines = await sync_to_async(list)(
+          userinfo.objects.filter(mail_flag_discspace95=True)
+      )
+      for userline in userlines:
         if not userline.mail_flag_discspace95:
           print('Server Capacity 95')
           smtp_conf = get_smtp_conf()
@@ -111,7 +115,10 @@ class health_runner():
           userline.mail_flag_discspace95 = True 
           await userline.save(update_fields = ['mail_flag_discspace95', ]) 
     else:  
-      async for userline in userlines:
+      userlines = await sync_to_async(list)(
+          userinfo.objects.filter(mail_flag_discspace95=True)
+      )
+      for userline in userlines:
         if userline.mail_flag_discspace95:
           userline.mail_flag_discspace95 = False 
           userline.save(update_fields = ['mail_flag_discspace95', ]) 
@@ -119,7 +126,7 @@ class health_runner():
   async def health_task(self):
     logname = 'health'
     self.logger = getLogger(logname)
-    log_ini(self.logger, logname)
+    await alog_ini(self.logger, logname)
     while self.do_run:
       #print('**** Health Task *****')
       await self.setdiscspace()

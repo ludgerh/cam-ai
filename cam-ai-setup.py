@@ -20,6 +20,7 @@ import requests
 import json
 import pathlib
 import re
+import sys
 import shlex
 from time import sleep
 from shutil import move, rmtree, copy
@@ -115,7 +116,7 @@ def ensure_kv(key, value):
 print('CAM-AI server setup tool')
 hw_os_code = sysinfo()
 print('Hardware & OS codes:', hw_os_code)
-
+  
 if ((((hw_os_code['hw'] == 'raspi' and 4 <= int(hw_os_code['hw_version']) and 4 <= int(hw_os_code['hw_ram']))
     or hw_os_code['hw'] == 'pc')
     and hw_os_code['dist'] == 'debian')
@@ -128,16 +129,25 @@ else:
   print('Minimum internal RAM 4 GB...')
   exit(1)
 
-url = 'https://api.github.com/repos/ludgerh/cam-ai/releases/latest'
-response = requests.get(url)
-if response.status_code != 200:
-  print('Could not connect to:', url)
-  print('Error', response.status_code)
-  exit(1)
-response = json.loads(response.text)
-new_version = response['tag_name']
-zip_url = response['zipball_url']
-print('Installing ', new_version)
+
+if len(sys.argv) >= 3 and sys.argv[1] == '--version':
+  special_version = sys.argv[2] 
+else:  
+  special_version = ''
+if special_version:
+  zip_url = 'https://github.com/ludgerh/cam-ai/archive/refs/tags/' + special_version + '.zip'
+  print('Installing ', special_version)
+else:  
+  url = 'https://api.github.com/repos/ludgerh/cam-ai/releases/latest'
+  response = requests.get(url)
+  if response.status_code != 200:
+    print('Could not connect to:', url)
+    print('Error', response.status_code)
+    exit(1)
+  response = json.loads(response.text)
+  new_version = response['tag_name']
+  zip_url = response['zipball_url']
+  print('Installing ', new_version)
 print() 
 
 if False or run_all:
@@ -233,8 +243,10 @@ if False or run_all:
   with ZipFile(zip_path, 'r') as zip_ref:
     zip_ref.extractall('.')  
   os.remove(zip_path)
-  zipresult = glob('ludgerh-cam-ai-*')[0]
-
+  if special_version:
+    zipresult = 'cam-ai-' + special_version[1:]
+  else:  
+    zipresult = glob('ludgerh-cam-ai-*')[0]
   if os.path.exists('backup'):
     rmtree('backup')
   if os.path.exists(installdir):  

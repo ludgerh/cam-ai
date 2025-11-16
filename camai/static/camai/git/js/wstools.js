@@ -53,3 +53,37 @@ function WSAsync(url) {
   });
 };
 
+function nextMessage(ws, { signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const onMsg = (ev) => {
+      cleanup();
+      resolve(ev.data);
+    };
+    const onErr = () => {
+      cleanup();
+      reject(new Error('WebSocket error'));
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error('WebSocket closed'));
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException('Aborted','AbortError'));
+    };
+    const cleanup = () => {
+      ws.removeEventListener('message', onMsg);
+      ws.removeEventListener('error', onErr);
+      ws.removeEventListener('close', onClose);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    ws.addEventListener('message', onMsg, { once: true });
+    ws.addEventListener('error', onErr, { once: true });
+    ws.addEventListener('close', onClose, { once: true });
+    signal?.addEventListener('abort', onAbort);
+  });
+}
+
+// Nutzung:
+// const data = await nextMessage(ws); // string oder Blob/ArrayBuffer
+

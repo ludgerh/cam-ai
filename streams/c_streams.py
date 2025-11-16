@@ -20,7 +20,7 @@ from traceback import format_exc
 from logging import getLogger
 from multiprocessing import SimpleQueue
 from channels.db import database_sync_to_async
-from tools.c_logger import log_ini
+from tools.c_logger import alog_ini
 from globals.c_globals import add_viewer, add_viewable, tf_workers
 from detectors.c_detectors import c_detector
 from eventers.c_eventers import c_eventer
@@ -39,7 +39,7 @@ class c_stream():
       self.dbline = await dbstream.objects.aget(id = self.id)
       self.logname = 'stream #'+str(self.id)
       self.logger = getLogger(self.logname)
-      log_ini(self.logger, self.logname)
+      await alog_ini(self.logger, self.logname)
       my_redis.set_killing_stream(self.id, False)
       if self.dbline.eve_mode_flag:
         eve_school = await database_sync_to_async(lambda: self.dbline.eve_school)() 
