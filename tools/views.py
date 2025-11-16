@@ -330,7 +330,7 @@ class process_restore(myTemplateView):
   def post(self, request, *args, **kwargs):
     context = self.get_context_data()
     post_dict = request.POST.dict()
-    #print(post_dict)
+    print(post_dict)
     if post_dict['status'] != 'OK':
       context.update({
         'code' : 5,

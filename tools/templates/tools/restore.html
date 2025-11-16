@@ -25,21 +25,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endif %}
   
 <main>
-  {% if phase == 0 %}
+  <div id="phase0"> 
     <div class="h2">
       Select the backup ZIP file you want to upload to this server.
     </div> 
-    <form class="h2" id="upload-form" method="post" enctype="multipart/form-data">
+    <form class="h2" id="upload-form">
       {% csrf_token %}
       <input id="fileselector" type="file" name="myfile">
       <button id="upload-btn" type="submit">Upload</button>
     </form>
-    <div class="h2 d-none" id="line2">
-      Sending the upload. Please wait...
-    </div>  
-    <div class="h2 d-none" id="line3">?</div>  
-  {% endif %}
-  {% if phase == 1 %}
+    <div class="h2" id="upload-status"></div>
+  </div> 
+  <div id="phase1" class="d-none"> 
     <div class="h2">
       We received the ZIP File. Select what you want to import:<BR>
     </div> 
@@ -47,6 +44,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         id="import-form" method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <input type="hidden" name="job_type" value="restore">
+      <input type="hidden" name="file_name" value="?">
+      <input type="hidden" name="status" value="?">
       <input type="checkbox" id="check_files" name="check_files" checked>
       Import files?<BR>
       <input type="checkbox" id="check_db" name="check_db" checked>
@@ -58,7 +57,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <div class="h2 d-none" id="line2">
       Processing the upload. Please wait...
     </div>  
-  {% endif %}
+  </div> 
   
 </main>
   
@@ -67,20 +66,65 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let tools_asyncSocket;
 
 $(document).ready(function() {
-  {% if phase == 0 %}
-    $('#upload-form').on('submit', function () {
-      $('#line2').removeClass('d-none');
-      $('#line3').addClass('d-none');
-      $('#upload-btn').prop('disabled', true);
-    });
-  {% endif %}
-  {% if phase == 1 %}
-    $('#import-form').on('submit', function () {
-      $('#line2').removeClass('d-none');
-      $('#line3').addClass('d-none');
-      $('#import-btn').prop('disabled', true);
-    });
-  {% endif %}
+  const upload_socket = new WebSocket(ws_scheme + '//'
+    + window.location.host
+    + '/ws/uploads/')
+  const CHUNK_SIZE = 1024 * 1024;
+  $('#upload-form').on('submit', async function (e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('fileselector');
+    const file = fileInput.files[0];
+    if (!file) return;
+    $('#upload-btn').prop('disabled', true);
+    $('#upload-status').text('Starting upload...');
+    upload_socket.send(JSON.stringify({
+      command: 'upload_start',
+      filename: file.name,
+      size: file.size,
+    }));
+    let result = JSON.parse(await nextMessage(upload_socket));
+    if (!result || result.status !== 'OK') {
+      $('#upload-status').text('Error during upload_start: ' 
+        + (result && result.message ? result.message : ''));
+      return;
+    } 
+    upload_socket.onmessage = async function(e) {
+      result = e.data;
+      if (result == 'Done!'){
+        upload_socket.onmessage = null;
+        upload_socket.send(JSON.stringify({
+          command: 'upload_finish',
+          filename: file.name,
+        }));
+        result = JSON.parse(await nextMessage(upload_socket));
+        if (result && result.status === 'OK') {
+          $('#import-form input[name="file_name"]').val(file.name);
+          $('#phase0').addClass('d-none');
+          $('#phase1').removeClass('d-none');
+        } else {
+          $('#upload-status').text('Error during upload_finish: ' 
+            + (result && result.message ? result.message : ''));
+        }
+      } else {
+        $('#upload-status').text('Upload: ' + result);
+      };
+    };  
+    let offset = 0;
+    while (offset < file.size) {
+      const slice = file.slice(offset, offset + CHUNK_SIZE);
+      const buffer = await slice.arrayBuffer();
+      upload_socket.send(buffer);
+      offset += CHUNK_SIZE;
+    };
+  });
+  $('#import-form').on('submit', function (e) {
+    e.preventDefault();
+    const form = this;
+    $('#line2').removeClass('d-none');
+    $('#import-btn').prop('disabled', true);
+    $('#import-form input[name="status"]').val('OK');
+    form.submit();
+  });
 });
 
 </script>  

@@ -140,7 +140,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           }));
           let result = JSON.parse(await nextMessage(upload_socket));
           if (!result || result.status !== 'OK') {
-            $('#upload-status').text('Error during upload_start: ' + (result && result.message ? result.message : ''));
+            $('#upload-status').text('Error during upload_start: ' 
+              + (result && result.message ? result.message : ''));
             return;
           } 
           upload_socket.onmessage = async function(e) {
@@ -157,7 +158,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
                 $('#phase0').addClass('d-none');
                 $('#phase1').removeClass('d-none');
               } else {
-                $('#upload-status').text('Error during upload_finish: ' + (result && result.message ? result.message : ''));
+                $('#upload-status').text('Error during upload_finish: ' 
+                  + (result && result.message ? result.message : ''));
               }
             } else {
               $('#upload-status').text('Upload: ' + result);
@@ -173,8 +175,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         });
         $('#import-form').on('submit', async function (e) {
           e.preventDefault();
-          const form = this;               // natives Form-Element
-          const $btn = $('#import-btn');   // eigentlicher Button
+          const form = this;
+          const $btn = $('#import-btn');
           try {
             $btn.prop('disabled', true);
             $('#line2').removeClass('d-none');

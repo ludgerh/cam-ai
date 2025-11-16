@@ -625,7 +625,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while True:
-          await a_brake_type(BR_LONG)
+          await a_break_type(BR_LONG)
           
       elif params['command'] == 'sendlogs':
         smtp_conf = await aget_smtp_conf(extended_from = False)
