@@ -345,7 +345,8 @@ class process_restore(myTemplateView):
       zf.extractall(unpack_dir)
     zip_file.unlink(missing_ok=True) 
     version_file = unpack_dir / 'upload.cfg' 
-    school_line = school.objects.get(name = 'temp123school456name789magic')
+    if job_type == 'import':
+      school_line = school.objects.get(name = 'temp123school456name789magic')
     try:
       file_meta = {}
       with version_file.open(encoding='utf-8', errors='ignore') as f:
@@ -395,10 +396,9 @@ class process_restore(myTemplateView):
       if check_files:
         path_to_exchange = DATAPATH
         backup_path = PARENTPATH / 'temp' / 'data.old'
-        backup_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(DATAPATH, backup_dir)
+        shutil.move(DATAPATH, backup_path)
         shutil.move(unpack_dir, DATAPATH)
-        shutil.rmtree(backup_dir)
+        shutil.rmtree(backup_path)
     elif job_type == 'import':
       school_line.name = file_meta['schoolname']
       if 'delegation_level' in file_meta:
@@ -418,17 +418,19 @@ class process_restore(myTemplateView):
         if (unpack_dir / 'coded').exists():
           shutil.move(unpack_dir / 'coded', this_school_path / 'coded')
         data_file = unpack_dir / "db.dat"
-        cols = ",".join(trainframe_imex)  # z.B. made,encrypted,...
-        load = rf"""load data local infile '{data_file}'
-          into table trainers_trainframe
-          character set utf8mb4
-          fields terminated by '\t' escaped by '\\'
-          lines terminated by '\n'
-          ({cols});
-        """
+        cols = ",".join(trainframe_imex)
+        load = (
+          rf"load data local infile '{data_file}' "
+          "into table trainers_trainframe "
+          "character set utf8mb4 "
+          "fields terminated by 0x09 escaped by 0x5C "
+          "lines terminated by 0x0A "
+          f"({cols});"
+        )
         cmd = [
           'mariadb',
           '--user=CAM-AI',
+          f'--password={db_password}',
           '--host=localhost',
           '--database', db_database,  
           '--local-infile=1',
@@ -436,11 +438,9 @@ class process_restore(myTemplateView):
           '-e',
           load,
         ]
-        env = dict(os.environ, MYSQL_PWD = db_password)
         subprocess.run(
           cmd, 
           check=True, 
-          env=env, 
           stdout=subprocess.DEVNULL, 
           stderr=subprocess.DEVNULL,
         )

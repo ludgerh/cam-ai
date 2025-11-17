@@ -72,7 +72,7 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
         else:
           logger.error('binary data ohne upload_start erhalten')
         return()
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)
       if params['command'] == 'upload_start':	
         self.upload_uid = params.get('id') or str(uuid.uuid4())
@@ -97,7 +97,7 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
           'status' : 'OK',
           'filename' : dst.name,
         }
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
     except Exception:
       logger.error('Error in consumer: ' + LOGNAME + ' (uploads_async_consumer)')
