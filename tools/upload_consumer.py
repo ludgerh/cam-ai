@@ -44,7 +44,7 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
       self.tmp_path = None
       self.fp = None
       self.bytes_received = 0
-    except:
+    except Exception:
       logger.error('Error in consumer: ' + LOGNAME + ' (uploads_async_consumer)')
       logger.error(format_exc())
       
@@ -52,7 +52,7 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
     try:
       if self.fp and not self.fp.closed:
           self.fp.close()
-    except:
+    except Exception:
       logger.error('Error in consumer: ' + LOGNAME + ' (uploads_async_consumer)')
       logger.error(format_exc())
       
@@ -64,7 +64,8 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
         if self.bytes_received >= self.filesize:
           result = 'Done!'
         else:
-          result = str(round(self.bytes_received / self.filesize * 100)) + '%'
+          progress = self.bytes_received / self.filesize
+          result = f"{round(progress * 100)}%"
         await self.send(result)
         if self.fp:
           self.fp.write(bytes_data)
@@ -79,6 +80,7 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
         self.filesize = params['size']
         self.tmp_path = UPLOAD_TMP / f"{self.upload_uid}.part"
         self.fp = self.tmp_path.open("ab")
+        self.bytes_received = self.tmp_path.stat().st_size
         outlist = {
           'status' : 'OK',
           'id' : self.upload_uid,
@@ -97,6 +99,6 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
         }
         logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
-    except:
+    except Exception:
       logger.error('Error in consumer: ' + LOGNAME + ' (uploads_async_consumer)')
       logger.error(format_exc())

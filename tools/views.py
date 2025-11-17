@@ -29,7 +29,6 @@ from django.core.files.storage import FileSystemStorage
 from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, FileResponse
@@ -45,6 +44,7 @@ from streams.models import stream
 from eventers.models import evt_condition
 from users.models import userinfo
 from access.c_access import access
+from access.models import access_control
 from tf_workers.models import school, worker
 from trainers.models import trainer, trainframe, trainframe_imex
 from .models import camurl
@@ -174,19 +174,22 @@ class inst_virt_cam(cam_inst_view):
     newstream.eve_school = school.objects.filter(active=True).first()
     newstream.creator = request.user
     cap = cv.VideoCapture(VIRT_CAM_PATH / filename)
-    newstream.cam_xres = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
-    newstream.cam_yres = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-    newstream.cam_virtual_fps = cap.get(cv.CAP_PROP_FPS)
-    newstream.name = 'Virtual Camera ' + str(round(newstream.cam_virtual_fps, 2)) + 'fps'
-    newstream.save(update_fields=(
-      'name',
-      'cam_url', 
-      'eve_school', 
-      'creator', 
-      'cam_xres', 
-      'cam_yres', 
-      'cam_virtual_fps', 
-    ))
+    try:
+      newstream.cam_xres = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+      newstream.cam_yres = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+      newstream.cam_virtual_fps = cap.get(cv.CAP_PROP_FPS)
+      newstream.name = 'Virtual Camera ' + str(round(newstream.cam_virtual_fps, 2)) + 'fps'
+      newstream.save(update_fields=(
+        'name',
+        'cam_url', 
+        'eve_school', 
+        'creator', 
+        'cam_xres', 
+        'cam_yres', 
+        'cam_virtual_fps', 
+      ))
+    finally:
+      cap.release()
     if not request.user.is_superuser:
       myaccess = access_control()
       myaccess.vtype = 'X'
@@ -302,22 +305,6 @@ class restore(myTemplateView):
       'phase' : 0,
     })
     return context
-
-  def post(self, request, *args, **kwargs):
-    global import_filename, import_filepath
-    if 'myfile' not in request.FILES:
-      return self.get(request, *args, **kwargs)
-    myfile = request.FILES['myfile']
-    upload_dir = Path(settings.BASE_DIR) / 'temp' / 'backup'
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    fs = FileSystemStorage(location=str(upload_dir), base_url=None)
-    import_filename = fs.save(myfile.name, myfile)
-    import_filepath = fs.path(import_filename)
-    context = self.get_context_data()
-    context.update({
-      'phase' : 1,
-    })
-    return self.render_to_response(context)
     
 class process_restore(myTemplateView):  
   template_name = 'tools/process_restore.html'  
@@ -330,7 +317,7 @@ class process_restore(myTemplateView):
   def post(self, request, *args, **kwargs):
     context = self.get_context_data()
     post_dict = request.POST.dict()
-    print(post_dict)
+    #print(post_dict)
     if post_dict['status'] != 'OK':
       context.update({
         'code' : 5,
@@ -358,6 +345,7 @@ class process_restore(myTemplateView):
       zf.extractall(unpack_dir)
     zip_file.unlink(missing_ok=True) 
     version_file = unpack_dir / 'upload.cfg' 
+    school_line = school.objects.get(name = 'temp123school456name789magic')
     try:
       file_meta = {}
       with version_file.open(encoding='utf-8', errors='ignore') as f:
@@ -367,24 +355,34 @@ class process_restore(myTemplateView):
             continue
           if '=' in line:
             key, value = line.split('=', 1)
-            file_meta[key.strip()] = value.strip()
+            value = value.strip()
+            if len(value) >= 2 and value.startswith("'") and value.endswith("'"):
+              value = value[1:-1]
+            file_meta[key.strip()] = value
     except FileNotFoundError:   
       context.update({
         'code' : 2,
         'message' : 'Version-File missing...',
       })
+      if job_type == 'import':
+        school_line.delete()
       return self.render_to_response(context)
     if 'version' not in file_meta:   
       context.update({
         'code' : 3,
         'message' : 'Version-File not correct...',
       })
+      if job_type == 'import':
+        school_line.delete()
       return self.render_to_response(context)
-    if file_meta['version'] != version:   
+    if (not djconf.getconfigbool('import_ignore_version', default = False) 
+      and file_meta['version'] != version):   
       context.update({
         'code' : 4,
         'message' : 'Version mismatch: (' + file_meta['version'] + ' <> ' + version +')'
       })
+      if job_type == 'import':
+        school_line.delete()
       return self.render_to_response(context)
     if job_type == 'restore':
       for item in viewables.values():
@@ -396,19 +394,15 @@ class process_restore(myTemplateView):
             subprocess.run(cmd, check=True, stdin=f, env=env)
       if check_files:
         path_to_exchange = DATAPATH
-        shutil.move(DATAPATH, settings.BASE_DIR / 'temp/home/cam_ai/data.old')
+        backup_path = PARENTPATH / 'temp' / 'data.old'
+        backup_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(DATAPATH, backup_dir)
         shutil.move(unpack_dir, DATAPATH)
-        shutil.rmtree(settings.BASE_DIR / 'temp/home/cam_ai/data.old')
+        shutil.rmtree(backup_dir)
     elif job_type == 'import':
-      while True:
-        try:
-          school_line = school.objects.get(name = 'temp123school456name789magic')
-          break
-        except school.DoesNotExist: 
-          break_type(BR_LONG)
       school_line.name = file_meta['schoolname']
-      #print(file_meta)
-      school_line.delegation_level = int(file_meta['delegation_level'])
+      if 'delegation_level' in file_meta:
+        school_line.delegation_level = int(file_meta['delegation_level'])
       this_school_path = SCHOOLSPATH / f'model{school_line.id}'
       school_line.dir = str(this_school_path) + '/'
       school_line.save(update_fields=('name', 'dir', 'delegation_level', ))
@@ -421,18 +415,8 @@ class process_restore(myTemplateView):
       if check_frames:
         if (unpack_dir / 'frames').exists():
           shutil.move(unpack_dir / 'frames', this_school_path / 'frames')
-          
-        data_file = unpack_dir / 'db.dat'
-        load = f"load data local infile '{data_file}' "
-        load += "into table trainers_trainframe "
-        load += "character set utf8mb4 "
-        load += "fields terminated by '\t' escaped by '\\' "
-        load += "lines terminated by '\n' "
-        load += "("
-        for item in trainframe_imex[:-1]:
-          load += item + ','
-        load += trainframe_imex[-1] + ');'
-        
+        if (unpack_dir / 'coded').exists():
+          shutil.move(unpack_dir / 'coded', this_school_path / 'coded')
         data_file = unpack_dir / "db.dat"
         cols = ",".join(trainframe_imex)  # z.B. made,encrypted,...
         load = rf"""load data local infile '{data_file}'

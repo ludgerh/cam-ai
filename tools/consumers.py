@@ -25,7 +25,6 @@ import io
 import os
 from contextlib import suppress
 from asgiref.sync import sync_to_async
-from asyncio import sleep as asleep
 from pathlib import Path
 from glob import glob
 from shutil import rmtree
@@ -44,10 +43,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
 from tools.l_tools import djconf, displaybytes
 from tools.l_smtp import l_smtp, l_msg
-from tools.l_break import break_type, a_break_type, BR_LONG
+from tools.l_break import a_break_type, BR_LONG
 from camai.c_settings import safe_import
 from camai.version import version
 from tools.c_logger import log_ini
@@ -118,8 +116,10 @@ class health(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     try:
       #logger.info('<-- ' + text_data)
-      params = json.loads(text_data)['data']	
-      outlist = {'tracker' : json.loads(text_data)['tracker']}	
+      data = json.loads(text_data)
+      params = data.get('data', {})
+      outlist = {'tracker': data.get('tracker')}
+
 
       if params['command'] == 'getdiscinfo':
         if self.scope['user'].is_superuser:
@@ -381,7 +381,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         else:
           if await aiofiles.os.path.exists(schoolline.dir):
             await aioshutil.rmtree(schoolline.dir)
-          schoolline.adelete()
+          await schoolline.adelete()
         outlist['data'] = resultdict
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
@@ -423,7 +423,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 'wsid',
               ))
               while startup_redis.get_start_worker_busy():
-                brake_type(BR_LONG)
+                await a_break_type(BR_LONG)
               startup_redis.set_start_worker_busy(params['item_nr'])
               myschools = school.objects.filter(tf_worker=params['item_nr'])
               streamlist = []
@@ -433,7 +433,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
                   streamlist.append(item2.id)
               for i in streamlist:
                 while startup_redis.get_start_stream_busy(): 
-                  brake_type(BR_LONG)
+                  await a_break_type(BR_LONG)
                 startup_redis.set_start_stream_busy(i)
           elif params['type'] == 't': #Trainer
             if resultdict['data']['status'] == 'new': 
@@ -449,7 +449,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
                 'wsid',
               ))
               while startup_redis.get_start_trainer_busy():
-                brake_type(BR_LONG)
+                await a_break_type(BR_LONG)
               startup_redis.set_start_trainer_busy(mytrainer.id)
           outlist['data'] = resultdict['data']['status'] 
         else:
@@ -558,7 +558,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           return()
         startup_redis.set_shutdown_command(10)
         #while startup_redis.get_shutdown_command() != 11:
-        #  await a_brake_type(BR_LONG)
+        #  await a_break_type(BR_LONG)
         outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
