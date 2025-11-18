@@ -73,9 +73,9 @@ def temp_func():
   from trainers.models import trainer
   hw_type = safe_import('hw_type') 
   if hw_type == 'raspi': 
-  trainer.objects.all().update(
-    inference_waitingtime = 10.0,
-  )
+    trainer.objects.all().update(
+      inference_waitingtime = 10.0,
+    )
 proc_dict[version_flat('1.9.9')] = temp_func
 
 def version_upgrade(old_str, new_str):
