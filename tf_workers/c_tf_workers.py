@@ -551,6 +551,7 @@ class tf_worker_client():
     self.pred_out_lock = t_lock()
     self.is_ready = None
     self.auto_break = a_break_auto(tmin = 0.01, tmax = 0.1, rate = 0.01)
+    self.prio_dict = {}
 
   async def out_reader_proc(self, index): #called by client (c_eventer)
     try:
@@ -585,6 +586,7 @@ class tf_worker_client():
     self.id = worker_id
     self.my_output = output_dist(self)
     self.my_output.clean_one(self.tf_w_index)
+    self.prio_dict[self.tf_w_index] = prio
     return(self.tf_w_index)
 
   async def run_out(self, index, logger, logname):
@@ -617,6 +619,8 @@ class tf_worker_client():
     return(self.xy)
 
   async def ask_pred(self, school, image_list, tf_w_index):
+    if self.prio_dict[self.tf_w_index] < 6:
+      tf_workers_redis.set_last_prio_write()
     command_line = ['ask_pred', tf_w_index, school, ]
     command_line += image_list
     await self.inqueue.put(command_line)

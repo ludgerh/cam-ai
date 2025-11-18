@@ -30,7 +30,6 @@ class trainer(models.Model):
   startworking = models.CharField(max_length=8, default='00:00:00')
   stopworking = models.CharField(max_length=8, default='24:00:00')
   inference_brake = models.FloatField(default = 0.0)
-  inference_limit = models.FloatField(default = -1.0)
   inference_waitingtime = models.FloatField(default = 0.0)
   running  = models.BooleanField(default=False)
   wsserver = models.CharField(max_length=255, default='wss://django.cam-ai.eu/')

@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 import json
+from time import time
 from tools.c_redis import saferedis
 
 class new_redis(saferedis):
@@ -72,6 +73,15 @@ class new_redis(saferedis):
     
   def get_proc_time_10(self, idx):   
     result = self.get(self.stringbase + 'proc_time_10:'+str(idx)+':')
+    if result is None:
+      return(0.0)   
+    return(float(result)) 
+    
+  def set_last_prio_write(self):
+    self.set(self.stringbase + 'last_prio_write:', str(time()))
+    
+  def get_last_prio_write(self):   
+    result = self.get(self.stringbase + 'last_prio_write:')
     if result is None:
       return(0.0)   
     return(float(result)) 

@@ -57,18 +57,26 @@ def temp_func():
 proc_dict[version_flat('1.6.6d')] = temp_func
 
 def temp_func():
-  from pathlib import Path
-  #Path('/home/cam_ai').chmod(0o711) 
-  Path('..').chmod(0o711) 
-proc_dict[version_flat('1.9.6a')] = temp_func
-
-def temp_func():
   from tf_workers.models import school
   school.objects.all().update(
     l_rate_start = 0,
     l_rate_stop = 0,
   )
 proc_dict[version_flat('1.6.6g')] = temp_func
+
+def temp_func():
+  from pathlib import Path
+  Path('..').chmod(0o711) 
+proc_dict[version_flat('1.9.6a')] = temp_func
+
+def temp_func():
+  from trainers.models import trainer
+  hw_type = safe_import('hw_type') 
+  if hw_type == 'raspi': 
+  trainer.objects.all().update(
+    inference_waitingtime = 10.0,
+  )
+proc_dict[version_flat('1.9.9')] = temp_func
 
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)

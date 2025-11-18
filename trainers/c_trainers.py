@@ -102,19 +102,12 @@ class trainer(spawn_process):
             return()  
           if self.dbline.inference_brake:
             ts1 = time()
-          if self.dbline.inference_limit >= 0.0:
-            if (wait := self.dbline.inference_waitingtime):
-              last_stop = time()
+          if (wait := self.dbline.inference_waitingtime):
             while True:
-              buf = tf_workers_redis.get_buf_size_10(self.tf_worker.id)
-              if buf > self.dbline.inference_limit:
-                if wait:
-                  last_stop = time()
-                await a_break_type(BR_LONG)
-                continue
-              if not wait or (time() - last_stop) >= wait:
+              if time() - tf_workers_redis.get_last_prio_write() > wait:
                 break
               await a_break_type(BR_LONG)
+          #self.logger.info('One Chunk is being predicted...')    
           imglist = []
           chunk_frames = []
           for item in chunk:

@@ -159,7 +159,7 @@ class c_detector(viewable):
       self.sl.period = divisor / self.dbline.det_fpslimit
       if divisor != self.div_old:
         self.div_old = divisor
-        self.logger.warning(f'DE{self.id}: Fpm divisor = {divisor}')
+        #self.logger.warning(f'DE{self.id}: Fpm divisor = {divisor}')
       self.div_ts = new_time
           
           
