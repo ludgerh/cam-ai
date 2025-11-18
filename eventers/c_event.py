@@ -318,7 +318,7 @@ class c_event(list):
       html_text = '<html><body><p>Hello CAM-AI user, <br>\n' 
       html_text += 'We had some movement. <br> \n' 
       if self.savename:
-        filepath = (djconf.getconfig('recordingspath', self.datapath + 'recordings/')
+        filepath = (await djconf.agetconfig('recordingspath', self.datapath + 'recordings/')
           + self.dbline.videoclip + '.jpg')
         if path.exists(filepath):
           with open(filepath, "rb") as f:
