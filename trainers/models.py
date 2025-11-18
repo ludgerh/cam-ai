@@ -29,6 +29,9 @@ class trainer(models.Model):
   gpu_mem_limit = models.IntegerField("gpu mem limit", default=0)
   startworking = models.CharField(max_length=8, default='00:00:00')
   stopworking = models.CharField(max_length=8, default='24:00:00')
+  inference_brake = models.FloatField(default = 0.0)
+  inference_limit = models.FloatField(default = -1.0)
+  inference_waitingtime = models.FloatField(default = 0.0)
   running  = models.BooleanField(default=False)
   wsserver = models.CharField(max_length=255, default='wss://django.cam-ai.eu/')
   wsid = models.IntegerField(default=0)
@@ -55,7 +58,7 @@ for i in range(10):
 class trainframe(models.Model):
   deleted = models.BooleanField(default=False)
   made = models.DateTimeField()
-  school = models.IntegerField(default=0)
+  school = models.IntegerField(default=0, db_default=0)
   encrypted = models.BooleanField(default=True)
   name = models.CharField(max_length=256)
   code = models.CharField(max_length=2)

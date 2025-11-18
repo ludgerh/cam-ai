@@ -34,7 +34,6 @@ from globals.c_globals import tf_workers
 from tf_workers.c_tf_workers import tf_worker_client
 from tf_workers.redis import my_redis as tf_workers_redis
 from tools.l_break import a_break_time, a_break_type, BR_LONG
-from tools.l_sysinfo import is_raspi
 from .redis import my_redis as trainers_redis
 
 #from threading import enumerate 
@@ -101,8 +100,20 @@ class trainer(spawn_process):
         for chunk in _chunked(frames, CHUNK_SIZE):
           if self.got_sigint:
             return()  
-          if is_raspi():
-            while tf_workers_redis.get_buf_size_10(self.tf_worker.id) > 2.0:
+          if self.dbline.inference_brake:
+            ts1 = time()
+          if self.dbline.inference_limit >= 0.0:
+            if (wait := self.dbline.inference_waitingtime):
+              last_stop = time()
+            while True:
+              buf = tf_workers_redis.get_buf_size_10(self.tf_worker.id)
+              if buf > self.dbline.inference_limit:
+                if wait:
+                  last_stop = time()
+                await a_break_type(BR_LONG)
+                continue
+              if not wait or (time() - last_stop) >= wait:
+                break
               await a_break_type(BR_LONG)
           imglist = []
           chunk_frames = []
@@ -149,6 +160,8 @@ class trainer(spawn_process):
             chunk_frames,
             ["last_fit"] + [f"pred{i}" for i in range(10)],
           )
+          if self.dbline.inference_brake:
+            await a_break_time((time() - ts1) * self.dbline.inference_brake)
         if len(frames) >= total_count:  
           trainers_redis.set_predict_proc_started(school_nr, False)
           self.logger.info(

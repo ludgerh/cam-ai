@@ -307,7 +307,7 @@ class c_cam(viewable):
             chunk = await asyncio.to_thread(
               os.read, self.fifo.fileno(), min(bytes_needed, 65536)
             )
-          except (BlockingIOError, InterruptedError):
+          except (BlockingIOError, InterruptedError, OSError):
             chunk = b''
           if not chunk:
             await a_break_type(BR_SHORT)
