@@ -116,8 +116,6 @@ class fit(models.Model):
   l_rate_min = models.CharField(max_length=20, default='0')
   l_rate_max = models.CharField(max_length=20, default='0')
   l_rate_divisor = models.FloatField(default=0.0) #learning rate = val_loss / this
-  weight_min = models.FloatField(default=0.0)
-  weight_max = models.FloatField(default=0.0)
   early_stop_delta_min = models.FloatField(default=0.0)
   early_stop_patience = models.IntegerField(default=0)
   start_reduce_lr = models.FloatField(default=0.0)

@@ -569,10 +569,10 @@ class trainerutil(AsyncWebsocketConsumer):
             'l_rate_min':line.l_rate_min, 
             'l_rate_max':line.l_rate_max, 
             'l_rate_divisor':line.l_rate_divisor, 
-            'weight_min':line.weight_min, 
-            'weight_max':line.weight_max, 
             'early_stop_delta_min':line.early_stop_delta_min, 
             'early_stop_patience':line.early_stop_patience,
+            'start_reduce_lr':line.start_reduce_lr, 
+            'start_increase_aug':line.start_increase_aug,
           } 
             
           outlist['data'] = result

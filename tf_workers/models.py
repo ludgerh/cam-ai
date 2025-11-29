@@ -69,14 +69,14 @@ class school(models.Model):
   model_train_type = models.CharField(max_length=50, default='efficientnetv2-b0')
   model_xin = models.IntegerField(default=224)
   model_yin = models.IntegerField(default=224)
-  model_image_augmentation = models.FloatField(default=0.2)
-  l_rate_min = models.CharField(max_length=20, default='0')
-  l_rate_max = models.CharField(max_length=20, default='0')
+  model_image_augmentation = models.FloatField(default=0.0)
+  l_rate_min = models.CharField(max_length=20, default='1e-7')
+  l_rate_max = models.CharField(max_length=20, default='1e-3')
   l_rate_divisor = models.FloatField(default=1000.0) #learning rate = val_loss / this
-  weight_min = models.FloatField(default=1.0)
-  weight_max = models.FloatField(default=2.0)
   early_stop_delta_min = models.FloatField(default=0.0)
   early_stop_patience = models.IntegerField(default=20)
+  start_reduce_lr = models.FloatField(default=0.0)
+  start_increase_aug = models.FloatField(default=0.0)
 
   def __str__(self):
     return(self.name)
