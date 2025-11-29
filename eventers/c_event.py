@@ -344,7 +344,7 @@ class c_event(list):
           html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
           html_text += '" target="_blank">'
           html_text += ('<img src="cid:image' + str(item[0]) 
-            + '" style="width: 200px; height: 200px; object-fit: contain"</a> \n')
+            + '" style="width: 200px; height: 200px; object-fit: contain"></a> \n')
       html_text += '<br> \n'
       smtp_conf = await aget_smtp_conf()
       my_smtp = l_smtp(**smtp_conf)

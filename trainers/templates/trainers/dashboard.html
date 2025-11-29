@@ -163,7 +163,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <div class="container-fluid float-left">
       <div class="row">
         <div class="col-sm-auto h4">
-          <label class="m-2" for="start_lr">Starting Rate:</label>
+          <label class="m-2" for="start_lr">Min. LRate:</label>
           <select id="start_lr" value="1e-6">
             <option value="0">0.0</option>
             <option value="1e-3">1e-3 (0.001)</option>
@@ -174,7 +174,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           </select>
         </div>  
         <div class="col-sm-auto h4">
-          <label class="m-2" for="stop_lr">Stopping Rate:</label>
+          <label class="m-2" for="stop_lr">Max. LRate:</label>
           <select id="stop_lr" value="1e-6">
             <option value="0">No limit</option>$('#job_status').text(result_all[3]);
             <option value="1e-3">1e-3 (0.001)</option>
@@ -321,12 +321,11 @@ function refresh_all() {
       newaddition += '<td>' + (parseInt(item.nr_tr) + parseInt(item.nr_va)) + '</td>';
       newaddition += '<td>' + item.model_type + '</td>';
       newaddition += '<td>' + item.model_image_augmentation.toPrecision(2) + '</td>';
-      newaddition += '<td>' + item.l_rate_start + '</td>';
-      newaddition += '<td>' + item.l_rate_stop + '</td>';
+      newaddition += '<td>' + item.l_rate_min + '</td>';
+      newaddition += '<td>' + item.l_rate_max + '</td>';
       newaddition += '<td>' + item.l_rate_divisor.toPrecision(2) + '</td>';
       newaddition += '<td>' + item.weight_min.toPrecision(2) + '</td>';
       newaddition += '<td>' + item.weight_max.toPrecision(2) + '</td>';
-      newaddition += '<td>' + item.weight_boost.toPrecision(2) + '</td>';
       newaddition += '<td>' + item.early_stop_delta_min.toPrecision(2) + '</td>';
       newaddition += '<td>' + item.early_stop_patience.toPrecision(2) + '</td>';
       newaddition += '<td>' + Math.round(item.minutes) + '</td>';
@@ -438,16 +437,12 @@ $(document).ready(function() {
       init_var('#model_type', 'model_type');
       init_var('#model_train_type', 'model_train_type');
       init_var('#image_augmentation', 'model_image_augmentation');
-      init_var('#weight_constraint', 'model_weight_constraint');
-      init_var('#weight_decay', 'model_weight_decay');
-      init_var('#dropout', 'model_dropout');
       init_bool_var('#stop_overfit', 'model_stop_overfit');
       init_var('#patience', 'early_stop_patience');
       init_var('#maxweight', 'weight_max');
       init_var('#minweight', 'weight_min');
-      init_var('#weightboost', 'weight_boost');
-      init_var('#start_lr', 'l_rate_start');
-      init_var('#stop_lr', 'l_rate_stop');
+      init_var('#start_lr', 'l_rate_min');
+      init_var('#stop_lr', 'l_rate_max');
       init_var('#l_rate_divisor', 'l_rate_divisor');
       init_var('#early_stop_patience', 'early_stop_patience');
       init_var('#early_stop_delta_min', 'early_stop_delta_min');

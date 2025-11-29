@@ -10,7 +10,7 @@ if [ "$1" = "pc" ] ; then
   source ~/miniconda3/etc/profile.d/conda.sh
   conda activate tf
   pip install --upgrade pip
-  pip install -r requirements.pc_12
+  #pip install -r requirements.pc_12
 fi
 if [ "$1" = "nvidia" ] ; then
   source ~/miniconda3/etc/profile.d/conda.sh
@@ -18,5 +18,5 @@ if [ "$1" = "nvidia" ] ; then
   pip install --upgrade pip
   pip install -r requirements.nvidia_12
 fi
-python manage.py migrate
+#python manage.py migrate
 python cam-ai-server.py manage.py runserver 0.0.0.0:8000 --noreload

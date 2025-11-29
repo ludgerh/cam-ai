@@ -411,11 +411,14 @@ class process_restore(myTemplateView):
       frames_path = this_school_path / 'frames'
       if check_models:  
         if (unpack_dir / 'model').exists():
+          shutil.rmtree(this_school_path / 'model', ignore_errors=True)
           shutil.move(unpack_dir / 'model', this_school_path / 'model')
       if check_frames:
         if (unpack_dir / 'frames').exists():
+          shutil.rmtree(this_school_path / 'frames', ignore_errors=True)
           shutil.move(unpack_dir / 'frames', this_school_path / 'frames')
         if (unpack_dir / 'coded').exists():
+          shutil.rmtree(this_school_path / 'coded', ignore_errors=True)
           shutil.move(unpack_dir / 'coded', this_school_path / 'coded')
         data_file = unpack_dir / "db.dat"
         cols = ",".join(trainframe_imex)

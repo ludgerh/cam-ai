@@ -276,10 +276,12 @@ class tf_worker(spawn_process):
         self.cachedict = {}
       else: #Local CPU or GPU
         if self.dbline.use_litert:
-          if sysinfo()['hw'] == 'raspi':
-            from tflite_runtime import interpreter as tflite
-          else:
-            from tensorflow import lite as tflite
+          from ai_edge_litert import interpreter as tflite
+          from ai_edge_litert.interpreter import load_delegate
+          #if self.dbline.use_coral or sysinfo()['hw'] == 'raspi':
+          #  from tflite_runtime import interpreter as tflite
+          #else:
+          #  from ai_edge_litert import interpreter as tflite
           self.logger.info("*** Using LiteRT ***")
           self.tflite = tflite
         else:
@@ -398,8 +400,12 @@ class tf_worker(spawn_process):
         self.models[schoolnr]['ydim'] = 50
       else: #lokal GPU
         if self.dbline.use_litert:
-          model_path = (school_dbline.dir 
-            + 'model/' + school_dbline.model_type + '.tflite')
+          if self.dbline.use_coral:
+            model_path = (school_dbline.dir 
+              + 'model/c' + school_dbline.model_type + '.tflite')
+          else:
+            model_path = (school_dbline.dir 
+              + 'model/' + school_dbline.model_type + '.tflite')
         else:
           model_path = (school_dbline.dir
             + 'model/' + school_dbline.model_type + '.keras')
@@ -408,12 +414,20 @@ class tf_worker(spawn_process):
         self.models[schoolnr]['path'] = model_path  
         self.models[schoolnr]['model_type'] = school_dbline.model_type
         if self.dbline.use_litert:
-          interpreter = await asyncio.to_thread(
-            self.tflite.Interpreter, 
-            model_path = model_path, 
-            #num_threads = 4,
-          )
+          if self.dbline.use_coral:
+            interpreter = await asyncio.to_thread(
+              self.tflite.Interpreter, 
+              model_path = model_path, 
+              experimental_delegates=[load_delegate('libedgetpu.so.1')],
+            )
+          else:
+            interpreter = await asyncio.to_thread(
+              self.tflite.Interpreter, 
+              model_path = model_path, 
+            )
+          print('00000', interpreter._delegates)
           await asyncio.to_thread(interpreter.allocate_tensors)
+          print('11111', interpreter._delegates)
           self.models[schoolnr]['model'] = interpreter
           self.models[schoolnr]['int_input'] = interpreter.tensor(
             interpreter.get_input_details()[0]["index"],
@@ -432,8 +446,8 @@ class tf_worker(spawn_process):
             await a_break_type(BR_LONG)
           loaded_model = await asyncio.to_thread(self.load_model, model_path)
           self.models[schoolnr]['model'] = loaded_model
-          self.models[schoolnr]['xdim'] = loaded_model.layers[0].input_shape[2]
-          self.models[schoolnr]['ydim'] = loaded_model.layers[0].input_shape[1]
+          self.models[schoolnr]['xdim'] = loaded_model.input_shape[2]
+          self.models[schoolnr]['ydim'] = loaded_model.input_shape[1]
         logger.info('***** Got model file #'+str(schoolnr) 
           + ', file: '+model_path)
       if test_pred and self.dbline.gpu_sim < 0:

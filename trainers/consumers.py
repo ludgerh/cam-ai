@@ -566,15 +566,11 @@ class trainerutil(AsyncWebsocketConsumer):
           result = {
             'model_type':line.model_type, 
             'model_image_augmentation':line.model_image_augmentation, 
-            'model_weight_decay':line.model_weight_decay, 
-            'model_weight_constraint':line.model_weight_constraint, 
-            'model_dropout':line.model_dropout, 
-            'l_rate_start':line.l_rate_start, 
-            'l_rate_stop':line.l_rate_stop, 
+            'l_rate_min':line.l_rate_min, 
+            'l_rate_max':line.l_rate_max, 
             'l_rate_divisor':line.l_rate_divisor, 
             'weight_min':line.weight_min, 
             'weight_max':line.weight_max, 
-            'weight_boost':line.weight_boost, 
             'early_stop_delta_min':line.early_stop_delta_min, 
             'early_stop_patience':line.early_stop_patience,
           } 

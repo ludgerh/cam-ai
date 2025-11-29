@@ -52,6 +52,11 @@ async def db_ini():
     'x_in_default' : 300, 
     'y_in_default' : 300,
   })
+  await add_if_none(model_type, 'name', {
+    'name' : 'mobilenetv2',
+    'x_in_default' : 224, 
+    'y_in_default' : 224,
+  })
   
   await add_if_none(camurl, 'type', {
     'type' : 'Imou Cruiser SE+',
