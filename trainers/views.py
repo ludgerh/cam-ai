@@ -75,6 +75,7 @@ def dashboard(request, schoolnr):
       'school' : myschool,
       'model_types' : model_type.objects.all(),
       'may_write' : access.check('S', schoolnr, request.user, 'W'),
+      'schoolnr' : schoolnr,
     }
     return(HttpResponse(template.render(context)))
   else:

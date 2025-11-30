@@ -540,16 +540,18 @@ class trainerutil(AsyncWebsocketConsumer):
           result = []
           async for item in epoch.objects.filter(fit=params['fitnr']):
             result.append({
-              'loss':item.loss, 
-              'binacc':item.binacc, 
-              'recall':item.recall, 
-              'precision':item.precision, 
-              'val_loss':item.val_loss, 
-              'val_binacc':item.val_binacc, 
-              'val_recall':item.val_recall, 
-              'val_precision':item.val_precision, 
-              'seconds':item.seconds, 
-              'learning_rate':item.learning_rate,
+              'loss' : item.loss, 
+              'augmentation' : item.augmentation, 
+              'gamma' : item.gamma, 
+              'binacc' : item.binacc, 
+              'recall' : item.recall, 
+              'precision' : item.precision, 
+              'val_loss' : item.val_loss, 
+              'val_binacc' : item.val_binacc, 
+              'val_recall' : item.val_recall, 
+              'val_precision' : item.val_precision, 
+              'seconds' : item.seconds, 
+              'learning_rate' : item.learning_rate,
             })
           outlist['data'] = result
       
@@ -564,15 +566,15 @@ class trainerutil(AsyncWebsocketConsumer):
         else:
           line = await fit.objects.aget(id=params['fitnr'])
           result = {
-            'model_type':line.model_type, 
-            'model_image_augmentation':line.model_image_augmentation, 
-            'l_rate_min':line.l_rate_min, 
-            'l_rate_max':line.l_rate_max, 
-            'l_rate_divisor':line.l_rate_divisor, 
-            'early_stop_delta_min':line.early_stop_delta_min, 
-            'early_stop_patience':line.early_stop_patience,
-            'start_reduce_lr':line.start_reduce_lr, 
-            'start_increase_aug':line.start_increase_aug,
+            'model_type' : line.model_type, 
+            'model_image_augmentation' : line.model_image_augmentation, 
+            'l_rate_min' : line.l_rate_min, 
+            'l_rate_max' : line.l_rate_max, 
+            'l_rate_divisor' : line.l_rate_divisor, 
+            'early_stop_delta_min' : line.early_stop_delta_min, 
+            'early_stop_patience' : line.early_stop_patience,
+            'start_reduce_lr' : line.start_reduce_lr, 
+            'start_increase_aug' : line.start_increase_aug,
           } 
             
           outlist['data'] = result

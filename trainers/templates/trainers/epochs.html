@@ -50,9 +50,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <table class="table">
     <thead>
       <tr>
-        <th>#</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>BinAcc</th>
-        <th>Rec</th><th>Prec</th><th>val_Loss</th><th>val_BinAcc</th><th>val_Rec</th>
-        <th>val_Prec</th>
+        <th>#</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>Augm</th>
+        <th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th><th>val_Loss</th>
+        <th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
       </tr>
     </thead>
     <tbody>
@@ -187,6 +187,8 @@ function refresh_all() {
         newaddition += '<td>'+Math.round(item.seconds)+'</td>';
         newaddition += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.augmentation.toPrecision(4)+'</td>';
+        newaddition += '<td>'+item.gamma.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.recall.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.precision.toPrecision(4)+'</td>';
