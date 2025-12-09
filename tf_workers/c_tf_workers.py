@@ -277,11 +277,8 @@ class tf_worker(spawn_process):
       else: #Local CPU or GPU
         if self.dbline.use_litert:
           from ai_edge_litert import interpreter as tflite
-          from ai_edge_litert.interpreter import load_delegate
-          #if self.dbline.use_coral or sysinfo()['hw'] == 'raspi':
-          #  from tflite_runtime import interpreter as tflite
-          #else:
-          #  from ai_edge_litert import interpreter as tflite
+          if self.dbline.use_coral:
+            from ai_edge_litert.interpreter import load_delegate
           self.logger.info("*** Using LiteRT ***")
           self.tflite = tflite
         else:
@@ -402,7 +399,7 @@ class tf_worker(spawn_process):
         if self.dbline.use_litert:
           if self.dbline.use_coral:
             model_path = (school_dbline.dir 
-              + 'model/c' + school_dbline.model_type + '.tflite')
+              + 'model/c_' + school_dbline.model_type + '.tflite')
           else:
             model_path = (school_dbline.dir 
               + 'model/' + school_dbline.model_type + '.tflite')
@@ -414,20 +411,20 @@ class tf_worker(spawn_process):
         self.models[schoolnr]['path'] = model_path  
         self.models[schoolnr]['model_type'] = school_dbline.model_type
         if self.dbline.use_litert:
+          print('00000', self.tflite.Interpreter)
           if self.dbline.use_coral:
-            interpreter = await asyncio.to_thread(
-              self.tflite.Interpreter, 
-              model_path = model_path, 
-              experimental_delegates=[load_delegate('libedgetpu.so.1')],
-            )
+              interpreter = self.tflite.Interpreter(
+                  model_path=model_path,
+                  experimental_delegates=[load_delegate('libedgetpu.so.1')],
+              )
           else:
             interpreter = await asyncio.to_thread(
               self.tflite.Interpreter, 
               model_path = model_path, 
             )
-          print('00000', interpreter._delegates)
+          print('11111')
           await asyncio.to_thread(interpreter.allocate_tensors)
-          print('11111', interpreter._delegates)
+          print('22222')
           self.models[schoolnr]['model'] = interpreter
           self.models[schoolnr]['int_input'] = interpreter.tensor(
             interpreter.get_input_details()[0]["index"],

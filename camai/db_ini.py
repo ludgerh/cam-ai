@@ -88,6 +88,10 @@ async def db_ini():
     'url' : 'rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}', 
   })
   await add_if_none(camurl, 'type', {
+    'type' : 'Reolink E1 Pro',
+    'url' : 'rtsp://{user}:{pass}@{address}:{port}/Preview_01_main', 
+  })
+  await add_if_none(camurl, 'type', {
     'type' : 'Reolink E1 Zoom',
     'url' : 'rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}', 
   })

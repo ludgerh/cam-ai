@@ -540,6 +540,7 @@ class trainerutil(AsyncWebsocketConsumer):
           result = []
           async for item in epoch.objects.filter(fit=params['fitnr']):
             result.append({
+              'phase' : item.phase,
               'loss' : item.loss, 
               'augmentation' : item.augmentation, 
               'gamma' : item.gamma, 
@@ -568,13 +569,11 @@ class trainerutil(AsyncWebsocketConsumer):
           result = {
             'model_type' : line.model_type, 
             'model_image_augmentation' : line.model_image_augmentation, 
+            'model_gamma' : line.model_gamma, 
             'l_rate_min' : line.l_rate_min, 
             'l_rate_max' : line.l_rate_max, 
-            'l_rate_divisor' : line.l_rate_divisor, 
-            'early_stop_delta_min' : line.early_stop_delta_min, 
+            'l_rate_target' : line.l_rate_target, 
             'early_stop_patience' : line.early_stop_patience,
-            'start_reduce_lr' : line.start_reduce_lr, 
-            'start_increase_aug' : line.start_increase_aug,
           } 
             
           outlist['data'] = result

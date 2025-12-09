@@ -41,10 +41,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <table class="table">
       <thead>
         <tr>
-          <th>Made</th><th>Sam</th><th>MTy</th><th>MIA</th><th>LRMin</th><th>LRMax</th>
-          <th>LRat</th><th>RedLR</th><th>IncAug</th><th>ESD</th><th>ESP</th>
-          <th>Min</th><th>Epochs</th><th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
-          <th>val_L</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th><th>Status</th>
+          <th>Made</th><th>Sam</th><th>MTy</th><th>Aug</th><th>Gam</th><th>LRMin</th>
+          <th>LRMax</th><th>LRTar</th><th>ESP</th><th>Min</th><th>Epochs</th>
+          <th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th><th>val_L</th>
+          <th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -114,9 +114,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             min="0.0" max="1.0" step="0.01">
         </div>  
         <div class="col-sm-auto h4">
-          <label class="m-2" for="start_increase_aug">Aug Increase Start</label>
-          <input class="m-2" type="number" id="start_increase_aug" size="10" 
-            min="-1.0" max="1.0" step="0.1">
+          <label class="m-2" for="gamma">Gamma</label>
+          <input class="m-2" type="number" id="gamma" size="10" 
+            min="1.0" max="4.0" step="0.1">
         </div>  
       </div>  
     </div>
@@ -126,40 +126,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <div class="container-fluid float-left">
       <div class="row">
         <div class="col-sm-auto h4">
-          <label class="m-2" for="start_lr">Min. LRate:</label>
-          <select id="start_lr" value="1e-6">
-            <option value="0">0.0</option>
-            <option value="1e-3">1e-3 (0.001)</option>
-            <option value="1e-4">1e-4 (0.0001)</option>
-            <option value="1e-5">1e-5 (0.00001)</option>
-            <option value="1e-6">1e-6 (0.000001)</option>
-            <option value="1e-7">1e-7 (0.0000001)</option>
-            <option value="1e-8">1e-8 (0.00000001)</option>
-            <option value="1e-9">1e-9 (0.000000001)</option>
-          </select>
+          <label class="m-2" for="l_rate_min">Min. LRate:</label>
+          <input class="m-2" type="number" id="l_rate_min" size="10" 
+            min="1e-7" max="1e-3">
         </div>  
         <div class="col-sm-auto h4">
-          <label class="m-2" for="stop_lr">Max. LRate:</label>
-          <select id="stop_lr" value="1e-6">
-            <option value="0">No limit</option>$('#job_status').text(result_all[3]);
-            <option value="1e-3">1e-3 (0.001)</option>
-            <option value="1e-4">1e-4 (0.0001)</option>
-            <option value="1e-5">1e-5 (0.00001)</option>
-            <option value="1e-6">1e-6 (0.000001)</option>
-            <option value="1e-7">1e-7 (0.0000001)</option>
-            <option value="1e-8">1e-8 (0.00000001)</option>
-            <option value="1e-9">1e-9 (0.000000001)</option>
-          </select>
+          <label class="m-2" for="l_rate_max">Max. LRate:</label>
+          <input class="m-2" type="number" id="l_rate_max" size="10" 
+            min="1e-7" max="1e-3">
         </div>  
         <div class="col-sm-auto h4">
-          <label class="m-2" for="l_rate_divisor">VL/LR Ratio</label>
-          <input class="m-2" type="number" id="l_rate_divisor" size="10" 
-            min="100" step="100">
-        </div>  
-        <div class="col-sm-auto h4">
-          <label class="m-2" for="start_reduce_lr">LR Reduction Start</label>
-          <input class="m-2" type="number" id="start_reduce_lr" size="10" 
-            min="-1.0" max="1.0" step="0.1">
+          <label class="m-2" for="l_rate_target">Target LRate:</label>
+          <input class="m-2" type="number" id="l_rate_target" size="10" 
+            min="1e-7" max="1e-3">
         </div>  
       </div>  
     </div>
@@ -172,12 +151,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <label class="m-2" for="early_stop_patience">Patience</label>
           <input class="m-2" type="number" id="early_stop_patience" size="10" 
             min="3" max="1000" step="1">
-        </div>  
-        <div class="col-sm-auto h4">
-          <label class="m-2" for="early_stop_delta_min">Min. Delta</label>
-          <input class="m-2" type="number" id="early_stop_delta_min" size="10" 
-            min="0.0" max="0.99" step="0.00001">
-        </div>  
+        </div> 
       </div>  
     </div>
     {% endif %}
@@ -293,12 +267,10 @@ function refresh_all() {
       newaddition += '<td>' + (parseInt(item.nr_tr) + parseInt(item.nr_va)) + '</td>';
       newaddition += '<td>' + item.model_type + '</td>';
       newaddition += '<td>' + item.model_image_augmentation.toPrecision(2) + '</td>';
-      newaddition += '<td>' + item.l_rate_min + '</td>';
-      newaddition += '<td>' + item.l_rate_max + '</td>';
-      newaddition += '<td>' + item.l_rate_divisor.toPrecision(2) + '</td>';
-      newaddition += '<td>' + item.start_reduce_lr.toPrecision(2) + '</td>';
-      newaddition += '<td>' + item.start_increase_aug.toPrecision(2) + '</td>';
-      newaddition += '<td>' + item.early_stop_delta_min.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.model_gamma.toPrecision(2) + '</td>';
+      newaddition += '<td>' + Number(item.l_rate_min).toExponential() + '</td>';
+      newaddition += '<td>' + Number(item.l_rate_max).toExponential() + '</td>';
+      newaddition += '<td>' + Number(item.l_rate_target).toExponential() + '</td>';
       newaddition += '<td>' + item.early_stop_patience.toPrecision(2) + '</td>';
       newaddition += '<td>' + Math.round(item.minutes) + '</td>';
       newaddition += '<td>' + item.epochs + '</td>';
@@ -409,15 +381,11 @@ $(document).ready(function() {
       init_var('#model_type', 'model_type');
       init_var('#model_train_type', 'model_train_type');
       init_var('#image_augmentation', 'model_image_augmentation');
-      init_bool_var('#stop_overfit', 'model_stop_overfit');
-      init_var('#patience', 'early_stop_patience');
-      init_var('#start_reduce_lr', 'start_reduce_lr');
-      init_var('#start_increase_aug', 'start_increase_aug');
-      init_var('#start_lr', 'l_rate_min');
-      init_var('#stop_lr', 'l_rate_max');
-      init_var('#l_rate_divisor', 'l_rate_divisor');
+      init_var('#gamma', 'model_gamma');
+      init_var('#l_rate_min', 'l_rate_min');
+      init_var('#l_rate_max', 'l_rate_max');
+      init_var('#l_rate_target', 'l_rate_target');
       init_var('#early_stop_patience', 'early_stop_patience');
-      init_var('#early_stop_delta_min', 'early_stop_delta_min');
 {% endif %}
       refresh_all();
     } else {

@@ -50,9 +50,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <table class="table">
     <thead>
       <tr>
-        <th>#</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th><th>Augm</th>
-        <th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th><th>val_Loss</th>
-        <th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
+        <th>#</th><th>Phase</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th>
+        <th>Augm</th><th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
+        <th>val_Loss</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
       </tr>
     </thead>
     <tbody>
@@ -72,8 +72,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       Image Augmentation: <span id="model_image_augmentation">?</span>
     </div> 
     <div class="col-sm-auto h4">
-      Aug Increase Start: <span id="start_increase_aug">?</span>
-    </div>  
+      Gamma: <span id="model_gamma">?</span>
+    </div> 
   </div>  
 </div>
 <div class="h2">
@@ -88,10 +88,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       Max Learning Rate: <span id="l_rate_max">?</span>
     </div>  
     <div class="col-sm-auto h4">
-      VL/LR Ratio: <span id="l_rate_divisor">?</span>
-    </div> 
-    <div class="col-sm-auto h4">
-      LR Reduction Start: <span id="start_reduce_lr">?</span>
+      Target Learning Rate: <span id="l_rate_target">?</span>
     </div>  
   </div>  
 </div>
@@ -102,9 +99,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="row">
     <div class="col-sm-auto h4">
       Patience: <span id="early_stop_patience">?</span>
-    </div>  
-    <div class="col-sm-auto h4">
-      Min. Delta: <span id="early_stop_delta_min">?</span>
     </div>  
   </div>  
 </div>
@@ -184,6 +178,7 @@ function refresh_all() {
         graph_data.datasets[2].data.push(item.val_loss);
         newaddition += '<tr>';
         newaddition += '<td>'+counter+'</td>';
+        newaddition += '<td>'+item.phase+'</td>';
         newaddition += '<td>'+Math.round(item.seconds)+'</td>';
         newaddition += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
         newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';

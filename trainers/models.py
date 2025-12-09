@@ -19,30 +19,30 @@ from django.conf import settings
 from django.utils import timezone
 
 class trainer(models.Model):
-  active = models.BooleanField(default=True)
-  name = models.CharField(max_length=256, default='New Trainer')
-  t_type = models.IntegerField("trainer type", choices=((1, 'GPU'), (2, 'CPU'), 
-    (3, 'Remote'), (4, 'other')), default=2)
-  modeltype = models.IntegerField("model type", choices=((1, 'Keras'), (2, 'LiteRT'), 
-    (3, 'LiteRTQ')), default=2) #Codes for download: K, L, Q
-  gpu_nr = models.IntegerField("gpu number", default=1)
-  gpu_mem_limit = models.IntegerField("gpu mem limit", default=0)
-  startworking = models.CharField(max_length=8, default='00:00:00')
-  stopworking = models.CharField(max_length=8, default='24:00:00')
+  active = models.BooleanField(default = True)
+  name = models.CharField(max_length = 256, default = 'New Trainer')
+  t_type = models.IntegerField("trainer type", choices = ((1, 'GPU'), (2, 'CPU'), 
+    (3, 'Remote'), (4, 'other')), default = 2)
+  modeltype = models.IntegerField("model type", choices = ((1, 'Keras'), (2, 'LiteRT'), 
+    (3, 'LiteRTQ')), default = 2) #Codes for download: K, L, Q
+  gpu_nr = models.IntegerField("gpu number", default = 1)
+  gpu_mem_limit = models.IntegerField("gpu mem limit", default = 0)
+  startworking = models.CharField(max_length = 8, default = '00:00:00')
+  stopworking = models.CharField(max_length = 8, default = '24:00:00')
   inference_brake = models.FloatField(default = 0.0)
   inference_waitingtime = models.FloatField(default = 0.0)
-  running  = models.BooleanField(default=False)
-  wsserver = models.CharField(max_length=255, default='wss://django.cam-ai.eu/')
-  wsid = models.IntegerField(default=0)
-  wsname = models.CharField(max_length=50, default='')
-  wspass = models.CharField(max_length=50, default='')
+  running  = models.BooleanField(default = False)
+  wsserver = models.CharField(max_length = 255, default = 'wss://django.cam-ai.eu/')
+  wsid = models.IntegerField(default = 0)
+  wsname = models.CharField(max_length = 50, default = '')
+  wspass = models.CharField(max_length = 50, default = '')
 
   def __str__(self):
-    return('Trainer, Name = '+self.name)
+    return('Trainer, Name = ' + self.name)
     
 class img_size(models.Model):
-  x = models.IntegerField(default=0)
-  y = models.IntegerField(default=0) 
+  x = models.IntegerField(default = 0)
+  y = models.IntegerField(default = 0) 
 
   def __str__(self):
     return(f"img_size, {self.x}x{self.y}")
@@ -55,12 +55,12 @@ for i in range(10):
   trainframe_imex.append(f'pred{i}') 
 
 class trainframe(models.Model):
-  deleted = models.BooleanField(default=False)
+  deleted = models.BooleanField(default = False)
   made = models.DateTimeField()
-  school = models.IntegerField(default=0, db_default=0)
-  encrypted = models.BooleanField(default=True)
-  name = models.CharField(max_length=256)
-  code = models.CharField(max_length=2)
+  school = models.IntegerField(default = 0, db_default = 0)
+  encrypted = models.BooleanField(default = True)
+  name = models.CharField(max_length = 256)
+  code = models.CharField(max_length = 2)
   c0 = models.SmallIntegerField()
   c1 = models.SmallIntegerField()
   c2 = models.SmallIntegerField()
@@ -72,24 +72,24 @@ class trainframe(models.Model):
   c8 = models.SmallIntegerField()
   c9 = models.SmallIntegerField()
   checked = models.SmallIntegerField()
-  made_by = models.ForeignKey(settings.AUTH_USER_MODEL, default=None, 
-    on_delete=models.SET_NULL, null=True)
-  train_status = models.SmallIntegerField(default=0)
+  made_by = models.ForeignKey(settings.AUTH_USER_MODEL, default = None, 
+    on_delete = models.SET_NULL, null = True)
+  train_status = models.SmallIntegerField(default = 0)
   img_sizes = models.ManyToManyField(img_size)
   last_fit = models.IntegerField(default = -1)
-  pred0 = models.FloatField(default=0.0)
-  pred1 = models.FloatField(default=0.0)
-  pred2 = models.FloatField(default=0.0)
-  pred3 = models.FloatField(default=0.0)
-  pred4 = models.FloatField(default=0.0)
-  pred5 = models.FloatField(default=0.0)
-  pred6 = models.FloatField(default=0.0)
-  pred7 = models.FloatField(default=0.0)
-  pred8 = models.FloatField(default=0.0)
-  pred9 = models.FloatField(default=0.0)
+  pred0 = models.FloatField(default = 0.0)
+  pred1 = models.FloatField(default = 0.0)
+  pred2 = models.FloatField(default = 0.0)
+  pred3 = models.FloatField(default = 0.0)
+  pred4 = models.FloatField(default = 0.0)
+  pred5 = models.FloatField(default = 0.0)
+  pred6 = models.FloatField(default = 0.0)
+  pred7 = models.FloatField(default = 0.0)
+  pred8 = models.FloatField(default = 0.0)
+  pred9 = models.FloatField(default = 0.0)
 
   def __str__(self):
-    return('Trainframe, Name = '+self.name)
+    return('Trainframe, Name = ' + self.name)
 
   class Meta:
     indexes = [
@@ -97,66 +97,65 @@ class trainframe(models.Model):
     ]
 
 class fit(models.Model):
-  made = models.DateTimeField(default=timezone.now)
-  minutes = models.FloatField(default=0.0)
+  made = models.DateTimeField(default = timezone.now)
+  minutes = models.FloatField(default = 0.0)
   school = models.IntegerField()
-  epochs = models.IntegerField(default=0)
-  nr_tr = models.IntegerField(default=0)
-  nr_va = models.IntegerField(default=0)
-  loss = models.FloatField(default=0.0)
-  binacc = models.FloatField(default=0.0)
-  recall = models.FloatField(default=0.0)
-  precision = models.FloatField(default=0.0)
-  val_loss = models.FloatField(default=0.0)
-  val_binacc = models.FloatField(default=0.0)
-  val_recall = models.FloatField(default=0.0)
-  val_precision = models.FloatField(default=0.0)
+  epochs = models.IntegerField(default = 0)
+  nr_tr = models.IntegerField(default = 0)
+  nr_va = models.IntegerField(default = 0)
+  loss = models.FloatField(default = 0.0)
+  binacc = models.FloatField(default = 0.0)
+  recall = models.FloatField(default = 0.0)
+  precision = models.FloatField(default = 0.0)
+  val_loss = models.FloatField(default = 0.0)
+  val_binacc = models.FloatField(default = 0.0)
+  val_recall = models.FloatField(default = 0.0)
+  val_precision = models.FloatField(default = 0.0)
   model_type = models.CharField(max_length=50, default='')
-  model_image_augmentation = models.FloatField(default=0.0)
-  l_rate_min = models.CharField(max_length=20, default='0')
-  l_rate_max = models.CharField(max_length=20, default='0')
-  l_rate_divisor = models.FloatField(default=0.0) #learning rate = val_loss / this
-  early_stop_delta_min = models.FloatField(default=0.0)
-  early_stop_patience = models.IntegerField(default=0)
-  start_reduce_lr = models.FloatField(default=0.0)
-  start_increase_aug = models.FloatField(default=0.0)
-  status = models.CharField(max_length=10, default='Done')
+  model_image_augmentation = models.FloatField(default = 0.0)
+  model_gamma = models.FloatField(default = 1.0)
+  l_rate_min = models.FloatField(default = 1e-7)
+  l_rate_max = models.FloatField(default = 1e-4)
+  l_rate_target = models.FloatField(default = 1e-6)
+  early_stop_patience = models.IntegerField(default = 20)
+  status = models.CharField(max_length = 10, default = 'Done')
 
   def __str__(self):
     return('Fit made ' + str(self.made))
 
 class epoch(models.Model):
-  fit = models.ForeignKey(fit, on_delete=models.CASCADE)
-  seconds = models.FloatField(default=0.0)
-  loss = models.FloatField(default=0.0)
-  val_loss = models.FloatField(default=0.0)
-  recall = models.FloatField(default=0.0)
-  val_recall = models.FloatField(default=0.0)
-  precision = models.FloatField(default=0.0)
-  val_precision = models.FloatField(default=0.0)
-  learning_rate = models.FloatField(default=0.0)
-  binacc = models.FloatField(default=0.0)
-  val_binacc = models.FloatField(default=0.0)
-  augmentation = models.FloatField(default=0.0)
-  gamma = models.FloatField(default=0.0)
+  fit = models.ForeignKey(fit, on_delete = models.CASCADE)
+  phase = models.IntegerField(default = 0)
+  seconds = models.FloatField(default = 0.0)
+  loss = models.FloatField(default = 0.0)
+  val_loss = models.FloatField(default = 0.0)
+  recall = models.FloatField(default = 0.0)
+  val_recall = models.FloatField(default = 0.0)
+  precision = models.FloatField(default = 0.0)
+  val_precision = models.FloatField(default = 0.0)
+  learning_rate = models.FloatField(default = 0.0)
+  binacc = models.FloatField(default = 0.0)
+  val_binacc = models.FloatField(default = 0.0)
+  augmentation = models.FloatField(default = 0.0)
+  gamma = models.FloatField(default = 0.0)
 
   def __str__(self):
     return('epoch model (TBD ...)')
     
 class model_type(models.Model):
-  name = models.CharField(max_length=50, default = 'efficientnetv2-b0')  
-  x_in_default = models.IntegerField(default=224)
-  y_in_default = models.IntegerField(default=224)
+  name = models.CharField(max_length = 50, default = 'efficientnetv2-b0')  
+  x_in_default = models.IntegerField(default = 224)
+  y_in_default = models.IntegerField(default = 224)
 
   def __str__(self):
-    return('model_type, Name = '+self.name)
+    return('model_type, Name = ' + self.name)
     
 class download(models.Model):
-  dl_url = models.CharField(max_length=128)
-  school = models.IntegerField(default=1)
-  model_kat = models.IntegerField("model type", choices=((1, 'Keras'), (2, 'LiteRT'), 
-    (3, 'LiteRTQ')), default=2) #Codes for download: K, L, Q
-  model_type = models.CharField(max_length=50, default='efficientnetv2-b0') 
+  dl_url = models.CharField(max_length = 128)
+  school = models.IntegerField(default = 1)
+  model_kat = models.IntegerField("model type", choices = ((1, 'Keras'), (2, 'LiteRT'), 
+    (3, 'LiteRTQ')), default = 2) #Codes for download: K, L, Q
+  model_type = models.CharField(max_length = 50, default = 'efficientnetv2-b0') 
 
   def __str__(self):
-    return('Model download, Url = '+self.dl_url)
+    return('Model download, Url = ' + self.dl_url)

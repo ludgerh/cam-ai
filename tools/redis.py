@@ -19,6 +19,10 @@ import json
 from tools.c_redis import saferedis
 
 class new_redis(saferedis):
+
+  def __init__(self):
+    super().__init__()
+    self.debug = False
   
   stringbase = 'cam-ai.tools.zip_info:'
 
