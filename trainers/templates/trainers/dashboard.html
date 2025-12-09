@@ -41,10 +41,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <table class="table">
       <thead>
         <tr>
-          <th>Made</th><th>Sam</th><th>MTy</th><th>Aug</th><th>Gam</th><th>LRMin</th>
-          <th>LRMax</th><th>LRTar</th><th>ESP</th><th>Min</th><th>Epochs</th>
-          <th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th><th>val_L</th>
-          <th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th><th>Status</th>
+          <th>Made</th><th>Sam</th><th>MTy</th><th>Aug</th><th>Gam</th><th>Fin</th>
+          <th>LRMin</th><th>LRMax</th><th>LRTar</th><th>ESP</th><th>Min</th>
+          <th>Epochs</th><th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
+          <th>val_L</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -117,6 +118,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <label class="m-2" for="gamma">Gamma</label>
           <input class="m-2" type="number" id="gamma" size="10" 
             min="1.0" max="4.0" step="0.1">
+        </div>   
+        <div class="col-sm-auto h4">
+          <label class="m-2" for="finetuning">Finetuning</label>
+          <input class="m-2" type="number" id="finetuning" size="10" 
+            min="0" max="100000">
         </div>  
       </div>  
     </div>
@@ -268,6 +274,7 @@ function refresh_all() {
       newaddition += '<td>' + item.model_type + '</td>';
       newaddition += '<td>' + item.model_image_augmentation.toPrecision(2) + '</td>';
       newaddition += '<td>' + item.model_gamma.toPrecision(2) + '</td>';
+      newaddition += '<td>' + item.model_finetuning + '</td>';
       newaddition += '<td>' + Number(item.l_rate_min).toExponential() + '</td>';
       newaddition += '<td>' + Number(item.l_rate_max).toExponential() + '</td>';
       newaddition += '<td>' + Number(item.l_rate_target).toExponential() + '</td>';
@@ -382,6 +389,7 @@ $(document).ready(function() {
       init_var('#model_train_type', 'model_train_type');
       init_var('#image_augmentation', 'model_image_augmentation');
       init_var('#gamma', 'model_gamma');
+      init_var('#finetuning', 'model_finetuning');
       init_var('#l_rate_min', 'l_rate_min');
       init_var('#l_rate_max', 'l_rate_max');
       init_var('#l_rate_target', 'l_rate_target');

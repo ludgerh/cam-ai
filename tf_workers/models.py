@@ -71,6 +71,7 @@ class school(models.Model):
   model_yin = models.IntegerField(default = 224)
   model_image_augmentation = models.FloatField(default = 0.0)
   model_gamma = models.FloatField(default = 1.0)
+  model_finetuning = models.IntegerField(default = 0)
   l_rate_min = models.FloatField(default = 1e-7)
   l_rate_max = models.FloatField(default = 1e-4)
   l_rate_target = models.FloatField(default = 1e-6)
