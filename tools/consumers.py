@@ -42,6 +42,7 @@ django.setup()
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
+from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.l_tools import djconf, displaybytes
 from tools.l_smtp import l_smtp, l_msg
@@ -112,6 +113,9 @@ class health(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + LOGNAME + ' (health)')
       logger.error(format_exc())
+      
+  async def disconnect(self, code = None):
+    close_old_connections()       
 
   async def receive(self, text_data):
     try:
@@ -284,6 +288,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + LOGNAME + ' (admin_tools_async)')
       logger.error(format_exc())
+      
+  async def disconnect(self, code = None):
+    close_old_connections()       
     
   async def check_create_school_priv(self, user):
     # todo: Add volume quota
@@ -640,8 +647,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
           params['message'],
           html = params['message'].replace('\n', '<br>'),
         )
-        my_msg.attach_file(LOGPATH + 'c_server.err') 
-        my_msg.attach_file(LOGPATH + 'c_server.log')  
+        my_msg.attach_file(LOGPATH / 'c_server.err')
+        my_msg.attach_file(LOGPATH / 'c_server.log')
         await my_smtp.sendmail(
           smtp_conf['sender_email'],
           'support@cam-ai.de',

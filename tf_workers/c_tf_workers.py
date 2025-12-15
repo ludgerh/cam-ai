@@ -26,7 +26,6 @@ import itertools
 from multiprocessing import Queue as p_queue, SimpleQueue as s_queue
 from time import time
 from datetime import datetime
-from threading import Lock as t_lock
 from random import random
 from logging import getLogger
 from signal import signal, SIGINT
@@ -56,13 +55,15 @@ def sigint_handler(signal, frame):
 
 class model_buffer(asyncio.PriorityQueue):
 
-  def __init__(self, schoolnr, xdim, ydim):
+  def __init__(self, schoolnr):
     super().__init__()
     self._counter = itertools.count()
     self.ts = time()
+    self.pause = True
+    
+  def set_xy(self, xdim, ydim):
     self.xdim = xdim
     self.ydim = ydim
-    self.pause = True
 
   async def append(self, initem, prio):
     # structure of initem:
@@ -165,13 +166,6 @@ class tf_worker(spawn_process):
         del self.users[received[1]]
     elif (received[0] == 'get_is_ready'):
       await self.my_output.put(received[1], ('put_is_ready', self.is_ready))
-    elif (received[0] == 'get_xy'):
-      await self.check_model(received[2], self.logger, True)
-      while not 'xdim' in self.models[received[2]]:
-        await a_break_type(BR_LONG)
-      xdim = self.models[received[2]]['xdim']
-      ydim = self.models[received[2]]['ydim']
-      await self.my_output.put(received[1], ('put_xy', (xdim, ydim)))
     elif (received[0] == 'ask_pred'):
       schoolnr = received[2]
       await self.check_model(schoolnr, self.logger, True)
@@ -179,11 +173,6 @@ class tf_worker(spawn_process):
         return(True)
       while not 'xdim' in self.models[schoolnr]:
         await a_break_type(BR_LONG)
-      if schoolnr not in self.model_buffers:
-        self.model_buffers[schoolnr] = model_buffer(schoolnr, 
-          self.models[schoolnr]['xdim'], 
-          self.models[schoolnr]['ydim'],
-        )
       self.model_buffers[schoolnr].pause = False
       await self.model_buffers[schoolnr].append(
         received[1:], 
@@ -193,8 +182,6 @@ class tf_worker(spawn_process):
       myuser = tf_user(prio = received[1])
       self.users[myuser.id] = myuser
       self.registerqueue.put(myuser.id)
-    elif (received[0] == 'checkmod'):
-      await self.check_model(received[2], self.logger, True)
     else:
       result = False  
     return(result)
@@ -233,7 +220,7 @@ class tf_worker(spawn_process):
         schooldir = schoolsdir + 'model' + str(schoolline.id) + '/'
         if not schoolline.dir:
           schoolline.dir = schooldir
-          await schoolline.asave(update_fields=["dir"])
+          await schoolline.asave(update_fields=('dir', ))
         await aiofiles.os.makedirs(schooldir + 'model/', exist_ok=True)
         await aiofiles.os.makedirs(schooldir + 'frames/', exist_ok=True)
         if self.dbline.use_litert:
@@ -258,9 +245,7 @@ class tf_worker(spawn_process):
       #*** Common Vars
       self.is_ready = False
       #*** Server Var
-      self.check_ts = time()
       self.models = {}
-      self.active_models = 0
       #*** Client Var
       self.run_out_procs = {}
       self.ws_ts = None
@@ -271,7 +256,6 @@ class tf_worker(spawn_process):
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       self.model_buffers = {}
-      self.load_model = None
       if self.dbline.gpu_sim >= 0: # Random values
         self.cachedict = {}
       else: #Local CPU or GPU
@@ -301,12 +285,15 @@ class tf_worker(spawn_process):
               tf.config.experimental.set_memory_growth(gpu, True)
           self.logger.info('+++++ tf_worker Selected: '+self.cuda_select)
           from tensorflow.keras.models import load_model
+          from trainers.custom_layers import CAMAI_RandAugment
+          from trainers.custom_layers import AdaptiveFocalLoss
           self.tf = tf
           self.load_model = load_model
       self.is_ready = True
       schoolnr = 0
       #print('Launch: tf_worker')
       await super().async_runner() 
+      self.tf_load_lock = asyncio.Lock()
       while not (self.got_sigint or self.model_buffers):
         await a_break_type(BR_LONG)
       self.finished = False
@@ -359,110 +346,101 @@ class tf_worker(spawn_process):
 #***************************************************************************
 
   async def check_model(self, schoolnr, logger, test_pred = False):
-    if schoolnr not in self.models:
-      self.models[schoolnr] = {}
-      self.models[schoolnr]['dbline'] = await self.dbschool.objects.aget(id = schoolnr)
-      self.models[schoolnr]['model_type'] = None
-    school_dbline = self.models[schoolnr]['dbline']
-    self.models[schoolnr]['last_check'] = time()
-    if self.check_ts + 60.0 < time() and self.models[schoolnr]['model_type'] is not None:
-      await school_dbline.arefresh_from_db()
-      self.check_ts = time()
-      if (
-        school_dbline.last_fit != self.models[schoolnr]['fit_nr']
-        or school_dbline.model_type != self.models[schoolnr]['model_type']
-      ):
-        if schoolnr in self.model_buffers:  
-          self.model_buffers[schoolnr].pause = True 
-        self.models[schoolnr]['model_type'] = None   
-        if self.dbline.gpu_sim < 0:
-          del self.models[schoolnr]['model']
-        self.active_models -= 1
-      self.check_ts = time()
-    if self.models[schoolnr]['model_type'] is None: 
-      if self.active_models >= self.dbline.max_nr_models:
-        nr_to_replace = min(self.models, key= lambda x: self.models[x]['last_check'])	
-        self.models[nr_to_replace]['model_type'] = None   
-        del self.models[nr_to_replace]['model']
-        self.active_models -= 1
-      if self.dbline.gpu_sim >= 0: #simulation
-        self.models[schoolnr]['fit_nr'] = 1
-        self.models[schoolnr]['model_type'] = 'simulation'
-      else:  #lokal GPU
-        self.models[schoolnr]['fit_nr'] = school_dbline.last_fit
-        self.models[schoolnr]['model_type'] = school_dbline.model_type
-        await a_break_time(self.dbline.gpu_sim_loading)
-      if self.dbline.gpu_sim >= 0:
-        self.models[schoolnr]['xdim'] = 50
-        self.models[schoolnr]['ydim'] = 50
-      else: #lokal GPU
-        if self.dbline.use_litert:
-          if self.dbline.use_coral:
-            model_path = (school_dbline.dir 
-              + 'model/c_' + school_dbline.model_type + '.tflite')
-          else:
-            model_path = (school_dbline.dir 
-              + 'model/' + school_dbline.model_type + '.tflite')
+    if (first_time := schoolnr not in self.models):
+      self.models[schoolnr] = {}  
+      this_model = self.models[schoolnr]   
+      this_model['dbline'] = await self.dbschool.objects.aget(id = schoolnr) 
+      this_model['fit_nr'] = -2
+    else: 
+      this_model = self.models[schoolnr]
+      if this_model['last_check'] + 60 > time():
+        return() 
+    this_model['last_check'] = time()
+    await this_model['dbline'].arefresh_from_db()
+    if this_model['dbline'].last_fit == this_model['fit_nr']:
+      return()
+    if schoolnr not in self.model_buffers:
+      self.model_buffers[schoolnr] = model_buffer(schoolnr)
+    if not self.model_buffers[schoolnr].pause:  
+      self.model_buffers[schoolnr].pause = True 
+      await a_break_type(BR_LONG)
+    if self.model_buffers[schoolnr].qsize():
+      return()
+    if len(self.models) >= self.dbline.max_nr_models:
+      nr_to_replace = min(self.models, key= lambda x: self.models[x]['last_check'])	
+      del self.models[nr_to_replace]
+    this_model['fit_nr'] = this_model['dbline'].last_fit
+    if self.dbline.gpu_sim >= 0: #simulation
+      this_model['model_type'] = 'simulation'
+      await a_break_time(self.dbline.gpu_sim_loading)
+    else:  #lokal GPU
+      this_model['model_type'] = this_model['dbline'].model_type
+    if self.dbline.gpu_sim >= 0:
+      this_model['xdim'] = 50
+      this_model['ydim'] = 50
+    else: #lokal GPU
+      if self.dbline.use_litert:
+        if self.dbline.use_coral:
+          model_path = (this_model['dbline'].dir 
+            + 'model/c_' + this_model['dbline'].model_type + '.tflite')
         else:
-          model_path = (school_dbline.dir
-            + 'model/' + school_dbline.model_type + '.keras')
-        logger.info('***** Loading model file #'+str(schoolnr)
-          + ', file: '+model_path)
-        self.models[schoolnr]['path'] = model_path  
-        self.models[schoolnr]['model_type'] = school_dbline.model_type
-        if self.dbline.use_litert:
-          print('00000', self.tflite.Interpreter)
-          if self.dbline.use_coral:
-              interpreter = self.tflite.Interpreter(
-                  model_path=model_path,
-                  experimental_delegates=[load_delegate('libedgetpu.so.1')],
-              )
-          else:
-            interpreter = await asyncio.to_thread(
-              self.tflite.Interpreter, 
-              model_path = model_path, 
+          model_path = (this_model['dbline'].dir 
+            + 'model/' + this_model['dbline'].model_type + '.tflite')
+      else:
+        model_path = (this_model['dbline'].dir
+          + 'model/' + this_model['dbline'].model_type + '.keras')
+      logger.info('***** Loading model file #'+str(schoolnr)
+        + ', file: '+model_path)
+      this_model['path'] = model_path  
+      this_model['model_type'] = this_model['dbline'].model_type
+      if self.dbline.use_litert:
+        if self.dbline.use_coral:
+            interpreter = self.tflite.Interpreter(
+                model_path=model_path,
+                experimental_delegates=[load_delegate('libedgetpu.so.1')],
             )
-          print('11111')
-          await asyncio.to_thread(interpreter.allocate_tensors)
-          print('22222')
-          self.models[schoolnr]['model'] = interpreter
-          self.models[schoolnr]['int_input'] = interpreter.tensor(
-            interpreter.get_input_details()[0]["index"],
-          )
-          self.models[schoolnr]['int_output'] = interpreter.tensor(
-            interpreter.get_output_details()[0]["index"],
-          )
-          self.models[schoolnr]['xdim'] = (
-            interpreter.get_input_details()[0]['shape_signature'][2]
-          )  
-          self.models[schoolnr]['ydim'] = (
-            interpreter.get_input_details()[0]['shape_signature'][1]
-          )
-        else: 
-          while self.load_model is None:
-            await a_break_type(BR_LONG)
-          loaded_model = await asyncio.to_thread(self.load_model, model_path)
-          self.models[schoolnr]['model'] = loaded_model
-          self.models[schoolnr]['xdim'] = loaded_model.input_shape[2]
-          self.models[schoolnr]['ydim'] = loaded_model.input_shape[1]
-        logger.info('***** Got model file #'+str(schoolnr) 
-          + ', file: '+model_path)
-      if test_pred and self.dbline.gpu_sim < 0:
-        xdata = np.random.rand(8,self.models[schoolnr]['xdim'],
-          self.models[schoolnr]['ydim'],3)
-        if self.dbline.use_litert: 
-          logger.info(str(self.models[schoolnr]['model'].get_input_details()[0]))
-          self.models[schoolnr]['int_input']().fill(128)
-          self.models[schoolnr]['model'].invoke()
-
         else:
-          loaded_model = await asyncio.to_thread(
-            self.models[schoolnr]['model'].predict_on_batch, 
-            xdata, 
+          interpreter = await asyncio.to_thread(
+            self.tflite.Interpreter, 
+            model_path = model_path, 
           )
-        logger.info('***** Testrun for model #' + str(schoolnr)+', type: '
-          + self.models[schoolnr]['model_type'])
-      self.active_models += 1    
+        await asyncio.to_thread(interpreter.allocate_tensors)
+        this_model['model'] = interpreter
+        this_model['int_input'] = interpreter.tensor(
+          interpreter.get_input_details()[0]["index"],
+        )
+        this_model['int_output'] = interpreter.tensor(
+          interpreter.get_output_details()[0]["index"],
+        )
+        this_model['xdim'] = (
+          interpreter.get_input_details()[0]['shape_signature'][2]
+        )  
+        this_model['ydim'] = (
+          interpreter.get_input_details()[0]['shape_signature'][1]
+        )
+      else: 
+        async with self.tf_load_lock:
+          loaded_model = await asyncio.to_thread(self.load_model, model_path)
+          this_model['model'] = loaded_model
+          this_model['xdim'] = loaded_model.input_shape[2]
+          this_model['ydim'] = loaded_model.input_shape[1]
+      self.model_buffers[schoolnr].set_xy(this_model['xdim'], this_model['ydim']) 
+      logger.info('***** Got model file #'+str(schoolnr) 
+        + ', file: '+model_path)
+    if test_pred and self.dbline.gpu_sim < 0:
+      xdata = np.random.rand(8,this_model['xdim'], this_model['ydim'],3)
+      if self.dbline.use_litert: 
+        logger.info(str(this_model['model'].get_input_details()[0]))
+        this_model['int_input']().fill(128)
+        this_model['model'].invoke()
+      else:
+        loaded_model = await asyncio.to_thread(
+          this_model['model'].predict_on_batch, xdata)
+      logger.info('***** Testrun for model #' + str(schoolnr)+', type: '
+        + this_model['model_type'])
+    self.model_buffers[schoolnr].pause = False
+    this_model['dbline'].last_fit_infer = this_model['fit_nr']
+    await this_model['dbline'].asave(update_fields = ('last_fit_infer', ))
 
   async def process_buffer(self, schoolnr, logger, had_timeout=False):
     mybuffer = self.model_buffers[schoolnr]
@@ -470,8 +448,7 @@ class tf_worker(spawn_process):
     slice_to_process = await mybuffer.get(self._safe_maxblock())
     framelist = [item[0] for item in slice_to_process]
     framesinfo = [item[1] for item in slice_to_process]
-    await self.check_model(schoolnr, logger, True)
-    self.model_buffers[schoolnr].pause = False
+    #await self.check_model(schoolnr, logger, True)
     if self.dbline.gpu_sim >= 0: #GPU Simulation with random
       if self.dbline.gpu_sim > 0:
         await a_break_time(self.dbline.gpu_sim)
@@ -491,9 +468,9 @@ class tf_worker(spawn_process):
       if self.dbline.use_litert: #Predictions Tensorflow Lite
         predictions = np.empty((0, self.len_taglist), np.float32)
         for item in framelist:
+          line=np.zeros((1, self.len_taglist), np.float32)
           np.copyto(self.models[schoolnr]['int_input'](), item)
           await asyncio.to_thread(self.models[schoolnr]['model'].invoke)
-          line=np.zeros((1, self.len_taglist), np.float32)
           np.copyto(line, self.models[schoolnr]['int_output']())
           predictions = np.vstack((predictions, line))
       else:
@@ -559,7 +536,7 @@ class tf_worker_client():
     self.registerqueue = registerqueue
     self.run_out_procs = {}
     self.pred_out_dict = {}
-    self.pred_out_lock = t_lock()
+    self.pred_out_lock = asyncio.Lock()
     self.is_ready = None
     self.auto_break = a_break_auto(tmin = 0.01, tmax = 0.1, rate = 0.01)
     self.prio_dict = {}
@@ -577,7 +554,7 @@ class tf_worker_client():
           self.xy = received[1]
         elif (received[0] == 'pred_to_send'):
           while True:
-            with self.pred_out_lock:
+            async with self.pred_out_lock:
               if received[2] not in self.pred_out_dict:
                 self.pred_out_dict[received[2]] = None
               if self.pred_out_dict[received[2]] is None:
@@ -621,14 +598,6 @@ class tf_worker_client():
       self.auto_break.reset()  
     return(self.is_ready)
 
-  async def get_xy(self, school, tf_w_index):
-    self.xy = None
-    await self.inqueue.put(('get_xy', tf_w_index, school))
-    while self.xy is None:
-      await self.auto_break.wait() 
-    self.auto_break.reset()  
-    return(self.xy)
-
   async def ask_pred(self, school, image_list, tf_w_index):
     if self.prio_dict[self.tf_w_index] < 6:
       tf_workers_redis.set_last_prio_write()
@@ -636,23 +605,15 @@ class tf_worker_client():
     command_line += image_list
     await self.inqueue.put(command_line)
 
-  async def client_check_model(self, tf_w_index, schoolnr, test_pred = False):
-    await self.inqueue.put((
-      'checkmod', 
-      tf_w_index, 
-      schoolnr, 
-      test_pred,
-    ))
-
-  def outqueue_empty(self, userindex):
-    with self.pred_out_lock:
+  async def outqueue_empty(self, userindex):
+    async with  self.pred_out_lock:
       result = ((userindex not in self.pred_out_dict) 
         or (self.pred_out_dict[userindex] is None))
     return(result)
 
   async def get_from_outqueue(self, userindex):
     while True:
-      with self.pred_out_lock:
+      async with  self.pred_out_lock:
         if userindex in self.pred_out_dict and self.pred_out_dict[userindex] is not None:
           result = self.pred_out_dict[userindex]
           self.pred_out_dict[userindex] = None

@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import asyncio
 from socket import gaierror
+from pathlib import Path
 from aiosmtplib import (
   SMTP,
   SMTPAuthenticationError, 
@@ -47,13 +48,15 @@ class l_msg(MIMEMultipart):
     self.attach(part)
       
   def attach_file(self, file_path):
+    # accept both str and Path
+    file_path = Path(file_path)      # normalize to Path
     with open(file_path, "rb") as f:
       part = MIMEBase("application", "octet-stream")
       part.set_payload(f.read())
     encoders.encode_base64(part)
     part.add_header(
-        "Content-Disposition",
-        f"attachment; filename={file_path.split('/')[-1]}"
+      "Content-Disposition",
+      f"attachment; filename={file_path.name}"  # use only filename
     )
     self.attach(part)
     

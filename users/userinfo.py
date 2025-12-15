@@ -20,7 +20,6 @@ from .models import userinfo
 def general_part(myuser):
   useddiscspace = tools_redis.get_useddiscspace()
   totaldiscspace = tools_redis.get_totaldiscspace()
-  print('DDD', totaldiscspace, useddiscspace)
   if useddiscspace > totaldiscspace * 0.95:
     return(0) 
   if myuser.is_superuser:

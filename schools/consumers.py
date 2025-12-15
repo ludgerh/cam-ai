@@ -34,6 +34,7 @@ from time import time
 from django.utils import timezone
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
+from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async, close_old_connections
 from django.contrib.auth.hashers import check_password
@@ -135,6 +136,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       if self.tf_w_index is not None:
         await self.tf_worker.stop_out(self.tf_w_index)
         await self.tf_worker.unregister(self.tf_w_index) 
+      close_old_connections()    
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -548,7 +550,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           self.school_lines[self.myschool] = await school.objects.aget(id = self.myschool)
           self.check_ts = time()
         if ('logout' in params) and params['logout'] and (self.myschool > 0):
-          await self.disconnect(None)
+          await self.disconnect()
         if self.myschool > 0:
           schoolline = await school.objects.aget(id=self.myschool)
           workerline = await worker.objects.aget(school__id=schoolline.id)
@@ -783,6 +785,7 @@ class schoolutil(AsyncWebsocketConsumer):
     try:
       if self.ws_session is not None:
         await self.ws_session.close()
+      close_old_connections()    
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())

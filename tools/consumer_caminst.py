@@ -23,6 +23,7 @@ from ipaddress import ip_network
 from validators.domain import domain
 from validators.ip_address import ipv4, ipv6
 from django.forms.models import model_to_dict
+from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from startup.redis import my_redis as startup_redis
@@ -69,6 +70,9 @@ class acaminst(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (acaminst)')
       logger.error(format_exc())
+      
+  async def disconnect(self, code = None):
+    close_old_connections()        
 
   async def receive(self, text_data):
     try:

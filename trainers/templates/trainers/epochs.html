@@ -44,6 +44,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="h2 m-10">Details for Fit #{{ fitnr }}</div>
 </div>
 <div class="container-fluid float-left">
+  <div class="h4 m-10">
+    Starting epoch #
+    <input class="h4 m-2" type="number" id="start_epoch" size="10"  min="1" max="1000" 
+      step="1" value="1">
+  </div>
+</div>
+<div class="container-fluid float-left">
   <canvas id="myChart"></canvas>
 </div>
 <div class="container-fluid float-left">
@@ -55,9 +62,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <th>val_Loss</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
       </tr>
     </thead>
-    <tbody>
-    <tbody id="tablebody">
-    </tbody>
+    <tbody id="tablebody"></tbody>
   </table>
 </div>
 <div class="h2">
@@ -112,28 +117,36 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let trainerutilSocket;
 let fit_length = -1;
 let graph_labels = [];
+let start_epoch = 1;
 let graph_data = {
   labels: graph_labels,
   datasets: [
     {
-    label: 'val_BinAcc',
-    backgroundColor: 'rgb(200, 0, 0)',
-    borderColor: 'rgb(200, 0, 0)',
+    label: 'Augmentation',
+    backgroundColor: 'rgb(0, 0, 155)',
+    borderColor: 'rgb(0, 0, 155)',
     yAxisID: 'A',
     data: [],
     },
     {
-    label: 'val_Precision',
+    label: 'Gamma',
+    backgroundColor: 'rgb(200, 155, 0)',
+    borderColor: 'rgb(200, 155, 0)',
+    yAxisID: 'B',
+    data: [],
+    },
+    {
+    label: 'Loss',
     backgroundColor: 'rgb(0, 155, 0)',
     borderColor: 'rgb(0, 155, 0)',
-    yAxisID: 'A',
+    yAxisID: 'C',
     data: [],
     },
     {
     label: 'val_Loss',
-    backgroundColor: 'rgb(0, 0, 155)',
-    borderColor: 'rgb(0, 0, 155)',
-    yAxisID: 'B',
+    backgroundColor: 'rgb(200, 0, 0)',
+    borderColor: 'rgb(200, 0, 0)',
+    yAxisID: 'D',
     data: [],
     },
   ]
@@ -143,14 +156,38 @@ let graph_config = {
   data: graph_data,
   options: {
     scales: {
+      B: {
+        type: 'linear',
+        position: 'left',
+        ticks: { color: 'rgb(200, 155, 0)' }, 
+        grid: {
+          drawOnChartArea: false
+        },
+      },
       A: {
         type: 'linear',
         position: 'left',
+        ticks: { color: 'rgb(0, 0, 155)' }, 
+        grid: {
+          drawOnChartArea: false
+        },
       },
-      B: {
+      C: {
         type: 'linear',
         position: 'right',
-      }
+        ticks: { color: 'rgb(0, 155, 0)' }, 
+        grid: {
+          drawOnChartArea: false
+        }
+      },
+      D: {
+        type: 'linear',
+        position: 'right',
+        ticks: { color: 'rgb(200, 0, 0)' }, 
+        grid: {
+          drawOnChartArea: false
+        }
+      },
     }
   }
 };
@@ -171,39 +208,37 @@ function refresh_all() {
       graph_data.datasets[0].data.length = 0;
       graph_data.datasets[1].data.length = 0;
       graph_data.datasets[2].data.length = 0;
-      newaddition = '';
+      graph_data.datasets[3].data.length = 0;
+      let rows = '';
       counter = 0;
       result.forEach(function(item, index) {
         counter += 1;
-        graph_labels.push(counter);
-        graph_data.datasets[0].data.push(item.val_binacc);
-        graph_data.datasets[1].data.push(item.val_precision);
-        graph_data.datasets[2].data.push(item.val_loss);
-        newaddition += '<tr>';
-        newaddition += '<td>'+counter+'</td>';
-        newaddition += '<td>'+item.phase+'</td>';
-        newaddition += '<td>'+Math.round(item.seconds)+'</td>';
-        newaddition += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.augmentation.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.gamma.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.recall.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.precision.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_recall.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_precision.toPrecision(4)+'</td>';
-        newaddition += '</tr>';
-        $('#tablebody').empty();
-        $('#tablebody').append(newaddition);
+        if (counter >= start_epoch) {
+          graph_labels.push(counter);
+          graph_data.datasets[0].data.push(item.augmentation);
+          graph_data.datasets[1].data.push(item.gamma);
+          graph_data.datasets[2].data.push(item.loss);
+          graph_data.datasets[3].data.push(item.val_loss);
+        };  
+        rows += '<tr>';
+        rows += '<td>'+counter+'</td>';
+        rows += '<td>'+item.phase+'</td>';
+        rows += '<td>'+Math.round(item.seconds)+'</td>';
+        rows += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
+        rows += '<td>'+item.loss.toPrecision(4)+'</td>';
+        rows += '<td>'+item.augmentation.toPrecision(4)+'</td>';
+        rows += '<td>'+item.gamma.toPrecision(4)+'</td>';
+        rows += '<td>'+item.binacc.toPrecision(4)+'</td>';
+        rows += '<td>'+item.recall.toPrecision(4)+'</td>';
+        rows += '<td>'+item.precision.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_loss.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_recall.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_precision.toPrecision(4)+'</td>';
+        rows += '</tr>';
       });
-      mygraph.destroy();
-      mygraph = new Chart(
-        document.getElementById('myChart'),
-        graph_config
-      );
-
+      mygraph.update('none');
+      $('#tablebody').html(rows);
       fit_length = result.length;
     };
     setTimeout(refresh_all, 10000);
@@ -238,7 +273,12 @@ $(document).ready(function() {
         refresh_all();
       })
     };
-  })
+  });
+  $('#start_epoch').on('change', function () {
+    start_epoch = parseInt($(this).val(), 10) || 0;
+    fit_length = -1; 
+    refresh_all();
+  });
 });
 
 </script>

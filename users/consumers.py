@@ -18,6 +18,7 @@ import json
 from logging import getLogger
 from traceback import format_exc
 from django.conf import settings
+from django.db import close_old_connections
 from channels.generic.websocket import WebsocketConsumer #, AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.tokens import maketoken
@@ -42,6 +43,9 @@ class archiveConsumer(WebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (archive)')
       logger.error(format_exc())
+      
+  async def disconnect(self, code = None):
+    close_old_connections()       
 
   def to_archive(self, mytype, mynumber):
     myarchive.to_archive(mytype, mynumber, self.scope['user'])

@@ -22,6 +22,7 @@ from logging import getLogger
 from traceback import format_exc
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
+from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
 from globals.c_globals import tf_workers
 from tools.c_logger import log_ini
@@ -57,11 +58,12 @@ class predictionsConsumer(AsyncWebsocketConsumer):
       logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())
 
-  async def disconnect(self, close_code):
+  async def disconnect(self, code = None):
     try:
       logger.info('Websocket-logout: WS-ID: ' + str(self.ws_id) 
         + ' - WS-Name: '  + str(self.ws_name) 
         + ' - Worker-Number: ' + str(self.worker_nr))
+      close_old_connections()    
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())
@@ -188,7 +190,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
               while (predictions.shape[0] 
                   < len(self.mydatacache['schooldata'][myschool]['imglist'])):
                 while ('tf_w_index' not in self.mydatacache 
-                    or my_worker.outqueue_empty(self.mydatacache['tf_w_index'])):
+                    or await my_worker.outqueue_empty(self.mydatacache['tf_w_index'])):
                   await asleep(medium_brake)
                 predictions = np.vstack((predictions, 
                   await my_worker.get_from_outqueue(self.mydatacache['tf_w_index'])))

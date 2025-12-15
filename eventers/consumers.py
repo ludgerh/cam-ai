@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import json
 from logging import getLogger
 from traceback import format_exc
+from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from .models import alarm as dbalarm
@@ -34,6 +35,9 @@ class alarm(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (alarm)')
       logger.error(format_exc())
+      
+  async def disconnect(self, code = None): 
+    close_old_connections()       
 
   async def receive(self, text_data):
     try:

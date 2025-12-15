@@ -216,10 +216,6 @@ class c_eventer(viewable):
       self.tf_w_index = await self.tf_worker.register(self.tf_worker_id, prio = 2)
       await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
       self.school_line = await database_sync_to_async(lambda: self.dbline.eve_school)()
-      self.xdim, self.ydim = await self.tf_worker.get_xy(
-        self.school_line.id,
-        self.tf_w_index
-      )
       self.finished = False
       self.scaling = None
       self.scrwidth = None 
@@ -484,9 +480,8 @@ class c_eventer(viewable):
     if item.goes_to_school or item.isrecording or item.to_email:
       if not await afree_quota(item.stream_creator):
         self.logger.warning(f'EV{self.id}: Did not save the event because of low quota')
-        self.event_dict.goes_to_school = False
-        self.event_dict.item.isrecording = False
-        self.event_dict.item.to_email = []
+        async with self.event_dict_lock:
+          self.event_dict.pop(i, None)
         return()
       if item.isrecording:
         async with self.vid_deque_lock:

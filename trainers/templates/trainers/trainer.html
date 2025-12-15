@@ -103,9 +103,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <th>val_Rec</th><th>val_Prec</th><th>Status</th>
         </tr>
       </thead>
-      <tbody>
-      <tbody id="tablebody">
-      </tbody>
+      <tbody id="tablebody"></tbody>
     </table>
   </div>
 </main>
@@ -128,14 +126,14 @@ let graph_data = {
     data: [],
     },
     {
-    label: 'val_Precision',
+    label: 'val_Recall',
     backgroundColor: 'rgb(0, 155, 0)',
     borderColor: 'rgb(0, 155, 0)',
-    yAxisID: 'A',
+    yAxisID: 'B',
     data: [],
     },
     {
-    label: 'val_Loss',
+    label: 'val_Precision',
     backgroundColor: 'rgb(0, 0, 155)',
     borderColor: 'rgb(0, 0, 155)',
     yAxisID: 'B',
@@ -151,11 +149,18 @@ let graph_config = {
       A: {
         type: 'linear',
         position: 'left',
+        ticks: { color: 'rgb(200, 0, 0)' }, 
+        grid: {
+          drawOnChartArea: false
+        }
       },
       B: {
         type: 'linear',
         position: 'right',
-      }
+        grid: {
+          drawOnChartArea: false
+        }
+      },
     }
   }
 };
@@ -177,16 +182,9 @@ function refresh_all() {
     $('#nr_validated').text(result.nr_validated);
     $('#nr_not_trained').text(result.nr_not_trained);
     $('#nr_not_checked').text(result.nr_not_checked);
-    $('#recog0').text(result.recog0);
-    $('#recog1').text(result.recog1);
-    $('#recog2').text(result.recog2);
-    $('#recog3').text(result.recog3);
-    $('#recog4').text(result.recog4);
-    $('#recog5').text(result.recog5);
-    $('#recog6').text(result.recog6);
-    $('#recog7').text(result.recog7);
-    $('#recog8').text(result.recog8);
-    $('#recog9').text(result.recog9);
+    for (let i = 0; i < 10; i++) {
+      $('#recog' + i).text(result['recog' + i]);
+    }
     return(trainerutilSocket.sendandwait({
       'command' : 'getfitinfo',
       'school' : {{ schoolnr }},
@@ -198,43 +196,38 @@ function refresh_all() {
       graph_data.datasets[0].data.length = 0;
       graph_data.datasets[1].data.length = 0;
       graph_data.datasets[2].data.length = 0;
-      newaddition = '';
+      let rows = '';
       result.forEach(function(item, index) {
         datestring = item.made;
+        d = datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4);
         if (item.status == 'Done') {
-          graph_labels.push(datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4));
+          graph_labels.push(d);
           graph_data.datasets[0].data.push(item.val_binacc);
-          graph_data.datasets[1].data.push(item.val_precision);
-          graph_data.datasets[2].data.push(item.val_loss);
+          graph_data.datasets[1].data.push(item.val_recall);
+          graph_data.datasets[2].data.push(item.val_precision);
         };
-        newaddition += '<tr>';
-        newaddition += '<td>'+datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4)+'</td>';
-        newaddition += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
-        newaddition += '<td>'+Math.round(item.minutes)+'</td>';
-        newaddition += '<td>'+item.epochs+'</td>';
-        newaddition += '<td>'+item.loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.recall.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.precision.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_loss.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_recall.toPrecision(4)+'</td>';
-        newaddition += '<td>'+item.val_precision.toPrecision(4)+'</td>';
-        newaddition += '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.id+'/">'+item.status+'</a></td>';
-        newaddition += '</tr>';
-        $('#tablebody').empty();
-        $('#tablebody').append(newaddition);
+        rows += '<tr>';
+        rows += '<td>'+d+'</td>';
+        rows += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
+        rows += '<td>'+Math.round(item.minutes)+'</td>';
+        rows += '<td>'+item.epochs+'</td>';
+        rows += '<td>'+item.loss.toPrecision(4)+'</td>';
+        rows += '<td>'+item.binacc.toPrecision(4)+'</td>';
+        rows += '<td>'+item.recall.toPrecision(4)+'</td>';
+        rows += '<td>'+item.precision.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_loss.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_recall.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_precision.toPrecision(4)+'</td>';
+        rows+= '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.id+'/">'+item.status+'</a></td>';
+        rows += '</tr>';
       });
+      $('#tablebody').html(rows);
       last_status = result[result.length - 1].status;
-      mygraph.destroy();
-      mygraph = new Chart(
-        document.getElementById('myChart'),
-        graph_config
-      );
+      mygraph.update('none');
 
       fit_length = result.length;
     };
-    //setTimeout(refresh_all, 10000);
   })
 };
 

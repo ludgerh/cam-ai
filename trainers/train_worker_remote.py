@@ -38,6 +38,7 @@ from tools.l_break import break_time
 from tools.c_tools import list_from_queryset
 from users.userinfo import afree_quota
 from tf_workers.models import school as school_db
+from trainers.models import trainframe
 from .models import trainframe, download
 from camai.version import version
 
@@ -90,8 +91,8 @@ async def check_downloads(logger, session):
       school_line = await school_db.objects.aget(id=new_download.school)
       if school_line.model_type == school_line.model_train_type:
         school_line.last_fit += 1
-        school_line.lastmodelfile = timezone.now()
-        await school_line.asave(update_fields=("last_fit", "lastmodelfile"))
+      school_line.lastmodelfile = timezone.now()
+      await school_line.asave(update_fields=("last_fit", "lastmodelfile"))
       await new_download.adelete()
       return(True)
     finally:

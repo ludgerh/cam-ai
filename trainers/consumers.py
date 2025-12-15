@@ -35,7 +35,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.forms.models import model_to_dict
-from django.db import transaction
+from django.db import transaction, close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from camai.version import version
@@ -100,6 +100,14 @@ class remotetrainer(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
       logger.error(format_exc())
+
+  async def disconnect(self, code):
+    try:
+      logger.debug('Disconnected, Code:'+ str(code)) 
+      close_old_connections() 
+    except:
+      logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
+      logger.error(format_exc())      
 
   async def receive(self, text_data =None, bytes_data=None):
     global counter_dict
@@ -363,13 +371,6 @@ class remotetrainer(AsyncWebsocketConsumer):
         if self.ws_session is not None:
           #await asyncio.sleep(1.0)  
           await self.ws_session.close()
-    except:
-      logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
-      logger.error(format_exc())
-
-  async def disconnect(self, code):
-    try:
-      logger.debug('Disconnected, Code:'+ str(code))
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
       logger.error(format_exc())
@@ -656,9 +657,9 @@ class trainerutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'set_from_dashboard':
         if self.maywrite:
-          schoolline = await school.objects.aget(id=self.schoolnr)
+          schoolline = await school.objects.aget(id = self.schoolnr)
           setattr(schoolline, params['item'], params['value'])
-          await schoolline.asave(update_fields=[params['item']])
+          await schoolline.asave(update_fields = [params['item']])
           if self.trainerline.t_type == 2:
             temp = json.loads(text_data)
             temp['data']['school']=self.schoolline.e_school
@@ -666,6 +667,9 @@ class trainerutil(AsyncWebsocketConsumer):
             returned = await self.ws.receive()
             if json.loads(returned.data)['data'] != 'OK':
               self.close()	
+          if params['item'] == 'model_type':
+            schoolline.last_fit += 1
+            await schoolline.asave(update_fields=('last_fit', ))
           outlist['data'] = 'OK'
           #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))	

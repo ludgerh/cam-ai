@@ -12,7 +12,6 @@ See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-v1.6.6 01.03.25
 """
 
 import asyncio
@@ -82,8 +81,8 @@ class trainer(spawn_process):
       from tf_workers.models import school
       school_dbline = await school.objects.aget(id = school_nr)
       base_qs = (trainframe.objects
-        .filter(school=school_nr, deleted=False)
-        .exclude(last_fit=school_dbline.last_fit))
+        .filter(school = school_nr, deleted=False)
+        .exclude(last_fit = school_dbline.last_fit_infer))
       total_count = await base_qs.acount()
       framelines = base_qs[:1000]
       if self.got_sigint:
@@ -146,7 +145,7 @@ class trainer(spawn_process):
                   )  
                   await a_break_type(BR_LONG)
             prediction = received.pop(0) 
-            frameline.last_fit = school_dbline.last_fit
+            frameline.last_fit = school_dbline.last_fit_infer
             for i in range(10):
               setattr(frameline, f"pred{i}", prediction[i])
           await trainframe.objects.abulk_update(
@@ -201,10 +200,7 @@ class trainer(spawn_process):
         if((self.dbline.startworking < timestr) 
             and (self.dbline.stopworking > timestr)
             and self.dbline.running):
-          if self.dbline.t_type == 1: 
-            if train_once_gpu is None:
-              from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
-          elif self.dbline.t_type == 2:
+          if self.dbline.t_type == 2:
             for item in list(self.process_dict):
               if not self.process_dict[item][0].is_alive():
                 filterdict = {
@@ -214,8 +210,6 @@ class trainer(spawn_process):
                 if not self.process_dict[item][1].ignore_checked:
                   filterdict['checked'] = True
                 await trainframe.objects.filter(**filterdict).aupdate(train_status = 2)
-                myschool.l_rate_divisor = 10000.0
-                await myschool.asave(update_fields=['l_rate_divisor'])
                 del self.process_dict[item]
             if train_once_remote is None:
               from .train_worker_remote import train_once_remote, check_downloads
@@ -233,6 +227,8 @@ class trainer(spawn_process):
             if got:
               self.job_queue.task_done()
           if self.dbline.t_type == 1:
+            if train_once_gpu is None:
+              from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
             train_process = Process(target = train_once_gpu, args = (
               myschool, 
               myfit, 

@@ -20,6 +20,7 @@ from time import sleep
 from threading import Lock as t_lock
 from logging import getLogger
 from traceback import format_exc
+from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.l_tools import djconf
@@ -53,6 +54,9 @@ class cleanup(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (cleanup)')
       logger.error(format_exc())
+      
+  async def disconnect(self, code = None):
+    close_old_connections()                
 
   async def receive(self, text_data):
     try:
