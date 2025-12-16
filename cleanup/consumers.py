@@ -20,8 +20,8 @@ from time import sleep
 from threading import Lock as t_lock
 from logging import getLogger
 from traceback import format_exc
-from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import aclose_old_connections
 from tools.c_logger import log_ini
 from tools.l_tools import djconf
 from tf_workers.models import school
@@ -50,13 +50,11 @@ class cleanup(AsyncWebsocketConsumer):
         self.missingdbdict= {}
         self.missingfilesdict = {}
         self.counter_lock = t_lock()
+        await aclose_old_connections()
         await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (cleanup)')
-      logger.error(format_exc())
-      
-  async def disconnect(self, code = None):
-    close_old_connections()                
+      logger.error(format_exc())          
 
   async def receive(self, text_data):
     try:

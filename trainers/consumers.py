@@ -35,9 +35,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.forms.models import model_to_dict
-from django.db import transaction, close_old_connections
+from django.db import transaction
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
+from channels.db import database_sync_to_async, aclose_old_connections
 from camai.version import version
 from tools.l_tools import djconf, seq_to_int, version_newer_or_equal
 from tools.c_logger import log_ini
@@ -96,6 +96,7 @@ class remotetrainer(AsyncWebsocketConsumer):
       self.frameinfo = {}
       self.made_dirs = set()
       self.sizeline = None
+      await aclose_old_connections()
       await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
@@ -104,7 +105,6 @@ class remotetrainer(AsyncWebsocketConsumer):
   async def disconnect(self, code):
     try:
       logger.debug('Disconnected, Code:'+ str(code)) 
-      close_old_connections() 
     except:
       logger.error('Error in consumer: ' + logname + ' (remotetrainer)')
       logger.error(format_exc())      
@@ -398,6 +398,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       self.ws_ts = None
       self.status_string = 'Idle'
+      await aclose_old_connections()
       await self.accept()
       self.trainer_nr = None
       self.ws_session = None

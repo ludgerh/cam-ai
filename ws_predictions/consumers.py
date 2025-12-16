@@ -22,8 +22,8 @@ from logging import getLogger
 from traceback import format_exc
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
-from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import aclose_old_connections
 from globals.c_globals import tf_workers
 from tools.c_logger import log_ini
 from tools.l_tools import djconf
@@ -53,6 +53,7 @@ class predictionsConsumer(AsyncWebsocketConsumer):
       self.worker_nr = 0
       self.ws_name = 'undefined'
       self.mydatacache = {}
+      await aclose_old_connections()
       await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')
@@ -63,7 +64,6 @@ class predictionsConsumer(AsyncWebsocketConsumer):
       logger.info('Websocket-logout: WS-ID: ' + str(self.ws_id) 
         + ' - WS-Name: '  + str(self.ws_name) 
         + ' - Worker-Number: ' + str(self.worker_nr))
-      close_old_connections()    
     except:
       logger.error('Error in consumer: ' + logname + ' (predictions)')
       logger.error(format_exc())

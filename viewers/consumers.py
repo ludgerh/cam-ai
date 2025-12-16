@@ -19,9 +19,8 @@ import asyncio
 from logging import getLogger
 from traceback import format_exc
 from django.utils import timezone
-from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
+from channels.db import database_sync_to_async, aclose_old_connections
 from autobahn.exception import Disconnected
 from access.c_access import access
 from globals.c_globals import viewables, viewers
@@ -48,6 +47,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
   async def connect(self):
     try:
       self.viewer_dict = {}
+      await aclose_old_connections()
       await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
@@ -61,7 +61,6 @@ class triggerConsumer(AsyncWebsocketConsumer):
           dict_item = self.viewer_dict[mode][idx]
           if dict_item['show_cam']:
             dict_item['viewer'].pop_from_onf(dict_item['onf'])
-      close_old_connections()    
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
@@ -170,13 +169,11 @@ class c_viewConsumer(AsyncWebsocketConsumer):
 
   async def connect(self):
     try:
+      await aclose_old_connections()
       await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (c_view)')
       logger.error(format_exc())
-      
-  async def disconnect(self, code = None):
-    close_old_connections()       
 
   async def receive(self, text_data):
     try:

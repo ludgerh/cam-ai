@@ -18,8 +18,8 @@ import json
 from logging import getLogger
 from traceback import format_exc
 from django.forms.models import model_to_dict
-from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import aclose_old_connections
 from autobahn.exception import Disconnected
 from access.c_access import access
 from tools.c_logger import log_ini
@@ -56,6 +56,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
   async def connect(self):
     try:
+      await aclose_old_connections()
       await self.accept()
       self.myitem = None
       self.detectormask_changed = False
@@ -68,7 +69,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       if self.myitem is not None:
         self.myitem.nr_of_cond_ed = 0
         self.myitem.last_cond_ed = 0
-      close_old_connections()    
     except:
       logger.error('Error in consumer: ' + logname + ' (oneitem)')
       logger.error(format_exc())

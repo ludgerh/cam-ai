@@ -34,9 +34,8 @@ from time import time
 from django.utils import timezone
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
-from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async, close_old_connections
+from channels.db import database_sync_to_async, aclose_old_connections
 from django.contrib.auth.hashers import check_password
 from camai.c_settings import safe_import
 from tools.l_tools import ts2filename, djconf, uniquename_async
@@ -126,6 +125,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       self.check_ts = 0.0
       self.user = self.scope['user']
       self.tf_w_index = None
+      await aclose_old_connections()
       if self.user.is_authenticated:
         await self.accept()
       else:
@@ -147,7 +147,6 @@ class schooldbutil(AsyncWebsocketConsumer):
       if self.tf_w_index is not None:
         await self.tf_worker.stop_out(self.tf_w_index)
         await self.tf_worker.unregister(self.tf_w_index) 
-      close_old_connections()   
       del getbmp_dict[0][self.consumer_id]
       del getbmp_dict[1][self.consumer_id]
       schooldbutil.consumer_id_list.remove(self.consumer_id) 
@@ -836,6 +835,7 @@ class schoolutil(AsyncWebsocketConsumer):
     try:
       self.ws_session = None
       self.authed = False
+      await aclose_old_connections()
       await self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
@@ -845,7 +845,6 @@ class schoolutil(AsyncWebsocketConsumer):
     try:
       if self.ws_session is not None:
         await self.ws_session.close()
-      close_old_connections()    
     except:
       logger.error('Error in consumer: ' + logname + ' (trainerutil)')
       logger.error(format_exc())

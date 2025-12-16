@@ -42,8 +42,8 @@ django.setup()
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
-from django.db import close_old_connections
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import aclose_old_connections
 from tools.l_tools import djconf, displaybytes
 from tools.l_smtp import l_smtp, l_msg
 from tools.l_break import a_break_type, BR_LONG
@@ -109,13 +109,11 @@ class health(AsyncWebsocketConsumer):
 
   async def connect(self):
     try:
+      await aclose_old_connections()
       await self.accept()
     except:
       logger.error('Error in consumer: ' + LOGNAME + ' (health)')
       logger.error(format_exc())
-      
-  async def disconnect(self, code = None):
-    close_old_connections()       
 
   async def receive(self, text_data):
     try:
@@ -284,13 +282,11 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def connect(self):
     try:
+      await aclose_old_connections()
       await self.accept()
     except:
       logger.error('Error in consumer: ' + LOGNAME + ' (admin_tools_async)')
-      logger.error(format_exc())
-      
-  async def disconnect(self, code = None):
-    close_old_connections()       
+      logger.error(format_exc()) 
     
   async def check_create_school_priv(self, user):
     # todo: Add volume quota

@@ -181,7 +181,9 @@ ASGI_APPLICATION = 'camai.asgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'camai.db_backend',
+        'ENGINE': 'django.db.backends.mysql',
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
         'NAME': db_database,
         'HOST': 'localhost',
         'PORT': '3306',

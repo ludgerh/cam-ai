@@ -39,13 +39,11 @@ class archiveConsumer(WebsocketConsumer):
   def connect(self):
     try:
       self.user = self.scope['user']
+      close_old_connections()
       self.accept()
     except:
       logger.error('Error in consumer: ' + logname + ' (archive)')
-      logger.error(format_exc())
-      
-  async def disconnect(self, code = None):
-    close_old_connections()       
+      logger.error(format_exc())  
 
   def to_archive(self, mytype, mynumber):
     myarchive.to_archive(mytype, mynumber, self.scope['user'])
