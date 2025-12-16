@@ -187,7 +187,6 @@ DATABASES = {
         'PORT': '3306',
         'USER': 'CAM-AI',
         'PASSWORD': db_password,
-        'CONN_MAX_AGE': 60,   # keep-alive connections for 60 seconds
     }
 }
 

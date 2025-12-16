@@ -1,6 +1,6 @@
 {% extends 'eventers/basis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -106,15 +106,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% for item in frames %}
           <div id="col{{ frame.id }}" class="col-sm-auto">
             <div class="card m-2" id="crd{{ item.id }}" dtype="0" style="width: 375px; height: 480px;">
-              <a href="/schools/getbigbmp/0/{{ item.id }}/" target="_blank">
-                <img src="/schools/getbmp/0/{{ item.id }}/3/1/375/375/" style="width: 375px; height: 375px; object-fit: contain;"></a>
-                <div class="card-body">
-                  <h6 class="card-title">{{ item.time|date:'d.m.Y H:i:s' }}</h6>
-                  <button type="button"  id="{{ item.id }}" class="btn btn-primary position-absolute bottom-0 start-0 m-3 framearchbutton" style="width: 120px;">To Archive</button>
+              <a class="framebig-link" data-frame-id="{{ item.id }}" href="#" target="_blank">
+                <img class="frame-img"
+                     data-frame-id="{{ item.id }}"
+                     src=""
+                     style="width: 375px; height: 375px; object-fit: contain;">
+              </a>
+                  
+              <div class="card-body">
+                <h6 class="card-title">{{ item.time|date:'d.m.Y H:i:s' }}</h6>
+                <button type="button"  id="{{ item.id }}" class="btn btn-primary position-absolute bottom-0 start-0 m-3 framearchbutton" style="width: 120px;">To Archive</button>
 {% if may_write_stream %}
-                  <button type="button"  id="{{ item.id }}" dtype="0" class="btn btn-primary position-absolute bottom-0 end-0 m-3" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 120px;">Delete</button>
+                <button type="button"  id="{{ item.id }}" dtype="0" class="btn btn-primary position-absolute bottom-0 end-0 m-3" data-bs-toggle="modal" data-bs-target="#deleteModal" style="width: 120px;">Delete</button>
 {% endif %}
-                </div>
+              </div>
             </div>
           </div>
 {% endfor %}
@@ -127,6 +132,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <script >
 
 let displaywidth = Math.round($(window).width() * 0.97);
+let consumer_id = 0;
 
 {% if may_write_stream %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
@@ -159,7 +165,6 @@ $.fn.isInViewport = function() {
 vid = document.getElementById("video");
 if (vid) {
   vid.addEventListener( "loadedmetadata", function () {
-    console.log(this.duration)
     $('#duration').text(Math.round(this.duration) + ' Sec');
     xscale = ($(window).width() - 20) / this.videoWidth;
     yscale = ($(window).height() - 300) / this.videoHeight;
@@ -195,6 +200,27 @@ $(document).ready(function() {
   })
 	.then((result) => {
 		SchoolDBUtilSocket = result;
+    return(SchoolDBUtilSocket.sendandwait({
+      'command' : 'get_consumer_id',
+    }));
+  })
+  .then((result) => {
+    consumer_id = result;
+    return(SchoolDBUtilSocket.sendandwait({
+      'command' : 'event_to_dict',
+			  'event_nr' : {{ event.id }},
+    }));
+  })
+  .then(() => {
+    // Build URLs after consumer_id is known
+    $('.framebig-link').each(function () {
+      const id = $(this).data('frameId');
+      $(this).attr('href', `/schools/getbigbmp/0/${consumer_id}/${id}/`);
+    });
+    $('.frame-img').each(function () {
+      const id = $(this).data('frameId');
+      $(this).attr('src', `/schools/getbmp/0/${consumer_id}/${id}/3/1/375/375/`);
+    });
     $('.framearchbutton').each(function() {
       ArchiveSocket.sendandwait({
 			  'command' : 'check_arch',
@@ -206,7 +232,6 @@ $(document).ready(function() {
           $(this).prop("disabled",true);
         };
       })
-	    .catch(err => {console.log(err);});
     });
     $('.videoarchbutton').each(function() {
       ArchiveSocket.sendandwait({
@@ -219,7 +244,6 @@ $(document).ready(function() {
           $(this).prop("disabled",true);
         };
       })
-	    .catch(err => {console.log(err);});
     });
     $('.framearchbutton').click(function() {
       ArchiveSocket.sendandwait({
@@ -232,7 +256,6 @@ $(document).ready(function() {
           $(this).prop("disabled",true);
         };
       })
-	    .catch(err => {console.log(err);});
     });
     $('.videoarchbutton').click(function() {
       ArchiveSocket.sendandwait({
@@ -245,7 +268,6 @@ $(document).ready(function() {
           $(this).prop("disabled",true);
         };
       })
-	    .catch(err => {console.log(err);});
     });
 {% if may_write_stream %}
     $('.delbutton').click(function() {
@@ -267,11 +289,9 @@ $(document).ready(function() {
           console.log('Error while deleting Nr. '+nr_todel);
         };
 		  })
-		  .catch(err => {console.log(err);});
     });
 {% endif %}
   })
-	.catch(err => {console.log(err);});
 });
 </script>
 

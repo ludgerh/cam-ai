@@ -92,6 +92,7 @@ let events;
 let get_lines_busy = false;
 let indices = {};
 let framelines = {};
+let consumer_id = 0;
 
 function isInViewport(elementid) {
   element = document.getElementById(elementid);
@@ -235,10 +236,10 @@ function getimages (count) {
       frames_list.push(frame_item);
       mycard = '<div id="card'+item+'" class="card m-1 p-0"'
       mycard += 'style="width: 212px; height: auto;">'
-      mycard += '<a href="/schools/getbigbmp/0/'
+      mycard += '<a href="/schools/getbigbmp/0/' + consumer_id + '/';
       mycard += item + '/'
       mycard += '" target="_blank">'
-      mycard += '<img src="/schools/getbmp/0/'
+      mycard += '<img src="/schools/getbmp/0/' + consumer_id + '/';
       mycard += item + '/3/1/210/210/'
       mycard += '" style="width: 210px; height: 210px; object-fit: contain"</a>'
       mycard += '</div>';
@@ -475,6 +476,12 @@ $(document).ready(function () {
 	)
 	.then((result) => {
 		SchoolDBUtilSocket = result;
+    return(SchoolDBUtilSocket.sendandwait({
+      'command' : 'get_consumer_id',
+    }));
+  })
+  .then((result) => {
+    consumer_id = result;
 		return (SchoolDBUtilSocket.sendandwait({
 			'command' : 'setcrypt',
 			'stream' : {{ stream.id }},

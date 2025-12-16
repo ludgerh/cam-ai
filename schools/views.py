@@ -18,6 +18,7 @@ import os
 from shutil import rmtree
 from glob import glob
 from ua_parser import user_agent_parser
+from pathlib import Path
 from zipfile import ZipFile
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
@@ -116,32 +117,24 @@ def imexport(request, schoolnr):
   else:
     return render(request, 'schools/imexport.html', context)
 
+getbmp_dict = {}
 #mode == 0: Classroom Dir, mode == 1: Model Dir
 #mode == 2: Archive Image, mode == 3: Archive video 
-def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, token=None): 
+def getbmp(request, mode, consumer_id, framenr, outtype, xycontained, x, y, 
+    tokennr=None, token=None): 
   global crypter_dict
   if mode == 0:
-    frameline = event_frame.objects.get(id = framenr)
-    eventline = frameline.event
-    streamline = eventline.camera
-    if (crypt := frameline.encrypted):
-      if not streamline.id in crypter_dict:
-        crypter_dict[streamline.id] = l_crypt(key=streamline.crypt_key)
-    if (
-        is_public_server 
-        and request.user.is_superuser 
-        and request.user.id != streamline.creator.id
-        and crypt
-    ):   
-      filepath = 'camai/static/camai/git/img/privacy.jpg'
-    else:
-      filepath = schoolframespath + frameline.name
+    frame_info = getbmp_dict[0][consumer_id][framenr]
+    if frame_info['crypt']:
+      crypter_dict.setdefault(frame_info['stream'], l_crypt(key=frame_info['crypt']))
+    filepath = schoolframespath + frame_info['path']
+    crypt = frame_info['crypt']
   elif mode == 1:
-    frameline = trainframe.objects.get(id = framenr)
-    schoolline = school.objects.get(id = frameline.school)
-    filepath = schoolline.dir + 'frames/' + frameline.name
+    filepath_raw = getbmp_dict[1][consumer_id][framenr]['path']
+    filepath = filepath_raw.replace('*****', 'frames', 1)
     if not os.path.exists(filepath):
-      filepath = schoolline.dir + 'coded/' + '224x224/' + frameline.name[:-3] + 'cod'
+      filepath = filepath_raw.split("*****/", 1)[0]
+      filepath = filepath + 'coded/' + '224x224/' + frameline.name[:-3] + 'cod'
       filepath = filepath[:-3]+'cod'
     crypt = False
   elif mode == 2:
@@ -164,9 +157,14 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
       go_on = False
   else:
     if mode == 0:
-      go_on = access.check('C', streamline.id, request.user, 'R')
+      go_on = access.check('C', frame_info['stream'], request.user, 'R')
     elif mode == 1:
-      go_on = access.check('S', schoolline.id, request.user, 'R')
+      go_on = access.check(
+        'S', 
+        getbmp_dict[1][consumer_id][framenr]['path'], 
+        request.user, 
+        'R', 
+      )
     else:
       go_on = (request.user in userset)
   if not go_on:
@@ -174,15 +172,8 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
   with open(filepath, "rb") as f:
     image_data = f.read()
   if crypt: 
-    if (is_public_server 
-      and request.user.is_superuser
-      and request.user.id != streamline.creator.id
-    ):
-      myframe = c_convert(image_data, typein=3, typeout=outtype, xycontained=xycontained, 
-        xout=x, yout=y)
-    else:  
-      myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
-        xout=x, yout=y, incrypt=crypter_dict[streamline.id]) 
+    myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
+      xout=x, yout=y, incrypt=crypter_dict[frame_info['stream']]) 
   else:
     myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
       xout=x, yout=y)  
@@ -190,7 +181,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y, tokennr=None, tok
   return HttpResponse(myframe, content_type="image/jpeg")
 
 #schoolnr = 0 --> from classroom directory
-def getbigbmp(request, mode, framenr, tokennr=0, token=''): 
+def getbigbmp(request, mode, consumer_id, framenr, tokennr=0, token=''): 
   if mode == 0:
     frameline = event_frame.objects.get(id = framenr)
     eventline = frameline.event
@@ -219,6 +210,7 @@ def getbigbmp(request, mode, framenr, tokennr=0, token=''):
   template = loader.get_template('schools/bigbmp.html')
   context = {
     'mode' : mode,
+    'consumer_id' : consumer_id,
     'framenr' : framenr,
     'tokennr' : tokennr,
     'token' : token,

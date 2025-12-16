@@ -48,6 +48,7 @@ from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers
 from schools.c_schools import get_taglist, check_extratags_async
+from schools.views import getbmp_dict
 from tf_workers.models import school, worker
 from tf_workers.c_tf_workers import tf_worker_client
 from eventers.models import event, event_frame
@@ -100,6 +101,7 @@ class schooldbutil(AsyncWebsocketConsumer):
   cache_dict['tagging'] = defaultdict(dict)
   cache_dict['school'] = defaultdict(dict)
   school_lines = {}
+  consumer_id_list = []
 
   @database_sync_to_async
   def gettags(self, myschool):
@@ -120,6 +122,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
   async def connect(self):
     try:
+      global getbmp_dict
       self.check_ts = 0.0
       self.user = self.scope['user']
       self.tf_w_index = None
@@ -127,6 +130,14 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.accept()
       else:
         await self.close()
+      self.consumer_id = 0
+      while self.consumer_id in schooldbutil.consumer_id_list:
+        self.consumer_id += 1
+      schooldbutil.consumer_id_list.append(self.consumer_id)  
+      getbmp_dict.setdefault(0, {})
+      getbmp_dict[0][self.consumer_id] = {}
+      getbmp_dict.setdefault(1, {})
+      getbmp_dict[1][self.consumer_id] = {}
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -136,7 +147,10 @@ class schooldbutil(AsyncWebsocketConsumer):
       if self.tf_w_index is not None:
         await self.tf_worker.stop_out(self.tf_w_index)
         await self.tf_worker.unregister(self.tf_w_index) 
-      close_old_connections()    
+      close_old_connections()   
+      del getbmp_dict[0][self.consumer_id]
+      del getbmp_dict[1][self.consumer_id]
+      schooldbutil.consumer_id_list.remove(self.consumer_id) 
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -242,6 +256,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
+      global getbmp_dict
       #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']
 
@@ -251,7 +266,33 @@ class schooldbutil(AsyncWebsocketConsumer):
       else:
         await self.close()
 
-      if params['command'] == 'settrainpage' :
+      if params['command'] == 'get_consumer_id':
+        outlist['data'] = self.consumer_id
+        #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))
+
+      if params['command'] == 'event_to_dict':
+        event_line = await event.objects.select_related('camera').aget(
+          id=params['event_nr'], 
+        )
+        stream_line = event_line.camera
+        framelines = await get_framelines(params['event_nr'])
+        frame_info = getbmp_dict[0][self.consumer_id]
+        if stream_line.crypt_key:
+          cryptic = stream_line.crypt_key
+        else:
+          cryptic =''   
+        for item in framelines:
+          frame_info.setdefault(item.id, {
+            'path': item.name,
+            'stream': stream_line.id,
+            'crypt' : cryptic,
+          })
+        outlist['data'] = 'OK'
+        #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))
+
+      elif params['command'] == 'settrainpage':
         school_nr = params['school_nr']
         if self.check_ts + 60.0 < time():
           await self.school_lines[school_nr].arefresh_from_db()
@@ -325,7 +366,8 @@ class schooldbutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      elif params['command'] == 'seteventpage' :
+      elif params['command'] == 'seteventpage':
+        stream_line = await stream.objects.aget(id=params['streamnr'])
         if params['showdone']:
           eventlines = event.objects.filter(
             camera=params['streamnr'], 
@@ -340,11 +382,16 @@ class schooldbutil(AsyncWebsocketConsumer):
             deleted=False,
           ).order_by('-id')
         self.eventpage = Paginator(eventlines, params['pagesize'])
+        self.stream_nr = params['streamnr']
+        if stream_line.encrypted:
+          self.crypt_key = stream_line.crypt_key
+        else:
+          self.crypt_key = ''  
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      elif params['command'] == 'gettrainimages' :
+      elif params['command'] == 'gettrainimages':
         lines = []
         for line in await self.gettrainobjectlist(params['page_nr']):
           made_by_nr = await database_sync_to_async(
@@ -361,11 +408,15 @@ class schooldbutil(AsyncWebsocketConsumer):
               line.c7,line.c8,line.c9,],
             'made' : line.made.strftime("%d.%m.%Y %H:%M:%S %Z"),
           })
+          getbmp_dict[1][self.consumer_id].setdefault(line.id, {
+            'path' : self.school_dir + '*****/' + line.name,
+            'school' :self.myschool,
+          })
         outlist['data'] = lines
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      elif params['command'] == 'getevents' :
+      elif params['command'] == 'getevents':
         lines = []
         async for line in self.eventpage.page(params['page_nr']).object_list:
           lines.append({
@@ -385,7 +436,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      elif params['command'] == 'gettrainshortlist' :
+      elif params['command'] == 'gettrainshortlist':
         result = list(await self.gettrainshortlist(params['page_nr']))
         for i in range(len(result)):
           if not isinstance(result[i], int):
@@ -394,7 +445,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
-      elif params['command'] == 'geteventshortlist' :
+      elif params['command'] == 'geteventshortlist':
         result = list(await self.geteventshortlist(params['page_nr']))
         for i in range(len(result)):
           if not isinstance(result[i], int):
@@ -549,6 +600,7 @@ class schooldbutil(AsyncWebsocketConsumer):
         if self.myschool not in self.school_lines:
           self.school_lines[self.myschool] = await school.objects.aget(id = self.myschool)
           self.check_ts = time()
+        self.school_dir = self.school_lines[self.myschool].dir
         if ('logout' in params) and params['logout'] and (self.myschool > 0):
           await self.disconnect()
         if self.myschool > 0:
@@ -564,9 +616,17 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'geteventframes':
         framelines = await get_framelines(params['event'])
+        result = []
+        for item in framelines:
+          result.append(item.id)
+          getbmp_dict[0][self.consumer_id].setdefault(item.id, {
+            'path' : item.name,
+            'stream' : self.stream_nr,
+            'crypt' : self.crypt_key,
+          })
         result = [item.id for item in framelines]
         outlist['data'] = (params['count'], result)
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'setcrypt':

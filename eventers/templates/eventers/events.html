@@ -122,6 +122,7 @@ let events_ready;
 let events_count;
 let last_event_visible;
 let get_cards_active = false;
+let consumer_id = 0;
 
 function isInViewport(elementid) {
   element = document.getElementById(elementid)
@@ -274,7 +275,7 @@ getimages = function() {
 			      imgElement += '<img src="'
 			      imgElement += window.location.protocol;
             imgElement += '//' +  window.location.host;
-			      imgElement += '/schools/getbmp/0/';
+			      imgElement += '/schools/getbmp/0/' + consumer_id + '/';
 			      imgElement += framelines[j] + '/3/1/375/375/" ';
             imgElement += 'style="width: 375px; height: 375px;';
             imgElement += 'object-fit: contain;" ';
@@ -302,6 +303,12 @@ $(document).ready(function() {
 	)
 	.then((result) => {
 		SchoolDBUtilSocket = result;
+    return(SchoolDBUtilSocket.sendandwait({
+      'command' : 'get_consumer_id',
+    }));
+  })
+  .then((result) => {
+    consumer_id = result;
     $(window).on('resize scroll', function() {
       getcards();
     });

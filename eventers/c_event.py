@@ -271,7 +271,7 @@ class c_event(list):
       frame.append(frameline.id)
 
   async def save(self, cond_dict):
-    print('*** Saving Event:', self.id)
+    #print('*** Saving Event:', self.id)
     await self.frames_filter(self.number_of_frames, cond_dict)
     frames_to_save = self.frames.values()
     self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
