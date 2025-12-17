@@ -346,7 +346,7 @@ class schooldbutil(AsyncWebsocketConsumer):
                 frame["prediction"] = tuple(getattr(item, f"pred{i}") for i in range(10))
               frames.append(frame)
               last_pk = item.id
-            await a_close_old_connections()
+            await aclose_old_connections()
           await self.predictions_from_tfw(
             frames_to_infer, 
             school_nr, 
