@@ -253,39 +253,60 @@ function getcards() {
   };  
 };
 
+function getEventFramesRetry(payload, delay = 100) {
+  return SchoolDBUtilSocket.sendandwait(payload)
+  .then((result) => {
+    if (result === 'Wait!') {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(getEventFramesRetry(payload, delay));
+        }, delay);
+      });
+    }
+    return result;
+  });
+}
+
 getimages = function() {
   $('.carousel').each(function() {
     if ($(this).attr('done') == '0') {
       if (isInViewport($(this).attr('id'))) {
         $(this).attr('done', '1');
-	      SchoolDBUtilSocket.sendandwait({
-		      'command' : 'geteventframes',
-		      'count' : 0,
-		      'event' : $(this).attr('id'),
-	      })
-	      .then((result) => {
-          framelines = result[1];
-		      for (let j=0; j<framelines.length; j++) {
-            let imgElement;
-            if (j == 0) {
-              imgElement = '<div class="carousel-item active">';
-            } else {
-              imgElement = '<div class="carousel-item">';
-            };
-			      imgElement += '<img src="'
-			      imgElement += window.location.protocol;
-            imgElement += '//' +  window.location.host;
-			      imgElement += '/schools/getbmp/0/' + consumer_id + '/';
-			      imgElement += framelines[j] + '/3/1/375/375/" ';
-            imgElement += 'style="width: 375px; height: 375px;';
-            imgElement += 'object-fit: contain;" ';
-            imgElement += 'class="d-block w-100" alt="Event ';
-            imgElement += +$(this).attr('id')+', Image '+(j+1)+'">';
-            imgElement += '</div>';
-            $(this).children().append(imgElement);
-          };
-          $(this).carousel();
-        });
+        getEventFramesRetry({
+          command: 'geteventframes',
+          count: 0,
+          event: $(this).attr('id'),
+        })
+        .then((result) => {
+          const framelines = result[1];
+          const $carousel = $(this);
+          const imgPromises = [];
+          for (let j = 0; j < framelines.length; j++) {
+            const active = (j === 0) ? ' active' : '';
+            const src =
+              window.location.protocol + '//' + window.location.host +
+              '/schools/getbmp/0/' + consumer_id + '/' + framelines[j] + '/3/1/375/375/';
+            const $item = $('<div class="carousel-item' + active + '"></div>');
+            const $img  = $('<img>', {
+              src: src,
+              style: 'width: 375px; height: 375px; object-fit: contain;',
+              class: 'd-block w-100',
+              alt: 'Event ' + $carousel.attr('id') + ', Image ' + (j + 1),
+            });
+            imgPromises.push(new Promise((resolve) => {
+              $img.on('load error', () => resolve());
+            }));
+            $item.append($img);
+            $carousel.children().append($item);
+          }
+          $carousel.carousel();
+          return Promise.all(imgPromises);   // <- wichtig: return!
+        })
+        .then(() => {
+          return SchoolDBUtilSocket.sendandwait({
+            command: 'reseteventframes',
+          });
+        })
       };
     };
   });

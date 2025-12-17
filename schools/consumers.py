@@ -42,7 +42,7 @@ from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
 from tools.c_logger import log_ini
 from tools.l_crypt import l_crypt
-from tools.l_break import a_break_type, BR_LONG
+from tools.l_break import a_break_type, BR_MEDIUM
 from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers
@@ -80,6 +80,9 @@ else:
 #*****************************************************************************
 
 CHUNK_SIZE = 32
+GETFRAMES_TIMEOUT = 1.0
+GETFRAMES_MAX = 1
+
 
 def decode_and_convert_image(myimage_bytes):
   img = cv.imdecode(np.frombuffer(myimage_bytes, dtype=np.uint8), cv.IMREAD_UNCHANGED)
@@ -101,6 +104,8 @@ class schooldbutil(AsyncWebsocketConsumer):
   cache_dict['school'] = defaultdict(dict)
   school_lines = {}
   consumer_id_list = []
+  active_getframes_locked = False
+  active_getframes_list = []
 
   @database_sync_to_async
   def gettags(self, myschool):
@@ -256,6 +261,7 @@ class schooldbutil(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     try:
       global getbmp_dict
+      await aclose_old_connections()
       #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']
 
@@ -340,7 +346,7 @@ class schooldbutil(AsyncWebsocketConsumer):
                 frame["prediction"] = tuple(getattr(item, f"pred{i}") for i in range(10))
               frames.append(frame)
               last_pk = item.id
-            await sync_to_async(close_old_connections)()
+            await a_close_old_connections()
           await self.predictions_from_tfw(
             frames_to_infer, 
             school_nr, 
@@ -614,17 +620,39 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'geteventframes':
-        framelines = await get_framelines(params['event'])
-        result = []
-        for item in framelines:
-          result.append(item.id)
-          getbmp_dict[0][self.consumer_id].setdefault(item.id, {
-            'path' : item.name,
-            'stream' : self.stream_nr,
-            'crypt' : self.crypt_key,
-          })
-        result = [item.id for item in framelines]
-        outlist['data'] = (params['count'], result)
+        new_time = time()
+        while schooldbutil.active_getframes_locked:
+          await a_break_type(BR_MEDIUM) 
+        schooldbutil.active_getframes_locked = True
+        schooldbutil.active_getframes_list = [item for item in schooldbutil.active_getframes_list if item > new_time - GETFRAMES_TIMEOUT]
+        if len(schooldbutil.active_getframes_list) >= GETFRAMES_MAX:
+          outlist['data'] = ('Wait!')
+          schooldbutil.active_getframes_locked = False
+        else:  
+          schooldbutil.active_getframes_list.append(new_time)
+          schooldbutil.active_getframes_locked = False
+          framelines = await get_framelines(params['event'])
+          result = []
+          for item in framelines:
+            result.append(item.id)
+            getbmp_dict[0][self.consumer_id].setdefault(item.id, {
+              'path' : item.name,
+              'stream' : self.stream_nr,
+              'crypt' : self.crypt_key,
+            })
+          result = [item.id for item in framelines]
+          outlist['data'] = (params['count'], result)
+        #logger.info('--> ' + str(outlist))
+        await self.send(json.dumps(outlist))
+
+      elif params['command'] == 'reseteventframes':
+        while schooldbutil.active_getframes_locked:
+          await a_break_type(BR_MEDIUM) 
+        schooldbutil.active_getframes_locked = True
+        if schooldbutil.active_getframes_list:
+          schooldbutil.active_getframes_list.pop(0)
+        schooldbutil.active_getframes_locked = False
+        outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 

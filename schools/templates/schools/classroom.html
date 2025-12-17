@@ -219,11 +219,25 @@ function chunkArray(array, chunkSize) {
   return chunks;
 }
 
-function getimages (count) {
-  SchoolDBUtilSocket.sendandwait({
-    'command' : 'geteventframes',
-    'event' : events[count].id,
-    'count' : count,
+function getEventFramesRetry(payload, delay = 100) {
+  return SchoolDBUtilSocket.sendandwait(payload)
+    .then((result) => {
+      if (result === 'Wait!') {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(getEventFramesRetry(payload, delay));
+          }, delay);
+        });
+      }
+      return result;
+    });
+}
+
+function getimages(count) {
+  getEventFramesRetry({
+    command: 'geteventframes',
+    count: count,
+    event: events[count].id,
   })
   .then((result) => {
     let frame_count = result[0];
@@ -255,7 +269,6 @@ function getimages (count) {
     .then((result) => {
       count = result[0];
       frameslist = result[1];
-      console.log(frameslist);
       for (let j=0; j < frameslist.length; j++) {
         cblines = '<div class="checklist h4">';
         for (let k=0; k<taglines.length; k++) {
@@ -306,7 +319,15 @@ function getimages (count) {
         $('#del_button' + frame_count).removeClass('disabled');
       };
 {% endif %}
-    });
+    })  
+    .then(() => {
+      return SchoolDBUtilSocket.sendandwait({
+        command: 'reseteventframes',
+      });
+    }) 
+    
+    
+    
 {% if may_write_school %}
     buttonline = '<h4>Who / what is this?<br>';
     buttonline += '<select id="myselect'+frame_count
