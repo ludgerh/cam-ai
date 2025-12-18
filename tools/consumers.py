@@ -65,8 +65,6 @@ from .health import my_health_runner
 
 DB_DATABASE = safe_import('db_database') 
 DB_PASSWORD = safe_import('db_password') 
-HW_TYPE = safe_import('hw_type') 
-OS_VERSION = safe_import('os_version') 
 MYDOMAIN = safe_import('mydomain') 
 
 OUT = 0
@@ -606,23 +604,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
           )
         datapath_rel = DATAPATH.relative_to(BASE_PATH) #not complete if DATAPATH absolute
         await aioshutil.move(backup_path / datapath_rel, DATAPATH)
-        
-        if HW_TYPE == 'raspi':
-          cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
-        if HW_TYPE == 'pc':
-          cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
-        cmd += 'conda activate tf; '
-        cmd += 'pip install --upgrade pip; '
-        cmd += 'pip install -r requirements.' + HW_TYPE + '_' + OS_VERSION + '; '
-        cmd += 'python manage.py migrate; '
-        p = await asyncio.create_subprocess_shell(
-          cmd, 
-          stdout=asyncio.subprocess.PIPE, 
-          executable='/bin/bash',
-        )
-        output, _ = await p.communicate()
-        for line in output.decode().split('\n'):
-          logger.info(line);
         startup_redis.set_shutdown_command(20)
         outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))

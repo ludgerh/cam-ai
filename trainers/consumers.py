@@ -659,8 +659,13 @@ class trainerutil(AsyncWebsocketConsumer):
       elif params['command'] == 'set_from_dashboard':
         if self.maywrite:
           schoolline = await school.objects.aget(id = self.schoolnr)
-          setattr(schoolline, params['item'], params['value'])
-          await schoolline.asave(update_fields = [params['item']])
+          try:
+            if params['item'] == 'model_finetuning' or params['item'] == 'early_stop_patience':
+              params['value'] = round(float(params['value']))
+            setattr(schoolline, params['item'], params['value'])
+            await schoolline.asave(update_fields = [params['item']])
+          except ValueError:
+            pass 
           if self.trainerline.t_type == 2:
             temp = json.loads(text_data)
             temp['data']['school']=self.schoolline.e_school

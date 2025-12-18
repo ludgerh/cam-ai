@@ -19,9 +19,8 @@ import os
 import sys
 from sys import argv
 from signal import signal, SIGINT, SIGTERM, SIGHUP
-from setproctitle import setproctitle
-from startup.redis import my_redis as startup_redis
 from time import sleep, time
+from sysinfo import sysinfo
 
 ctrl_c_count = 2
 ts = 0
@@ -38,30 +37,49 @@ def sigint_handler(signal, frame):
   if ctrl_c_count:
     ctrl_c_count -= 1
   else: 
-    print('Killing cam-ai-ser.py...')    
+    print('Killing cam-ai-server.py...')    
     sys.exit(0)
 
-
-setproctitle('CAM-AI-Server')
-signal(SIGINT, sigint_handler)
-signal(SIGTERM, sigint_handler)
-signal(SIGHUP, sigint_handler)
-basepath = os.getcwd() 
-print('***** CAM-AI server is running *****')
-print('Calling: python ' + ' '.join(argv[1:]))
-print()
-startup_redis.set_shutdown_command(0) 
-while True:
-  call_pars = argv
-  call_pars[0] = 'python'
-  os.chdir(basepath)
-  subprocess.call(call_pars)
-  if startup_redis.get_shutdown_command() in {0, 10}:
-    break
-  else: 
-    sleep(0.1) 
-if startup_redis.get_shutdown_command() == 10:  
-  #print('!!!!! Shutting down !!!!!') 
-  os.system('sudo shutdown now') 
-print('***** CAM-AI server is done *****')  
+my_sysinfo = sysinfo()
+if my_sysinfo['hw'] == 'pc':
+  cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
+if my_sysinfo['hw'] == 'raspi':
+  cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
+cmd += 'conda activate tf; '
+cmd += 'pip install --upgrade pip; '
+cmd += ('pip install -r requirements.' 
+  + my_sysinfo['hw'] 
+  + '_' 
+  + my_sysinfo['dist_version'] 
+  + '; '
+)
+cmd += 'python manage.py migrate; '
+subprocess.call(cmd, shell=True, executable='/bin/bash')
+print(my_sysinfo)
+print(cmd)
+if len(argv) > 1:
+  from setproctitle import setproctitle
+  from startup.redis import my_redis as startup_redis
+  setproctitle('CAM-AI-Server')
+  signal(SIGINT, sigint_handler)
+  signal(SIGTERM, sigint_handler)
+  signal(SIGHUP, sigint_handler)
+  basepath = os.getcwd() 
+  print('***** CAM-AI server is running *****')
+  print('Calling: python ' + ' '.join(argv[1:]))
+  print()
+  startup_redis.set_shutdown_command(0) 
+  while True:
+    call_pars = argv
+    call_pars[0] = 'python'
+    os.chdir(basepath)
+    subprocess.call(call_pars)
+    if startup_redis.get_shutdown_command() in {0, 10}:
+      break
+    else: 
+      sleep(0.1) 
+  if startup_redis.get_shutdown_command() == 10:  
+    #print('!!!!! Shutting down !!!!!') 
+    os.system('sudo shutdown now') 
+  print('***** CAM-AI server is done *****')  
     

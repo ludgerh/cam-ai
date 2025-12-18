@@ -124,7 +124,7 @@ if ((((hw_os_code['hw'] == 'raspi' and 4 <= int(hw_os_code['hw_version']) and 4 
   print('Your system is compatible, we continue...')
 else:
   print('Your system does not meet our specs, see your hardware & OS codes above.')
-  print('We need a PC or a Raspberry Pi with Debian 12 OS.')
+  print('We need a PC or a Raspberry Pi with Debian 12 or 13 OS.')
   print('The Raspberry Pi needs to be at least version 4, better version 5.')
   print('Minimum internal RAM 4 GB...')
   exit(1)
