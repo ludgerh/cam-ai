@@ -604,16 +604,16 @@ class admin_tools_async(AsyncWebsocketConsumer):
           )
         datapath_rel = DATAPATH.relative_to(BASE_PATH) #not complete if DATAPATH absolute
         await aioshutil.move(backup_path / datapath_rel, DATAPATH)
-        # Remove destination if it exists
+        src = BASE_PATH / "runserver.sh"
+        dst = PARENTPATH / "runserver.sh"
         try:
-          await aiofiles.os.remove(PARENTPATH / 'runserver.sh')
+          await aiofiles.os.remove(dst)
         except FileNotFoundError:
           pass
-        await aioshutil.move(BASE_PATH / 'runserver.sh' , PARENTPATH)
-        os.chmod(PARENTPATH / 'runserver.sh', 0o744)
+        await aioshutil.move(src, dst)
+        os.chmod(dst, 0o744)
         startup_redis.set_shutdown_command(20)
         outlist['data'] = 'OK'
-        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         while True:
           await a_break_type(BR_LONG)
