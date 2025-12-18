@@ -604,6 +604,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
           )
         datapath_rel = DATAPATH.relative_to(BASE_PATH) #not complete if DATAPATH absolute
         await aioshutil.move(backup_path / datapath_rel, DATAPATH)
+        await aioshutil.move(BASE_PATH / 'runserver.sh' , PARENTPATH)
+        os.chmod(PARENTPATH / 'runserver.sh', 0o744)
         startup_redis.set_shutdown_command(20)
         outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))

@@ -388,10 +388,8 @@ if False or run_all:
   cmd += 'python manage.py migrate; '
   result = subprocess.call(cmd, shell=True, executable='/bin/bash')
   copy('runserver.sh', '..')
-  copy('upgrade-conda.sh', '..')
   os.chdir('..')
   os.chmod('runserver.sh', 0o744)
-  os.chmod('upgrade-conda.sh', 0o744)
   
 if False or run_all:
   print('>>>>> Modifying the database...')
