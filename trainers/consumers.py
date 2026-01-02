@@ -546,6 +546,7 @@ class trainerutil(AsyncWebsocketConsumer):
               'loss' : item.loss, 
               'augmentation' : item.augmentation, 
               'gamma' : item.gamma, 
+              'finetuning' : item.finetuning,
               'binacc' : item.binacc, 
               'recall' : item.recall, 
               'precision' : item.precision, 

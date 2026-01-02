@@ -114,7 +114,7 @@ class fit(models.Model):
   model_type = models.CharField(max_length=50, default='')
   model_image_augmentation = models.FloatField(default = 0.0)
   model_gamma = models.FloatField(default = 1.0)
-  model_finetuning = models.IntegerField(default = 0)
+  model_finetuning = models.IntegerField(default = -1)
   l_rate_min = models.FloatField(default = 1e-7)
   l_rate_max = models.FloatField(default = 1e-4)
   l_rate_target = models.FloatField(default = 1e-6)
@@ -139,6 +139,7 @@ class epoch(models.Model):
   val_binacc = models.FloatField(default = 0.0)
   augmentation = models.FloatField(default = 0.0)
   gamma = models.FloatField(default = 0.0)
+  finetuning = models.IntegerField(default = 0.0)
 
   def __str__(self):
     return('epoch model (TBD ...)')

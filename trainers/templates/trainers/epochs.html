@@ -58,7 +58,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <thead>
       <tr>
         <th>#</th><th>Phase</th><th>Seconds</th><th>log(l_rate)</th><th>Loss</th>
-        <th>Augm</th><th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
+        <th>Fine</th><th>Augm</th><th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
         <th>val_Loss</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
       </tr>
     </thead>
@@ -227,22 +227,23 @@ function refresh_all() {
           graph_data.datasets[1].data.push(item.gamma);
           graph_data.datasets[2].data.push(item.loss);
           graph_data.datasets[3].data.push(item.val_loss);
-        };  
+        };
         rows += '<tr>';
-        rows += '<td>'+counter+'</td>';
-        rows += '<td>'+item.phase+'</td>';
-        rows += '<td>'+Math.round(item.seconds)+'</td>';
-        rows += '<td>'+item.learning_rate.toPrecision(4)+'</td>';
-        rows += '<td>'+item.loss.toPrecision(4)+'</td>';
-        rows += '<td>'+item.augmentation.toPrecision(4)+'</td>';
-        rows += '<td>'+item.gamma.toPrecision(4)+'</td>';
-        rows += '<td>'+item.binacc.toPrecision(4)+'</td>';
-        rows += '<td>'+item.recall.toPrecision(4)+'</td>';
-        rows += '<td>'+item.precision.toPrecision(4)+'</td>';
-        rows += '<td>'+item.val_loss.toPrecision(4)+'</td>';
-        rows += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
-        rows += '<td>'+item.val_recall.toPrecision(4)+'</td>';
-        rows += '<td>'+item.val_precision.toPrecision(4)+'</td>';
+        rows += '<td>' + counter+'</td>';
+        rows += '<td>' + item.phase+'</td>';
+        rows += '<td>' + Math.round(item.seconds) + '</td>';
+        rows += '<td>' + item.learning_rate.toPrecision(4) + '</td>';
+        rows += '<td>' + item.loss.toPrecision(4) + '</td>';
+        rows += '<td>' + item.finetuning + '</td>';
+        rows += '<td>' + item.augmentation.toPrecision(4) + '</td>';
+        rows += '<td>' + item.gamma.toPrecision(4) + '</td>';
+        rows += '<td>' + item.binacc.toPrecision(4) + '</td>';
+        rows += '<td>' + item.recall.toPrecision(4) + '</td>';
+        rows += '<td>' + item.precision.toPrecision(4) + '</td>';
+        rows += '<td>' + item.val_loss.toPrecision(4) + '</td>';
+        rows += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
+        rows += '<td>' + item.val_recall.toPrecision(4) + '</td>';
+        rows += '<td>' + item.val_precision.toPrecision(4) + '</td>';
         rows += '</tr>';
       });
       mygraph.update('none');

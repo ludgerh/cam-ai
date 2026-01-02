@@ -20,6 +20,9 @@ import aioshutil
 import os
 import cv2 as cv
 import numpy as np
+import queue
+import threading
+import select
 from aiopath import AsyncPath
 from psutil import Process, NoSuchProcess, TimeoutExpired, AccessDenied
 from signal import SIGINT, SIGKILL
@@ -28,7 +31,7 @@ from logging import getLogger
 from time import time
 from globals.c_globals import viewers
 from tools.c_spawn import viewable
-from tools.l_break import a_break_time, a_break_type, BR_SHORT, BR_MEDIUM, BR_LONG
+from tools.l_break import a_break_time, a_break_type, break_type, BR_SHORT, BR_MEDIUM, BR_LONG
 from tools.l_tools import djconf, ts2filename
 from tools.l_sysinfo import is_raspi
 from .redis import my_redis as streams_redis
@@ -149,6 +152,8 @@ class c_cam(viewable):
               await a_break_type(BR_LONG)
       if self.dbline.cam_apply_mask:
         await self.viewer.drawpad.set_mask_local()
+      self.raw_queue = queue.Queue(maxsize=1)
+      self.raw_running = True
       #print(f'Launch: cam#{self.id}')
       while not self.got_sigint:
         frameline = await self.run_one()
@@ -294,29 +299,11 @@ class c_cam(viewable):
       if self.ff_proc is None:
         await a_break_type(BR_LONG)
         return(None)
-      in_bytes = bytearray()
-      bytes_needed = self.bytes_per_frame
-      while not self.got_sigint and bytes_needed > 0:
-        if self.reset_buffer:
-          in_bytes = bytearray()
-          bytes_needed = self.bytes_per_frame
-          self.reset_buffer = False
-          continue
-        try:
-          try:
-            chunk = await asyncio.to_thread(
-              os.read, self.fifo.fileno(), min(bytes_needed, 65536)
-            )
-          except (BlockingIOError, InterruptedError, OSError):
-            chunk = b''
-          if not chunk:
-            await a_break_type(BR_SHORT)
-            continue
-          in_bytes.extend(chunk)
-          bytes_needed -= len(chunk)
-        except (ValueError, AttributeError):
-          in_bytes = None
-          break
+        
+      try:
+        in_bytes = await asyncio.to_thread(self.raw_queue.get)
+      except Exception:
+        break
       if in_bytes:
         self.framewait = 0.0
         nptemp = np.frombuffer(in_bytes, np.uint8)
@@ -517,28 +504,78 @@ class c_cam(viewable):
     self._fifo_dummy_fd = os.open(self.fifo_path, os.O_RDWR | os.O_NONBLOCK)
     rd_fd = os.open(self.fifo_path, os.O_RDONLY | os.O_NONBLOCK)
     return os.fdopen(rd_fd, "rb", buffering=0)
+    
+  def _raw_reader(self):
+    self.logger.info('CA{self.id}: +++++ Starting Reader')
+    self.raw_running = True
+    try:
+      self.logger.info('CA{self.id}: RawRunning: ' + str(self.raw_running) + ' ' + str( self.got_sigint))
+      while self.raw_running and not self.got_sigint:
+        buf = b''
+        while len(buf) < self.bytes_per_frame and self.raw_running:
+          # Wait until fd is readable (prevents busy loop)
+          r, _, _ = select.select([self.fifo.fileno()], [], [], 0.05)
+          if not r:
+            continue  # timeout, check flags again
+          try:
+            chunk = os.read(self.fifo.fileno(), self.bytes_per_frame - len(buf))
+            if not chunk:
+              # EOF: ffmpeg exited or pipe closed
+              self.logger.info('CA{self.id}: ffmpeg pipe closed (EOF)')
+              self.raw_running = False
+              break
+            buf += chunk
+          except BlockingIOError:
+            # No data available yet
+            continue
+          except OSError as e:
+            self.logger.warning('CA{self.id}: FD error, stopping RAW reader: %s', e)
+            self.raw_running = False
+            break
+        if self.raw_running and len(buf) == self.bytes_per_frame:
+          self.raw_queue.put_nowait(buf)
+    except Exception as fatal:
+      self.logger.error('CA{self.id}: Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("CA{self.id}: Rawfeed crashed: %s", fatal, exc_info=True)
+    #except Exception as e:
+    #  self.logger.error('RAW reader stopped: %s', e)
+    #  self.raw_running = False
+    # Cleanup (FD must be closed by ONE owner only)
+    self.logger.info('CA{self.id}: RawRunning:' + str(self.raw_running) + str( self.got_sigint))
+    self.logger.info('CA{self.id}: ----- Stopping Reader')
+    try:
+      self.fifo.close()
+    except AttributeError:
+      pass
+    try:
+      os.close(self._fifo_dummy_fd)
+    except Exception:
+      pass
+    self._fifo_dummy_fd = None
 
   async def newprocess(self):
     while True:
+      await self.dbline.arefresh_from_db()
       inp_frame_rate = 0.0
-      if self.dbline.cam_virtual_fps:
-        if (self.dbline.cam_fpslimit 
-            and self.dbline.cam_fpslimit < self.dbline.cam_virtual_fps):
-          inp_frame_rate = self.dbline.cam_fpslimit
-      else:  
-        if self.dbline.cam_fpslimit and self.dbline.cam_fpslimit < self.cam_fps:
-          inp_frame_rate = self.dbline.cam_fpslimit
+      fps_limit = self.dbline.cam_fpslimit or 0.0
+      base_fps = self.dbline.cam_virtual_fps or self.cam_fps
+      print('*****', fps_limit, base_fps)
+      if fps_limit and fps_limit < base_fps:
+        inp_frame_rate = fps_limit
       self.wd_ts = time()
       if self.dbline.cam_virtual_fps:
-        if self.virt_cam_path_ram:
-          source_string = self.virt_cam_path_ram
-        else:
-          source_string = self.virt_cam_path
-        source_string += self.dbline.cam_url
+        base_path = self.virt_cam_path_ram or self.virt_cam_path
+        source_string = f"{base_path}{self.dbline.cam_url}"
         filepath = None
       else:
         self.myeventer_in.put(('purge_videos', ))
-        source_string = self.dbline.cam_url.replace('{address}', self.dbline.cam_control_ip)
+        source_string = self.dbline.cam_url.replace(
+          '{address}', 
+          self.dbline.cam_control_ip, 
+        )
         if streams_redis.record_from_dev(self.type, self.id):
           self.vid_count = 0
           filepath = (self.recordingspath + 'C' 
@@ -553,27 +590,22 @@ class c_cam(viewable):
         generalparams += ['-v', 'info']
       else:  
         generalparams += ['-v', 'fatal']
-      #if is_raspi():
-      #  generalparams += ['-threads', '1']
       if not self.dbline.cam_virtual_fps:
         if source_string[:4].upper() == 'RTSP':
           generalparams += ['-rtsp_transport', 'tcp']
-        if self.dbline.cam_red_lat:
-          generalparams += ['-fflags', 'nobuffer']
-          generalparams += ['-flags', 'low_delay']
-        if self.video_codec_name not in {'h264', 'hevc'}:
-          generalparams += ['-use_wallclock_as_timestamps', '1']
+        generalparams += ['-fflags', 'genpts']
+        generalparams += ['-use_wallclock_as_timestamps', '1']
+        generalparams += ['-flags', 'low_delay']
       inparams = ['-i', source_string]
       outparams1 = []
       if not self.dbline.cam_virtual_fps:
         outparams1 += ['-map', '0:' + str(self.video_codec), '-map', '-0:a']
+      outparams1 += ['-vsync', '0']  
       outparams1 += ['-f', 'rawvideo']
       outparams1 += ['-pix_fmt', 'bgr24']
       if inp_frame_rate:
         outparams1 += ['-r', str(inp_frame_rate)]
         outparams1 += ['-fps_mode', 'cfr']
-      else:  
-        outparams1 += ['-fps_mode', 'passthrough']
       outparams1 += [self.fifo_path]
       outparams2 = []
       if filepath:
@@ -611,19 +643,19 @@ class c_cam(viewable):
         self.ffmpeg_recording = True
       cmd = (generalparams + inparams + outparams1 
         + outparams2)
-      #self.logger.info('#####' + str(cmd))
+      self.logger.info('#####' + str(cmd))
       
-      #self.logger.info('#'+str(self.id) + ' 00000')
+      self.logger.info('#'+str(self.id) + ' 00000')
       while self.ff_proc is not None and self.ff_proc.returncode is None:
         await a_break_type(BR_LONG)
-      #self.logger.info('#'+str(self.id) + ' 11111')
+      self.logger.info('#'+str(self.id) + ' 11111')
       try:
         await aiofiles.os.remove(self.fifo_path)
       except FileNotFoundError:
         pass
-      #self.logger.info('#'+str(self.id) + ' 22222')
+      self.logger.info('#'+str(self.id) + ' 22222')
       await asyncio.to_thread(os.mkfifo, self.fifo_path)
-      #self.logger.info('#'+str(self.id) + ' 33333')
+      self.logger.info('#'+str(self.id) + ' 33333')
       if log_ffmpeg:
         log = open(logpath + f'ffmpeg{self.id}.log', "ab")
         self.ff_proc = await asyncio.create_subprocess_exec(
@@ -638,10 +670,15 @@ class c_cam(viewable):
           *cmd,
           stdout=None,
         )
-      #self.logger.info('#'+str(self.id) + ' 44444')
+      self.logger.info('#'+str(self.id) + ' 44444')
       try:
         self.fifo = await asyncio.to_thread(self._open_fifo_pair)
-        #self.logger.info('#%s 55555', self.id)
+        self.logger.info('#%s 55555', self.id)
+        self.reader_thread = threading.Thread(
+          target=self._raw_reader,
+          daemon=True,
+        )
+        self.reader_thread.start()
         break
       except FileNotFoundError:
         self.logger.warning('#%s FIFO fehlt – lege neu an', self.id)
@@ -661,37 +698,26 @@ class c_cam(viewable):
 
   async def stopprocess(self):
     if self.ff_proc is not None and self.ff_proc.returncode is None:
-      #self.logger.info(
-      #  '#'+str(self.id) + ' xxxxx ' 
-      #  + str(self.ff_proc) 
-      #  + ' ' + str(self.ff_proc.returncode)
-      #)
       try:
-        #self.logger.info('#'+str(self.id) + ' aaaaa')
+        self.logger.info('#'+str(self.id) + ' aaaaa')
         p = Process(self.ff_proc.pid)
         child_pid = p.children(recursive=True)
         for pid in child_pid:
           pid.send_signal(SIGKILL)
           pid.wait()
-        #self.logger.info('#'+str(self.id) + ' bbbbb')
+        self.logger.info('#'+str(self.id) + ' bbbbb')
         self.ff_proc.send_signal(SIGKILL)
-        #self.logger.info('#'+str(self.id) + ' ccccc')
+        self.logger.info('#'+str(self.id) + ' ccccc')
         await self.ff_proc.wait()
-        #self.logger.info('#'+str(self.id) + ' ddddd')
+        self.logger.info('#'+str(self.id) + ' ddddd')
       except NoSuchProcess:
         pass        
       self.ff_proc = None
-      #self.logger.info('#'+str(self.id) + ' eeeee')
-    try:  
-      self.fifo.close()
-    except AttributeError:#
-      pass #Fifo does not exist: No closing.
-    try:  
-      os.close(self._fifo_dummy_fd)
-    except Exception:
-      pass
-    self._fifo_dummy_fd = None
-    #self.logger.info('#'+str(self.id) + ' fffff')
+      self.logger.info('#'+str(self.id) + ' eeeee')
+      self.raw_running = False
+      if self.reader_thread and self.reader_thread.is_alive():
+        await asyncio.to_thread(self.reader_thread.join)
+    self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
     return('C'+str(self.id).zfill(4) + '_'
