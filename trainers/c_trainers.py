@@ -341,6 +341,9 @@ class trainer(spawn_process):
             myfit = fit(
               made=timezone.now(), 
               school = s_item.id, 
+              model_image_augmentation = s_item.model_image_augmentation,
+              model_gamma = s_item.model_gamma,
+              model_finetuning = s_item.model_finetuning,
               status = 'Waiting',
             )
             await myfit.asave() 

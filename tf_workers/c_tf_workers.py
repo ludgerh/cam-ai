@@ -395,10 +395,12 @@ class tf_worker(spawn_process):
       this_model['model_type'] = this_model['dbline'].model_type
       if self.dbline.use_litert:
         if self.dbline.use_coral:
+            print('+++++')
             interpreter = self.tflite.Interpreter(
                 model_path=model_path,
                 experimental_delegates=[load_delegate('libedgetpu.so.1')],
             )
+            print('-----', interpreter)
         else:
           interpreter = await asyncio.to_thread(
             self.tflite.Interpreter, 

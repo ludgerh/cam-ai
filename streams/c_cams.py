@@ -29,6 +29,7 @@ from signal import SIGINT, SIGKILL
 from setproctitle import setproctitle
 from logging import getLogger
 from time import time
+from django.db import OperationalError, close_old_connections
 from globals.c_globals import viewers
 from tools.c_spawn import viewable
 from tools.l_break import a_break_time, a_break_type, break_type, BR_SHORT, BR_MEDIUM, BR_LONG
@@ -506,10 +507,10 @@ class c_cam(viewable):
     return os.fdopen(rd_fd, "rb", buffering=0)
     
   def _raw_reader(self):
-    self.logger.info('CA{self.id}: +++++ Starting Reader')
+    self.logger.info(f'CA{self.id}: +++++ Starting Reader')
     self.raw_running = True
     try:
-      self.logger.info('CA{self.id}: RawRunning: ' + str(self.raw_running) + ' ' + str( self.got_sigint))
+      self.logger.info(f'CA{self.id}: RawRunning: ' + str(self.raw_running) + ' ' + str( self.got_sigint))
       while self.raw_running and not self.got_sigint:
         buf = b''
         while len(buf) < self.bytes_per_frame and self.raw_running:
@@ -521,7 +522,7 @@ class c_cam(viewable):
             chunk = os.read(self.fifo.fileno(), self.bytes_per_frame - len(buf))
             if not chunk:
               # EOF: ffmpeg exited or pipe closed
-              self.logger.info('CA{self.id}: ffmpeg pipe closed (EOF)')
+              self.logger.info(f'CA{self.id}: ffmpeg pipe closed (EOF)')
               self.raw_running = False
               break
             buf += chunk
@@ -529,23 +530,22 @@ class c_cam(viewable):
             # No data available yet
             continue
           except OSError as e:
-            self.logger.warning('CA{self.id}: FD error, stopping RAW reader: %s', e)
+            self.logger.warning(f'CA{self.id}: FD error, stopping RAW reader: %s', e)
             self.raw_running = False
             break
         if self.raw_running and len(buf) == self.bytes_per_frame:
-          self.raw_queue.put_nowait(buf)
+          try:
+            self.raw_queue.put_nowait(buf)
+          except queue.Full:
+            pass  
     except Exception as fatal:
-      self.logger.error('CA{self.id}: Error in process: ' 
+      self.logger.error(f'CA{self.id}: Error in process: ' 
         + self.logname 
         + ' - ' + self.type + str(self.id)
       )
-      self.logger.critical("CA{self.id}: Rawfeed crashed: %s", fatal, exc_info=True)
-    #except Exception as e:
-    #  self.logger.error('RAW reader stopped: %s', e)
-    #  self.raw_running = False
-    # Cleanup (FD must be closed by ONE owner only)
-    self.logger.info('CA{self.id}: RawRunning:' + str(self.raw_running) + str( self.got_sigint))
-    self.logger.info('CA{self.id}: ----- Stopping Reader')
+      self.logger.critical(f'CA{self.id}: Rawfeed crashed: %s', fatal, exc_info=True)
+    self.logger.info(f'CA{self.id}: RawRunning:' + str(self.raw_running) + str( self.got_sigint))
+    self.logger.info(f'CA{self.id}: ----- Stopping Reader')
     try:
       self.fifo.close()
     except AttributeError:
@@ -558,11 +558,15 @@ class c_cam(viewable):
 
   async def newprocess(self):
     while True:
-      await self.dbline.arefresh_from_db()
+      while True:
+        try:
+          await self.dbline.arefresh_from_db()
+          break
+        except OperationalError:
+          close_old_connections()
       inp_frame_rate = 0.0
       fps_limit = self.dbline.cam_fpslimit or 0.0
       base_fps = self.dbline.cam_virtual_fps or self.cam_fps
-      print('*****', fps_limit, base_fps)
       if fps_limit and fps_limit < base_fps:
         inp_frame_rate = fps_limit
       self.wd_ts = time()
@@ -643,19 +647,19 @@ class c_cam(viewable):
         self.ffmpeg_recording = True
       cmd = (generalparams + inparams + outparams1 
         + outparams2)
-      self.logger.info('#####' + str(cmd))
+      #self.logger.info('#####' + str(cmd))
       
-      self.logger.info('#'+str(self.id) + ' 00000')
+      #self.logger.info('#'+str(self.id) + ' 00000')
       while self.ff_proc is not None and self.ff_proc.returncode is None:
         await a_break_type(BR_LONG)
-      self.logger.info('#'+str(self.id) + ' 11111')
+      #self.logger.info('#'+str(self.id) + ' 11111')
       try:
         await aiofiles.os.remove(self.fifo_path)
       except FileNotFoundError:
         pass
-      self.logger.info('#'+str(self.id) + ' 22222')
+      #self.logger.info('#'+str(self.id) + ' 22222')
       await asyncio.to_thread(os.mkfifo, self.fifo_path)
-      self.logger.info('#'+str(self.id) + ' 33333')
+      #self.logger.info('#'+str(self.id) + ' 33333')
       if log_ffmpeg:
         log = open(logpath + f'ffmpeg{self.id}.log', "ab")
         self.ff_proc = await asyncio.create_subprocess_exec(
@@ -670,10 +674,10 @@ class c_cam(viewable):
           *cmd,
           stdout=None,
         )
-      self.logger.info('#'+str(self.id) + ' 44444')
+      #self.logger.info('#'+str(self.id) + ' 44444')
       try:
         self.fifo = await asyncio.to_thread(self._open_fifo_pair)
-        self.logger.info('#%s 55555', self.id)
+        #self.logger.info('#%s 55555', self.id)
         self.reader_thread = threading.Thread(
           target=self._raw_reader,
           daemon=True,
@@ -699,25 +703,25 @@ class c_cam(viewable):
   async def stopprocess(self):
     if self.ff_proc is not None and self.ff_proc.returncode is None:
       try:
-        self.logger.info('#'+str(self.id) + ' aaaaa')
+        #self.logger.info('#'+str(self.id) + ' aaaaa')
         p = Process(self.ff_proc.pid)
         child_pid = p.children(recursive=True)
         for pid in child_pid:
           pid.send_signal(SIGKILL)
           pid.wait()
-        self.logger.info('#'+str(self.id) + ' bbbbb')
+        #self.logger.info('#'+str(self.id) + ' bbbbb')
         self.ff_proc.send_signal(SIGKILL)
-        self.logger.info('#'+str(self.id) + ' ccccc')
+        #self.logger.info('#'+str(self.id) + ' ccccc')
         await self.ff_proc.wait()
-        self.logger.info('#'+str(self.id) + ' ddddd')
+        #self.logger.info('#'+str(self.id) + ' ddddd')
       except NoSuchProcess:
         pass        
       self.ff_proc = None
-      self.logger.info('#'+str(self.id) + ' eeeee')
+      #self.logger.info('#'+str(self.id) + ' eeeee')
       self.raw_running = False
       if self.reader_thread and self.reader_thread.is_alive():
         await asyncio.to_thread(self.reader_thread.join)
-    self.logger.info('#'+str(self.id) + ' fffff')
+    #self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
     return('C'+str(self.id).zfill(4) + '_'

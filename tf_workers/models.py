@@ -76,7 +76,7 @@ class school(models.Model):
   l_rate_min = models.FloatField(default = 1e-7)
   l_rate_max = models.FloatField(default = 1e-4)
   l_rate_target = models.FloatField(default = 1e-6)
-  early_stop_patience = models.IntegerField(default = 20)
+  early_stop_patience = models.IntegerField(default = 12)
 
   def __str__(self):
     return(self.name)
