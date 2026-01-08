@@ -22,7 +22,6 @@ import pickle
 import asyncio
 import aiofiles
 import aiohttp
-import itertools
 from multiprocessing import Queue as p_queue, SimpleQueue as s_queue
 from time import time
 from datetime import datetime
@@ -53,13 +52,15 @@ def sigint_handler(signal, frame):
 #
 #***************************************************************************
 
-class model_buffer(asyncio.PriorityQueue):
+class model_buffer():
 
   def __init__(self, schoolnr):
-    super().__init__()
-    self._counter = itertools.count()
     self.ts = time()
     self.pause = True
+    self.queues = {
+      prio: asyncio.Queue()
+      for prio in range(10)
+    }
     
   def set_xy(self, xdim, ydim):
     self.xdim = xdim
@@ -76,21 +77,28 @@ class model_buffer(asyncio.PriorityQueue):
     for frame in initem[2:]:
       if frame.shape[1] != self.xdim or  frame.shape[0] != self.ydim:
         frame = await asyncio.to_thread(cv.resize, frame, (self.xdim, self.ydim))
-      cnt = next(self._counter) 
-      await super().put((prio, cnt, (frame, initem[0])))
+      await self.queues[prio].put((frame, initem[0]))
 
   async def get(self, maxcount):
-    result = []
+    # Wait until at least one item is available
     while True:
-      if self.empty():
-        break
-      else:  
-        outitem = (await super().get())[2]
-        #prio, count, outitem = (await super().get())
-      result.append(outitem)
-      if len(result) >= maxcount:
-        break 
-    return(result)
+      for prio in range(10):  # 0 = highest priority
+        q = self.queues[prio]
+        if not q.empty():
+          result = []
+          while len(result) < maxcount and not q.empty():
+            result.append(await q.get())
+          return(result)
+      await asyncio.sleep(0)  # yield control
+    
+  def qsize(self):
+    result = 0
+    for item in self.queues:
+      result += self.queues[item].qsize()
+    return(result)  
+    
+  def empty(self):
+    return(self.qsize == 0)
 
 class tf_user(object):
   clientset = set()

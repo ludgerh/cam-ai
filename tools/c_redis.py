@@ -34,17 +34,25 @@ class saferedis(Redis):
     super().__init__(health_check_interval=30)
     
   def get(self, key):
-    if self.debug:
-      result = super().get(key)
-      print(round(time() - self.start_ts, 5), 'GET', key, reduce(result))
-      return(result)
-    else:  
-      return(super().get(key))
+    for _ in range(10):  
+      try:  
+        result = super().get(key)
+        if self.debug:
+          print(round(time() - self.start_ts, 5), 'GET', key, reduce(result))
+        return(result)
+        break
+      except ConnectionError:
+        sleep(1.0)
     
   def set(self, key, value):
     if self.debug:
       print(round(time() - self.start_ts, 5), 'SET', key, reduce(value))
-    super().set(key, value)
+    for _ in range(10):  
+      try:  
+        super().set(key, value)
+        break
+      except ConnectionError:
+        sleep(1.0)
     
   def incr(self, key):
     if self.debug:
@@ -79,7 +87,7 @@ class saferedis(Redis):
       except (ConnectionResetError, ConnectionError):
         now = datetime.now()
         print (now.strftime("%Y-%m-%d %H:%M:%S")+': Redis connection error from call of exists()') 
-        sleep(0.1)  
+        sleep(1.0)  
     
   def rpop(self, key):
     if self.debug:
