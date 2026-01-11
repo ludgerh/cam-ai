@@ -69,9 +69,13 @@ class trainer(spawn_process):
     self.glob_lock = glob_lock
     if self.id == 1:
       self.glob_lock.acquire()
+    self.doing_reinference = 0  
     super().__init__()
       
   async def update_predictions(self, school_nr, last_fit):
+    if self.doing_reinference > 0 and self.doing_reinference != school_nr:
+      return()
+    self.doing_reinference = school_nr
     with self.glob_lock:
       if trainers_redis.get_predict_proc_active(school_nr): 
         return()
@@ -133,17 +137,18 @@ class trainer(spawn_process):
             await asyncio.sleep(0)
             if not received:
               while True:
-                try:
-                  received = (await asyncio.wait_for(
-                    self.tf_worker.get_from_outqueue(self.tf_w_index),
-                    timeout=60
-                  )).tolist()
-                  break
-                except TimeoutError: 
+                received = await self.tf_worker.get_from_outqueue(
+                  self.tf_w_index, 
+                  timeout = 60.0,
+                )
+                if received is None:
                   self.logger.warning(
                     f'TR{self.id}: School #{school_nr}: Inferencing timeout'
                   )  
                   await a_break_type(BR_LONG)
+                else:
+                  received = received.tolist()  
+                  break
             prediction = received.pop(0) 
             frameline.last_fit = school_dbline.last_fit_infer
             for i in range(10):
@@ -160,9 +165,9 @@ class trainer(spawn_process):
             f'TR{self.id}: Finished re-inferencing {total_count} frames '
             + f'of school #{school_nr}'
           )  
+          self.doing_reinference = 0
     finally:
       trainers_redis.set_predict_proc_active(school_nr, False)
-    
               
   async def async_runner(self): 
     try:
@@ -284,6 +289,7 @@ class trainer(spawn_process):
         ))
         for s_item in schoollines: 
           trainers_redis.set_predict_proc_active(s_item.id, False)
+          trainers_redis.set_predict_proc_started(s_item.id, False)
         self.glob_lock.release()    
       while  not self.got_sigint:
         schoollines = await sync_to_async(list)(school.objects.filter(active=True))

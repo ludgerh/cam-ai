@@ -334,7 +334,7 @@ class c_cam(viewable):
         self.imagecheck = imagesum
     if frame is None: 
       return(None)
-    self.wd_ts = in_ts
+    #self.wd_ts = in_ts
     fps = self.som.gettime()
     if fps:
       self.dbline.cam_fpsactual = fps
@@ -557,6 +557,7 @@ class c_cam(viewable):
     self._fifo_dummy_fd = None
 
   async def newprocess(self):
+    self.logger.info('#'+str(self.id) + ' Starting newprocess()')
     while True:
       while True:
         try:
@@ -647,19 +648,19 @@ class c_cam(viewable):
         self.ffmpeg_recording = True
       cmd = (generalparams + inparams + outparams1 
         + outparams2)
-      #self.logger.info('#####' + str(cmd))
+      self.logger.info('#####' + str(cmd))
       
-      #self.logger.info('#'+str(self.id) + ' 00000')
+      self.logger.info('#'+str(self.id) + ' 00000')
       while self.ff_proc is not None and self.ff_proc.returncode is None:
         await a_break_type(BR_LONG)
-      #self.logger.info('#'+str(self.id) + ' 11111')
+      self.logger.info('#'+str(self.id) + ' 11111')
       try:
         await aiofiles.os.remove(self.fifo_path)
       except FileNotFoundError:
         pass
-      #self.logger.info('#'+str(self.id) + ' 22222')
+      self.logger.info('#'+str(self.id) + ' 22222')
       await asyncio.to_thread(os.mkfifo, self.fifo_path)
-      #self.logger.info('#'+str(self.id) + ' 33333')
+      self.logger.info('#'+str(self.id) + ' 33333')
       if log_ffmpeg:
         log = open(logpath + f'ffmpeg{self.id}.log', "ab")
         self.ff_proc = await asyncio.create_subprocess_exec(
@@ -674,10 +675,10 @@ class c_cam(viewable):
           *cmd,
           stdout=None,
         )
-      #self.logger.info('#'+str(self.id) + ' 44444')
+      self.logger.info('#'+str(self.id) + ' 44444')
       try:
         self.fifo = await asyncio.to_thread(self._open_fifo_pair)
-        #self.logger.info('#%s 55555', self.id)
+        self.logger.info('#%s 55555', self.id)
         self.reader_thread = threading.Thread(
           target=self._raw_reader,
           daemon=True,
@@ -703,25 +704,25 @@ class c_cam(viewable):
   async def stopprocess(self):
     if self.ff_proc is not None and self.ff_proc.returncode is None:
       try:
-        #self.logger.info('#'+str(self.id) + ' aaaaa')
+        self.logger.info('#'+str(self.id) + ' aaaaa')
         p = Process(self.ff_proc.pid)
         child_pid = p.children(recursive=True)
         for pid in child_pid:
           pid.send_signal(SIGKILL)
           pid.wait()
-        #self.logger.info('#'+str(self.id) + ' bbbbb')
+        self.logger.info('#'+str(self.id) + ' bbbbb')
         self.ff_proc.send_signal(SIGKILL)
-        #self.logger.info('#'+str(self.id) + ' ccccc')
+        self.logger.info('#'+str(self.id) + ' ccccc')
         await self.ff_proc.wait()
-        #self.logger.info('#'+str(self.id) + ' ddddd')
+        self.logger.info('#'+str(self.id) + ' ddddd')
       except NoSuchProcess:
         pass        
       self.ff_proc = None
-      #self.logger.info('#'+str(self.id) + ' eeeee')
+      self.logger.info('#'+str(self.id) + ' eeeee')
       self.raw_running = False
       if self.reader_thread and self.reader_thread.is_alive():
         await asyncio.to_thread(self.reader_thread.join)
-    #self.logger.info('#'+str(self.id) + ' fffff')
+    self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
     return('C'+str(self.id).zfill(4) + '_'

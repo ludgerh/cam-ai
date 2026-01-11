@@ -42,7 +42,7 @@ from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
 from tools.c_logger import log_ini
 from tools.l_crypt import l_crypt
-from tools.l_break import a_break_type, BR_MEDIUM
+from tools.l_break import a_break_type, BR_MEDIUM, BR_LONG
 from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers
@@ -228,22 +228,25 @@ class schooldbutil(AsyncWebsocketConsumer):
       received = []
       for code, frame_dict, frame_id in zip(code_list, chunk, frame_ids):
         if code == 'I':
-          try:
-            if not received:
-              received = (await asyncio.wait_for(
-                self.tf_worker.get_from_outqueue(self.tf_w_index),
-                timeout=60
-              )).tolist()
-            prediction = received.pop(0)  
-            frame_dict['prediction'] = prediction
-            cache_entry = my_cache_dict.setdefault(frame_id, {})
-            cache_entry['pred'] = prediction
-            cache_entry['fit'] = school_dbline.last_fit
-          except asyncio.TimeoutError:
-            logger.error(
-              f'SC{school_nr}: Timeout during Getpredictions'
-            )  
-            frame_dict['prediction'] = None
+          if not received:
+            while True:
+              received = await self.tf_worker.get_from_outqueue(
+                self.tf_w_index, 
+                timeout = 60.0, 
+              )
+              if received is None:
+                logger.error(
+                  f'SC{school_nr}: Timeout during Getpredictions'
+                )  
+                await a_break_type(BR_LONG)
+              else:
+                received = received.tolist()
+                break
+          prediction = received.pop(0)  
+          frame_dict['prediction'] = prediction
+          cache_entry = my_cache_dict.setdefault(frame_id, {})
+          cache_entry['pred'] = prediction
+          cache_entry['fit'] = school_dbline.last_fit
         elif code == 'R':
           frame_dict['prediction'] = my_cache_dict[frame_id]['pred']
         elif code == 'D':

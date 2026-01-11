@@ -52,6 +52,14 @@ def sigint_handler(signal, frame):
 #
 #***************************************************************************
 
+
+PRIO_LIMITS = {
+  0: 5, 1: 5, 2: 5,
+  3: 2, 4: 2, 5: 2,
+  6: 1, 7: 1, 8: 1, 9: 1,
+}
+
+
 class model_buffer():
 
   def __init__(self, schoolnr):
@@ -61,6 +69,8 @@ class model_buffer():
       prio: asyncio.Queue()
       for prio in range(10)
     }
+    self.schoolnr = schoolnr
+    self.prio_counters = {p: 0 for p in range(10)}
     
   def set_xy(self, xdim, ydim):
     self.xdim = xdim
@@ -80,21 +90,36 @@ class model_buffer():
       await self.queues[prio].put((frame, initem[0]))
 
   async def get(self, maxcount):
-    # Wait until at least one item is available
     while True:
-      for prio in range(10):  # 0 = highest priority
-        q = self.queues[prio]
-        if not q.empty():
-          result = []
-          while len(result) < maxcount and not q.empty():
-            result.append(await q.get())
-          return(result)
+      prios_with_jobs = [i for i in range(10) if not self.queues[i].empty()]
+      if prios_with_jobs:    
+        prio_to_serve = prios_with_jobs[-1]
+      else:
+        prio_to_serve = None  
+      for i in prios_with_jobs:
+        if self.prio_counters[i] < PRIO_LIMITS[i]:
+          self.prio_counters[i] += 1
+          prio_to_serve = i
+          break
+        else:
+          self.prio_counters[i] = 0
+      if prio_to_serve is not None:  
+        result = []
+        while len(result) < maxcount and not self.queues[prio_to_serve].empty():
+          result.append(await self.queues[prio_to_serve].get())
+        return(result)
       await asyncio.sleep(0)  # yield control
     
   def qsize(self):
     result = 0
     for item in self.queues:
       result += self.queues[item].qsize()
+    return(result)  
+    
+  def max_qsize(self):
+    result = 0  
+    for item in self.queues:
+      result = max(self.queues[item].qsize(), result)
     return(result)  
     
   def empty(self):
@@ -168,7 +193,7 @@ class tf_worker(spawn_process):
     
   async def process_received(self, received):  
     result = True
-    #print('TF-Worker-Inqueue received:', received[:3], len(received))
+    #print('TF-Worker-Inqueue received:', received[:3], len(received) - 3)
     if (received[0] == 'unregister'):
       if received[1] in self.users:
         del self.users[received[1]]
@@ -332,7 +357,7 @@ class tf_worker(spawn_process):
               wait_autos[schoolnr] = a_break_auto()  
             timeout = time() > self.model_buffers[schoolnr].ts + self.dbline.timeout
             if (schoolnr in self.model_buffers
-                and (self.model_buffers[schoolnr].qsize() >= self._safe_maxblock()
+                and (self.model_buffers[schoolnr].max_qsize() >= self._safe_maxblock()
                 or timeout)):
               wait_autos[schoolnr].reset()
               if not self.got_sigint and not self.model_buffers[schoolnr].empty():
@@ -616,19 +641,22 @@ class tf_worker_client():
     await self.inqueue.put(command_line)
 
   async def outqueue_empty(self, userindex):
-    async with  self.pred_out_lock:
+    async with self.pred_out_lock:
       result = ((userindex not in self.pred_out_dict) 
         or (self.pred_out_dict[userindex] is None))
     return(result)
 
-  async def get_from_outqueue(self, userindex):
+  async def get_from_outqueue(self, userindex, timeout = None):
+    ts = time()
     while True:
-      async with  self.pred_out_lock:
+      async with self.pred_out_lock: 
         if userindex in self.pred_out_dict and self.pred_out_dict[userindex] is not None:
           result = self.pred_out_dict[userindex]
           self.pred_out_dict[userindex] = None
           self.auto_break.reset()  
           return(result)
+      if timeout and time() - ts >= timeout:
+        return(None)
       await self.auto_break.wait()   
 
   async def stop_out(self, index):
