@@ -334,7 +334,7 @@ class c_cam(viewable):
         self.imagecheck = imagesum
     if frame is None: 
       return(None)
-    #self.wd_ts = in_ts
+    self.wd_ts = in_ts
     fps = self.som.gettime()
     if fps:
       self.dbline.cam_fpsactual = fps
