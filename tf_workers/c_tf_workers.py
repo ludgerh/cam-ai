@@ -193,7 +193,7 @@ class tf_worker(spawn_process):
     
   async def process_received(self, received):  
     result = True
-    #print('TF-Worker-Inqueue received:', received[:3], len(received) - 3)
+    print('TF-Worker-Inqueue received:', received[:3], len(received) - 3)
     if (received[0] == 'unregister'):
       if received[1] in self.users:
         del self.users[received[1]]
@@ -454,11 +454,17 @@ class tf_worker(spawn_process):
           interpreter.get_input_details()[0]['shape_signature'][1]
         )
       else: 
+        print('+++++')
         async with self.tf_load_lock:
           loaded_model = await asyncio.to_thread(self.load_model, model_path)
+          print('00000')
           this_model['model'] = loaded_model
+          print('11111')
           this_model['xdim'] = loaded_model.input_shape[2]
+          print('22222')
           this_model['ydim'] = loaded_model.input_shape[1]
+          print('33333')
+        print('-----')
       self.model_buffers[schoolnr].set_xy(this_model['xdim'], this_model['ydim']) 
       logger.info('***** Got model file #'+str(schoolnr) 
         + ', file: '+model_path)

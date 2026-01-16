@@ -265,7 +265,7 @@ class schooldbutil(AsyncWebsocketConsumer):
     try:
       global getbmp_dict
       await aclose_old_connections()
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']
 
       if ((params['command'] == 'gettags') 
@@ -627,7 +627,10 @@ class schooldbutil(AsyncWebsocketConsumer):
         while schooldbutil.active_getframes_locked:
           await a_break_type(BR_MEDIUM) 
         schooldbutil.active_getframes_locked = True
-        schooldbutil.active_getframes_list = [item for item in schooldbutil.active_getframes_list if item > new_time - GETFRAMES_TIMEOUT]
+        schooldbutil.active_getframes_list = [item 
+          for item in schooldbutil.active_getframes_list 
+          if item > new_time - GETFRAMES_TIMEOUT
+        ]
         if len(schooldbutil.active_getframes_list) >= GETFRAMES_MAX:
           outlist['data'] = ('Wait!')
           schooldbutil.active_getframes_locked = False
@@ -645,7 +648,7 @@ class schooldbutil(AsyncWebsocketConsumer):
             })
           result = [item.id for item in framelines]
           outlist['data'] = (params['count'], result)
-        #logger.info('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'reseteventframes':

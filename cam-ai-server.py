@@ -40,24 +40,29 @@ def sigint_handler(signal, frame):
     print('Killing cam-ai-server.py...')    
     sys.exit(0)
 
+if argv[1] == 'nvidia':
+  use_nvidia = True
+  call_pars = argv[1:]
+else:
+  use_nvidia = False
+  call_pars = argv   
 my_sysinfo = sysinfo()
-if my_sysinfo['hw'] == 'pc':
-  cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
 if my_sysinfo['hw'] == 'raspi':
+  cmd = 'source ~/miniforge3/etc/profile.d/conda.sh; '
+if my_sysinfo['hw'] == 'pc':
   cmd = 'source ~/miniconda3/etc/profile.d/conda.sh; '
 cmd += 'conda activate tf; '
 cmd += 'pip install --upgrade pip; '
-cmd += ('pip install -r requirements.' 
-  + my_sysinfo['hw'] 
-  + '_' 
-  + my_sysinfo['dist_version'] 
-  + '; '
-)
+if use_nvidia:
+  cmd += 'pip install -r requirements.nvidia_' 
+else:
+  cmd += 'pip install -r requirements.' + my_sysinfo['hw'] + '_' 
+cmd += my_sysinfo['dist_version'] + '; '
 cmd += 'python manage.py migrate; '
 subprocess.call(cmd, shell=True, executable='/bin/bash')
 print(my_sysinfo)
 print(cmd)
-if len(argv) > 1:
+if len(call_pars) > 1:
   from setproctitle import setproctitle
   from startup.redis import my_redis as startup_redis
   setproctitle('CAM-AI-Server')
@@ -66,11 +71,10 @@ if len(argv) > 1:
   signal(SIGHUP, sigint_handler)
   basepath = os.getcwd() 
   print('***** CAM-AI server is running *****')
-  print('Calling: python ' + ' '.join(argv[1:]))
+  print('Calling: python ' + ' '.join(call_pars[1:]))
   print()
   startup_redis.set_shutdown_command(0) 
   while True:
-    call_pars = argv
     call_pars[0] = 'python'
     os.chdir(basepath)
     subprocess.call(call_pars)

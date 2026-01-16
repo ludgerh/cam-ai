@@ -29,7 +29,8 @@ from signal import SIGINT, SIGKILL
 from setproctitle import setproctitle
 from logging import getLogger
 from time import time
-from django.db import OperationalError, close_old_connections
+from django.db import OperationalError
+from channels.db import aclose_old_connections
 from globals.c_globals import viewers
 from tools.c_spawn import viewable
 from tools.l_break import a_break_time, a_break_type, break_type, BR_SHORT, BR_MEDIUM, BR_LONG
@@ -564,7 +565,7 @@ class c_cam(viewable):
           await self.dbline.arefresh_from_db()
           break
         except OperationalError:
-          close_old_connections()
+          await aclose_old_connections()
       inp_frame_rate = 0.0
       fps_limit = self.dbline.cam_fpslimit or 0.0
       base_fps = self.dbline.cam_virtual_fps or self.cam_fps

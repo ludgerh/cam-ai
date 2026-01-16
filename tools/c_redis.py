@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -44,12 +44,12 @@ class saferedis(Redis):
       except ConnectionError:
         sleep(1.0)
     
-  def set(self, key, value):
+  def set(self, key, value, ex=None):
     if self.debug:
       print(round(time() - self.start_ts, 5), 'SET', key, reduce(value))
     for _ in range(10):  
       try:  
-        super().set(key, value)
+        super().set(key, value, ex)
         break
       except ConnectionError:
         sleep(1.0)

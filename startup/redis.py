@@ -1,5 +1,5 @@
 """
-Copyright (C) 2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -21,7 +21,11 @@ from tools.c_redis import saferedis
 class new_redis(saferedis):
 
   def set_running(self, value):
-    self.set('cam-ai.startup.running:', str(value))
+    self.set(
+      'cam-ai.startup.running:', 
+      str(value),
+      ex=120,     # auto-expire)
+    )
   
   def get_running(self):
     if (result := self.get('cam-ai.startup.running:')):

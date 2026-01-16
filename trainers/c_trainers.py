@@ -301,10 +301,18 @@ class trainer(spawn_process):
             school_change = (
               await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]
             )
-            self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
+            self.school_cache[s_item.id] = model_to_dict(
+              s_item,
+              exclude=['trainers', ]
+            )
+            #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
           else:
             school_change = True
-            self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
+            self.school_cache[s_item.id] = model_to_dict(
+              s_item,
+              exclude=['trainers', ]
+            )
+            #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
           if s_item.id in self.frames_cache:
             frames_change = (
               trainers_redis.get_last_frame(s_item.id) != self.frames_cache[s_item.id]
