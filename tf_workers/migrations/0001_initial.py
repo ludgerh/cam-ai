@@ -4,28 +4,6 @@ import datetime
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-#from django.utils.timezone import utc
-
-def fill_table(apps, schema_editor):
-  User = apps.get_model("auth", "user")
-  if not User.objects.all().count():
-    newline = User.objects.create(
-      password='pbkdf2_sha256$390000$S1kU2slc9jyJIPerlg0Zke$XhcjiuIc1UQY9GpuGPFFE0YSDaM7blJVxsxSZqfBRZQ=',
-      is_superuser=True,
-      username='admin',
-      first_name='admin',
-      last_name='admin',
-      email='theo@tester.de',
-      is_staff=True,
-      is_active=True,
-    )
-  Worker = apps.get_model("tf_workers", "worker")
-  if not Worker.objects.all().count():
-    Worker.objects.create(active=True, name='TF-Worker 1')
-  School = apps.get_model("tf_workers", "school")
-  if not School.objects.all().count():
-    School.objects.create(active=True, name='Standard')
-
 
 class Migration(migrations.Migration):
 
@@ -85,5 +63,4 @@ class Migration(migrations.Migration):
           ('trainer', models.ForeignKey(default=1, on_delete=django.db.models.deletion.SET_DEFAULT, to='trainers.trainer')),
       ],
     ),
-    migrations.RunPython(fill_table),
   ]

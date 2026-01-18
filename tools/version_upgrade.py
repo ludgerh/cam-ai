@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -21,42 +21,6 @@ from camai.c_settings import safe_import
 proc_dict = OrderedDict()
 
 def temp_func():
-  from tf_workers.models import worker
-  worker.objects.all().update(timeout = 1.0)
-proc_dict[version_flat('1.4.7i')] = temp_func
-
-def temp_func():
-  hw_type = safe_import('hw_type') 
-  if hw_type == 'raspi': 
-    from tf_workers.models import worker
-    from trainers.models import trainer
-    worker.objects.all().update(use_litert = True)
-    trainer.objects.all().update(modeltype = 2)  
-proc_dict[version_flat('1.4.7o')] = temp_func
-
-def temp_func():
-  hw_type = safe_import('hw_type') 
-  if hw_type == 'raspi': 
-    from tf_workers.models import worker
-    worker.objects.all().update(use_websocket = False)
-proc_dict[version_flat('1.5.1')] = temp_func
-
-def temp_func():
-  from tf_workers.models import worker
-  worker.objects.all().update(timeout = 0.1)
-proc_dict[version_flat('1.6.6a')] = temp_func
-
-def temp_func():
-  from .l_sysinfo import is_raspi
-  from streams.models import stream 
-  stream.objects.all().update(
-    cam_fpslimit = 0,
-    det_fpslimit = 2.0,
-    eve_fpslimit = 0,
-  )
-proc_dict[version_flat('1.6.6d')] = temp_func
-
-def temp_func():
   from pathlib import Path
   Path('..').chmod(0o711) 
 proc_dict[version_flat('1.9.6a')] = temp_func
@@ -68,7 +32,7 @@ def temp_func():
     trainer.objects.all().update(
       inference_waitingtime = 10.0,
     )
-proc_dict[version_flat('1.9.9')] = temp_func
+proc_dict[version_flat('1.9.9')] = temp_func   
 
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)

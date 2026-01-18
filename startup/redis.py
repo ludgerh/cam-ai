@@ -21,11 +21,7 @@ from tools.c_redis import saferedis
 class new_redis(saferedis):
 
   def set_running(self, value):
-    self.set(
-      'cam-ai.startup.running:', 
-      str(value),
-      ex=120,     # auto-expire)
-    )
+    self.set('cam-ai.startup.running:', str(value))
   
   def get_running(self):
     if (result := self.get('cam-ai.startup.running:')):

@@ -41,14 +41,6 @@ class worker(models.Model):
 
   def __str__(self):
     return('Worker model, TBD')
-    
-class SchoolTrainer(models.Model):
-  school = models.ForeignKey("tf_workers.school", on_delete=models.CASCADE)
-  trainer = models.ForeignKey("trainers.trainer", on_delete=models.CASCADE)
-
-  class Meta:
-    db_table = "tf_workers_school_trainer"
-    managed = False   # wichtig: Tabelle existiert schon
 
 class school(models.Model):
   name =  models.CharField(max_length = 100)
@@ -68,12 +60,7 @@ class school(models.Model):
   active = models.IntegerField(default = 1)
   e_school = models.IntegerField(default = 1)
   tf_worker = models.ForeignKey(worker, on_delete = models.SET_DEFAULT, default = 1)
-  #trainers = models.ManyToManyField(trainermod)
-  trainers = models.ManyToManyField(
-    "trainers.trainer",
-    through="SchoolTrainer",
-    related_name="schools",
-  )
+  trainers = models.ManyToManyField(trainermod)
   ignore_checked = models.BooleanField(default = True)
   trainer_nr = models.IntegerField(default = 1)
   donate_pics = models.BooleanField(default = False)

@@ -6,14 +6,6 @@ from django.db import migrations, models
 import django.db.models.deletion
 from django.utils.timezone import now
 
-def fill_table(apps, schema_editor):
-  User = apps.get_model("auth", "user")
-  Userinfo = apps.get_model("users", "userinfo")
-  myuser = User.objects.first()
-  if not Userinfo.objects.all().count():
-    Userinfo.objects.create(user_id=myuser.id)
-
-
 class Migration(migrations.Migration):
 
   initial = True
@@ -39,7 +31,6 @@ class Migration(migrations.Migration):
         ('pay_tokens', models.IntegerField(default=0)),
       ],
     ),
-    migrations.RunPython(fill_table),
     migrations.CreateModel(
       name='archive',
       fields=[

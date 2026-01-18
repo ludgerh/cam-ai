@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -90,25 +90,22 @@ class model_buffer():
       await self.queues[prio].put((frame, initem[0]))
 
   async def get(self, maxcount):
-    while True:
-      prios_with_jobs = [i for i in range(10) if not self.queues[i].empty()]
-      if prios_with_jobs:    
-        prio_to_serve = prios_with_jobs[-1]
+    prios_with_jobs = [i for i in range(10) if not self.queues[i].empty()]
+    if prios_with_jobs:    
+      prio_to_serve = prios_with_jobs[-1]
+    else:
+      return(None)
+    for i in prios_with_jobs:
+      if self.prio_counters[i] < PRIO_LIMITS[i]:
+        self.prio_counters[i] += 1
+        prio_to_serve = i
+        break
       else:
-        prio_to_serve = None  
-      for i in prios_with_jobs:
-        if self.prio_counters[i] < PRIO_LIMITS[i]:
-          self.prio_counters[i] += 1
-          prio_to_serve = i
-          break
-        else:
-          self.prio_counters[i] = 0
-      if prio_to_serve is not None:  
-        result = []
-        while len(result) < maxcount and not self.queues[prio_to_serve].empty():
-          result.append(await self.queues[prio_to_serve].get())
-        return(result)
-      await asyncio.sleep(0)  # yield control
+        self.prio_counters[i] = 0
+    result = []
+    while len(result) < maxcount and not self.queues[prio_to_serve].empty():
+      result.append(await self.queues[prio_to_serve].get())
+    return(result)
     
   def qsize(self):
     result = 0
@@ -193,7 +190,7 @@ class tf_worker(spawn_process):
     
   async def process_received(self, received):  
     result = True
-    print('TF-Worker-Inqueue received:', received[:3], len(received) - 3)
+    #print('TF-Worker-Inqueue received:', received[:3], len(received) - 3)
     if (received[0] == 'unregister'):
       if received[1] in self.users:
         del self.users[received[1]]
@@ -454,17 +451,11 @@ class tf_worker(spawn_process):
           interpreter.get_input_details()[0]['shape_signature'][1]
         )
       else: 
-        print('+++++')
         async with self.tf_load_lock:
           loaded_model = await asyncio.to_thread(self.load_model, model_path)
-          print('00000')
           this_model['model'] = loaded_model
-          print('11111')
           this_model['xdim'] = loaded_model.input_shape[2]
-          print('22222')
           this_model['ydim'] = loaded_model.input_shape[1]
-          print('33333')
-        print('-----')
       self.model_buffers[schoolnr].set_xy(this_model['xdim'], this_model['ydim']) 
       logger.info('***** Got model file #'+str(schoolnr) 
         + ', file: '+model_path)
@@ -487,6 +478,8 @@ class tf_worker(spawn_process):
     mybuffer = self.model_buffers[schoolnr]
     ts_one = time()
     slice_to_process = await mybuffer.get(self._safe_maxblock())
+    if slice_to_process is None:
+      return()
     framelist = [item[0] for item in slice_to_process]
     framesinfo = [item[1] for item in slice_to_process]
     #await self.check_model(schoolnr, logger, True)

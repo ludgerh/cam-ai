@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -265,7 +265,7 @@ class schooldbutil(AsyncWebsocketConsumer):
     try:
       global getbmp_dict
       await aclose_old_connections()
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']
 
       if ((params['command'] == 'gettags') 
@@ -648,7 +648,7 @@ class schooldbutil(AsyncWebsocketConsumer):
             })
           result = [item.id for item in framelines]
           outlist['data'] = (params['count'], result)
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'reseteventframes':
@@ -892,7 +892,7 @@ class schoolutil(AsyncWebsocketConsumer):
       if params['command'] == 'delschool':
         if not self.authed:
           self.schoolline = await school.objects.aget(id=params['schoolnr'])
-          t_query = self.schoolline.trainers.filter(active = True)
+          t_query = trainer.objects.filter(active = True)
           trainerline = await t_query.afirst()
           self.user = self.scope['user']
           if not self.user.is_authenticated:

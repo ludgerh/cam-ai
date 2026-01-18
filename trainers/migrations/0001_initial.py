@@ -4,12 +4,6 @@ from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 
-def fill_table(apps, schema_editor):
-  Trainer = apps.get_model("trainers", "trainer")
-  if not Trainer.objects.all().count():
-    Trainer.objects.create(active=False, name='Trainer 1', gpu_nr=0, running=True)
-
-
 class Migration(migrations.Migration):
 
   initial = True
@@ -68,7 +62,6 @@ class Migration(migrations.Migration):
         ('wspass', models.CharField(default='', max_length=50)),
       ],
     ),
-    migrations.RunPython(fill_table),
     migrations.CreateModel(
       name='trainframe',
       fields=[

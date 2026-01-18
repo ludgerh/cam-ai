@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -394,7 +394,6 @@ if False or run_all:
 if False or run_all:
   print('>>>>> Modifying the database...')
   subprocess.call(['sudo', 'mariadb-admin', '-u', 'root', 'password', db_pass])
-  sql_query("update `CAM-AI`.tf_workers_worker set use_websocket = 0;")
   if hw_os_code['hw'] == 'raspi':
     sql_query("update `CAM-AI`.tf_workers_worker set use_litert = 1;")
   else:  
