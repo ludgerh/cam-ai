@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -341,6 +341,7 @@ class trainer(spawn_process):
           if await s_item.trainers.filter(id=self.id).aexists():
             run_condition = (
               await trainframe.objects.filter(school=s_item.id).acount() > 0
+              self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
             )
             if run_condition:
               await sync_to_async(s_item.trainers.remove)(self.dbline)

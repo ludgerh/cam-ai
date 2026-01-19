@@ -22,6 +22,7 @@ import aiofiles
 import aiofiles.os
 import aioshutil
 import aiohttp
+import autobahn
 from asgiref.sync import sync_to_async
 from glob import glob
 from os import path
@@ -260,6 +261,12 @@ class schooldbutil(AsyncWebsocketConsumer):
         elif code == '0':  
           frame_dict['prediction'] = None
     return() 
+    
+  async def send(self, data):
+    try:
+      await super().send(data)  
+    except autobahn.exception.Disconnected:
+      pass  
 
   async def receive(self, text_data):
     try:
