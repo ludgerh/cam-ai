@@ -290,10 +290,13 @@ class tf_worker(spawn_process):
         self.cachedict = {}
       else: #Local CPU or GPU
         if self.dbline.use_litert:
-          from ai_edge_litert import interpreter as tflite
           if self.dbline.use_coral:
-            from ai_edge_litert.interpreter import load_delegate
-          self.logger.info("*** Using LiteRT ***")
+            from tflite_runtime import interpreter as tflite
+            delegates = [tflite.load_delegate('libedgetpu.so.1')]
+            self.logger.info("*** Using LiteRT for Coral TPU***")
+          else:
+            from ai_edge_litert import interpreter as tflite
+            self.logger.info("*** Using LiteRT on CPU***")
           self.tflite = tflite
         else:
           os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
@@ -426,9 +429,10 @@ class tf_worker(spawn_process):
       if self.dbline.use_litert:
         if self.dbline.use_coral:
             print('+++++')
-            interpreter = self.tflite.Interpreter(
-                model_path=model_path,
-                experimental_delegates=[load_delegate('libedgetpu.so.1')],
+            interpreter = await asyncio.to_thread(
+              self.tflite.Interpreter,
+              model_path = model_path,
+              experimental_delegates = delegates,
             )
             print('-----', interpreter)
         else:

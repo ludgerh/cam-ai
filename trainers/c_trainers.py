@@ -339,12 +339,10 @@ class trainer(spawn_process):
             filterdict['checked'] = True
           undone_qs = trainframe.objects.filter(**filterdict)
           if await s_item.trainers.filter(id=self.id).aexists():
-            run_condition = (
-              await trainframe.objects.filter(school=s_item.id).acount() > 0
+            run_condition = await trainframe.objects.filter(school=s_item.id).aexists()
+            if not run_condition:
               self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
-            )
-            if run_condition:
-              await sync_to_async(s_item.trainers.remove)(self.dbline)
+            await sync_to_async(s_item.trainers.remove)(self.dbline)
           else:
             run_condition = (
               await undone_qs.acount() >= s_item.trigger
