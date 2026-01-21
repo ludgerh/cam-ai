@@ -71,7 +71,6 @@ ua-parser-builtins==202601
 ujson==5.11.0
 urllib3==2.6.3
 validators==0.35.0
-websocket-client==1.9.0
 yarl==1.22.0
 zeep==4.3.2
 zope.interface==8.2

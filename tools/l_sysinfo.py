@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,6 +15,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import platform
+from pathlib import Path
+
+def _freedesktop_os_release_fallback():
+  """Fallback for Python < 3.10: parse /etc/os-release if present."""
+  p = Path("/etc/os-release")
+  data = {}
+  if not p.exists():
+    return data
+  for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+    line = line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+      continue
+    k, v = line.split("=", 1)
+    data[k] = v.strip().strip('"')
+  return data
 
 def cpuinfo():
   with open("/proc/cpuinfo", "r") as f:
@@ -50,12 +65,17 @@ def meminfo():
   return(result)  
   
 def osinfo():
+  # Use stdlib function when available, otherwise fallback.
+  if hasattr(platform, "freedesktop_os_release"):
+    dist = platform.freedesktop_os_release()
+  else:
+    dist = _freedesktop_os_release_fallback()
   result = {
     'platform' :  platform.platform(),
     'system' : platform.system(),
     'release' : platform.release(),
     'version' : platform.version(),
-    'dist' : platform.freedesktop_os_release(),
+    'dist' : dist,
   }
   return(result) 
   
