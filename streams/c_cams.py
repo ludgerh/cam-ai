@@ -22,7 +22,6 @@ import cv2 as cv
 import numpy as np
 import queue
 import threading
-import select
 from aiopath import AsyncPath
 from psutil import Process, NoSuchProcess, TimeoutExpired, AccessDenied
 from signal import SIGINT, SIGKILL
@@ -301,11 +300,12 @@ class c_cam(viewable):
       if self.ff_proc is None:
         await a_break_type(BR_LONG)
         return(None)
-        
       try:
-        in_bytes = await asyncio.to_thread(self.raw_queue.get)
-      except Exception:
-        break
+        #in_bytes = await asyncio.to_thread(self.raw_queue.get)
+        in_bytes = self.raw_queue.get_nowait()
+      except queue.Empty:
+        await a_break_type(BR_SHORT)
+        return(None)
       if in_bytes:
         self.framewait = 0.0
         nptemp = np.frombuffer(in_bytes, np.uint8)
@@ -390,7 +390,12 @@ class c_cam(viewable):
         return()  
       self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
       self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
-      await self.dbline.asave(update_fields=('cam_xres', 'cam_yres',))
+      while True:
+        try:
+          await self.dbline.asave(update_fields=('cam_xres', 'cam_yres',))
+          break
+        except OperationalError:
+          await aclose_old_connections()
       if self.dbline.cam_audio_codec == -1:
         self.audio_codec = 0
         try:
@@ -491,8 +496,8 @@ class c_cam(viewable):
           self.logger.info(
             f'CA{self.id}: Wakeup for Camera #{self.id} ({self.dbline.name})...'
           )
-        if not self.dbline.cam_virtual_fps:
-          await self.stopprocess()
+        #if not self.dbline.cam_virtual_fps:
+        await self.stopprocess()
         await self.newprocess() 
         self.getting_newprozess = True
     except Exception as fatal:
@@ -508,54 +513,55 @@ class c_cam(viewable):
     return os.fdopen(rd_fd, "rb", buffering=0)
     
   def _raw_reader(self):
-    self.logger.info(f'CA{self.id}: +++++ Starting Reader')
     self.raw_running = True
+    self.logger.info(f'CA{self.id}: +++++ Starting Reader')
     try:
-      self.logger.info(f'CA{self.id}: RawRunning: ' + str(self.raw_running) + ' ' + str( self.got_sigint))
       while self.raw_running and not self.got_sigint:
         buf = b''
-        while len(buf) < self.bytes_per_frame and self.raw_running:
-          # Wait until fd is readable (prevents busy loop)
-          r, _, _ = select.select([self.fifo.fileno()], [], [], 0.05)
-          if not r:
-            continue  # timeout, check flags again
+        bytes_left = self.bytes_per_frame
+        while bytes_left > 0:
+          if not self.raw_running or self.got_sigint:
+            buf = b''
+            break
           try:
-            chunk = os.read(self.fifo.fileno(), self.bytes_per_frame - len(buf))
-            if not chunk:
-              # EOF: ffmpeg exited or pipe closed
-              self.logger.info(f'CA{self.id}: ffmpeg pipe closed (EOF)')
-              self.raw_running = False
-              break
-            buf += chunk
+            chunk = os.read(self.fd, bytes_left)
           except BlockingIOError:
-            # No data available yet
+            break_type(BR_MEDIUM)
             continue
           except OSError as e:
-            self.logger.warning(f'CA{self.id}: FD error, stopping RAW reader: %s', e)
-            self.raw_running = False
-            break
-        if self.raw_running and len(buf) == self.bytes_per_frame:
-          try:
-            self.raw_queue.put_nowait(buf)
-          except queue.Full:
-            pass  
+            self.logger.warning(
+              f'CA{self.id}: FD error mid-frame → dropping partial frame: {e}'
+            )
+            buf = b''
+            bytes_left = self.bytes_per_frame
+            continue
+          if not chunk:
+            self.logger.error(
+              f'CA{self.id}: EOF mid-frame ({len(buf)} bytes read)'
+            )
+            return
+          buf += chunk
+          bytes_left -= len(chunk)
+        try:
+          self.raw_queue.put(buf, block=False)
+        except queue.Full:
+          pass
     except Exception as fatal:
-      self.logger.error(f'CA{self.id}: Error in process: ' 
-        + self.logname 
-        + ' - ' + self.type + str(self.id)
+      self.logger.critical(
+        f'CA{self.id}: Rawfeed crashed: {fatal}',
+        exc_info=True
       )
-      self.logger.critical(f'CA{self.id}: Rawfeed crashed: %s', fatal, exc_info=True)
-    self.logger.info(f'CA{self.id}: RawRunning:' + str(self.raw_running) + str( self.got_sigint))
-    self.logger.info(f'CA{self.id}: ----- Stopping Reader')
-    try:
-      self.fifo.close()
-    except AttributeError:
-      pass
-    try:
-      os.close(self._fifo_dummy_fd)
-    except Exception:
-      pass
-    self._fifo_dummy_fd = None
+    finally:
+      self.logger.info(f'CA{self.id}: ----- Stopping Reader')
+      try:
+        self.fifo.close()
+      except Exception:
+        pass
+      try:
+        os.close(self._fifo_dummy_fd)
+      except Exception:
+        pass
+      self._fifo_dummy_fd = None
 
   async def newprocess(self):
     self.logger.info('#'+str(self.id) + ' Starting newprocess()')
@@ -679,6 +685,7 @@ class c_cam(viewable):
       self.logger.info('#'+str(self.id) + ' 44444')
       try:
         self.fifo = await asyncio.to_thread(self._open_fifo_pair)
+        self.fd = self.fifo.fileno()
         self.logger.info('#%s 55555', self.id)
         self.reader_thread = threading.Thread(
           target=self._raw_reader,
@@ -701,28 +708,32 @@ class c_cam(viewable):
         await self.stopprocess()
         return()
 
-
   async def stopprocess(self):
+    self.logger.info('#'+str(self.id) + ' aaaaa')
+    self.raw_running = False
+    if self.reader_thread and self.reader_thread.is_alive():
+      await asyncio.to_thread(self.reader_thread.join)
+    self.logger.info('#'+str(self.id) + ' bbbbb')
     if self.ff_proc is not None and self.ff_proc.returncode is None:
       try:
-        self.logger.info('#'+str(self.id) + ' aaaaa')
         p = Process(self.ff_proc.pid)
-        child_pid = p.children(recursive=True)
-        for pid in child_pid:
-          pid.send_signal(SIGKILL)
-          pid.wait()
-        self.logger.info('#'+str(self.id) + ' bbbbb')
-        self.ff_proc.send_signal(SIGKILL)
-        self.logger.info('#'+str(self.id) + ' ccccc')
-        await self.ff_proc.wait()
-        self.logger.info('#'+str(self.id) + ' ddddd')
+        for child in p.children(recursive=True):
+          try:
+            child.kill()
+            child.wait()
+          except NoSuchProcess:
+            pass        
       except NoSuchProcess:
         pass        
-      self.ff_proc = None
+      self.logger.info('#'+str(self.id) + ' ccccc')
+      try:
+        self.ff_proc.send_signal(SIGKILL)
+      except ProcessLookupError:
+        pass
+      self.logger.info('#'+str(self.id) + ' ddddd')
+      await self.ff_proc.wait()
       self.logger.info('#'+str(self.id) + ' eeeee')
-      self.raw_running = False
-      if self.reader_thread and self.reader_thread.is_alive():
-        await asyncio.to_thread(self.reader_thread.join)
+    self.ff_proc = None
     self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):

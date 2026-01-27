@@ -57,7 +57,8 @@ for i in range(10):
 class trainframe(models.Model):
   deleted = models.BooleanField(default = False)
   made = models.DateTimeField()
-  school = models.IntegerField(default = 0, db_default = 0)
+  #school = models.IntegerField(default = 0, db_default = 0)
+  school = models.IntegerField(default = 0)
   encrypted = models.BooleanField(default = True)
   name = models.CharField(max_length = 256)
   code = models.CharField(max_length = 2)

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -165,7 +165,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.myitem.dbline.eve_margin = value
             self.myitem.inqueue.put(('set_margin', value))
           elif params['pname'] == 'eve_event_time_gap':
-            value = int(params['value'])
+            value = round(float(params['value']))
             self.myitem.dbline.eve_event_time_gap = value
             self.myitem.inqueue.put(('set_event_time_gap', value))
           elif params['pname'] == 'eve_school':

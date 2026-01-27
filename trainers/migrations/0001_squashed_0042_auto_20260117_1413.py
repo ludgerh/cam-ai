@@ -90,7 +90,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('made', models.DateTimeField()),
-                ('school', models.IntegerField(db_default=0, default=0)),
+                ('school', models.IntegerField(default=0)),
                 ('name', models.CharField(max_length=256)),
                 ('code', models.CharField(max_length=2)),
                 ('c0', models.SmallIntegerField()),

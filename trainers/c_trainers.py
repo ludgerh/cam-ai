@@ -291,79 +291,85 @@ class trainer(spawn_process):
           trainers_redis.set_predict_proc_active(s_item.id, False)
           trainers_redis.set_predict_proc_started(s_item.id, False)
         self.glob_lock.release()    
-      while  not self.got_sigint:
+      while not self.got_sigint:
         schoollines = await sync_to_async(list)(school.objects.filter(active=True))
-        for s_item in schoollines:
-          await s_item.arefresh_from_db()
-          if s_item.delegation_level == 1:
-            asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
-          if s_item.id in self.school_cache:
-            school_change = (
-              await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]
-            )
-            self.school_cache[s_item.id] = model_to_dict(
-              s_item,
-              exclude=['trainers', ]
-            )
-            #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
-          else:
-            school_change = True
-            self.school_cache[s_item.id] = model_to_dict(
-              s_item,
-              exclude=['trainers', ]
-            )
-            #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
-          if s_item.id in self.frames_cache:
-            frames_change = (
-              trainers_redis.get_last_frame(s_item.id) != self.frames_cache[s_item.id]
-            )
-            self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
-          else:
-            frames_change = True
-            self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
-          if not (school_change or frames_change):
-            await a_break_type(BR_LONG)
-            continue
-          for t_item in trainers:
-            if s_item.id in trainers[t_item].getqueueinfo():
-              self.logger.warning(
-                f'TR{self.id}: School #{s_item.id} not inserted into Trainer Queue '
-                + 'because already in.'
-              )  
-              self.school_cache[s_item.id] = model_to_dict(s_item)
+        if trainers_redis.get_check_proc_started():
+          await a_break_time(10.0)
+        else:
+          trainers_redis.set_check_proc_started(True)
+          for s_item in schoollines:
+            await s_item.arefresh_from_db()
+            if s_item.delegation_level == 1:
+              asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
+            if s_item.id in self.school_cache:
+              school_change = (
+                await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]
+              )
+              self.school_cache[s_item.id] = model_to_dict(
+                s_item,
+                exclude=['trainers', ]
+              )
+              #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
+            else:
+              school_change = True
+              self.school_cache[s_item.id] = model_to_dict(
+                s_item,
+                exclude=['trainers', ]
+              )
+              #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
+            if s_item.id in self.frames_cache:
+              frames_change = (
+                trainers_redis.get_last_frame(s_item.id) != self.frames_cache[s_item.id]
+              )
+              self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
+            else:
+              frames_change = True
+              self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
+            if not (school_change or frames_change):
+              await a_break_type(BR_LONG)
               continue
-          filterdict = {
-            'school' : s_item.id,
-            'train_status' : 0,}
-          if not s_item.ignore_checked:
-            filterdict['checked'] = True
-          undone_qs = trainframe.objects.filter(**filterdict)
-          if await s_item.trainers.filter(id=self.id).aexists():
-            run_condition = await trainframe.objects.filter(school=s_item.id).aexists()
-            if not run_condition:
-              self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
-            await sync_to_async(s_item.trainers.remove)(self.dbline)
-          else:
-            run_condition = (
-              await undone_qs.acount() >= s_item.trigger
-              and not s_item.id in self.job_queue_list
-              and s_item.delegation_level == 1
-            )
-          if run_condition:
-            await undone_qs.aupdate(train_status=1)
-            myfit = fit(
-              made=timezone.now(), 
-              school = s_item.id, 
-              model_image_augmentation = s_item.model_image_augmentation,
-              model_gamma = s_item.model_gamma,
-              model_finetuning = s_item.model_finetuning,
-              status = 'Waiting',
-            )
-            await myfit.asave() 
-            with self.mylock:
-              self.job_queue_list.append(s_item.id)
-            trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
-            await self.job_queue.put((s_item, myfit)) 
+            for t_item in trainers:
+              if s_item.id in trainers[t_item].getqueueinfo():
+                self.logger.warning(
+                  f'TR{self.id}: School #{s_item.id} not inserted into Trainer Queue '
+                  + 'because already in.'
+                )  
+                self.school_cache[s_item.id] = model_to_dict(s_item)
+                continue
+            filterdict = {
+              'school' : s_item.id,
+              'train_status' : 0,}
+            if not s_item.ignore_checked:
+              filterdict['checked'] = True
+            undone_qs = trainframe.objects.filter(**filterdict)
+            if await s_item.trainers.filter(id=self.id).aexists():
+              run_condition = await trainframe.objects.filter(school=s_item.id).aexists()
+              if not run_condition:
+                self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
+              await sync_to_async(s_item.trainers.remove)(self.dbline)
+            else:
+              run_condition = (
+                await undone_qs.acount() >= s_item.trigger
+                and not s_item.id in self.job_queue_list
+                and s_item.delegation_level == 1
+              )
+            if run_condition:
+              await undone_qs.aupdate(train_status=1)
+              myfit = fit(
+                made=timezone.now(), 
+                school = s_item.id, 
+                model_image_augmentation = s_item.model_image_augmentation,
+                model_gamma = s_item.model_gamma,
+                model_finetuning = s_item.model_finetuning,
+                status = 'Waiting',
+              )
+              await myfit.asave() 
+              with self.mylock:
+                self.job_queue_list.append(s_item.id)
+              trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
+              await self.job_queue.put((s_item, myfit)) 
+            #await a_break_time(10.0)
+          trainers_redis.set_check_proc_started(False)
         try:
           await a_break_time(10.0)
         except  asyncio.exceptions.CancelledError:

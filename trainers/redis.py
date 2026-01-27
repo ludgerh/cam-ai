@@ -1,5 +1,5 @@
 """
-Copyright (C) 2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -24,6 +24,7 @@ class redis(saferedis):
   frames_stringbase = 'cam-ai.trainers.frames:'
   predict_stringbase = 'cam-ai.trainers.predict:'
   predict_started_stringbase = 'cam-ai.trainers.predict_started:'
+  check_started_stringbase = 'cam-ai.trainers.check_started:'
 
   def set_trainerqueue(self, idx, value):
     self.set(self.queue_stringbase + str(idx)+':', str(json.dumps(value)))
@@ -70,6 +71,19 @@ class redis(saferedis):
       self.set(self.predict_started_stringbase + str(idx)+':', 1)
     else:  
       self.set(self.predict_started_stringbase + str(idx)+':', 0) 
+      
+  def get_check_proc_started(self): 
+    result = self.get(self.check_started_stringbase)
+    if result:
+      return(int(result))
+    else:
+      return(0)
+      
+  def set_check_proc_started(self, value): 
+    if bool(value):
+      self.set(self.check_started_stringbase, 1)
+    else:  
+      self.set(self.check_started_stringbase, 0) 
 
       
 my_redis = redis()      

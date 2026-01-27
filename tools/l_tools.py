@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@ import numpy as np
 from pathlib import Path
 from time import sleep
 from pathlib import Path
+from typing import Optional, Union
 from os import path, getpid, scandir
 from threading import Thread
 from queue import Queue, Empty
@@ -207,7 +208,7 @@ class djconfig():
     self,
     name: str,
     default: str = None,
-    base: str | Path | None = None,
+    base: Optional[Union[str, Path]] = None,
     must_exist: bool = False,
     resolve: bool = True,
   ) -> Path:
@@ -230,7 +231,7 @@ class djconfig():
     self,
     name: str,
     default: str = None,
-    base: str | Path | None = None,
+    base: Optional[Union[str, Path]] = None,
     must_exist: bool = False,
     resolve: bool = True,
   ) -> Path:

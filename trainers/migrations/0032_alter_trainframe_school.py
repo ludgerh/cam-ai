@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='trainframe',
             name='school',
-            field=models.IntegerField(db_default=0, default=0),
+            field=models.IntegerField(default=0),
         ),
     ]
