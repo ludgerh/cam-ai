@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -36,6 +36,7 @@ urlpatterns = [
 	  name='virt_cam_error',
 	),
 	path('shutdown/', views.shutdown.as_view(), name='shutdown'),
+	path('reboot/', views.reboot.as_view(), name='reboot'),
 	path('sendlogs/', views.sendlogs.as_view(), name='sendlogs'),
 	path('upgrade/', views.upgrade.as_view(), name='upgrade'),
 	path('backup/', views.backup.as_view(), name='backup'),

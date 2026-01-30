@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -52,6 +52,7 @@ class startup_class():
     data_path = safe_import('data_path') 
     db_database = safe_import('db_database') 
     from trainers.c_trainers import clean_fits
+    from trainers.redis import my_redis as trainers_redis
     from django.apps import apps
     try:
       while not apps.ready:
@@ -88,6 +89,7 @@ class startup_class():
       startup_redis.set_start_worker_busy(0)
       startup_redis.set_start_stream_busy(0)
       startup_redis.set_shutdown_command(0)
+      trainers_redis.set_check_proc_started(False)
       await sync_to_async(version_upgrade)(old_version, software_version)
       await clean_fits()
       for item in tf_workers:
@@ -115,7 +117,7 @@ class startup_class():
     from tf_workers.c_tf_workers import tf_worker
     from trainers.c_trainers import trainer
     while self.do_run:
-      if (startup_redis.get_shutdown_command() in {10, 20}):
+      if (startup_redis.get_shutdown_command() in {10, 11, 20}):
         os.kill(os.getpid(), SIGINT)
         return() 
       if (item := startup_redis.get_start_trainer_busy()):

@@ -1,6 +1,6 @@
 """
 Original path: tools/views.py
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -249,6 +249,9 @@ class linkservers(myTemplateView):
       'trainerlist' : trainer.objects.filter(active=True),
     })
     return context
+
+class reboot(myTemplateView):
+  template_name = 'tools/reboot.html'
 
 class shutdown(myTemplateView):
   template_name = 'tools/shutdown.html'

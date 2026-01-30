@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@ import cv2 as cv
 import numpy as np
 import queue
 import threading
+import socket
 from aiopath import AsyncPath
 from psutil import Process, NoSuchProcess, TimeoutExpired, AccessDenied
 from signal import SIGINT, SIGKILL
@@ -50,6 +51,7 @@ class c_cam(viewable):
     self.myeventer_data = myeventer_data
     self.myeventer_in = myeventer_in
     self.mycam = None
+    self.reader_thread = None
     super().__init__(logger, )
 
   async def async_runner(self):
@@ -61,9 +63,14 @@ class c_cam(viewable):
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Camera #'+str(self.id))
-      self.fifo_path = await djconf.agetconfig('fifo_path', '/home/cam_ai/shm/fifo/')
-      await aiofiles.os.makedirs(self.fifo_path, exist_ok=True)
-      self.fifo_path += f'cam{self.id}.pipe'
+      #*****
+      self.socket_path = await djconf.agetconfig(
+        'socket_path', 
+        '/home/cam_ai/shm/sockets/',
+      )
+      await aiofiles.os.makedirs(self.socket_path, exist_ok=True)
+      self.socket_path += f'cam{self.id}.sock'
+      #*****
       if self.dbline.cam_virtual_fps:
         self.wd_ts = 0.0
         self.wd_interval = 1.0
@@ -154,7 +161,6 @@ class c_cam(viewable):
       if self.dbline.cam_apply_mask:
         await self.viewer.drawpad.set_mask_local()
       self.raw_queue = queue.Queue(maxsize=1)
-      self.raw_running = True
       #print(f'Launch: cam#{self.id}')
       while not self.got_sigint:
         frameline = await self.run_one()
@@ -181,12 +187,6 @@ class c_cam(viewable):
         else:
           await a_break_type(BR_SHORT)
       await self.dbline.asave(update_fields = ['cam_fpsactual', ])
-      if getattr(self, "_inq_task", None):
-        self._inq_task.cancel()
-        try:
-          await self._inq_task
-        except asyncio.CancelledError:
-          pass
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
       await self.stopprocess()
@@ -507,11 +507,6 @@ class c_cam(viewable):
       )
       self.logger.critical("watchdog crashed: %s", fatal, exc_info=True)
     
-  def _open_fifo_pair(self):
-    self._fifo_dummy_fd = os.open(self.fifo_path, os.O_RDWR | os.O_NONBLOCK)
-    rd_fd = os.open(self.fifo_path, os.O_RDONLY | os.O_NONBLOCK)
-    return os.fdopen(rd_fd, "rb", buffering=0)
-    
   def _raw_reader(self):
     self.raw_running = True
     self.logger.info(f'CA{self.id}: +++++ Starting Reader')
@@ -525,6 +520,7 @@ class c_cam(viewable):
             break
           try:
             chunk = os.read(self.fd, bytes_left)
+            #print(len(chunk), self.bytes_per_frame - bytes_left, self.bytes_per_frame)
           except BlockingIOError:
             break_type(BR_MEDIUM)
             continue
@@ -536,10 +532,10 @@ class c_cam(viewable):
             bytes_left = self.bytes_per_frame
             continue
           if not chunk:
+            continue
             self.logger.error(
               f'CA{self.id}: EOF mid-frame ({len(buf)} bytes read)'
             )
-            return
           buf += chunk
           bytes_left -= len(chunk)
         try:
@@ -553,160 +549,138 @@ class c_cam(viewable):
       )
     finally:
       self.logger.info(f'CA{self.id}: ----- Stopping Reader')
-      try:
-        self.fifo.close()
-      except Exception:
-        pass
-      try:
-        os.close(self._fifo_dummy_fd)
-      except Exception:
-        pass
-      self._fifo_dummy_fd = None
 
   async def newprocess(self):
     self.logger.info('#'+str(self.id) + ' Starting newprocess()')
     while True:
-      while True:
-        try:
-          await self.dbline.arefresh_from_db()
-          break
-        except OperationalError:
-          await aclose_old_connections()
-      inp_frame_rate = 0.0
-      fps_limit = self.dbline.cam_fpslimit or 0.0
-      base_fps = self.dbline.cam_virtual_fps or self.cam_fps
-      if fps_limit and fps_limit < base_fps:
-        inp_frame_rate = fps_limit
-      self.wd_ts = time()
-      if self.dbline.cam_virtual_fps:
-        base_path = self.virt_cam_path_ram or self.virt_cam_path
-        source_string = f"{base_path}{self.dbline.cam_url}"
-        filepath = None
-      else:
-        self.myeventer_in.put(('purge_videos', ))
-        source_string = self.dbline.cam_url.replace(
-          '{address}', 
-          self.dbline.cam_control_ip, 
-        )
-        if streams_redis.record_from_dev(self.type, self.id):
-          self.vid_count = 0
-          filepath = (self.recordingspath + 'C' 
-            + str(self.id).zfill(4) + '_%08d.mp4')
-        else:
-          filepath = None
-      generalparams = ['-y']
-      #**********
-      log_ffmpeg = False
-      #**********
-      if log_ffmpeg:
-        generalparams += ['-v', 'info']
-      else:  
-        generalparams += ['-v', 'fatal']
-      if not self.dbline.cam_virtual_fps:
-        if source_string[:4].upper() == 'RTSP':
-          generalparams += ['-rtsp_transport', 'tcp']
-        generalparams += ['-fflags', 'genpts']
-        generalparams += ['-use_wallclock_as_timestamps', '1']
-        generalparams += ['-flags', 'low_delay']
-      inparams = ['-i', source_string]
-      outparams1 = []
-      if not self.dbline.cam_virtual_fps:
-        outparams1 += ['-map', '0:' + str(self.video_codec), '-map', '-0:a']
-      outparams1 += ['-vsync', '0']  
-      outparams1 += ['-f', 'rawvideo']
-      outparams1 += ['-pix_fmt', 'bgr24']
-      if inp_frame_rate:
-        outparams1 += ['-r', str(inp_frame_rate)]
-        outparams1 += ['-fps_mode', 'cfr']
-      outparams1 += [self.fifo_path]
-      outparams2 = []
-      if filepath:
-        self.ffmpeg_recording = True
-        if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
-          video_framerate = self.dbline.cam_ffmpeg_fps
-        else:
-          video_framerate = None
-        outparams2 += ['-map', '0:' + str(self.video_codec)]
-        if self.audio_codec > -1:
-          outparams2 += ['-map', '0:' + str(self.audio_codec)]
-        if self.video_codec_name in {'h264', 'hevc'}:
-          if video_framerate:
-            outparams2 += ['-c:v', 'libx264']
-          else:
-            outparams2 += ['-c:v', 'copy']
-          if self.audio_codec_name == 'pcm_alaw':
-            outparams2 += ['-c:a', 'aac']
-          else:
-            outparams2 += ['-c:a', 'copy']
-        else:    
-          outparams2 = ['-c', 'libx264']
-        if video_framerate:
-          outparams2 += ['-r', str(video_framerate)]
-          outparams2 += ['-g', str(round(video_framerate * self.dbline.cam_ffmpeg_segment))]
-        outparams2 += ['-f', 'segment']
-        outparams2 += ['-segment_time', str(self.dbline.cam_ffmpeg_segment)]
-        if video_framerate:
-          outparams2 += ['-segment_time_delta', str(0.5 / (video_framerate))]
-        outparams2 += ['-reset_timestamps', '1']
-        if self.dbline.cam_ffmpeg_crf:
-          outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
-        outparams2 += [filepath]
-      else:
-        self.ffmpeg_recording = True
-      cmd = (generalparams + inparams + outparams1 
-        + outparams2)
-      self.logger.info('#####' + str(cmd))
-      
-      self.logger.info('#'+str(self.id) + ' 00000')
-      while self.ff_proc is not None and self.ff_proc.returncode is None:
-        await a_break_type(BR_LONG)
-      self.logger.info('#'+str(self.id) + ' 11111')
       try:
-        await aiofiles.os.remove(self.fifo_path)
-      except FileNotFoundError:
-        pass
-      self.logger.info('#'+str(self.id) + ' 22222')
-      await asyncio.to_thread(os.mkfifo, self.fifo_path)
-      self.logger.info('#'+str(self.id) + ' 33333')
-      if log_ffmpeg:
-        log = open(logpath + f'ffmpeg{self.id}.log', "ab")
-        self.ff_proc = await asyncio.create_subprocess_exec(
-          '/usr/bin/ffmpeg',
-          *cmd,
-          stdout=None,
-          stderr=log,
-        )
-      else:  
-        self.ff_proc = await asyncio.create_subprocess_exec(
-          '/usr/bin/ffmpeg',
-          *cmd,
-          stdout=None,
-        )
-      self.logger.info('#'+str(self.id) + ' 44444')
-      try:
-        self.fifo = await asyncio.to_thread(self._open_fifo_pair)
-        self.fd = self.fifo.fileno()
-        self.logger.info('#%s 55555', self.id)
-        self.reader_thread = threading.Thread(
-          target=self._raw_reader,
-          daemon=True,
-        )
-        self.reader_thread.start()
+        await self.dbline.arefresh_from_db()
         break
-      except FileNotFoundError:
-        self.logger.warning('#%s FIFO fehlt – lege neu an', self.id)
-        self.logger.warning(
-          f'CA{self.id}: FIFO fehlt – lege neu an'
-        )
-        await asyncio.to_thread(lambda: (os.makedirs(os.path.dirname(self.fifo_path), exist_ok=True),
-                                         os.path.exists(self.fifo_path) or os.mkfifo(self.fifo_path, 0o660)))
-        await a_break_time(0.5)
-      except OSError as e:
-        self.logger.error(
-          f'CA{self.id}: Fehler beim Öffnen des Fifos {e}'
-        )
-        await self.stopprocess()
-        return()
+      except OperationalError:
+        await aclose_old_connections()
+    inp_frame_rate = 0.0
+    fps_limit = self.dbline.cam_fpslimit or 0.0
+    base_fps = self.dbline.cam_virtual_fps or self.cam_fps
+    if fps_limit and fps_limit < base_fps:
+      inp_frame_rate = fps_limit
+    self.wd_ts = time()
+    if self.dbline.cam_virtual_fps:
+      base_path = self.virt_cam_path_ram or self.virt_cam_path
+      source_string = f"{base_path}{self.dbline.cam_url}"
+      filepath = None
+    else:
+      self.myeventer_in.put(('purge_videos', ))
+      source_string = self.dbline.cam_url.replace(
+        '{address}', 
+        self.dbline.cam_control_ip, 
+      )
+      if streams_redis.record_from_dev(self.type, self.id):
+        self.vid_count = 0
+        filepath = (self.recordingspath + 'C' 
+          + str(self.id).zfill(4) + '_%08d.mp4')
+      else:
+        filepath = None
+    generalparams = ['-y']
+    #**********
+    log_ffmpeg = False
+    #**********
+    if log_ffmpeg:
+      generalparams += ['-v', 'info']
+    else:  
+      generalparams += ['-v', 'fatal']
+    if not self.dbline.cam_virtual_fps:
+      if source_string[:4].upper() == 'RTSP':
+        generalparams += ['-rtsp_transport', 'tcp']
+      generalparams += ['-fflags', 'genpts']
+      generalparams += ['-use_wallclock_as_timestamps', '1']
+      generalparams += ['-flags', 'low_delay']
+    inparams = ['-i', source_string]
+    outparams1 = []
+    if not self.dbline.cam_virtual_fps:
+      outparams1 += ['-map', '0:' + str(self.video_codec), '-map', '-0:a']
+    outparams1 += ['-f', 'rawvideo']
+    outparams1 += ['-pix_fmt', 'bgr24']
+    if inp_frame_rate:
+      outparams1 += ['-r', str(inp_frame_rate)]
+      outparams1 += ['-fps_mode', 'cfr']
+    else:
+      outparams1 += ['-fps_mode', 'passthrough']
+    outparams1 += ['unix://' + self.socket_path]
+    outparams2 = []
+    if filepath:
+      self.ffmpeg_recording = True
+      if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
+        video_framerate = self.dbline.cam_ffmpeg_fps
+      else:
+        video_framerate = None
+      outparams2 += ['-map', '0:' + str(self.video_codec)]
+      if self.audio_codec > -1:
+        outparams2 += ['-map', '0:' + str(self.audio_codec)]
+      if self.video_codec_name in {'h264', 'hevc'}:
+        if video_framerate:
+          outparams2 += ['-c:v', 'libx264']
+        else:
+          outparams2 += ['-c:v', 'copy']
+        if self.audio_codec_name == 'pcm_alaw':
+          outparams2 += ['-c:a', 'aac']
+        else:
+          outparams2 += ['-c:a', 'copy']
+      else:    
+        outparams2 = ['-c', 'libx264']
+      if video_framerate:
+        outparams2 += ['-r', str(video_framerate)]
+        outparams2 += ['-g', str(round(video_framerate * self.dbline.cam_ffmpeg_segment))]
+      outparams2 += ['-f', 'segment']
+      outparams2 += ['-segment_time', str(self.dbline.cam_ffmpeg_segment)]
+      if video_framerate:
+        outparams2 += ['-segment_time_delta', str(0.5 / (video_framerate))]
+      outparams2 += ['-reset_timestamps', '1']
+      if self.dbline.cam_ffmpeg_crf:
+        outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
+      outparams2 += [filepath]
+    else:
+      self.ffmpeg_recording = True
+    cmd = (generalparams + inparams + outparams1 
+      + outparams2)
+    self.logger.info('#####' + str(cmd))
+    self.logger.info('#'+str(self.id) + ' 00000')
+    while self.ff_proc is not None and self.ff_proc.returncode is None:
+      await a_break_type(BR_LONG)
+    self.logger.info('#'+str(self.id) + ' 11111')
+    try:
+      os.unlink(self.socket_path)
+    except FileNotFoundError:
+      pass
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(self.socket_path)
+    srv.listen(1)
+    self.logger.info('#'+str(self.id) + ' 22222')
+    if log_ffmpeg:
+      log = open(logpath + f'ffmpeg{self.id}.log', "ab")
+      self.ff_proc = await asyncio.create_subprocess_exec(
+        '/usr/bin/ffmpeg',
+        *cmd,
+        stdout=None,
+        stderr=log,
+      )
+    else:  
+      self.ff_proc = await asyncio.create_subprocess_exec(
+        '/usr/bin/ffmpeg',
+        *cmd,
+        stdout=None,
+      )
+    self.logger.info('#'+str(self.id) + ' 33333')
+    conn, _ = await asyncio.to_thread(srv.accept)
+    conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 * 1024 * 1024)
+    conn.setblocking(False)
+    self.fd = conn.fileno()
+    self.sock_conn = conn
+    self.reader_thread = threading.Thread(
+      target=self._raw_reader,
+      daemon=True,
+    )
+    self.reader_thread.start()
+    self.logger.info('#'+str(self.id) + ' 44444')
 
   async def stopprocess(self):
     self.logger.info('#'+str(self.id) + ' aaaaa')

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -108,16 +108,14 @@ if len(call_pars) > 1:
             f.write(now + "\n")
       first_round = False
     call_in_env('python manage.py migrate', my_sysinfo)
-    
-    
-    
     subprocess.call(call_pars)
-    if startup_redis.get_shutdown_command() in {0, 10}:
+    if startup_redis.get_shutdown_command() in {0, 10, 11}:
       break
     else: 
       sleep(0.1) 
   if startup_redis.get_shutdown_command() == 10:  
-    #print('!!!!! Shutting down !!!!!') 
     os.system('sudo shutdown now') 
+  if startup_redis.get_shutdown_command() == 11:  
+    os.system('sudo reboot now') 
   print('***** CAM-AI server is done *****')  
     

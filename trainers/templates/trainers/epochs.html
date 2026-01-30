@@ -1,5 +1,5 @@
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -41,7 +41,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/chart.min.js"></script>
 {% endif %}
 <div class="container-fluid float-left">
-  <div class="h2 m-10">Details for Fit #{{ fitnr }}</div>
+  <div class="h2 m-10">
+    Details for Fit #{{ fitnr }}
+     --- Phase <span id="phase_nr">0</span>
+     --- Finetuning <span id="ft_nr">0</span>
+  </div>
 </div>
 <div class="container-fluid float-left">
   <div class="h4 m-10">
@@ -115,6 +119,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <script>
 
 let trainerutilSocket;
+let last_phase = 0;
+let last_ft = 0;
 let fit_length = -1;
 let graph_labels = [];
 let start_epoch = 1;
@@ -264,11 +270,15 @@ function refresh_all() {
         rows += '<td>' + item.val_recall.toPrecision(4) + '</td>';
         rows += '<td>' + item.val_precision.toPrecision(4) + '</td>';
         rows += '</tr>';
+        last_phase = item.phase;
+        last_ft = item.finetuning;
       });
       mygraph.update('none');
       $('#tablebody').html(rows);
       fit_length = result.length;
     };
+    $('#phase_nr').text(last_phase);
+    $('#ft_nr').text(last_ft);
     setTimeout(refresh_all, 10000);
   })
 };
