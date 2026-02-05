@@ -619,7 +619,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           pass
         await aioshutil.move(src, dst)
         os.chmod(dst, 0o744)
-        startup_redis.set_shutdown_command(20)
+        startup_redis.set_shutdown_command(11)
         outlist['data'] = 'OK'
         await self.send(json.dumps(outlist))	
         while True:

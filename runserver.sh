@@ -1,4 +1,5 @@
 #!/bin/bash 
+cd ~/cam-ai
 if [ "$1" = "raspi" ] ; then
   source ~/miniforge3/etc/profile.d/conda.sh
   conda activate tf

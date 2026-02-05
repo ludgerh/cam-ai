@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -315,6 +315,8 @@ class l_buffer():
       raise Empty
     except Full:
       raise Full
+    except asyncio.exceptions.CancelledError:
+      pass  
     if self.debug:
       print(self.debug, '--- Put:', debug_display(data_for_send)) 
       

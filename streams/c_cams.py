@@ -160,7 +160,7 @@ class c_cam(viewable):
               await a_break_type(BR_LONG)
       if self.dbline.cam_apply_mask:
         await self.viewer.drawpad.set_mask_local()
-      self.raw_queue = queue.Queue(maxsize=1)
+      self.raw_queue = queue.Queue(maxsize=2)
       #print(f'Launch: cam#{self.id}')
       while not self.got_sigint:
         frameline = await self.run_one()
@@ -244,7 +244,10 @@ class c_cam(viewable):
       self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
     elif (received[0] == 'stop'):
       if self.dbline.cam_virtual_fps and self.virt_cam_path_ram:
-        await aiofiles.os.remove(self.virt_cam_path_ram + self.dbline.cam_url)
+        try:
+          os.remove(self.virt_cam_path_ram + self.dbline.cam_url)
+        except FileNotFoundError:
+          pass
     else:
       result = False   
     return(result)
@@ -509,7 +512,10 @@ class c_cam(viewable):
     
   def _raw_reader(self):
     self.raw_running = True
-    self.logger.info(f'CA{self.id}: +++++ Starting Reader')
+    #self.logger.info(f'CA{self.id}: +++++ Starting Reader')
+    #self.logger.info(
+    #  f"RCVBUF={self.sock_conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}"
+    #)
     try:
       while self.raw_running and not self.got_sigint:
         buf = b''
@@ -522,7 +528,7 @@ class c_cam(viewable):
             chunk = os.read(self.fd, bytes_left)
             #print(len(chunk), self.bytes_per_frame - bytes_left, self.bytes_per_frame)
           except BlockingIOError:
-            break_type(BR_MEDIUM)
+            #break_type(BR_MEDIUM)
             continue
           except OSError as e:
             self.logger.warning(
@@ -548,10 +554,10 @@ class c_cam(viewable):
         exc_info=True
       )
     finally:
-      self.logger.info(f'CA{self.id}: ----- Stopping Reader')
+      pass
+      #self.logger.info(f'CA{self.id}: ----- Stopping Reader')
 
   async def newprocess(self):
-    self.logger.info('#'+str(self.id) + ' Starting newprocess()')
     while True:
       try:
         await self.dbline.arefresh_from_db()
@@ -642,11 +648,11 @@ class c_cam(viewable):
       self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    self.logger.info('#####' + str(cmd))
-    self.logger.info('#'+str(self.id) + ' 00000')
+    #self.logger.info('#####' + str(cmd))
+    #self.logger.info('#'+str(self.id) + ' 00000')
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)
-    self.logger.info('#'+str(self.id) + ' 11111')
+    #self.logger.info('#'+str(self.id) + ' 11111')
     try:
       os.unlink(self.socket_path)
     except FileNotFoundError:
@@ -654,7 +660,7 @@ class c_cam(viewable):
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(self.socket_path)
     srv.listen(1)
-    self.logger.info('#'+str(self.id) + ' 22222')
+    #self.logger.info('#'+str(self.id) + ' 22222')
     if log_ffmpeg:
       log = open(logpath + f'ffmpeg{self.id}.log', "ab")
       self.ff_proc = await asyncio.create_subprocess_exec(
@@ -669,7 +675,7 @@ class c_cam(viewable):
         *cmd,
         stdout=None,
       )
-    self.logger.info('#'+str(self.id) + ' 33333')
+    #self.logger.info('#'+str(self.id) + ' 33333')
     conn, _ = await asyncio.to_thread(srv.accept)
     conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 * 1024 * 1024)
     conn.setblocking(False)
@@ -680,14 +686,14 @@ class c_cam(viewable):
       daemon=True,
     )
     self.reader_thread.start()
-    self.logger.info('#'+str(self.id) + ' 44444')
+    #self.logger.info('#'+str(self.id) + ' 44444')
 
   async def stopprocess(self):
-    self.logger.info('#'+str(self.id) + ' aaaaa')
+    #self.logger.info('#'+str(self.id) + ' aaaaa')
     self.raw_running = False
     if self.reader_thread and self.reader_thread.is_alive():
       await asyncio.to_thread(self.reader_thread.join)
-    self.logger.info('#'+str(self.id) + ' bbbbb')
+    #self.logger.info('#'+str(self.id) + ' bbbbb')
     if self.ff_proc is not None and self.ff_proc.returncode is None:
       try:
         p = Process(self.ff_proc.pid)
@@ -699,16 +705,16 @@ class c_cam(viewable):
             pass        
       except NoSuchProcess:
         pass        
-      self.logger.info('#'+str(self.id) + ' ccccc')
+      #self.logger.info('#'+str(self.id) + ' ccccc')
       try:
         self.ff_proc.send_signal(SIGKILL)
       except ProcessLookupError:
         pass
-      self.logger.info('#'+str(self.id) + ' ddddd')
+      #self.logger.info('#'+str(self.id) + ' ddddd')
       await self.ff_proc.wait()
-      self.logger.info('#'+str(self.id) + ' eeeee')
+      #self.logger.info('#'+str(self.id) + ' eeeee')
     self.ff_proc = None
-    self.logger.info('#'+str(self.id) + ' fffff')
+    #self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
     return('C'+str(self.id).zfill(4) + '_'

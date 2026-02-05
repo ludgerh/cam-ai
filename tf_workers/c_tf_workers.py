@@ -129,12 +129,12 @@ class tf_user(object):
       i = 0
       while (i in self.clientset):
         i += 1
-      self.clientset.add(i)
+      tf_user.clientset.add(i)
       self.id = i 
       self.prio = prio
 
   def __del__(self):
-      self.clientset.discard(self.id)
+      tf_user.clientset.discard(self.id)
       
 class output_dist():   
   def __init__(self, tf_worker):
@@ -192,7 +192,7 @@ class tf_worker(spawn_process):
     result = True
     #print('TF-Worker-Inqueue received:', received[:3], len(received) - 3)
     if (received[0] == 'unregister'):
-      if received[1] in self.users:
+      async with self.users_lock:
         del self.users[received[1]]
     elif (received[0] == 'get_is_ready'):
       await self.my_output.put(received[1], ('put_is_ready', self.is_ready))
@@ -204,13 +204,17 @@ class tf_worker(spawn_process):
       while not 'xdim' in self.models[schoolnr]:
         await a_break_type(BR_LONG)
       self.model_buffers[schoolnr].pause = False
-      await self.model_buffers[schoolnr].append(
-        received[1:], 
-        self.users[received[1]].prio,
-      )
+      async with self.users_lock:
+        user = self.users.get(received[1])
+      if not user:
+        return(True)
+      async with self.users_lock:
+        prio = user.prio
+      await self.model_buffers[schoolnr].append(received[1:], prio)
     elif (received[0] == 'register'):
       myuser = tf_user(prio = received[1])
-      self.users[myuser.id] = myuser
+      async with self.users_lock:
+        self.users[myuser.id] = myuser
       self.registerqueue.put(myuser.id)
     else:
       result = False  
@@ -282,6 +286,7 @@ class tf_worker(spawn_process):
       #signal(SIGINT, sigint_handler)
       self.len_taglist = len(await database_sync_to_async(get_taglist)(1, ))
       self.users = {}
+      self.users_lock = asyncio.Lock()
       self.logname = 'tf_worker #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
@@ -537,12 +542,11 @@ class tf_worker(spawn_process):
       for i in range(len(framelist)):
         if ((i == len(framelist) - 1) 
             or (framesinfo[i] != framesinfo[i+1])):
-          if (framesinfo[starting] in self.users):
-            await self.my_output.put(framesinfo[starting], (
-              'pred_to_send', 
-              predictions[starting:i+1], 
-              framesinfo[starting],
-            ))
+          await self.my_output.put(framesinfo[starting], (
+            'pred_to_send', 
+            predictions[starting:i+1], 
+            framesinfo[starting],
+          ))
           starting = i + 1
       if self.do_tf_debug:
         block_size = len(framelist)

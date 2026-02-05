@@ -54,7 +54,7 @@ from .models import camurl
 
 emulatestatic = safe_import('emulatestatic')
 db_database = safe_import('db_database')
-no_nginx = safe_import('localaccess') or not safe_import('mydomain')
+no_nginx = safe_import('localaccess')
 
 BASE_PATH = Path(settings.BASE_DIR)
 DATAPATH = djconf.getconfigpath('datapath', default = 'data/', base = BASE_PATH)

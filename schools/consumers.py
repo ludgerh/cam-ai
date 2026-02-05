@@ -448,7 +448,7 @@ class schooldbutil(AsyncWebsocketConsumer):
             'ymax' : line.ymax,
           })
         outlist['data'] = lines
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'gettrainshortlist':
