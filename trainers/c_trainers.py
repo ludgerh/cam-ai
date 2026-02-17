@@ -84,6 +84,7 @@ class trainer(spawn_process):
       from .models import trainframe
       from tf_workers.models import school
       school_dbline = await school.objects.aget(id = school_nr)
+      #print('%%%%% update_predictions: school_nr:', school_nr, 'last_fit:', last_fit, 'last_fit_infer:', school_dbline.last_fit_infer)
       base_qs = (trainframe.objects
         .filter(school = school_nr, deleted=False)
         .exclude(last_fit = school_dbline.last_fit_infer))
@@ -166,6 +167,8 @@ class trainer(spawn_process):
             + f'of school #{school_nr}'
           )  
           self.doing_reinference = 0
+      else:    
+        self.doing_reinference = 0
     finally:
       trainers_redis.set_predict_proc_active(school_nr, False)
               

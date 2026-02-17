@@ -30,6 +30,7 @@ security_key = safe_import('security_key')
 localaccess = safe_import('localaccess') 
 myip = safe_import('myip') 
 mydomain = safe_import('mydomain') 
+httpport = safe_import('httpport') 
 httpsport = safe_import('httpsport') 
 mail_client_url = safe_import('mail_client_url') 
 smtp_account = safe_import('smtp_account') 
@@ -54,25 +55,36 @@ if emulatestatic:
 else:  
   DEBUG = debugpw
 
+trusted = []
+if not httpport:
+  httpport = '8000'
+if not httpsport:
+  httpsport = '443'
 if localaccess:
-  ALLOWED_HOSTS =  ['127.0.0.1', 'localhost']
-  CLIENT_URL = 'http://localhost:8000/'
-else:  
-  ALLOWED_HOSTS = []
+  allowed =  ['127.0.0.1', 'localhost']
+  CLIENT_URL = 'http://localhost:' + httpport + '/'
+  for item in allowed:
+    trusted.append('http://' + item + ':' + httpport)
+else:
+  allowed = []    
 if myip:
   if isinstance(myip, str):
-    ALLOWED_HOSTS += [myip]
-    CLIENT_URL = 'http://' + myip + ':8000/'
-  else:
-    ALLOWED_HOSTS += myip
-    CLIENT_URL = 'http://' + myip[0] + ':8000/'
+    myip = [myip]
+  for item in myip:  
+    allowed.append(item)
+    trusted.append('http://' + item + ':' + httpport)
+  CLIENT_URL = 'http://' + myip[0] + ':' + httpport + '/'
 if mydomain:
-  ALLOWED_HOSTS.append(mydomain.split(':')[0])
-  trustedorigin = 'https://'+mydomain
-  if httpsport:
-    trustedorigin += (':'+httpsport)
-  CLIENT_URL = trustedorigin + '/'
-  CSRF_TRUSTED_ORIGINS = [trustedorigin]
+  mydomain = mydomain.split(':')[0]
+  allowed.append(mydomain)
+  trusted.append('https://' + mydomain + ':' + httpsport)
+  trusted.append('http://' + mydomain + ':' + httpport)
+  CLIENT_URL = 'https://' + mydomain + ':' + httpsport + '/'
+ALLOWED_HOSTS = allowed
+CSRF_TRUSTED_ORIGINS = trusted
+print('ALLOWED_HOSTS', ALLOWED_HOSTS)
+print('CSRF_TRUSTED_ORIGINS', CSRF_TRUSTED_ORIGINS)
+print('CLIENT_URL', CLIENT_URL)
 if mail_client_url:  
   CLIENT_URL = mail_client_url  
 

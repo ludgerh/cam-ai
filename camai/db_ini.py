@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -53,6 +53,21 @@ async def db_ini():
     'y_in_default' : 300,
   })
   await add_if_none(model_type, 'name', {
+    'name' : 'efficientnetv2-s',
+    'x_in_default' : 384, 
+    'y_in_default' : 384,
+  })
+  await add_if_none(model_type, 'name', {
+    'name' : 'efficientnetv2-m',
+    'x_in_default' : 480, 
+    'y_in_default' : 480,
+  })
+  await add_if_none(model_type, 'name', {
+    'name' : 'efficientnetv2-l',
+    'x_in_default' : 480, 
+    'y_in_default' : 480,
+  })
+  await add_if_none(model_type, 'name', {
     'name' : 'mobilenetv2',
     'x_in_default' : 224, 
     'y_in_default' : 224,
@@ -63,16 +78,21 @@ async def db_ini():
     'url' : 'rtsp://{user}:{pass}@{address}:{port}/cam/realmonitor?channel=1&subtype=0', 
   })
   await add_if_none(camurl, 'type', {
+    'type' : 'IDS uEye SCP',
+    'url' : 'rtsp://{user}:{pass}@{address}:{port}/stream1', 
+  })
+  print('#####', 'rtsp://{user}:{pass}@{address}:{port}/stream1')
+  await add_if_none(camurl, 'type', {
+    'type' : 'Instar IN-5907 HD',
+    'url' : 'rtsp://{user}:{pass}@{address}:{port}/11', 
+  })
+  await add_if_none(camurl, 'type', {
     'type' : 'levelone FCS-4051',
     'url' : 'rtsp://{user}:{pass}@{address}:{port}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1', 
   })
   await add_if_none(camurl, 'type', {
     'type' : 'levelone FCS-5201',
     'url' : 'rtsp://{user}:{pass}@{address}:{port}/Streaming/Channels/101?transportmode=mcast&profile=Profile_1', 
-  })
-  await add_if_none(camurl, 'type', {
-    'type' : 'Instar IN-5907 HD',
-    'url' : 'rtsp://{user}:{pass}@{address}:{port}/11', 
   })
   await add_if_none(camurl, 'type', {
     'type' : 'Novus NVIP-4VE-6501',

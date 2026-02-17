@@ -186,7 +186,12 @@ class c_cam(viewable):
               pass
         else:
           await a_break_type(BR_SHORT)
-      await self.dbline.asave(update_fields = ['cam_fpsactual', ])
+      while True:
+        try:
+          await self.dbline.asave(update_fields = ['cam_fpsactual', ])
+          break
+        except OperationalError:
+          await aclose_old_connections()
       self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
       await self.stopprocess()
@@ -608,7 +613,8 @@ class c_cam(viewable):
     outparams1 += ['-pix_fmt', 'bgr24']
     if inp_frame_rate:
       outparams1 += ['-r', str(inp_frame_rate)]
-      outparams1 += ['-fps_mode', 'cfr']
+      #outparams1 += ['-fps_mode', 'cfr']
+      outparams1 += ['-fps_mode', 'drop']
     else:
       outparams1 += ['-fps_mode', 'passthrough']
     outparams1 += ['unix://' + self.socket_path]
@@ -648,7 +654,7 @@ class c_cam(viewable):
       self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    #self.logger.info('#####' + str(cmd))
+    self.logger.info('#####' + str(cmd))
     #self.logger.info('#'+str(self.id) + ' 00000')
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)
@@ -677,8 +683,10 @@ class c_cam(viewable):
       )
     #self.logger.info('#'+str(self.id) + ' 33333')
     conn, _ = await asyncio.to_thread(srv.accept)
-    conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 * 1024 * 1024)
+    #conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 32 * 1024 * 1024)
+    conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 * self.bytes_per_frame)
     conn.setblocking(False)
+    self.logger.info(f'SocketSize: {conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}')    
     self.fd = conn.fileno()
     self.sock_conn = conn
     self.reader_thread = threading.Thread(

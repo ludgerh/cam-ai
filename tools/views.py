@@ -29,6 +29,7 @@ from django.core.files.storage import FileSystemStorage
 from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
+from django.db.models.functions import Lower
 from django.views.generic.base import TemplateView
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, FileResponse
@@ -134,7 +135,7 @@ class inst_cam_expert(cam_inst_view):
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
     context.update({
-      'camurls' : camurl.objects.all(),
+      'camurls' : camurl.objects.all().order_by(Lower('type')),
       'ipaddress' : kwargs['ip'],
       'ports' : json.loads(kwargs['ports']),
     })

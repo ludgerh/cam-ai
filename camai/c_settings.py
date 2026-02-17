@@ -30,6 +30,7 @@ system_defaults = {
   'localaccess' : True,
   'myip' : [],
   'mydomain' : '',
+  'httpport' : '',
   'httpsport' : '',
   'mail_client_url' : '',
   'smtp_account' : '',
