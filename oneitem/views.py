@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -61,7 +61,6 @@ class OneCamView(View):
       'cam_fpslimit': dbline.cam_fpslimit,
       'cam_ffmpeg_fps': dbline.cam_ffmpeg_fps,
       'cam_url': dbline.cam_url,
-      'cam_red_lat': dbline.cam_red_lat,
       'cam_checkdoubles': dbline.cam_checkdoubles,
     })
     context = {
@@ -104,11 +103,9 @@ class OneCamView(View):
     dbline.cam_url = form.cleaned_data['cam_url']
     dbline.cam_fpslimit = form.cleaned_data['cam_fpslimit']
     dbline.cam_ffmpeg_fps = form.cleaned_data['cam_ffmpeg_fps']
-    dbline.cam_red_lat = form.cleaned_data['cam_red_lat']
-    dbline.cam_checkdoubles = form.cleaned_data['cam_checkdoubles']
     await dbline.asave(update_fields=[
         'name', 'cam_pause', 'cam_fpslimit', 'cam_ffmpeg_fps',
-        'cam_url', 'cam_red_lat', 'cam_checkdoubles'
+        'cam_url', 'cam_checkdoubles',
     ])
     await asyncio.to_thread(mycam.inqueue.put, (('reset_cam',)), )
     return HttpResponseRedirect(f'{myurl}{camnr}/')
@@ -144,6 +141,7 @@ class OneDetView(View):
       'det_max_size' : dbline.det_max_size,
       'det_max_rect' : dbline.det_max_rect,
       'det_scaledown' : dbline.det_scaledown,
+      'det_positive_mask': dbline.det_positive_mask,
     })
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -184,7 +182,6 @@ class OneDetView(View):
     form = DetectorForm(request.POST)
     if not form.is_valid():
       return HttpResponse('Invalid form data', status=400)
-    print(form.cleaned_data)
     dbline.det_fpslimit = form.cleaned_data['det_fpslimit']
     dbline.det_threshold = form.cleaned_data['det_threshold']
     dbline.det_backgr_delay = form.cleaned_data['det_backgr_delay']

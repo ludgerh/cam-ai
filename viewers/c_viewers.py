@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -29,12 +29,11 @@ from drawpad.drawpad import drawpad
 
 class c_viewer():
 
-  def __init__(self, type, idx, xdim, ydim, scaledown, logger):
+  def __init__(self, type, idx, scaledown, logger):
     self.logger = logger
     self.type = type
     self.id = idx
-    self.xdim = xdim
-    self.ydim = ydim
+    self.xdim = None
     self.scaledown = scaledown
     self.inqueue = c_buffer(
       block_put = False, 
@@ -50,8 +49,6 @@ class c_viewer():
       self.drawpad = None
     else:  
       self.drawpad = drawpad(self, self.logger)
-      self.drawpad.mtype = self.type
-      self.drawpad.myid = self.id
     self.framebuffer = None 
           
   async def onf(self, client_nr):
@@ -60,23 +57,25 @@ class c_viewer():
       self.client_dict[client_nr]['lat_ts'] = time()
       ts = time()
       frame = (await self.inqueue.get())[1]
-      if self.type == 'D':
-        if (self.drawpad.show_mask 
-            and (self.drawpad.mask is not None)):
+      #if self.type == 'D':
+      #  if (self.drawpad.show_mask 
+      #      and (self.drawpad.mask is not None)):
+      #    frame = cv.addWeighted(frame, 1, 
+      #      (255 - self.drawpad.mask), 0.3, 0)
+      #elif self.type == 'C':
+      if (self.drawpad.show_mask 
+          and (self.drawpad.mask is not None)):
+        if self.drawpad.positive_mask:
+          frame = cv.addWeighted(frame, 1, (self.drawpad.mask), -0.3, 0)
+        else:  
+          frame = cv.addWeighted(frame, 1, (255 - self.drawpad.mask), -0.3, 0)
+      if self.drawpad.edit_active and self.drawpad.ringlist:
+        if self.drawpad.whitemarks:
           frame = cv.addWeighted(frame, 1, 
-            (255-self.drawpad.mask), 0.3, 0)
-      elif self.type == 'C':
-        if (self.drawpad.show_mask 
-            and (self.drawpad.mask is not None)):
+            (255 - self.drawpad.screen), 1, 0)
+        else:
           frame = cv.addWeighted(frame, 1, 
-            (255-self.drawpad.mask), -0.3, 0)
-        if self.drawpad.edit_active and self.drawpad.ringlist:
-          if self.drawpad.whitemarks:
-            frame = cv.addWeighted(frame, 1, 
-              (255-self.drawpad.screen), 1, 0)
-          else:
-            frame = cv.addWeighted(frame, 1, 
-              (255-self.drawpad.screen), -1.0, 0)
+            (255 - self.drawpad.screen), -1.0, 0)
       if self.client_dict[client_nr]['do_compress']:
         to = 3 #jpg
       else:
@@ -90,7 +89,7 @@ class c_viewer():
           self.client_dict[client_nr]['index'].encode()+frame
         ))
       except Disconnected:
-        logger.warning('*** Could not send Frame, socket closed...')
+        self.logger.warning('*** Could not send Frame, socket closed...')
 
   async def callback(self):  
     with self.client_dict_lock: 

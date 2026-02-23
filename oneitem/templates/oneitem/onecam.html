@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -180,37 +180,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	        <input class="me-3" type="checkbox" id="ch_edit" name="ch_edit">
 	        <label for="ch_white">White Marks</label>
 	        <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
+          <label for="ch_positive">Positive Mask</label>
+	        <input class="me-3" type="checkbox" id="ch_positive" name="ch_positive">
+          <label for="ch_rectangular">Rectangular</label>
+	        <input class="me-3" type="checkbox" id="ch_rectangular" name="ch_rectangular">
 	        <button class="btn btn-primary m-2" type="button" id="bt_new">New Masked Area</button>
-	        <select class="me-3" id="mask_select">
-            <option value="C" selected>Edit Camera Mask</option>
-            <option value="X">Edit Detector Mask</option>
-          </select>
         </div>
       </div>
     </div>  
 </main>
-
-
-
-		  
-	  <div class="row my-1 d-none" id="cam_c_boxes">
-		  <div class="col-auto my-2">
-			  <label for="ch_show">Show</label>
-			  <input class="me-3" type="checkbox" id="ch_show" name="ch_show">
-			  <label for="ch_apply">Apply</label>
-			  <input class="me-3" type="checkbox" id="ch_apply" name="ch_apply">
-			  <label for="ch_edit">Edit</label>
-			  <input class="me-3" type="checkbox" id="ch_edit" name="ch_edit">
-			  <label for="ch_white">White Marks</label>
-			  <input class="me-3" type="checkbox" id="ch_white" name="ch_white">
-			  <button class="btn btn-primary m-2" type="button" id="bt_new">New Masked Area</button>
-			  <select class="me-3" id="mask_select">
-          <option value="C" selected>Edit Camera Mask</option>
-          <option value="X">Edit Detector Mask</option>
-        </select>
-		  </div>
-	  </div>
-  </div>
 {% endif %}
 
 <script>
@@ -294,7 +272,6 @@ function rawDataToJpeg(rawData, width, height, quality = 0.8) {
 }
 
 $(document).ready(function() {
-	$('#mask_select').val('C');
   $('#imagespace').attr('width', displaywidth+'px');
   $('#imagespace').attr('height', displayheight+'px');
 {% if may_write %}
@@ -322,18 +299,16 @@ $(document).ready(function() {
 			'ch_white' : $('#ch_white').prop('checked'),
 		})
 	});
-	$('#mask_select').change((evt) => {
-	  if ($('#mask_select').val() == 'C') {
-	    $('#ch_show').prop("disabled", false);
-	    $('#ch_apply').prop("disabled", false);
-	  };
-	  if ($('#mask_select').val() == 'X') {
-	    $('#ch_show').prop("disabled", true);
-	    $('#ch_apply').prop("disabled", true);
-	  };
+	$('#ch_positive').change((evt) => {
 		oneitemSocket.sendandwait({
-			'command' : 'm_select_change',
-			'new_val' : $('#mask_select').val(),
+			'command' : 'setcbstatus',
+			'ch_positive' : $('#ch_positive').prop('checked'),
+		})
+	});
+	$('#ch_rectangular').change((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_rectangular' : $('#ch_rectangular').prop('checked'),
 		})
 	});
 	$('#bt_new').click((evt) => {
@@ -459,7 +434,9 @@ $(document).ready(function() {
 		$('#ch_show').prop('checked', false);
 		$('#ch_apply').prop('checked', ('{{ dbline.cam_apply_mask }}' == 'True'));
 		$('#ch_edit').prop('checked', false);
-		$('#ch_white').prop('checked', false);
+		$('#ch_white').prop('checked', true);
+		$('#ch_positive').prop('checked', ('{{ dbline.cam_positive_mask }}' == 'True'));
+		$('#ch_rectangular').prop('checked', false);
 		return(WSAsync(ws_scheme + '//' + window.location.host + '/ws/oneitem/'));
 	})
 	.then((result) => {
@@ -629,11 +606,8 @@ $(document).ready(function() {
 			'command' : 'setcbstatus',
 			'ch_show' : $('#ch_show').prop('checked'),
 			'ch_apply' : $('#ch_apply').prop('checked'),
-			'ch_edit' : $('#ch_edit').prop('checked'),
-		})
-		oneitemSocket.sendandwait({
-			'command' : 'm_select_change',
-			'new_val' : $('#mask_select').val(),
+			'ch_positive' : $('#ch_positive').prop('checked'),
+			'ch_rectangular' : $('#ch_rectangular').prop('checked'),
 		})
 {% endif %}
 	})
@@ -684,6 +658,9 @@ $(document).ready(function() {
 			  })
 			};
 		});
+		$('#collapseTwo').on('shown.bs.collapse', function () {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    });
 		if (ptz_active) {
       myimage.mousewheel(function(event) {
 			  if(!($('#ch_edit').prop('checked'))) {

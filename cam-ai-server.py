@@ -85,27 +85,9 @@ if len(call_pars) > 1:
     cmd += my_sysinfo['dist_version']
     call_in_env(cmd, my_sysinfo)
     if first_round:
-      if os.path.exists('last_run.dat') or os.path.exists('data'):
-        # This can be removed as soon as everybody has 2.0.3 installed
-        cmd = ('python manage.py migrate tf_workers '
-          + '0001_squashed_0058_auto_20260117_1253 --fake')
-        call_in_env(cmd, my_sysinfo)
-        cmd = ('python manage.py migrate cleanup '
-          + '0001_squashed_0011_remove_status_line_event_stream_and_more --fake')
-        call_in_env(cmd, my_sysinfo)
-        cmd = ('python manage.py migrate eventers '
-          + '0001_squashed_0015_event_deleted_event_frame_deleted --fake')
-        call_in_env(cmd, my_sysinfo)
-        cmd = ('python manage.py migrate streams '
-          + '0001_squashed_0030_stream_eve_one_frame_per_event --fake')
-        call_in_env(cmd, my_sysinfo)
-        cmd = ('python manage.py migrate trainers '
-          + '0001_squashed_0042_auto_20260117_1413 --fake')
-        call_in_env(cmd, my_sysinfo)
-      else:  
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("last_run.dat", "w", encoding="utf-8") as f:
-            f.write(now + "\n")
+      now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+      with open("last_run.dat", "w", encoding="utf-8") as f:
+          f.write(now + "\n")
       first_round = False
     call_in_env('python manage.py migrate', my_sysinfo)
     subprocess.call(call_pars)

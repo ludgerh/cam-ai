@@ -1,5 +1,5 @@
 """
-Copyright (C) 2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-20269 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -105,8 +105,6 @@ class viewable(spawn_process):
     add_viewer((my_viewer := c_viewer(
       self.type, 
       self.id, 
-      self.dbline.cam_xres, 
-      self.dbline.cam_yres, 
       scaledown,
       logger,
     )))

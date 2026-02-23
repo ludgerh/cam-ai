@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -24,6 +24,7 @@ from setproctitle import setproctitle
 from streams.redis import my_redis as streams_redis
 from tf_workers.redis import my_redis as tf_workers_redis
 from tools.c_spawn import viewable
+from drawpad.models import mask
 
 #from psutil import virtual_memory
 
@@ -78,8 +79,8 @@ class c_detector(viewable):
         + str(self.dbline.det_gpu_nr_cv))
       self.do_run = True
       self.warning_done = False
-      if self.dbline.det_apply_mask:
-        await self.viewer.drawpad.set_mask_local()
+      self.viewer.drawpad.set_xy((self.xres, self.yres))
+      await self.viewer.drawpad.set_mask_local()
       self.div_ts = 0.0
       self.div_old = 1.0
       #print('Launch: detector')
@@ -111,9 +112,29 @@ class c_detector(viewable):
         self.sl.period = 0.0
       else:
         self.sl.period = 1.0 / received[1]
+    elif (received[0] == 'set_drawpad_size'):
+      self.viewer.drawpad.set_xy((self.xres, self.yres))
+    elif (received[0] == 'new_mask_item'):
+      self.viewer.drawpad.new_ring()
+      self.viewer.drawpad.make_screen()
+      self.viewer.drawpad.mask_from_polygons()
+      await mask.objects.filter(
+        stream_id=self.id, 
+        mtype='D',
+      ).adelete()
+      for ring in self.viewer.drawpad.ringlist:
+        m = mask(
+          name='New Ring',
+          definition=json.dumps(ring.points),
+          stream_id=self.id,
+          mtype='D',
+        )
+        await m.asave()
+    elif (received[0] == 'set_cb_apply'):
+      self.dbline.det_apply_mask = received[1]
+    elif (received[0] == 'set_cb_positive'):
+      self.viewer.drawpad.positive_mask = received[1]
     elif (received[0] == 'set_mask'):
-      await self.viewer.drawpad.set_mask_local(received[1])
-    elif (received[0] == 'set_apply_mask'):
       self.dbline.det_apply_mask = received[1]
     elif (received[0] == 'set_threshold'):
       self.dbline.det_threshold = received[1]
@@ -182,11 +203,18 @@ class c_detector(viewable):
       else:
         self.buffer = frame
       if self.dbline.det_apply_mask:
-        self.buffer = await asyncio.to_thread(
-          cv.bitwise_and, 
-          self.buffer, 
-          self.viewer.drawpad.mask, 
-        )
+        if self.dbline.det_positive_mask:
+          self.buffer = await asyncio.to_thread(
+            cv.bitwise_and, 
+            self.buffer, 
+            255 - self.viewer.drawpad.mask, 
+          )
+        else:
+          self.buffer = await asyncio.to_thread(
+            cv.bitwise_and, 
+            self.buffer, 
+            self.viewer.drawpad.mask, 
+          )
       self.background = np.float32(self.buffer)  
       self.firstdetect = False
     if self.scaledown > 1:
@@ -197,11 +225,18 @@ class c_detector(viewable):
         interpolation=cv.INTER_NEAREST, 
       )
     if self.dbline.det_apply_mask:
-      frame = await asyncio.to_thread(
-        cv.bitwise_and, 
-        frame, 
-        self.viewer.drawpad.mask, 
-      )
+      if self.dbline.det_positive_mask:
+        frame = await asyncio.to_thread(
+          cv.bitwise_and, 
+          frame, 
+          255 - self.viewer.drawpad.mask, 
+        )
+      else:
+        frame = await asyncio.to_thread(
+          cv.bitwise_and, 
+          frame, 
+          self.viewer.drawpad.mask, 
+        )
     objectmaxsize = round(max(
       self.buffer.shape[0],
       self.buffer.shape[1],

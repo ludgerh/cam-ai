@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -103,7 +103,6 @@ class acaminst(AsyncWebsocketConsumer):
         newstream.eve_gpu_nr_cv = cv_gpu_nr
         newstream.eve_school = myschool
         newstream.creator = self.scope['user']
-        newstream.cam_red_lat = params['red_lat']
         await newstream.asave()
         newlineid = newstream.id
         if not self.scope['user'].is_superuser:

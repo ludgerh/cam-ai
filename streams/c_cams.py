@@ -23,6 +23,7 @@ import numpy as np
 import queue
 import threading
 import socket
+import json
 from aiopath import AsyncPath
 from psutil import Process, NoSuchProcess, TimeoutExpired, AccessDenied
 from signal import SIGINT, SIGKILL
@@ -36,6 +37,7 @@ from tools.c_spawn import viewable
 from tools.l_break import a_break_time, a_break_type, break_type, BR_SHORT, BR_MEDIUM, BR_LONG
 from tools.l_tools import djconf, ts2filename
 from tools.l_sysinfo import is_raspi
+from drawpad.models import mask
 from .redis import my_redis as streams_redis
 from .c_camera import c_camera
 
@@ -158,8 +160,8 @@ class c_cam(viewable):
             while not self.got_sigint and counter > 0:
               counter -= 1
               await a_break_type(BR_LONG)
-      if self.dbline.cam_apply_mask:
-        await self.viewer.drawpad.set_mask_local()
+      self.viewer.drawpad.set_xy((self.dbline.cam_xres, self.dbline.cam_yres))
+      await self.viewer.drawpad.set_mask_local()
       self.raw_queue = queue.Queue(maxsize=2)
       #print(f'Launch: cam#{self.id}')
       while not self.got_sigint:
@@ -225,8 +227,28 @@ class c_cam(viewable):
     #print(f'***** CAM Inqueue #{self.id}:', received)
     if (received[0] == 'set_mask'):
       await self.viewer.drawpad.set_mask_local(received[1])
-    elif (received[0] == 'set_apply_mask'):
+    elif (received[0] == 'new_mask_item'):
+      self.viewer.drawpad.new_ring()
+      self.viewer.drawpad.make_screen()
+      self.viewer.drawpad.mask_from_polygons()
+      await mask.objects.filter(
+        stream_id=self.id, 
+        mtype='C',
+      ).adelete()
+      for ring in self.viewer.drawpad.ringlist:
+        m = mask(
+          name='New Ring',
+          definition=json.dumps(ring.points),
+          stream_id=self.id,
+          mtype='C',
+        )
+        await m.asave()
+    elif (received[0] == 'set_drawpad_size'):
+      self.viewer.drawpad.set_xy((self.dbline.cam_xres, self.dbline.cam_yres))
+    elif (received[0] == 'set_cb_apply'):
       self.dbline.cam_apply_mask = received[1]
+    elif (received[0] == 'set_cb_positive'):
+      self.viewer.drawpad.positive_mask = received[1]
     elif (received[0] == 'reset_cam'):
       await self.reset_cam()
     elif (received[0] == 'pause'):
@@ -349,7 +371,18 @@ class c_cam(viewable):
       self.dbline.cam_fpsactual = fps
       streams_redis.fps_to_dev('C', self.id, fps)
     if self.dbline.cam_apply_mask:
-      frame = await asyncio.to_thread(cv.bitwise_and, frame, self.viewer.drawpad.mask)
+      if self.viewer.drawpad.positive_mask:
+        frame = await asyncio.to_thread(
+          cv.bitwise_and, 
+          frame, 
+          255 - self.viewer.drawpad.mask,
+        )
+      else:
+        frame = await asyncio.to_thread(
+          cv.bitwise_and, 
+          frame, 
+          self.viewer.drawpad.mask,
+        )
     if self.dbline.cam_virtual_fps and self.file_end:
       in_ts = 0.0
       self.file_end = False 
@@ -608,15 +641,13 @@ class c_cam(viewable):
     inparams = ['-i', source_string]
     outparams1 = []
     if not self.dbline.cam_virtual_fps:
-      outparams1 += ['-map', '0:' + str(self.video_codec), '-map', '-0:a']
-    outparams1 += ['-f', 'rawvideo']
-    outparams1 += ['-pix_fmt', 'bgr24']
+      outparams1 += ['-map', '0:v:' + str(self.video_codec)]
     if inp_frame_rate:
-      outparams1 += ['-r', str(inp_frame_rate)]
-      #outparams1 += ['-fps_mode', 'cfr']
-      outparams1 += ['-fps_mode', 'drop']
+      outparams1 += ['-vf', 'fps=' + str(inp_frame_rate)]
     else:
       outparams1 += ['-fps_mode', 'passthrough']
+    outparams1 += ['-f', 'rawvideo']
+    outparams1 += ['-pix_fmt', 'bgr24']
     outparams1 += ['unix://' + self.socket_path]
     outparams2 = []
     if filepath:
@@ -625,7 +656,7 @@ class c_cam(viewable):
         video_framerate = self.dbline.cam_ffmpeg_fps
       else:
         video_framerate = None
-      outparams2 += ['-map', '0:' + str(self.video_codec)]
+      outparams2 += ['-map', '0:v:' + str(self.video_codec)]
       if self.audio_codec > -1:
         outparams2 += ['-map', '0:' + str(self.audio_codec)]
       if self.video_codec_name in {'h264', 'hevc'}:
@@ -686,7 +717,7 @@ class c_cam(viewable):
     #conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 32 * 1024 * 1024)
     conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 * self.bytes_per_frame)
     conn.setblocking(False)
-    self.logger.info(f'SocketSize: {conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}')    
+    #self.logger.info(f'SocketSize: {conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}')    
     self.fd = conn.fileno()
     self.sock_conn = conn
     self.reader_thread = threading.Thread(

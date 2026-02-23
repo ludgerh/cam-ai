@@ -78,7 +78,11 @@ if mydomain:
   mydomain = mydomain.split(':')[0]
   allowed.append(mydomain)
   trusted.append('https://' + mydomain + ':' + httpsport)
+  if httpsport == '443':
+    trusted.append('https://' + mydomain)
   trusted.append('http://' + mydomain + ':' + httpport)
+  if httpport == '80':
+    trusted.append('http://' + mydomain)
   CLIENT_URL = 'https://' + mydomain + ':' + httpsport + '/'
 ALLOWED_HOSTS = allowed
 CSRF_TRUSTED_ORIGINS = trusted
