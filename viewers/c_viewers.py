@@ -41,6 +41,7 @@ class c_viewer():
       call = self.callback,
       #debug = '*** Viewer: ' + self.type + str(self.id),
     )
+    self.dbline = viewables[self.id]['stream'].dbline
     #self.inqueue.display_qinfo('Init 1: ')
     self.client_dict_lock = p_lock()
     self.client_dict = {}
@@ -57,25 +58,30 @@ class c_viewer():
       self.client_dict[client_nr]['lat_ts'] = time()
       ts = time()
       frame = (await self.inqueue.get())[1]
-      #if self.type == 'D':
-      #  if (self.drawpad.show_mask 
-      #      and (self.drawpad.mask is not None)):
-      #    frame = cv.addWeighted(frame, 1, 
-      #      (255 - self.drawpad.mask), 0.3, 0)
-      #elif self.type == 'C':
-      if (self.drawpad.show_mask 
-          and (self.drawpad.mask is not None)):
-        if self.drawpad.positive_mask:
-          frame = cv.addWeighted(frame, 1, (self.drawpad.mask), -0.3, 0)
-        else:  
-          frame = cv.addWeighted(frame, 1, (255 - self.drawpad.mask), -0.3, 0)
-      if self.drawpad.edit_active and self.drawpad.ringlist:
-        if self.drawpad.whitemarks:
-          frame = cv.addWeighted(frame, 1, 
-            (255 - self.drawpad.screen), 1, 0)
-        else:
-          frame = cv.addWeighted(frame, 1, 
-            (255 - self.drawpad.screen), -1.0, 0)
+      if self.type in {'C', 'D'}:
+        if (self.drawpad.show_mask 
+            and (self.drawpad.mask is not None)):
+          if self.type == 'D':
+            do_positive_mask = self.dbline.det_positive_mask
+          else: 
+            do_positive_mask = self.dbline.cam_positive_mask 
+          if self.type == 'D' and not self.drawpad.edit_active:
+            if do_positive_mask:
+              frame = cv.addWeighted(frame, 1, (self.drawpad.mask), 0.3, 0)
+            else:  
+              frame = cv.addWeighted(frame, 1, (255 - self.drawpad.mask), 0.3, 0)
+          else:
+            if do_positive_mask:
+              frame = cv.addWeighted(frame, 1, (self.drawpad.mask), -0.3, 0)
+            else:  
+              frame = cv.addWeighted(frame, 1, (255 - self.drawpad.mask), -0.3, 0)
+        if self.drawpad.edit_active and self.drawpad.ringlist:
+          if self.drawpad.whitemarks:
+            frame = cv.addWeighted(frame, 1, 
+              (255 - self.drawpad.screen), 1, 0)
+          else:
+            frame = cv.addWeighted(frame, 1, 
+              (255 - self.drawpad.screen), -1.0, 0)
       if self.client_dict[client_nr]['do_compress']:
         to = 3 #jpg
       else:
@@ -95,7 +101,6 @@ class c_viewer():
     with self.client_dict_lock: 
       for item in self.client_dict:
         await self.onf(item)
-        
 
   def push_to_onf(self, outx, do_compress, websocket):
     add_view_count(self.type, self.id)

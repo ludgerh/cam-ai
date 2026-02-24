@@ -471,7 +471,7 @@ class tf_worker(spawn_process):
     if test_pred and self.dbline.gpu_sim < 0:
       xdata = np.random.rand(8,this_model['xdim'], this_model['ydim'],3)
       if self.dbline.use_litert: 
-        logger.info(str(this_model['model'].get_input_details()[0]))
+        #logger.info(str(this_model['model'].get_input_details()[0]))
         this_model['int_input']().fill(128)
         this_model['model'].invoke()
       else:

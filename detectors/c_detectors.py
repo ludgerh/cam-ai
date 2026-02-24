@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import asyncio
 import numpy as np
 import cv2 as cv
+import json
 from os import environ
 from logging import getLogger
 from time import time
@@ -106,15 +107,17 @@ class c_detector(viewable):
   async def process_received(self, received): 
     #print(f'***** DET Inqueue #{self.id}:', received) 
     result = True
-    if (received[0] == 'set_fpslimit'):
+    if received[0] == 'set_fpslimit':
       self.dbline.det_fpslimit = received[1]
       if received[1] == 0:
         self.sl.period = 0.0
       else:
         self.sl.period = 1.0 / received[1]
-    elif (received[0] == 'set_drawpad_size'):
+    elif received[0] == 'set_mask':
+      await self.viewer.drawpad.set_mask_local(received[1])
+    elif received[0] == 'set_drawpad_size':
       self.viewer.drawpad.set_xy((self.xres, self.yres))
-    elif (received[0] == 'new_mask_item'):
+    elif received[0] == 'new_mask_item':
       self.viewer.drawpad.new_ring()
       self.viewer.drawpad.make_screen()
       self.viewer.drawpad.mask_from_polygons()
@@ -130,25 +133,27 @@ class c_detector(viewable):
           mtype='D',
         )
         await m.asave()
-    elif (received[0] == 'set_cb_apply'):
+    elif received[0] == 'set_cb_apply':
       self.dbline.det_apply_mask = received[1]
-    elif (received[0] == 'set_cb_positive'):
-      self.viewer.drawpad.positive_mask = received[1]
-    elif (received[0] == 'set_mask'):
+    elif received[0] == 'set_cb_positive':
+      self.dbline.det_positive_mask = received[1]
+    elif received[0] == 'set_cb_edit':
+      self.viewer.drawpad.edit_active = received[1]
+    elif received[0] == 'set_mask':
       self.dbline.det_apply_mask = received[1]
-    elif (received[0] == 'set_threshold'):
+    elif received[0] == 'set_threshold':
       self.dbline.det_threshold = received[1]
-    elif (received[0] == 'set_backgr_delay'):
+    elif received[0] == 'set_backgr_delay':
       self.dbline.det_backgr_delay = received[1]
-    elif (received[0] == 'set_dilation'):
+    elif received[0] == 'set_dilation':
       self.dbline.det_dilation = received[1]
-    elif (received[0] == 'set_erosion'):
+    elif received[0] == 'set_erosion':
       self.dbline.det_erosion = received[1]
-    elif (received[0] == 'set_max_size'):
+    elif received[0] == 'set_max_size':
       self.dbline.det_fmax_size = received[1]
-    elif (received[0] == 'set_max_rect'):
+    elif received[0] == 'set_max_rect':
       self.dbline.det_max_rect = received[1]
-    elif (received[0] == 'reset'):
+    elif received[0] == 'reset':
       while self.run_lock:
         await break_type(BR_MEDIUM)
       self.run_lock = True  
@@ -156,7 +161,7 @@ class c_detector(viewable):
       self.scaledown = self.get_scale_down()
       self.firstdetect = True
       self.run_lock = False
-    elif (received[0] == 'stop'):
+    elif received[0] == 'stop':
       return(True)
     else:
       result = False  
@@ -166,8 +171,6 @@ class c_detector(viewable):
     if input[2] == 0.0:
       return(None)
     frametime = input[2]
-          
-          
     if (new_time := time()) - self.div_ts >= 5.0:  
       if (buffer_size := tf_workers_redis.get_buf_size_10(self.tf_worker_id)) < 2.5:
         divisor = 1.0  
@@ -182,9 +185,6 @@ class c_detector(viewable):
         self.div_old = divisor
         #self.logger.warning(f'DE{self.id}: Fpm divisor = {divisor}')
       self.div_ts = new_time
-          
-          
-          
     if self.got_sigint or not self.sl.greenlight(frametime):
       return(None)
     if self.run_lock and not self.dbline.cam_virtual_fps: 
@@ -224,7 +224,7 @@ class c_detector(viewable):
         (self.xres, self.yres), 
         interpolation=cv.INTER_NEAREST, 
       )
-    if self.dbline.det_apply_mask:
+    if self.dbline.det_apply_mask and not self.viewer.drawpad.edit_active: 
       if self.dbline.det_positive_mask:
         frame = await asyncio.to_thread(
           cv.bitwise_and, 
@@ -332,7 +332,10 @@ class c_detector(viewable):
       self.dbline.det_fpsactual = fps
       streams_redis.fps_to_dev(self.type, self.id, fps)
     self.run_lock = False 
-    return([3, buffer1, frametime])
+    if self.viewer.drawpad.edit_active:
+      return([3, frame, frametime])
+    else:
+      return([3, buffer1, frametime])
       
   def get_scale_down(self): 
     result = self.dbline.det_scaledown

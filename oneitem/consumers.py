@@ -48,7 +48,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
   async def disconnect(self, code = None):
     try:
-      self.myitem.viewer.drawpad.edit_active = False
+      try:
+        self.myitem.viewer.drawpad.edit_active = False
+      except AttributeError:
+          pass  # ignore missing attributes
       if self.myitem is not None:
         self.myitem.nr_of_cond_ed = 0
         self.myitem.last_cond_ed = 0
@@ -65,8 +68,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     try:
       params = json.loads(text_data)['data']
-      if params['command'] != 'mousemove':
-        logger.info('<-- ' + str(text_data))
+      #if params['command'] != 'mousemove':
+      #  logger.info('<-- ' + str(text_data))
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'setmyitem':
@@ -85,12 +88,13 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               self.myitem.dbline.cam_xres, 
               self.myitem.dbline.cam_yres, 
             ))
+            self.myitem.inqueue.put(('set_drawpad_size', ))
           elif self.mode == 'D': 
             self.myitem.viewer.drawpad.set_xy((
               self.myitem.xres, 
               self.myitem.yres, 
             )) 
-          self.myitem.inqueue.put(('set_drawpad_size', ))
+            self.myitem.inqueue.put(('set_drawpad_size', ))
           if self.mode in {'C', 'D'}:
             self.mydrawpad = self.myitem.viewer.drawpad
             if self.mode == 'C':
@@ -104,7 +108,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.scaling = params['scaling']
           if self.mode == 'D':
             self.scaling *= self.myitem.scaledown
-          await self.myitem.viewer.drawpad.set_mask_local()
+          if self.mode in {'C', 'D'}:  
+            await self.myitem.viewer.drawpad.set_mask_local()
           outlist['data'] = {}
           if (redis_data := streams_redis.get_ptz(self.idx)):
             outlist['data']['ptz'] = redis_data
@@ -191,6 +196,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.myitem.viewer.drawpad.show_mask = params['ch_show']
           if 'ch_edit' in params:
             self.myitem.viewer.drawpad.edit_active = params['ch_edit']
+            if  self.mode == 'D':
+              self.myitem.inqueue.put(('set_cb_edit', params['ch_edit'], ))
           if 'ch_apply' in params:
             if self.mode == 'C':
               self.myitem.dbline.cam_apply_mask = params['ch_apply']
@@ -202,9 +209,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           if 'ch_white' in params:
             self.myitem.viewer.drawpad.whitemarks = params['ch_white']
           if 'ch_positive' in params:
-            self.myitem.viewer.drawpad.positive_mask = params['ch_positive']
-            self.myitem.dbline.cam_positive_mask = params['ch_positive']
-            await self.myitem.dbline.asave(update_fields=('cam_positive_mask', ))
+            if self.mode == 'C':
+              self.myitem.dbline.cam_positive_mask = params['ch_positive']
+              await self.myitem.dbline.asave(update_fields=('cam_positive_mask', ))
+            elif self.mode == 'D':
+              self.myitem.dbline.det_positive_mask = params['ch_positive']
+              await self.myitem.dbline.asave(update_fields=('det_positive_mask', ))
             self.myitem.inqueue.put(('set_cb_positive', params['ch_positive'], ))
           if 'ch_rectangular' in params:
             self.myitem.viewer.drawpad.rectangular = params['ch_rectangular']
@@ -227,7 +237,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         await self.safe_send(outlist)	
 
       elif params['command'] == 'mousedown':
-        print('self.may_write', self.may_write, self.myitem.viewer.drawpad.edit_active)
         if self.myitem.viewer.drawpad.edit_active:
           if self.may_write:
             self.myitem.viewer.drawpad.mousedownhandler(

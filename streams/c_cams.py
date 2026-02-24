@@ -371,7 +371,7 @@ class c_cam(viewable):
       self.dbline.cam_fpsactual = fps
       streams_redis.fps_to_dev('C', self.id, fps)
     if self.dbline.cam_apply_mask:
-      if self.viewer.drawpad.positive_mask:
+      if self.dbline.cam_positive_mask:
         frame = await asyncio.to_thread(
           cv.bitwise_and, 
           frame, 
@@ -635,17 +635,20 @@ class c_cam(viewable):
     if not self.dbline.cam_virtual_fps:
       if source_string[:4].upper() == 'RTSP':
         generalparams += ['-rtsp_transport', 'tcp']
+      generalparams += ['-thread_queue_size', '1024']
+      generalparams += ['-timeout', '10000000']
       generalparams += ['-fflags', 'genpts']
       generalparams += ['-use_wallclock_as_timestamps', '1']
-      generalparams += ['-flags', 'low_delay']
+      #generalparams += ['-flags', 'low_delay']
     inparams = ['-i', source_string]
     outparams1 = []
     if not self.dbline.cam_virtual_fps:
       outparams1 += ['-map', '0:v:' + str(self.video_codec)]
-    if inp_frame_rate:
-      outparams1 += ['-vf', 'fps=' + str(inp_frame_rate)]
-    else:
-      outparams1 += ['-fps_mode', 'passthrough']
+      outparams1 += ['-an']
+      if inp_frame_rate:
+        outparams1 += ['-vf', 'fps=' + str(inp_frame_rate)]
+      else:
+        outparams1 += ['-fps_mode', 'passthrough']
     outparams1 += ['-f', 'rawvideo']
     outparams1 += ['-pix_fmt', 'bgr24']
     outparams1 += ['unix://' + self.socket_path]
@@ -662,14 +665,19 @@ class c_cam(viewable):
       if self.video_codec_name in {'h264', 'hevc'}:
         if video_framerate:
           outparams2 += ['-c:v', 'libx264']
+          if self.dbline.cam_ffmpeg_crf:
+            outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
         else:
           outparams2 += ['-c:v', 'copy']
+      else:    
+        outparams2 = ['-c', 'libx264']
+        if self.dbline.cam_ffmpeg_crf:
+          outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
+      if self.audio_codec > -1:
         if self.audio_codec_name == 'pcm_alaw':
           outparams2 += ['-c:a', 'aac']
         else:
           outparams2 += ['-c:a', 'copy']
-      else:    
-        outparams2 = ['-c', 'libx264']
       if video_framerate:
         outparams2 += ['-r', str(video_framerate)]
         outparams2 += ['-g', str(round(video_framerate * self.dbline.cam_ffmpeg_segment))]
@@ -678,8 +686,6 @@ class c_cam(viewable):
       if video_framerate:
         outparams2 += ['-segment_time_delta', str(0.5 / (video_framerate))]
       outparams2 += ['-reset_timestamps', '1']
-      if self.dbline.cam_ffmpeg_crf:
-        outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
       outparams2 += [filepath]
     else:
       self.ffmpeg_recording = True

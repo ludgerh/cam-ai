@@ -60,7 +60,6 @@ class drawpad():
     self.type = parent.type
     self.edit_active = False
     self.show_mask = False
-    self.positive_mask = False
     self.rectangular = False
     self.whitemarks = True
     self.backgr = (255,255,255)
@@ -70,7 +69,7 @@ class drawpad():
     self.mask = None 
     
   def set_xy(self, size):
-    print('##### set_xy', self.type, self.id, size)
+    #print('##### set_xy', self.type, self.id, size)
     self.xdim = size[0]
     self.ydim = size[1]  
     self.radius = round(min(self.xdim, self.ydim) / 50)
@@ -160,7 +159,7 @@ class drawpad():
     self.draw_rings()
 
   def mousemovehandler(self, x, y):
-    if self.mypoint is None:
+    if self.mypoint is None or not self.ringlist:
       return()
     my_ring = self.ringlist[self.mypoint[0]]
     new_x = round(min(max(x, 0), self.xdim - 1))
@@ -209,7 +208,6 @@ class drawpad():
       xs, ys = zip(*my_ring.points)
       my_ring.min_x, my_ring.max_x = min(xs), max(xs)
       my_ring.min_y, my_ring.max_y = min(ys), max(ys)
-    print('#####', my_ring.min_x, my_ring.max_x, my_ring.min_y, my_ring.max_y)
         
 
   async def mouseuphandler(self, x, y):
@@ -228,6 +226,7 @@ class drawpad():
         )
         await m.asave()
       self.mypoint = None
+      self.mask_from_polygons()
 
   async def dblclickhandler(self, x, y):
     self.mypoint = self.point_clicked(x, y) 
