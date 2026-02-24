@@ -86,9 +86,9 @@ if mydomain:
   CLIENT_URL = 'https://' + mydomain + ':' + httpsport + '/'
 ALLOWED_HOSTS = allowed
 CSRF_TRUSTED_ORIGINS = trusted
-print('ALLOWED_HOSTS', ALLOWED_HOSTS)
-print('CSRF_TRUSTED_ORIGINS', CSRF_TRUSTED_ORIGINS)
-print('CLIENT_URL', CLIENT_URL)
+#print('ALLOWED_HOSTS', ALLOWED_HOSTS)
+#print('CSRF_TRUSTED_ORIGINS', CSRF_TRUSTED_ORIGINS)
+#print('CLIENT_URL', CLIENT_URL)
 if mail_client_url:  
   CLIENT_URL = mail_client_url  
 

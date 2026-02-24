@@ -57,7 +57,7 @@ class stream(models.Model):
   cam_control_port = models.IntegerField(default=0)
   cam_control_user = models.CharField(max_length=256, default='')
   cam_control_passwd = models.CharField(max_length=256, default='')
-  cam_positive_mask = models.BooleanField("Positive Mask", default=True)
+  cam_positive_mask = models.BooleanField("Positive Mask", default=False)
  
   det_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  
@@ -77,7 +77,7 @@ class stream(models.Model):
   det_scaledown = models.IntegerField("scaledown", default=0)
   # 0: automatic, epending on size, 1: switch off scaling
   det_gpu_nr_cv = models.IntegerField(default=0)
-  det_positive_mask = models.BooleanField("Positive Mask", default=True)
+  det_positive_mask = models.BooleanField("Positive Mask", default=False)
 
   eve_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  

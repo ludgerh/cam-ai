@@ -17,11 +17,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='stream',
             name='cam_positive_mask',
-            field=models.BooleanField(default=True, verbose_name='Positive Mask'),
+            field=models.BooleanField(default=False, verbose_name='Positive Mask'),
         ),
         migrations.AddField(
             model_name='stream',
             name='det_positive_mask',
-            field=models.BooleanField(default=True, verbose_name='Positive Mask'),
+            field=models.BooleanField(default=False, verbose_name='Positive Mask'),
         ),
     ]
