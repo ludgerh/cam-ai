@@ -99,7 +99,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
         dbline = await stream.objects.aget(id = params['idx'])
         show_cam = await database_sync_to_async(self.check_conditions)(
           self.scope['user'], 
-          mystream,
+          dbline,
         )
         if access.check(params['type'], params['idx'], self.scope['user'], 'R'):
           if 'width' in params:

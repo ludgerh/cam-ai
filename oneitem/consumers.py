@@ -68,8 +68,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     try:
       params = json.loads(text_data)['data']
-      if params['command'] != 'mousemove':
-        logger.info('<-- ' + str(text_data))
+      #if params['command'] != 'mousemove':
+      #  logger.info('<-- ' + str(text_data))
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'setmyitem':
@@ -98,7 +98,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           outlist['data'] = {}
           if (redis_data := streams_redis.get_ptz(self.idx)):
             outlist['data']['ptz'] = redis_data
-          logger.info('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           await self.safe_send(outlist)
         else:
           await self.close()
@@ -231,7 +231,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.my_viewer.drawpad.make_screen()
             self.my_viewer.drawpad.mask_from_polygons()
         outlist['data'] = 'OK'
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.safe_send(outlist)	
 
       elif params['command'] == 'mousedown':
@@ -353,7 +353,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         async for item in condition_lines:
           result[item.reaction].append(model_to_dict(item)) 
         outlist['data'] = result
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.safe_send(outlist)		
 
       elif params['command'] == 'cond_to_str': 
