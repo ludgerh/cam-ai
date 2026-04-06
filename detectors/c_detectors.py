@@ -14,28 +14,112 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+import django
+django.setup()
 import asyncio
 import numpy as np
 import cv2 as cv
 import json
+import signal
+from multiprocessing import Process as mp_process, SimpleQueue as s_queue
 from os import environ
 from logging import getLogger
 from time import time
 from setproctitle import setproctitle
 from streams.redis import my_redis as streams_redis
 from tf_workers.redis import my_redis as tf_workers_redis
+from tools.c_logger import alog_ini
+from globals.c_globals import add_viewer
 from tools.c_spawn import viewable
+from tools.c_tools import (
+  rect_atob, 
+  rect_btoa, 
+  merge_rects, 
+  c_buffer, 
+  speedlimit, 
+  speedometer, 
+)
+from tools.l_break import break_type, a_break_type, BR_SHORT, BR_MEDIUM, BR_LONG
+from viewers.c_viewers import c_viewer
 from drawpad.models import mask
+from oneitem.shared_mem import shared_mem
+from streams.models import stream
 
-#from psutil import virtual_memory
+_SH_MEM_ITEMS = {
+    'fps_limit' : 'd',
+    'edit_active' : 'i',
+    'threshold' : 'i',
+    'backgr_delay' : 'i',
+    'dilation' : 'i',
+    'erosion' : 'i',
+    'max_size' : 'i',
+    'max_rect' : 'i',
+    'apply_mask' : 'i',
+    'aoi_xdim' : 'i',
+    'aoi_ydim' : 'i',
+    'scaledown' : 'i',
+}
 
-class c_detector(viewable):
-  def __init__(self, dbline, myeventer_det_queue, worker_id, logger, ):
-    from tools.c_tools import c_buffer
+class c_detector():
+  def __init__(self, dbline, myeventer, worker_id, logger, ):
     self.type = 'D'
-    self.dbline = dbline
     self.id = dbline.id
-    if self.dbline.cam_virtual_fps:
+    add_viewer((my_viewer := c_viewer(self.type, self.id, logger,)))
+    self.viewer = my_viewer
+    self.viewer_queue = my_viewer.inqueue
+    streams_redis.zero_to_dev(self.type, self.id)
+    streams_redis.fps_to_dev(self.type, self.id, 0.0)
+    self.shared_mem = shared_mem(
+      source_dict = _SH_MEM_ITEMS, 
+      shape = (dbline.cam_yres, dbline.cam_xres, 3), 
+    )
+    self.shared_mem.write_1_meta('fps_limit', dbline.det_fpslimit)
+    self.shared_mem.write_1_meta('threshold', dbline.det_threshold)
+    self.shared_mem.write_1_meta('backgr_delay', dbline.det_backgr_delay)
+    self.shared_mem.write_1_meta('dilation', dbline.det_dilation)
+    self.shared_mem.write_1_meta('erosion', dbline.det_erosion)
+    self.shared_mem.write_1_meta('max_size', dbline.det_max_size)
+    self.shared_mem.write_1_meta('max_rect', dbline.det_max_rect)
+    self.shared_mem.write_1_meta('apply_mask', dbline.det_apply_mask)
+    self.shared_mem.write_1_meta('scaledown', 0)
+    self.det_worker = det_worker(
+      dbline, 
+      my_viewer.inqueue,
+      myeventer.eve_worker.detectorqueue,
+      worker_id,
+      logger, 
+      self.shared_mem.shm.name, 
+    ) 
+    
+  def start(self):
+    self.det_worker.start()
+    self.viewer.inqueue.display_qinfo(info = self.type + ' ' + str(self.id) +  ' Spawn: ')
+    self.viewer.inqueue.start_data_loop()
+  
+  async def stop(self):
+    if self.det_worker.is_alive():
+      await asyncio.to_thread(self.det_worker.inqueue.put, ('stop',))
+      try:
+        await asyncio.to_thread(self.det_worker.join, 5.0)
+      except RuntimeError:
+        pass  # executor already shutting down
+    self.shared_mem.shm.close() 
+    self.shared_mem.shm.unlink()
+    
+class det_worker(mp_process):
+  def __init__(self, 
+      dbline, 
+      myviewer_queue, 
+      myeventer_det_queue, 
+      worker_id,
+      logger, 
+      shm_name, 
+    ):
+    super().__init__()
+    self.type = 'D'
+    self.id = dbline.id
+    self.scaledown = None
+    if dbline.cam_virtual_fps:
       self.dataqueue = c_buffer(
         #debug = 'Det' + str(self.id), 
       )
@@ -45,30 +129,72 @@ class c_detector(viewable):
         #debug = 'Det' + str(self.id), 
       )
     self.myeventer_det_queue = myeventer_det_queue 
-    self.scaledown = self.get_scale_down()
     self.tf_worker_id = worker_id
-    super().__init__(logger, )
-   
+    self.viewer_queue = myviewer_queue
+    self.inqueue = s_queue()
+    self.shm_name = shm_name
+    self.scaledown = 4
+
+  def run(self):
+    asyncio.run(self.async_runner()) 
+    
+  def sigint_handler(self, signal = None, frame = None ):
+    self.got_sigint = True 
+
+  async def in_queue_thread(self):
+    try:
+      while self.do_run:
+        received = await asyncio.to_thread(self.inqueue.get)
+        #print(f'***** DET Inqueue #{self.id}:', received) 
+        if (received[0] == 'stop'):
+          self.got_sigint = True
+          self.do_run = False  
+          if self.is_alive():
+            if self._inq_task:
+              self._inq_task.cancel()
+              try:
+                await self._inq_task
+              except asyncio.CancelledError:
+                pass
+        else:
+          self.logger.warning( 
+              f'CA{self.id}: Unknown key in Inqueue: {received[0]}'
+          ) 
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True)
+    
   async def async_runner(self):
     try:
-      import django
-      django.setup()
-      from tools.l_break import a_break_type, BR_SHORT, BR_MEDIUM
-      from tools.c_logger import alog_ini
-      from tools.c_tools import rect_atob, rect_btoa, merge_rects
-      self.merge_rects = merge_rects
-      self.rect_atob = rect_atob
-      self.rect_btoa = rect_btoa
       self.logname = 'detector #'+str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Detector #' + str(self.id))
-      await super().async_runner() 
+      self.dbline = await stream.objects.aget(id = self.id)
+      self.shared_mem = shared_mem(
+        source_dict = _SH_MEM_ITEMS, 
+        shape=(self.dbline.cam_yres, self.dbline.cam_xres, 3),
+        shm_name=self.shm_name, 
+      )
+      self.got_sigint = False
+      self._inq_task = None
+      self.sl = speedlimit(period = 0.0)
+      self.som = speedometer()
+      self.do_run = True
+      loop = asyncio.get_running_loop()
+      loop.add_signal_handler(signal.SIGINT, self.sigint_handler)
+      self._inq_task = asyncio.create_task(
+        self.in_queue_thread(), 
+        name = 'in_queue_thread', 
+      )
       self.firstdetect = True
       self.ts_background = time()
       self.finished = True
-      self.cam_xres = self.dbline.cam_xres
-      self.cam_yres = self.dbline.cam_yres
+      self.x_from_cam = -1
+      self.y_from_cam = -1
       self.run_lock = False
       self.adapt_fact = 1.5
       environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -80,18 +206,56 @@ class c_detector(viewable):
         + str(self.dbline.det_gpu_nr_cv))
       self.do_run = True
       self.warning_done = False
-      self.viewer.drawpad.set_xy((self.xres, self.yres))
-      await self.viewer.drawpad.set_mask_local()
       self.div_ts = 0.0
       self.div_old = 1.0
-      #print('Launch: detector')
+      self.fps_limit_old = -1
+      #print(f'Launch: detector #{self.id}')
       while not self.got_sigint:
         frameline = await self.dataqueue.get(timeout = 2.0)
         if frameline:
+          if frameline[1].shape[:2] != (self.y_from_cam, self.x_from_cam):
+            self.y_from_cam, self.x_from_cam = frameline[1].shape[:2]
+            self.scaledown = self.dbline.det_scaledown
+            if not self.scaledown:
+              if max(self.x_from_cam, self.y_from_cam) >= 2560:
+                self.scaledown = 4
+              elif max(self.x_from_cam, self.y_from_cam) >= 1280:
+                self.scaledown = 2
+              else:
+                self.scaledown = 1
+            if self.scaledown >= 4:
+              self.linewidth = 3
+            elif self.scaledown >= 2:
+              self.linewidth = 4
+            else:
+              self.linewidth = 5 
+            self.xres = self.x_from_cam // self.scaledown
+            self.yres = self.y_from_cam // self.scaledown
+            if self.scaledown > 1:
+              self.buffer = await asyncio.to_thread(
+                cv.resize, 
+                frameline[1], 
+                (self.xres, self.yres), 
+                interpolation=cv.INTER_NEAREST,
+              )
+            else:
+              self.buffer = frameline[1]
+            self.background = np.float32(self.buffer)
+            if not self.firstdetect:  
+              self.background_mask = await asyncio.to_thread(
+                cv.resize, 
+                self.background_mask, 
+                (self.xres, self.yres), 
+                interpolation=cv.INTER_NEAREST,
+              )
+            self.shared_mem.write_1_meta('aoi_xdim', self.x_from_cam)
+            self.shared_mem.write_1_meta('aoi_ydim', self.y_from_cam)
+            self.shared_mem.write_1_meta('scaledown', self.scaledown)
+          self.firstdetect = False
           frameline = await self.run_one(frameline)
         if frameline:
           if self.dbline.det_view and streams_redis.view_from_dev('D', self.id):
-            await self.viewer.inqueue.put(frameline)
+            await self.viewer_queue.put(frameline)
         await a_break_type(BR_SHORT)
       await self.dataqueue.stop()
       self.finished = True
@@ -103,75 +267,13 @@ class c_detector(viewable):
         + ' - ' + self.type + str(self.id)
       )
       self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
-    
-  async def process_received(self, received): 
-    #print(f'***** DET Inqueue #{self.id}:', received) 
-    result = True
-    if received[0] == 'set_fpslimit':
-      self.dbline.det_fpslimit = received[1]
-      if received[1] == 0:
-        self.sl.period = 0.0
-      else:
-        self.sl.period = 1.0 / received[1]
-    elif received[0] == 'set_mask':
-      await self.viewer.drawpad.set_mask_local(received[1])
-    elif received[0] == 'set_drawpad_size':
-      self.viewer.drawpad.set_xy((self.xres, self.yres))
-    elif received[0] == 'new_mask_item':
-      self.viewer.drawpad.new_ring()
-      self.viewer.drawpad.make_screen()
-      self.viewer.drawpad.mask_from_polygons()
-      await mask.objects.filter(
-        stream_id=self.id, 
-        mtype='D',
-      ).adelete()
-      for ring in self.viewer.drawpad.ringlist:
-        m = mask(
-          name='New Ring',
-          definition=json.dumps(ring.points),
-          stream_id=self.id,
-          mtype='D',
-        )
-        await m.asave()
-    elif received[0] == 'set_cb_apply':
-      self.dbline.det_apply_mask = received[1]
-    elif received[0] == 'set_cb_positive':
-      self.dbline.det_positive_mask = received[1]
-    elif received[0] == 'set_cb_edit':
-      self.viewer.drawpad.edit_active = received[1]
-    elif received[0] == 'set_mask':
-      self.dbline.det_apply_mask = received[1]
-    elif received[0] == 'set_threshold':
-      self.dbline.det_threshold = received[1]
-    elif received[0] == 'set_backgr_delay':
-      self.dbline.det_backgr_delay = received[1]
-    elif received[0] == 'set_dilation':
-      self.dbline.det_dilation = received[1]
-    elif received[0] == 'set_erosion':
-      self.dbline.det_erosion = received[1]
-    elif received[0] == 'set_max_size':
-      self.dbline.det_fmax_size = received[1]
-    elif received[0] == 'set_max_rect':
-      self.dbline.det_max_rect = received[1]
-    elif received[0] == 'reset':
-      while self.run_lock:
-        await break_type(BR_MEDIUM)
-      self.run_lock = True  
-      await self.dbline.arefresh_from_db()
-      self.scaledown = self.get_scale_down()
-      self.firstdetect = True
-      self.run_lock = False
-    elif received[0] == 'stop':
-      return(True)
-    else:
-      result = False  
-    return(result)
 
   async def run_one(self, input): 
     if input[2] == 0.0:
       return(None)
     frametime = input[2]
-    if (new_time := time()) - self.div_ts >= 5.0:  
+    if ((new_time := time()) - self.div_ts >= 5.0 and 
+        not self.dbline.cam_virtual_fps):  
       if (buffer_size := tf_workers_redis.get_buf_size_10(self.tf_worker_id)) < 2.5:
         divisor = 1.0  
       elif buffer_size < 5.0:
@@ -180,10 +282,15 @@ class c_detector(viewable):
         divisor = 4.0  
       else:  
         divisor = 8.0  
-      self.sl.period = divisor / self.dbline.det_fpslimit
+      if self.fps_limit_old != (new_fps := self.shared_mem.read_1_meta('fps_limit')):
+        if new_fps == 0:
+          self.sl.period = 0.0
+        else:
+          self.sl.period = divisor / new_fps
+        self.fps_limit_old = new_fps
       if divisor != self.div_old:
         self.div_old = divisor
-        #self.logger.warning(f'DE{self.id}: Fpm divisor = {divisor}')
+        self.logger.warning(f'DE{self.id}: Fpm divisor = {divisor}')
       self.div_ts = new_time
     if self.got_sigint or not self.sl.greenlight(frametime):
       return(None)
@@ -192,31 +299,6 @@ class c_detector(viewable):
     self.run_lock = True
     frame = input[1]
     frameall = frame
-    if self.firstdetect:
-      if self.scaledown > 1:
-        self.buffer = await asyncio.to_thread(
-          cv.resize, 
-          frame, 
-          (self.xres, self.yres), 
-          interpolation=cv.INTER_NEAREST,
-        )
-      else:
-        self.buffer = frame
-      if self.dbline.det_apply_mask:
-        if self.dbline.det_positive_mask:
-          self.buffer = await asyncio.to_thread(
-            cv.bitwise_and, 
-            self.buffer, 
-            255 - self.viewer.drawpad.mask, 
-          )
-        else:
-          self.buffer = await asyncio.to_thread(
-            cv.bitwise_and, 
-            self.buffer, 
-            self.viewer.drawpad.mask, 
-          )
-      self.background = np.float32(self.buffer)  
-      self.firstdetect = False
     if self.scaledown > 1:
       frame = await asyncio.to_thread(
         cv.resize, 
@@ -224,23 +306,18 @@ class c_detector(viewable):
         (self.xres, self.yres), 
         interpolation=cv.INTER_NEAREST, 
       )
-    if self.dbline.det_apply_mask and not self.viewer.drawpad.edit_active: 
-      if self.dbline.det_positive_mask:
+    if (self.shared_mem.read_1_meta('apply_mask') 
+        and not self.shared_mem.read_1_meta('edit_active')): 
+      if frame.shape[:2] == self.shared_mem.read_mask().shape[:2]:
         frame = await asyncio.to_thread(
           cv.bitwise_and, 
           frame, 
-          255 - self.viewer.drawpad.mask, 
-        )
-      else:
-        frame = await asyncio.to_thread(
-          cv.bitwise_and, 
-          frame, 
-          self.viewer.drawpad.mask, 
+          self.shared_mem.read_mask(),
         )
     objectmaxsize = round(max(
       self.buffer.shape[0],
       self.buffer.shape[1],
-    ) * self.dbline.det_max_size,)
+    ) * self.shared_mem.read_1_meta('max_size'))
     buffer1 = await asyncio.to_thread(cv.absdiff, self.buffer, frame)
     buffer1 = await asyncio.to_thread(cv.split, buffer1)
     buffer2 = await asyncio.to_thread(cv.max, buffer1[0], buffer1[1])
@@ -248,23 +325,21 @@ class c_detector(viewable):
     ret, buffer1 = await asyncio.to_thread(
       cv.threshold, 
       buffer1, 
-      self.dbline.det_threshold, 
+      self.shared_mem.read_1_meta('threshold'), 
       255, 
       cv.THRESH_BINARY, 
      )
-    erosion = self.dbline.det_erosion
-    if (erosion > 0) :
+    if (erosion := self.shared_mem.read_1_meta('erosion')):
       kernel = np.ones((erosion*2 + 1,erosion*2 + 1),np.uint8)
       buffer2 = await asyncio.to_thread(cv.erode, buffer1, kernel, iterations =1)
     else:
       buffer2 = buffer1
-    dilation = self.dbline.det_dilation
-    if (dilation > 0) :
+    if (dilation := self.shared_mem.read_1_meta('dilation')):
       kernel = np.ones((dilation*2 + 1,dilation*2 + 1),np.uint8)
       buffer3 = await asyncio.to_thread(cv.dilate, buffer2, kernel, iterations =1)
     else:
       buffer3 = buffer2
-    mask = 255 - buffer3
+    self.background_mask = 255 - buffer3
     buffer1 = await asyncio.to_thread(cv.cvtColor, buffer1, cv.COLOR_GRAY2BGR)
     buffer2 = await asyncio.to_thread(cv.cvtColor, buffer2, cv.COLOR_GRAY2BGR) 
     buffer4 = await asyncio.to_thread(cv.cvtColor, buffer3, cv.COLOR_GRAY2BGR)
@@ -293,14 +368,14 @@ class c_detector(viewable):
                 (x, y), 
                 100, 
               )
-              rectb = self.rect_atob(recta)
+              rectb = rect_atob(recta)
               rect_list.append(rectb)
-              recta = self.rect_btoa(rectb)
+              recta = rect_btoa(rectb)
     if rect_list:  
-      rect_list = self.merge_rects(rect_list)  
+      rect_list = merge_rects(rect_list)  
       with self.myeventer_det_queue.multi_put_lock: 
-        for rect in rect_list[:self.dbline.det_max_rect]:
-          recta = self.rect_btoa(rect)
+        for rect in rect_list[:self.shared_mem.read_1_meta('max_rect')]:
+          recta = rect_btoa(rect)
           await asyncio.to_thread(cv.rectangle, buffer1, recta, (200), self.linewidth)
           if ((recta[2]<=objectmaxsize) and (recta[3]<=objectmaxsize)):
             if not streams_redis.check_if_counts_zero('E', self.id):
@@ -318,46 +393,31 @@ class c_detector(viewable):
             self.background = np.float32(frame)
         if not streams_redis.check_if_counts_zero('E', self.id):
           await self.myeventer_det_queue.put('stop')   
-    if self.dbline.det_backgr_delay == 0:
+    self.shared_mem.read_1_meta('backgr_delay')
+    if (b_delay := self.shared_mem.read_1_meta('backgr_delay')) == 0:
       self.buffer = frame
     else:
-      if (time() >= (self.ts_background + self.dbline.det_backgr_delay)): 
+      if (time() >= (self.ts_background + b_delay)): 
         self.ts_background = time()
         await asyncio.to_thread(cv.accumulateWeighted, frame, self.background, 0.1)
       else:
-        await asyncio.to_thread(cv.accumulateWeighted, frame, self.background, 0.5, mask)
+        await asyncio.to_thread(
+          cv.accumulateWeighted, 
+          frame, 
+          self.background, 
+          0.5, 
+          self.background_mask, 
+        )
       self.buffer = np.uint8(self.background)
     fps = self.som.gettime()
     if fps:
       self.dbline.det_fpsactual = fps
       streams_redis.fps_to_dev(self.type, self.id, fps)
-    self.run_lock = False 
-    if self.viewer.drawpad.edit_active:
+    self.run_lock = False
+    if self.shared_mem.read_1_meta('edit_active'):
       return([3, frame, frametime])
     else:
       return([3, buffer1, frametime])
-      
-  def get_scale_down(self): 
-    result = self.dbline.det_scaledown
-    if not result:
-      if (self.dbline.cam_xres >= 2560) or (self.dbline.cam_yres >= 2560):
-        result = 4
-      elif (self.dbline.cam_xres >= 1280) or (self.dbline.cam_yres >= 1280):
-        result = 2
-      else:
-        result = 1
-    self.xres = self.dbline.cam_xres // result
-    self.yres = self.dbline.cam_yres // result
-    if result >= 4:
-      self.linewidth = 3
-    elif result >= 2:
-      self.linewidth = 4
-    else:
-      self.linewidth = 5 
-    return(result)      
-      
-  def reset(self):  
-    self.inqueue.put(('reset', ))
 
   async def stop(self):
     await self.dbline.asave(update_fields = ['det_fpsactual', ])

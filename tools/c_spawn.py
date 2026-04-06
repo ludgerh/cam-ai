@@ -1,5 +1,5 @@
 """
-Copyright (C) 2025-20269 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -98,14 +98,9 @@ class spawn_process(Process):
     
 class viewable(spawn_process):
   def __init__(self, logger, ):
-    if self.type == 'D':
-      scaledown = self.scaledown
-    else:
-      scaledown = 1  
     add_viewer((my_viewer := c_viewer(
       self.type, 
       self.id, 
-      scaledown,
       logger,
     )))
     self.viewer = my_viewer
@@ -115,8 +110,6 @@ class viewable(spawn_process):
     super().__init__()
   
   async def run_here(self): #Run on the original (=Main-) Process 
-    #from streams.models import stream as dbstream
-    #self.dbline = await dbstream.objects.aget(id = self.id)
     self.viewer.inqueue.display_qinfo(info = self.type + ' ' + str(self.id) +  ' Spawn: ')
     self.viewer.inqueue.start_data_loop()
 

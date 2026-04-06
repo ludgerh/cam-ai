@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -85,8 +85,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     {% for i in '12345'|make_list %}
     <div class="accordion-item">
 	    <h2 class="accordion-header">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-          data-bs-target="#collapse{{ i }}" aria-expanded="true" rea={{ i }}
+        <button class="accordion-button collapsed" 
+          type="button" 
+          data-bs-toggle="collapse" 
+          data-bs-target="#collapse{{ i }}" 
+          aria-expanded="false"
           aria-controls="collapse{{ i }}">
           {% if i == '1' %}
             Conditions for showing event frame
@@ -106,7 +109,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </button>
       </h2>   
 	  </div>
-	  <div id="collapse{{ i }}" class="accordion-collapse collapse" aria-labelledby="heading{{ i }}" data-bs-parent="#settings_accordion">
+	  <div id="collapse{{ i }}" 
+	      class="accordion-collapse collapse" 
+	      aria-labelledby="heading{{ i }}" 
+        rea="{{ i }}"
+	      data-bs-parent="#settings_accordion">
       <div class="accordion-body">
         <div class="col-auto my-2"><h4>If...</h4>
           <ul id="li_gr_{{ i }}" class="list-group">
@@ -139,13 +146,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 		<div class="col-auto">
       <div>
         <h2>Preview: {{ dbline.name }}</h2>
-          <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+          <h5>
+            <span id="xdimtag">{{ dbline.cam_xres }}</span>x<!--
+            --><span id="ydimtag">{{ dbline.cam_yres }}</span>,
             fps = <span id="fpstag">?</span>
             {% if user.is_superuser %}
               views = <span id="vnrtag">?</span>
 					  {% endif %}
           </h5>
-        <img id="imagespace" class="img-rounded" />
+          <img id="imagespace" class="img-rounded" draggable="false"/>
       </div>
 		</div>
 	</div>
@@ -156,21 +165,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </main>
 <script>
 
-xscale = ($(window).width() - 60) / {{ dbline.cam_xres }};
-let displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
-let displayheight = Math.round({{ dbline.cam_yres }}* xscale);
-//yscale = ($(window).height() - 230) / {{ dbline.cam_yres }};
-//let displaywidth;
-//let displayheight;
-//if (xscale > yscale) {
-//  displaywidth = Math.round({{ dbline.cam_xres }} * yscale);
-//  displayheight = Math.round({{ dbline.cam_yres }} * yscale);
-//} else {
-//  displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
-//  displayheight = Math.round({{ dbline.cam_yres }}* xscale);
-//};
-let xinput
-let yinput
+let displaywidth = -1;
+let displayheight = -1;
+let onf_nr;
 let c_view_Socket;
 let trigger_Socket;
 {% if may_write %}
@@ -184,19 +181,6 @@ let tagselect;
 let c_dict;
 let all_initialized = false;
 let bracketlevel = 0;
-
-function timedRefresh(bytebuffer) {
-  if (wait == 0) {
-    wait = 1;
-    UI8Carray = new Uint8ClampedArray(bytebuffer, 10); //10 is offset
-    imgsource = new ImageData(UI8Carray, xinput, yinput);
-    createImageBitmap(imgsource)
-		.then((result) => { 
-      ctx.drawImage(result, 0,0, displaywidth, displayheight)
-      wait = 0;
-    })
-  };
-};
 
 function make_list_line(condition, reaction, count) {
   if (count) {
@@ -439,23 +423,32 @@ function reset_triggers(first = false) {
 };
 
 $(document).ready(function() {
-  $('#imagespace').attr('width', displaywidth+'px');
-  $('#imagespace').attr('height', displayheight+'px');
+	$('#imagespace').attr('draggable', false);
 {% if may_write %}
 	$('#oneform').children(':first').children(':first').children('.col-auto')
 			.children(
         '#id_eve_fpslimit, '
         +'#id_eve_margin, '
         +'#id_eve_event_time_gap, '
+        +'#id_eve_shrink_factor, '
+        +'#id_eve_sync_factor, '
         +'#id_eve_school, '
         +'#id_eve_alarm_max_nr, '
-        +'#id_eve_alarm_email'
+        +'#id_eve_alarm_email, '
         +'#id_eve_one_frame_per_event'
       ).change(function(evt) {
+    const $el = $(evt.target);
+    let value;
+    if ($el.attr('id') === 'id_eve_one_frame_per_event') {
+      value = $el.prop('checked');   // Boolean!
+    } else {
+      value = $el.val();
+    }
+      
 		oneitemSocket.sendandwait({
 			'command' : 'setonefield',
 			'pname' : $(evt.target).attr('name'),
-			'value' : $(evt.target).val(),
+			'value' : value,
 		})
 		.then((result) => {
 			if (result === 'OK') {
@@ -463,38 +456,27 @@ $(document).ready(function() {
 			};
 		})
 	});
+  $('#settings_accordion .accordion-collapse')
+  .on('show.bs.collapse', function () {
+    let myreaction = $(this).attr('rea');
 
-	$('#settings_accordion').children('.accordion-item').click((evt) => {
-		let myreaction = $(evt.target).attr("rea");
-		let bstr_row = $('#settings_accordion').find('.rea' + myreaction);
-		console.log('Reaction', myreaction);
-		if (myreaction) {
-			if (bstr_row.hasClass('d-none')) {
-				oneitemSocket.sendandwait({
-					'command' : 'cond_open',
-					'reaction' : myreaction,
-				})
-				.then((result) => {
-					if (result === 'OK') {
-						//bstr_row.removeClass('d-none');
-					};
-				})
-			} else {
-				oneitemSocket.sendandwait({
-					'command' : 'cond_close',
-					'reaction' : myreaction,
-				})
-				.then((result) => {
-					if (result === 'OK') {
-						bstr_row.addClass('d-none');
-					};
-				})
-			};
-		} else {
-			bstr_row.toggleClass('d-none');
-			};
-		//$('html, body').animate({scrollTop:$(document).height()}, 'slow');
-	})
+    if (myreaction) {
+      oneitemSocket.sendandwait({
+        command: 'cond_open',
+        reaction: myreaction,
+      });
+    }
+  })
+  .on('hide.bs.collapse', function () {
+    let myreaction = $(this).attr('rea');
+
+    if (myreaction) {
+      oneitemSocket.sendandwait({
+        command: 'cond_close',
+        reaction: myreaction,
+      });
+    }
+  });
 	WSAsync(
 		  ws_scheme + '//' + window.location.host + '/ws/schooldbutil/'
 	)
@@ -520,45 +502,59 @@ $(document).ready(function() {
     trigger_Socket = result;
     return(trigger_Socket.sendandwait({
 	    'command' : 'starttrigger',
-	    'mode' : 'E',
+	    'type' : 'E',
       'idx' : {{ dbline.id }},
-      'width' : displaywidth,
+      'x_screen' : $(window).width(),
+      'y_screen' : $(window).height(),
       'tokennr' : {{ tokennr }},
       'token' : '{{ token }}',
     }));
   })
   .then((result) => {
     show_cam = result.show_cam;
-    xinput = result.outx;
-    yinput = 
-      Math.round(xinput * {{ dbline.cam_yres }} /  {{ dbline.cam_xres }});
     onf_nr = result.on_frame_nr; 
     if (show_cam) {
-      vnrcode = 'E' + String({{ dbline.id }}).padStart(6,'0') + String(onf_nr).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'E'.charCodeAt(0));
+      view.setUint32(1, {{ dbline.id }}, true);
+      view.setUint32(5, onf_nr, true);
+      trigger_Socket.socket.send(buf);
 		  trigger_Socket.socket.onclose = function(e) {
 			  console.log('Trigger-Socket closed');
 		  };
+		  trigger_Socket.socket.binaryType = 'arraybuffer';
 		  trigger_Socket.socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
-		      indicator = e.data.slice(0, 13);
-		      blob = e.data.slice(13, e.data.size, "image/jpeg")
+          const view = new DataView(e.data);
+          const new_x = view.getInt32(9, true);
+          const new_y = view.getInt32(13, true);
+          if (displaywidth != new_x) {
+            $('#imagespace').attr('width', new_x + 'px');
+            displaywidth = new_x;
+          };
+          if (displayheight != new_y) {
+            $('#imagespace').attr('height', new_y + 'px');
+            displayheight = new_y;
+          };
+		      const indicator = e.data.slice(0, 9);
+          const imageBuffer = e.data.slice(17);
+          const blob = new Blob([imageBuffer], { type: "image/jpeg" });
 		      let url = URL.createObjectURL(blob);
-		      imageElement.src = url;
-		      indicator.text()
-          .then((result) => {
-            trigger_Socket.socket.send(result);
-          })
+		      $('#imagespace').prop('src', url);
+          trigger_Socket.socket.send(indicator);
         };
 		  };
     } else {
       $('#maskedit').addClass('d-none');
       $('#imagespace').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElement.src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespace').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElement.src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespace').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
     };  
 {% if may_write %}
@@ -568,9 +564,10 @@ $(document).ready(function() {
 		oneitemSocket = result;
 		oneitemSocket.sendandwait({
 			'command' : 'setmyitem',
-			'mode' : 'E',
+			'type' : 'E',
 			'itemid' : {{ dbline.id }},
-      'scaling' : displaywidth / {{ dbline.cam_xres }}
+      'x_screen' : $(window).width(),
+			'onf_nr' : onf_nr,
 		})
 	})
 	.then(() => {
@@ -588,12 +585,14 @@ $(document).ready(function() {
     setInterval(() => {
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
-        'mode' : 'E',
+        'type' : 'E',
         'idx' : {{ dbline.id }},
         'tokennr' : {{ tokennr }},
         'token' : '{{ token }}',
       })
       .then((result) => {
+        $('#xdimtag').text(result.xdim);
+        $('#ydimtag').text(result.ydim);
         $('#fpstag').text(result.fps);
         {% if user.is_superuser %}
           $('#vnrtag').text(result.viewers);

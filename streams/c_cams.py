@@ -13,7 +13,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
-import shlex
+import django
+django.setup()
 import asyncio
 import aiofiles.os
 import aioshutil
@@ -24,55 +25,187 @@ import queue
 import threading
 import socket
 import json
+import signal
+from multiprocessing import Process as mp_process, SimpleQueue as s_queue
 from aiopath import AsyncPath
-from psutil import Process, NoSuchProcess, TimeoutExpired, AccessDenied
-from signal import SIGINT, SIGKILL
+from psutil import Process, NoSuchProcess
 from setproctitle import setproctitle
 from logging import getLogger
 from time import time
 from django.db import OperationalError
 from channels.db import aclose_old_connections
-from globals.c_globals import viewers
+from globals.c_globals import add_viewer
 from tools.c_spawn import viewable
-from tools.l_break import a_break_time, a_break_type, break_type, BR_SHORT, BR_MEDIUM, BR_LONG
+from tools.c_logger import alog_ini
+from tools.l_break import (
+  a_break_time, 
+  a_break_type, 
+  break_type, 
+  BR_SHORT, 
+  BR_MEDIUM, 
+  BR_LONG, 
+)
+from tools.c_tools import speedometer
 from tools.l_tools import djconf, ts2filename
-from tools.l_sysinfo import is_raspi
 from drawpad.models import mask
+from viewers.c_viewers import c_viewer
+from oneitem.shared_mem import shared_mem
 from .redis import my_redis as streams_redis
+from .models import stream
 from .c_camera import c_camera
 
 datapath = djconf.getconfig('datapath', 'data/')
 logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
 
-class c_cam(viewable):
-  def __init__(self, dbline, mydetector_data, myeventer_data, myeventer_in, logger, ):
+_SH_MEM_ITEMS = {
+  'aoi_xmin' : 'i',
+  'aoi_xmax' : 'i',
+  'aoi_ymin' : 'i',
+  'aoi_ymax' : 'i',
+  'apply_mask' : 'i',
+  'apply_pause' : 'i',
+}
+
+class c_cam():
+  def __init__(self, dbline, mydetector, myeventer, logger):
     self.type = 'C'
-    self.dbline = dbline
     self.id = dbline.id
+    add_viewer((my_viewer := c_viewer(self.type, self.id, logger)))
+    self.viewer = my_viewer
+    streams_redis.zero_to_dev(self.type, self.id)
+    streams_redis.fps_to_dev(self.type, self.id, 0.0) 
+    self.shared_mem = shared_mem(
+      source_dict = _SH_MEM_ITEMS, 
+      shape = (dbline.cam_yres, dbline.cam_xres, 3), 
+    )
+    self.cam_worker = cam_worker(
+      self.id, 
+      my_viewer.inqueue,
+      mydetector.det_worker.dataqueue, 
+      myeventer.eve_worker.dataqueue, 
+      myeventer.eve_worker.inqueue, 
+      logger, 
+      self.shared_mem.shm.name, 
+    )
+    self.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
+    self.shared_mem.write_1_meta('apply_pause', dbline.cam_pause)
+    self.viewer.drawpad.set_xy((dbline.cam_xres, dbline.cam_yres))
+    self.viewer.drawpad.positive_mask = dbline.cam_positive_mask
+    self.viewer.drawpad.load_ringlist()
+    self.viewer.drawpad.mask_from_polygons(sh_mem = self.shared_mem)
+    self.shared_mem.write_mask(self.viewer.drawpad.mask)
+    
+  def start(self):
+    self.cam_worker.start()
+    self.viewer.inqueue.display_qinfo(info = self.type + ' ' + str(self.id) +  ' Spawn: ')
+    self.viewer.inqueue.start_data_loop()
+  
+  async def stop(self):
+    if self.cam_worker.is_alive():
+      await asyncio.to_thread(self.cam_worker.inqueue.put, ('stop',))
+      try:
+        await asyncio.to_thread(self.cam_worker.join, 5.0)
+      except RuntimeError:
+        pass  # executor already shutting down
+    self.shared_mem.shm.close() 
+    self.shared_mem.shm.unlink()
+
+class cam_worker(mp_process):
+  def __init__(self, 
+      idx, 
+      myviewer_queue, 
+      mydetector_data, 
+      myeventer_data, 
+      myeventer_in, 
+      logger, 
+      shm_name, 
+    ):
+    super().__init__()
+    self.type = 'C'
+    self.id = idx
+    self.viewer_queue = myviewer_queue
     self.mydetector_data = mydetector_data
     self.myeventer_data = myeventer_data
     self.myeventer_in = myeventer_in
-    self.mycam = None
-    self.reader_thread = None
-    super().__init__(logger, )
+    self.inqueue = s_queue()
+    self.shm_name = shm_name
 
+  def run(self):
+    asyncio.run(self.async_runner()) 
+    
+  def sigint_handler(self, signal = None, frame = None ):
+    self.got_sigint = True 
+
+  async def in_queue_thread(self):
+    try:
+      received = await asyncio.to_thread(self.inqueue.get)
+      #print(f'***** CAM Inqueue #{self.id}:', received)
+      if (received[0] == 'reset_cam'):
+        await self.reset_cam()
+      elif (received[0] == 'ptz_mdown'):
+        self.mousex = received[1]
+        self.mousey = received[2]
+      elif (received[0] == 'ptz_mup'):
+        ptz_pos = self.mycam.myptz.abs_pos
+        xdiff = 0 - round((received[1] - self.mousex) / 3.0)
+        ydiff = 0 - round((received[2] - self.mousey) / 3.0)
+        self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
+      elif (received[0] == 'ptz_zoom'):
+        self.mycam.myptz.goto_rel(zian= 0-received[1])
+      elif (received[0] == 'zoom_abs'):
+        self.mycam.myptz.goto_abs(z = received[1])
+      elif (received[0] == 'pos_rel'):
+        xdiff = 0 - received[1]
+        ydiff = 0 - received[2]
+        self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
+      elif (received[0] == 'stop'):
+        if self.dbline.cam_virtual_fps and self.virt_cam_path_ram:
+          try:
+            os.remove(self.virt_cam_path_ram + self.dbline.cam_url)
+          except FileNotFoundError:
+            pass
+        self.got_sigint = True
+        self.do_run = False  
+        if self.is_alive():
+          if self._inq_task:
+            self._inq_task.cancel()
+            try:
+              await self._inq_task
+            except asyncio.CancelledError:
+              pass
+      else:
+        self.logger.warning( 
+            f'CA{self.id}: Unknown key in Inqueue: {received[0]}'
+          )    
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True)
+    
   async def async_runner(self):
     try:
-      import django
-      django.setup()
-      from tools.c_logger import alog_ini
+      self.mycam = None
+      self.reader_thread = None
+      self.got_sigint = False
+      self._inq_task = None
+      self.dbline = await stream.objects.aget(id = self.id)
       self.logname = 'camera #' + str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Camera #'+str(self.id))
-      #*****
       self.socket_path = await djconf.agetconfig(
         'socket_path', 
         '/home/cam_ai/shm/sockets/',
       )
+      self.shared_mem = shared_mem(
+        source_dict = _SH_MEM_ITEMS, 
+        shape=(self.dbline.cam_yres, self.dbline.cam_xres, 3),
+        shm_name=self.shm_name, 
+      )
       await aiofiles.os.makedirs(self.socket_path, exist_ok=True)
       self.socket_path += f'cam{self.id}.sock'
-      #*****
       if self.dbline.cam_virtual_fps:
         self.wd_ts = 0.0
         self.wd_interval = 1.0
@@ -89,7 +222,11 @@ class c_cam(viewable):
         self.mp4timestamp = 0.0
         self.wd_ts = time()
         self.wd_interval = 10.0 
-      await super().async_runner()
+      self.som = speedometer()
+      self.do_run = True
+      loop = asyncio.get_running_loop()
+      loop.add_signal_handler(signal.SIGINT, self.sigint_handler)
+      self._inq_task = asyncio.create_task(self.in_queue_thread(), name = 'in_queue_thread')
       self.mode_flag = self.dbline.cam_mode_flag
       self.cam_active = False
       self.cam_recording = False
@@ -100,6 +237,7 @@ class c_cam(viewable):
       self.framewait = 0.0
       self.reset_buffer = False
       datapath = await djconf.agetconfig('datapath', 'data/')
+      streams_redis.set_ffmpeg_running(False)
       if self.dbline.cam_virtual_fps:
         self.virt_cam_path = await djconf.agetconfig(
           'virt_cam_path', 
@@ -160,15 +298,33 @@ class c_cam(viewable):
             while not self.got_sigint and counter > 0:
               counter -= 1
               await a_break_type(BR_LONG)
-      self.viewer.drawpad.set_xy((self.dbline.cam_xres, self.dbline.cam_yres))
-      await self.viewer.drawpad.set_mask_local()
       self.raw_queue = queue.Queue(maxsize=2)
-      #print(f'Launch: cam#{self.id}')
+      #print(f'Launch: cam #{self.id}')
       while not self.got_sigint:
         frameline = await self.run_one()
         if self.got_sigint:
           break 
-        if frameline:
+        if frameline: 
+          xmin = self.shared_mem.read_1_meta('aoi_xmin')
+          xmax = self.shared_mem.read_1_meta('aoi_xmax')
+          ymin = self.shared_mem.read_1_meta('aoi_ymin')
+          ymax = self.shared_mem.read_1_meta('aoi_ymax')
+          if (self.shared_mem.read_1_meta('apply_mask') 
+            and xmax > 0
+            and ymax > 0
+            and (
+            xmin > 0
+            or xmax < self.dbline.cam_xres - 1
+            or ymin > 0
+            or ymax < self.dbline.cam_yres - 1
+          )):
+            aoi = [
+              frameline[0],
+              frameline[1][ymin:ymax, xmin:xmax],
+              frameline[2],
+            ]
+          else:  
+            aoi = None  
           if (self.dbline.cam_view 
               and streams_redis.view_from_dev('C', self.id)):
             await self.viewer_queue.put(frameline)
@@ -177,13 +333,19 @@ class c_cam(viewable):
               or streams_redis.data_from_dev('D', self.id))
               and frameline):
             try:
-              await asyncio.wait_for(self.mydetector_data.put(frameline), timeout=5.0)
+              if aoi is None:
+                await asyncio.wait_for(self.mydetector_data.put(frameline), timeout=5.0)
+              else:  
+                await asyncio.wait_for(self.mydetector_data.put(aoi), timeout=5.0)
             except asyncio.TimeoutError:
               pass
           if (self.dbline.eve_mode_flag 
               and (not streams_redis.check_if_counts_zero('E', self.id))):
             try:
-              await asyncio.wait_for(self.myeventer_data.put(frameline), timeout=5.0)
+              if aoi is None:
+                await asyncio.wait_for(self.myeventer_data.put(frameline), timeout=5.0)
+              else:  
+                await asyncio.wait_for(self.myeventer_data.put(aoi), timeout=5.0)
             except asyncio.TimeoutError:
               pass
         else:
@@ -221,63 +383,162 @@ class c_cam(viewable):
         + ' - ' + self.type + str(self.id)
       )
       self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
-    
-  async def process_received(self, received):  
-    result = True
-    #print(f'***** CAM Inqueue #{self.id}:', received)
-    if (received[0] == 'set_mask'):
-      await self.viewer.drawpad.set_mask_local(received[1])
-    elif (received[0] == 'new_mask_item'):
-      self.viewer.drawpad.new_ring()
-      self.viewer.drawpad.make_screen()
-      self.viewer.drawpad.mask_from_polygons()
-      await mask.objects.filter(
-        stream_id=self.id, 
-        mtype='C',
-      ).adelete()
-      for ring in self.viewer.drawpad.ringlist:
-        m = mask(
-          name='New Ring',
-          definition=json.dumps(ring.points),
-          stream_id=self.id,
-          mtype='C',
-        )
-        await m.asave()
-    elif (received[0] == 'set_drawpad_size'):
-      self.viewer.drawpad.set_xy((self.dbline.cam_xres, self.dbline.cam_yres))
-    elif (received[0] == 'set_cb_apply'):
-      self.dbline.cam_apply_mask = received[1]
-    elif (received[0] == 'set_cb_positive'):
-      self.viewer.drawpad.positive_mask = received[1]
-    elif (received[0] == 'reset_cam'):
-      await self.reset_cam()
-    elif (received[0] == 'pause'):
-      self.dbline.cam_pause = received[1]
-    elif (received[0] == 'ptz_mdown'):
-      self.mousex = received[1]
-      self.mousey = received[2]
-    elif (received[0] == 'ptz_mup'):
-      ptz_pos = self.mycam.myptz.abs_pos
-      xdiff = 0 - round((received[1] - self.mousex) / 3.0)
-      ydiff = 0 - round((received[2] - self.mousey) / 3.0)
-      self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
-    elif (received[0] == 'ptz_zoom'):
-      self.mycam.myptz.goto_rel(zian= 0-received[1])
-    elif (received[0] == 'zoom_abs'):
-      self.mycam.myptz.goto_abs(z = received[1])
-    elif (received[0] == 'pos_rel'):
-      xdiff = 0 - received[1]
-      ydiff = 0 - received[2]
-      self.mycam.myptz.goto_rel(xin=xdiff, yin=ydiff)
-    elif (received[0] == 'stop'):
-      if self.dbline.cam_virtual_fps and self.virt_cam_path_ram:
+
+  async def checkmp4(self):
+    try:
+      timestamp = None
+      while not self.got_sigint:
+        await a_break_type(BR_LONG)
+        if not self.cam_recording or self.vid_count is None:
+          continue
+        async with self._mp4_lock:
+          if timestamp is None:
+            if await aiofiles.os.path.exists(self.vid_file_path(self.vid_count)):
+              timestamp = time()
+              #print('##### Found MP4 Nr.', self.vid_count, timestamp)  
+            else:
+              continue  
+          if not await aiofiles.os.path.exists(self.vid_file_path(self.vid_count + 1)):
+            continue
+          targetname = self.ts_targetname(timestamp)
+          try:
+            await aioshutil.move(self.vid_file_path(self.vid_count), 
+              self.recordingspath + '/' + targetname)
+            await asyncio.to_thread(
+              self.myeventer_in.put, 
+              ('new_video', self.vid_count, targetname, timestamp)
+            )
+            timestamp = None
+            self.vid_count += 1
+          except FileNotFoundError:
+            self.logger.warning(
+              f'CA{self.id}: Move did not find: {self.vid_file_path(self.vid_count)}'
+            )
+    except asyncio.CancelledError:
+        return()
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("checkmp4 crashed: %s", fatal, exc_info=True)
+
+  async def watchdog(self):
+    try:
+      while True:
         try:
-          os.remove(self.virt_cam_path_ram + self.dbline.cam_url)
-        except FileNotFoundError:
+          await a_break_time(self.wd_interval)
+        except asyncio.CancelledError:
+          return()
+        if self.dbline.cam_virtual_fps:
+          if (streams_redis.check_if_counts_zero('C', self.id)
+              and streams_redis.check_if_counts_zero('D', self.id)
+              and streams_redis.check_if_counts_zero('E', self.id)):
+            continue
+          if self.ff_proc is None:
+            continue
+          if self.ff_proc.returncode is None:
+            continue
+          else:  
+            self.file_end = True
+        else:
+          timediff = time() - self.wd_ts
+          if timediff <= 60:
+            continue
+          if not self.cam_active:
+            self.wd_ts = time()  
+            continue
+          if (timediff <= 180) and (self.getting_newprozess):
+            continue
+          if not (streams_redis.view_from_dev('C', self.id)
+              or streams_redis.data_from_dev('C', self.id)):
+            continue
+          self.wd_ts = time()
+        if self.got_sigint:
+          break
+        if self.dbline.cam_virtual_fps:
           pass
-    else:
-      result = False   
-    return(result)
+          #self.logger.info(
+          #  f'CA{self.id}: Restarting Video, VirtCam #{self.id} ({self.dbline.name})...', 
+          #)
+        else:
+          self.logger.info(
+            f'CA{self.id}: Wakeup for Camera #{self.id} ({self.dbline.name})...'
+          )
+        #if not self.dbline.cam_virtual_fps:
+        await self.stopprocess()
+        await self.newprocess() 
+        self.getting_newprozess = True
+    except Exception as fatal:
+      self.logger.error('Error in process: ' 
+        + self.logname 
+        + ' - ' + self.type + str(self.id)
+      )
+      self.logger.critical("watchdog crashed: %s", fatal, exc_info=True)
+
+  async def try_connect(self, maxcounter):
+    if self.shared_mem.read_1_meta('apply_pause'):
+      return()
+    self.logger.info(
+      f'CA{self.id}: [{maxcounter}] Probing camera #{self.id} ({self.dbline.name})...'
+    )
+    while streams_redis.get_ffmpeg_running():
+      await a_break_type(BR_LONG)
+    streams_redis.set_ffmpeg_running(True)  
+    await self.mycam.ffprobe()
+    await a_break_time(5.0)
+    streams_redis.set_ffmpeg_running(False)  
+    probe = self.mycam.probe
+    self.online = self.mycam.online
+    if self.online:
+      if self.dbline.cam_video_codec == -1:
+        self.video_codec = 0
+        while probe['streams'][self.video_codec]['codec_type'] != 'video':
+          self.video_codec += 1
+      else:
+        self.video_codec = self.dbline.cam_video_codec
+      self.video_codec_name = probe['streams'][self.video_codec]['codec_name']
+      self.cam_fps = (
+        probe['streams'][self.video_codec]['r_frame_rate'].split('/'))
+      try:
+        self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
+      except ZeroDivisionError:
+        self.cam_fps = 0.0 
+      self.real_fps = (
+        probe['streams'][self.video_codec]['avg_frame_rate'].split('/'))
+      if (self.real_fps[0] == '0') or (self.real_fps[1] == '0'):
+        self.real_fps = 0.0
+      else:
+        self.real_fps = float(self.real_fps[0]) / float(self.real_fps[1])
+      self.logger.info('+++++ CAM #' + str(self.id) + ': ' + self.dbline.name)
+      self.logger.info('+++++ Video codec: ' + self.video_codec_name 
+        + ' / Cam: ' + str(self.cam_fps) + 'fps / Connect: ' 
+        + str(self.real_fps) + 'fps')
+      self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
+      self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
+      while True:
+        try:
+          await self.dbline.asave(update_fields=('cam_xres', 'cam_yres',))
+          break
+        except OperationalError:
+          await aclose_old_connections()
+      if self.dbline.cam_audio_codec == -1:
+        self.audio_codec = 0
+        try:
+          while probe['streams'][self.audio_codec]['codec_type'] != 'audio':
+            self.audio_codec  += 1
+          self.audio_codec_name=probe['streams'][self.audio_codec]['codec_name']
+        except IndexError:
+          self.audio_codec = -1
+      else:
+        self.audio_codec = self.dbline.cam_audio_codec
+      if self.audio_codec >= 0: 
+      
+        self.audio_codec_name = probe['streams'][self.audio_codec]['codec_name']
+      else:  
+        self.audio_codec_name = 'none'
+      self.logger.info('+++++ Audio codec: ' + self.audio_codec_name)
+      self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
       
   async def run_one(self):
     if self.got_sigint:
@@ -290,13 +551,15 @@ class c_cam(viewable):
     else:
       in_ts = time() 
     while True:
-      if self.dbline.cam_pause or streams_redis.check_if_counts_zero('C', self.id):
+      if (self.shared_mem.read_1_meta('apply_pause') 
+          or streams_redis.check_if_counts_zero('C', self.id)):
         if self.cam_active:
           if self.cam_ts is None:
             self.cam_ts = time()
             break
           else:
-            if ((time() - self.cam_ts) > 60) or self.dbline.cam_pause:
+            if (((time() - self.cam_ts) > 60) 
+                or self.shared_mem.read_1_meta('apply_pause')):
               self.logger.info('Cam #'+str(self.id)+' is off')
               self.cam_active = False
               self.cam_ts = None
@@ -370,183 +633,161 @@ class c_cam(viewable):
     if fps:
       self.dbline.cam_fpsactual = fps
       streams_redis.fps_to_dev('C', self.id, fps)
-    if self.dbline.cam_apply_mask:
-      if self.dbline.cam_positive_mask:
-        frame = await asyncio.to_thread(
-          cv.bitwise_and, 
-          frame, 
-          255 - self.viewer.drawpad.mask,
-        )
-      else:
-        frame = await asyncio.to_thread(
-          cv.bitwise_and, 
-          frame, 
-          self.viewer.drawpad.mask,
-        )
+    if self.shared_mem.read_1_meta('apply_mask'):
+      frame = await asyncio.to_thread(
+        cv.bitwise_and, 
+        frame, 
+        self.shared_mem.read_mask(),
+      )
     if self.dbline.cam_virtual_fps and self.file_end:
       in_ts = 0.0
       self.file_end = False 
     return([3, frame, in_ts])
 
-  async def try_connect(self, maxcounter):
-    if self.dbline.cam_pause:
-      return()
-    self.logger.info(
-      f'CA{self.id}: [{maxcounter}] Probing camera #{self.id} ({self.dbline.name})...'
-    )
-    await self.mycam.ffprobe()
-    probe = self.mycam.probe
-    self.online = self.mycam.online
-    if self.online:
-      if self.dbline.cam_video_codec == -1:
-        self.video_codec = 0
-        while probe['streams'][self.video_codec]['codec_type'] != 'video':
-          self.video_codec += 1
-      else:
-        self.video_codec = self.dbline.cam_video_codec
-      self.video_codec_name = probe['streams'][self.video_codec]['codec_name']
-      self.cam_fps = (
-        probe['streams'][self.video_codec]['r_frame_rate'].split('/'))
+  async def newprocess(self):
+    while True:
       try:
-        self.cam_fps = float(self.cam_fps[0]) / float(self.cam_fps[1])
-      except ZeroDivisionError:
-        self.cam_fps = 0.0 
-      self.real_fps = (
-        probe['streams'][self.video_codec]['avg_frame_rate'].split('/'))
-      if (self.real_fps[0] == '0') or (self.real_fps[1] == '0'):
-        self.real_fps = 0.0
+        await self.dbline.arefresh_from_db()
+        break
+      except OperationalError:
+        await aclose_old_connections()
+    inp_frame_rate = 0.0
+    fps_limit = self.dbline.cam_fpslimit or 0.0
+    base_fps = self.dbline.cam_virtual_fps or self.cam_fps
+    if fps_limit and fps_limit < base_fps:
+      inp_frame_rate = fps_limit
+    self.wd_ts = time()
+    if self.dbline.cam_virtual_fps:
+      base_path = self.virt_cam_path_ram or self.virt_cam_path
+      source_string = f"{base_path}{self.dbline.cam_url}"
+      filepath = None
+    else:
+      source_string = self.dbline.cam_url.replace(
+        '{address}', 
+        self.dbline.cam_control_ip, 
+      )
+      if streams_redis.record_from_dev(self.type, self.id):
+        self.vid_count = 0
+        filepath = (self.recordingspath + 'C' 
+          + str(self.id).zfill(4) + '_%08d.mp4')
       else:
-        self.real_fps = float(self.real_fps[0]) / float(self.real_fps[1])
-      self.logger.info('+++++ CAM #' + str(self.id) + ': ' + self.dbline.name)
-      self.logger.info('+++++ Video codec: ' + self.video_codec_name 
-        + ' / Cam: ' + str(self.cam_fps) + 'fps / Connect: ' 
-        + str(self.real_fps) + 'fps')
-      try:
-        streams_redis.x_y_res_to_cam(
-          self.id, probe['streams'][self.video_codec]['width'], 
-          probe['streams'][self.video_codec]['height'])
-      except KeyError:
-        self.logger.warning('Key Error in redis.x_y_res_to_cam')
-        self.online = False
-        return()  
-      self.dbline.cam_xres = probe['streams'][self.video_codec]['width']
-      self.dbline.cam_yres = probe['streams'][self.video_codec]['height']
-      while True:
-        try:
-          await self.dbline.asave(update_fields=('cam_xres', 'cam_yres',))
-          break
-        except OperationalError:
-          await aclose_old_connections()
-      if self.dbline.cam_audio_codec == -1:
-        self.audio_codec = 0
-        try:
-          while probe['streams'][self.audio_codec]['codec_type'] != 'audio':
-            self.audio_codec  += 1
-          self.audio_codec_name=probe['streams'][self.audio_codec]['codec_name']
-        except IndexError:
-          self.audio_codec = -1
+        filepath = None
+    generalparams = ['-y']
+    #**********
+    log_ffmpeg = False
+    #**********
+    if log_ffmpeg:
+      generalparams += ['-v', 'info']
+    else:  
+      generalparams += ['-v', 'fatal']
+      #generalparams += ['-v', 'info']
+    if not self.dbline.cam_virtual_fps:
+      if source_string[:4].upper() == 'RTSP':
+        generalparams += ['-rtsp_transport', 'tcp']
+      generalparams += ['-thread_queue_size', '1024']
+      #generalparams += ['-timeout', '10000000']
+      generalparams += ['-fflags', 'genpts']
+      generalparams += ['-use_wallclock_as_timestamps', '1']
+      #generalparams += ['-flags', 'low_delay']
+    inparams = ['-i', source_string]
+    outparams1 = []
+    if not self.dbline.cam_virtual_fps:
+      outparams1 += ['-map', '0:' + str(self.video_codec)]
+      outparams1 += ['-an']
+      if inp_frame_rate:
+        outparams1 += ['-vf', 'fps=' + str(inp_frame_rate)]
       else:
-        self.audio_codec = self.dbline.cam_audio_codec
-      if self.audio_codec >= 0: 
-      
-        self.audio_codec_name = probe['streams'][self.audio_codec]['codec_name']
-      else:  
-        self.audio_codec_name = 'none'
-      self.logger.info('+++++ Audio codec: ' + self.audio_codec_name)
-      self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
-
-  async def checkmp4(self):
+        outparams1 += ['-fps_mode', 'passthrough']
+    outparams1 += ['-f', 'rawvideo']
+    outparams1 += ['-pix_fmt', 'bgr24']
+    outparams1 += ['unix://' + self.socket_path]
+    outparams2 = []
+    if filepath:
+      self.ffmpeg_recording = True
+      if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
+        video_framerate = self.dbline.cam_ffmpeg_fps
+      else:
+        video_framerate = None
+      outparams2 += ['-map', '0:' + str(self.video_codec)]
+      if self.audio_codec > -1:
+        outparams2 += ['-map', '0:' + str(self.audio_codec)]
+      if self.video_codec_name in {'h264', 'hevc'}:
+        if video_framerate:
+          outparams2 += ['-c:v', 'libx264']
+          if self.dbline.cam_ffmpeg_crf:
+            outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
+        else:
+          outparams2 += ['-c:v', 'copy']
+      else:    
+        outparams2 = ['-c', 'libx264']
+        if self.dbline.cam_ffmpeg_crf:
+          outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
+      if self.audio_codec > -1:
+        if self.audio_codec_name == 'pcm_alaw':
+          outparams2 += ['-c:a', 'aac']
+        else:
+          outparams2 += ['-c:a', 'copy']
+      if video_framerate:
+        outparams2 += ['-r', str(video_framerate)]
+        outparams2 += ['-g', str(round(video_framerate * self.dbline.cam_ffmpeg_segment))]
+      outparams2 += ['-f', 'segment']
+      outparams2 += ['-segment_time', str(self.dbline.cam_ffmpeg_segment)]
+      if video_framerate:
+        outparams2 += ['-segment_time_delta', str(0.5 / (video_framerate))]
+      outparams2 += ['-reset_timestamps', '1']
+      outparams2 += [filepath]
+    else:
+      self.ffmpeg_recording = True
+    cmd = (generalparams + inparams + outparams1 
+      + outparams2)
+    #self.logger.info('#####' + str(cmd))
+    #self.logger.info('#'+str(self.id) + ' 00000')
+    while self.ff_proc is not None and self.ff_proc.returncode is None:
+      await a_break_type(BR_LONG)
+    #self.logger.info('#'+str(self.id) + ' 11111')
     try:
-      while not self.got_sigint:
+      os.unlink(self.socket_path)
+    except FileNotFoundError:
+      pass
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(self.socket_path)
+    srv.listen(1)
+    #self.logger.info('#'+str(self.id) + ' 22222')
+    while True:
+      while streams_redis.get_ffmpeg_running():
         await a_break_type(BR_LONG)
-        if not self.cam_recording or self.vid_count is None:
-          continue
-        async with self._mp4_lock:
-          if not await aiofiles.os.path.exists(self.vid_file_path(self.vid_count + 2)):
-            continue
-          try:
-            timestamp = await asyncio.to_thread(
-              os.path.getmtime, 
-              self.vid_file_path(self.vid_count),
-            )
-          except FileNotFoundError:
-            continue
-          if timestamp <= self.mp4timestamp:
-            continue
-          self.mp4timestamp = timestamp
-          targetname = self.ts_targetname(timestamp)
-          try:
-            await aioshutil.move(self.vid_file_path(self.vid_count), 
-              self.recordingspath + '/' + targetname)
-            await asyncio.to_thread(
-              self.myeventer_in.put, 
-              ('new_video', self.vid_count, targetname, timestamp)
-            )
-            self.vid_count += 1
-          except FileNotFoundError:
-            self.logger.warning(
-              f'CA{self.id}: Move did not find: {self.vid_file_path(self.vid_count)}'
-            )
-    except asyncio.CancelledError:
-        return()
-    except Exception as fatal:
-      self.logger.error('Error in process: ' 
-        + self.logname 
-        + ' - ' + self.type + str(self.id)
+      streams_redis.set_ffmpeg_running(True)  
+      ff_ts = time()
+      self.ff_proc = await asyncio.create_subprocess_exec(
+        '/usr/bin/ffmpeg',
+        *cmd,
+        stdout=None,
+        stderr=log if log_ffmpeg else None,
       )
-      self.logger.critical("checkmp4 crashed: %s", fatal, exc_info=True)
-
-  async def watchdog(self):
-    try:
-      while True:
-        try:
-          await a_break_time(self.wd_interval)
-        except asyncio.CancelledError:
-          return()
-        if self.dbline.cam_virtual_fps:
-          if (streams_redis.check_if_counts_zero('C', self.id)
-              and streams_redis.check_if_counts_zero('D', self.id)
-              and streams_redis.check_if_counts_zero('E', self.id)):
-            continue
-          if self.ff_proc is None:
-            continue
-          if self.ff_proc.returncode is None:
-            continue
-          else:  
-            self.file_end = True
-        else:
-          timediff = time() - self.wd_ts
-          if timediff <= 60:
-            continue
-          if not self.cam_active:
-            self.wd_ts = time()  
-            continue
-          if (timediff <= 180) and (self.getting_newprozess):
-            continue
-          if not (streams_redis.view_from_dev('C', self.id)
-              or streams_redis.data_from_dev('C', self.id)):
-            continue
-          self.wd_ts = time()
-        if self.got_sigint:
-          break
-        if self.dbline.cam_virtual_fps:
-          self.logger.info(
-            f'CA{self.id}: Restarting Video, VirtCam #{self.id} ({self.dbline.name})...', 
-          )
-        else:
-          self.logger.info(
-            f'CA{self.id}: Wakeup for Camera #{self.id} ({self.dbline.name})...'
-          )
-        #if not self.dbline.cam_virtual_fps:
-        await self.stopprocess()
-        await self.newprocess() 
-        self.getting_newprozess = True
-    except Exception as fatal:
-      self.logger.error('Error in process: ' 
-        + self.logname 
-        + ' - ' + self.type + str(self.id)
-      )
-      self.logger.critical("watchdog crashed: %s", fatal, exc_info=True)
+      try:
+        await asyncio.wait_for(self.ff_proc.wait(), timeout=30.0)
+        self.logger.warning(f'#{self.id} CamProc exited quickly ' 
+          f'after {round(time() - ff_ts, 3)} seconds')
+        streams_redis.set_ffmpeg_running(False)
+        await a_break_time(60.0) 
+      except asyncio.TimeoutError:
+        self.logger.info(f'#{self.id} CamProc still running ' 
+          f'after {round(time() - ff_ts, 3)} seconds')
+        streams_redis.set_ffmpeg_running(False)
+        break
+    #self.logger.info('#'+str(self.id) + ' 33333')
+    conn, _ = await asyncio.to_thread(srv.accept)
+    conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 * self.bytes_per_frame)
+    conn.setblocking(False)
+    #self.logger.info(f'SocketSize: {conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}')    
+    self.fd = conn.fileno()
+    self.sock_conn = conn
+    self.reader_thread = threading.Thread(
+      target=self._raw_reader,
+      daemon=True,
+    )
+    self.reader_thread.start()
+    #self.logger.info('#'+str(self.id) + ' 44444')
     
   def _raw_reader(self):
     self.raw_running = True
@@ -595,145 +836,6 @@ class c_cam(viewable):
       pass
       #self.logger.info(f'CA{self.id}: ----- Stopping Reader')
 
-  async def newprocess(self):
-    while True:
-      try:
-        await self.dbline.arefresh_from_db()
-        break
-      except OperationalError:
-        await aclose_old_connections()
-    inp_frame_rate = 0.0
-    fps_limit = self.dbline.cam_fpslimit or 0.0
-    base_fps = self.dbline.cam_virtual_fps or self.cam_fps
-    if fps_limit and fps_limit < base_fps:
-      inp_frame_rate = fps_limit
-    self.wd_ts = time()
-    if self.dbline.cam_virtual_fps:
-      base_path = self.virt_cam_path_ram or self.virt_cam_path
-      source_string = f"{base_path}{self.dbline.cam_url}"
-      filepath = None
-    else:
-      self.myeventer_in.put(('purge_videos', ))
-      source_string = self.dbline.cam_url.replace(
-        '{address}', 
-        self.dbline.cam_control_ip, 
-      )
-      if streams_redis.record_from_dev(self.type, self.id):
-        self.vid_count = 0
-        filepath = (self.recordingspath + 'C' 
-          + str(self.id).zfill(4) + '_%08d.mp4')
-      else:
-        filepath = None
-    generalparams = ['-y']
-    #**********
-    log_ffmpeg = False
-    #**********
-    if log_ffmpeg:
-      generalparams += ['-v', 'info']
-    else:  
-      generalparams += ['-v', 'fatal']
-      #generalparams += ['-v', 'info']
-    if not self.dbline.cam_virtual_fps:
-      if source_string[:4].upper() == 'RTSP':
-        generalparams += ['-rtsp_transport', 'tcp']
-      generalparams += ['-thread_queue_size', '1024']
-      #generalparams += ['-timeout', '10000000']
-      generalparams += ['-fflags', 'genpts']
-      generalparams += ['-use_wallclock_as_timestamps', '1']
-      #generalparams += ['-flags', 'low_delay']
-    inparams = ['-i', source_string]
-    outparams1 = []
-    if not self.dbline.cam_virtual_fps:
-      outparams1 += ['-map', '0:v:' + str(self.video_codec)]
-      outparams1 += ['-an']
-      if inp_frame_rate:
-        outparams1 += ['-vf', 'fps=' + str(inp_frame_rate)]
-      else:
-        outparams1 += ['-fps_mode', 'passthrough']
-    outparams1 += ['-f', 'rawvideo']
-    outparams1 += ['-pix_fmt', 'bgr24']
-    outparams1 += ['unix://' + self.socket_path]
-    outparams2 = []
-    if filepath:
-      self.ffmpeg_recording = True
-      if self.dbline.cam_ffmpeg_fps and self.dbline.cam_ffmpeg_fps < self.cam_fps:
-        video_framerate = self.dbline.cam_ffmpeg_fps
-      else:
-        video_framerate = None
-      outparams2 += ['-map', '0:v:' + str(self.video_codec)]
-      if self.audio_codec > -1:
-        outparams2 += ['-map', '0:' + str(self.audio_codec)]
-      if self.video_codec_name in {'h264', 'hevc'}:
-        if video_framerate:
-          outparams2 += ['-c:v', 'libx264']
-          if self.dbline.cam_ffmpeg_crf:
-            outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
-        else:
-          outparams2 += ['-c:v', 'copy']
-      else:    
-        outparams2 = ['-c', 'libx264']
-        if self.dbline.cam_ffmpeg_crf:
-          outparams2 += ['-crf', str(self.dbline.cam_ffmpeg_crf)]
-      if self.audio_codec > -1:
-        if self.audio_codec_name == 'pcm_alaw':
-          outparams2 += ['-c:a', 'aac']
-        else:
-          outparams2 += ['-c:a', 'copy']
-      if video_framerate:
-        outparams2 += ['-r', str(video_framerate)]
-        outparams2 += ['-g', str(round(video_framerate * self.dbline.cam_ffmpeg_segment))]
-      outparams2 += ['-f', 'segment']
-      outparams2 += ['-segment_time', str(self.dbline.cam_ffmpeg_segment)]
-      if video_framerate:
-        outparams2 += ['-segment_time_delta', str(0.5 / (video_framerate))]
-      outparams2 += ['-reset_timestamps', '1']
-      outparams2 += [filepath]
-    else:
-      self.ffmpeg_recording = True
-    cmd = (generalparams + inparams + outparams1 
-      + outparams2)
-    self.logger.info('#####' + str(cmd))
-    #self.logger.info('#'+str(self.id) + ' 00000')
-    while self.ff_proc is not None and self.ff_proc.returncode is None:
-      await a_break_type(BR_LONG)
-    #self.logger.info('#'+str(self.id) + ' 11111')
-    try:
-      os.unlink(self.socket_path)
-    except FileNotFoundError:
-      pass
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(self.socket_path)
-    srv.listen(1)
-    #self.logger.info('#'+str(self.id) + ' 22222')
-    if log_ffmpeg:
-      log = open(logpath + f'ffmpeg{self.id}.log', "ab")
-      self.ff_proc = await asyncio.create_subprocess_exec(
-        '/usr/bin/ffmpeg',
-        *cmd,
-        stdout=None,
-        stderr=log,
-      )
-    else:  
-      self.ff_proc = await asyncio.create_subprocess_exec(
-        '/usr/bin/ffmpeg',
-        *cmd,
-        stdout=None,
-      )
-    #self.logger.info('#'+str(self.id) + ' 33333')
-    conn, _ = await asyncio.to_thread(srv.accept)
-    #conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 32 * 1024 * 1024)
-    conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 * self.bytes_per_frame)
-    conn.setblocking(False)
-    #self.logger.info(f'SocketSize: {conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}')    
-    self.fd = conn.fileno()
-    self.sock_conn = conn
-    self.reader_thread = threading.Thread(
-      target=self._raw_reader,
-      daemon=True,
-    )
-    self.reader_thread.start()
-    #self.logger.info('#'+str(self.id) + ' 44444')
-
   async def stopprocess(self):
     #self.logger.info('#'+str(self.id) + ' aaaaa')
     self.raw_running = False
@@ -753,7 +855,7 @@ class c_cam(viewable):
         pass        
       #self.logger.info('#'+str(self.id) + ' ccccc')
       try:
-        self.ff_proc.send_signal(SIGKILL)
+        self.ff_proc.send_signal(signal.SIGKILL)
       except ProcessLookupError:
         pass
       #self.logger.info('#'+str(self.id) + ' ddddd')
@@ -789,7 +891,16 @@ class c_cam(viewable):
     self.reset_buffer = True
     await self.newprocess() 
     self.logger.info('Cam #'+str(self.id)+' is on')
-
-  async def set_pause(self, status):
-    await asyncio.to_thread(self.inqueue.put, ('pause', status))
     
+  async def stop(self):
+    if self.is_alive():
+      await asyncio.to_thread(self.inqueue.put, ('stop',))
+      if self._inq_task:
+        self._inq_task.cancel()
+        try:
+          await self._inq_task
+        except asyncio.CancelledError:
+          pass
+      self.shared_mem.shm.close() 
+      await asyncio.to_thread(self.join, 5.0)
+

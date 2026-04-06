@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -42,7 +42,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
         <div class="col-sm-auto box">
           <h2>Motion Detection</h2>
-          <h5>fps = <span id="fpstagD{{ item.id }}">?</span>
+          <h5>
+          <span id="xdimtagD{{ item.id }}">{{ item.cam_xres }}</span>x<!--
+          --><span id="ydimtagD{{ item.id }}">{{ item.cam_yres }}</span>,
+          fps = <span id="fpstagD{{ item.id }}">?</span>
           {% if user.is_superuser %}
             views = <span id="vnrtagD{{ item.id }}">?</span>
 		      {% endif %}
@@ -53,7 +56,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
         <div class="col-sm-auto box">
           <h2>Event Preview</h2>
-          <h5>fps = <span id="fpstagE{{ item.id }}">?</span>
+          <h5>
+          <span id="xdimtagE{{ item.id }}">{{ item.cam_xres }}</span>x<!--
+          --><span id="ydimtagE{{ item.id }}">{{ item.cam_yres }}</span>,
+          fps = <span id="fpstagE{{ item.id }}">?</span>
           {% if user.is_superuser %}
             views = <span id="vnrtagE{{ item.id }}">?</span>
 		      {% endif %}
@@ -70,11 +76,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 let c_view_Socket;
 let trigger_Socket;
-let displaywidth = 375 // Screen width IPhone 7
-
-let imageElementsC = [];
-let imageElementsD = [];
-let imageElementsE = [];
+let imagewidth = 375 // Screen width IPhone 7
+const displaywidth = {};
+const displayheight = {};
 
 function isInViewport(el) {
   let rect = el.getBoundingClientRect();
@@ -86,26 +90,7 @@ function isInViewport(el) {
   );
 };
 
-{% for item in camlist %} 
-  let displayheight{{ item.id }} = 
-    Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
-  let xinput{{ item.id }}
-  let yinput{{ item.id }}
-  let wait{{ item.id }} = 0;
-  imageElementsC[{{ item.id }}] = document.getElementById("imagespaceC{{ item.id }}");
-  imageElementsD[{{ item.id }}] = document.getElementById("imagespaceD{{ item.id }}");
-  imageElementsE[{{ item.id }}] = document.getElementById("imagespaceE{{ item.id }}");
-{% endfor %}
-
 $(document).ready(function() {
-{% for item in camlist %} 
-  $('#imagespaceC{{ item.id }}').attr('width', displaywidth+'px');
-  $('#imagespaceC{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
-  $('#imagespaceD{{ item.id }}').attr('width', displaywidth+'px');
-  $('#imagespaceD{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
-  $('#imagespaceE{{ item.id }}').attr('width', displaywidth+'px');
-  $('#imagespaceE{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
-{% endfor %}
   WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
   .then((result) => {
     c_view_Socket = result;
@@ -113,26 +98,23 @@ $(document).ready(function() {
   })
   .then((result) => {
     trigger_Socket = result;
-{% for item in camlist %} 
+{% for item in camlist %}
     return(trigger_Socket.sendandwait({
       'command' : 'starttrigger',
-      'mode' : 'C',
+      'type' : 'C',
       'idx' : {{ item.id }},
-      'width' : displaywidth,
-      //'do_compress' : false,
+      'width' : imagewidth,
+      'do_compress' : false,
     }));
   })
   .then((result) => {
     show_camC{{ item.id }} = result.show_cam;
-    xinput{{ item.id }} = result.outx;
-    yinput{{ item.id }} = 
-      Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
     onf_nrC{{ item.id }} = result.on_frame_nr; 
     return(trigger_Socket.sendandwait({
       'command' : 'starttrigger',
-      'mode' : 'D',
+      'type' : 'D',
       'idx' : {{ item.id }},
-      'width' : displaywidth,
+      'width' : imagewidth,
       'do_compress' : false,
     }));
   })
@@ -141,89 +123,110 @@ $(document).ready(function() {
     onf_nrD{{ item.id }} = result.on_frame_nr; 
     return(trigger_Socket.sendandwait({
       'command' : 'starttrigger',
-      'mode' : 'E',
+      'type' : 'E',
       'idx' : {{ item.id }},
-      'width' : displaywidth,
+      'width' : imagewidth,
       'do_compress' : false,
     }));
   })
   .then((result) => {
     show_camE{{ item.id }} = result.show_cam;
     onf_nrE{{ item.id }} = result.on_frame_nr; 
-{% endfor %}
-{% for item in camlist %} 
+    displaywidth[{{ item.id }}] = {};
+    displaywidth[{{ item.id }}].C = -1;
+    displaywidth[{{ item.id }}].D = -1;
+    displaywidth[{{ item.id }}].E  = -1; 
+    displayheight[{{ item.id }}] = {};
+    displayheight[{{ item.id }}].C = -1;
+    displayheight[{{ item.id }}].D = -1;
+    displayheight[{{ item.id }}].E  = -1;
     if (show_camC{{ item.id }}) {
-      vnrcode = 'C' + String({{ item.id }}).padStart(6,'0') + String(onf_nrC{{ item.id }}).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'C'.charCodeAt(0));
+      view.setUint32(1, {{ item.id }}, true);
+      view.setUint32(5, onf_nrC{{ item.id }}, true);
+      trigger_Socket.socket.send(buf);
     } else {
       $('#imagespaceC{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElementsC[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespaceC{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElementsC[{{ item.id }}].src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespaceC{{ item.id }}').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
     };
     if (show_camD{{ item.id }}) {
-      vnrcode = 'D' + String({{ item.id }}).padStart(6,'0') + String(onf_nrD{{ item.id }}).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'D'.charCodeAt(0));
+      view.setUint32(1, {{ item.id }}, true);
+      view.setUint32(5, onf_nrD{{ item.id }}, true);
+      trigger_Socket.socket.send(buf);
     } else {
       $('#imagespaceD{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElementsD[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespaceD{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElementsD[{{ item.id }}].src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespaceD{{ item.id }}').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
     };
     if (show_camE{{ item.id }}) {
-      vnrcode = 'E' + String({{ item.id }}).padStart(6,'0') + String(onf_nrE{{ item.id }}).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'E'.charCodeAt(0));
+      view.setUint32(1, {{ item.id }}, true);
+      view.setUint32(5, onf_nrE{{ item.id }}, true);
+      trigger_Socket.socket.send(buf);
     } else {
       $('#imagespaceE{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElementsE[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespaceE{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElementsE[{{ item.id }}].src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespaceE{{ item.id }}').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
     };
 {% endfor %}
     trigger_Socket.socket.onclose = function(e) {
       console.log('Trigger-Socket closed');
     };
+		trigger_Socket.socket.binaryType = 'arraybuffer';
     trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-		    blob = e.data.slice(13, e.data.size, "image/jpeg");
-		    indicator = e.data.slice(0, 13);
-		    let url = URL.createObjectURL(blob);
-        indicator.text()
-        .then((result) => {
-          mode = result[0];
-          vnr = parseInt(result.slice(1,7));
-		      if (mode == 'C') {
-		        checkelement = imageElementsC[vnr];
-		      } else if (mode == 'D') {  
-		        checkelement = imageElementsD[vnr];
-		      } else {
-		        checkelement = imageElementsE[vnr];
-		      };  
-		      checkelement.src = url;
-		      if (isInViewport(checkelement)) {
-            trigger_Socket.socket.send(result);
-		      } else { 
-            setTimeout(function() {
-              trigger_Socket.socket.send(result);
-            }, 5000);  
-		      };
-        })
+        const view = new DataView(e.data);
+        const type = String.fromCharCode(view.getUint8(0));
+        const idx = view.getInt32(1, true);
+        const new_x = view.getInt32(9, true);
+        const new_y = view.getInt32(13, true);
+        if (displaywidth[idx][type] !== new_x) {
+          $('#imagespace' + type + idx).attr('width', new_x + 'px');
+          displaywidth[idx][type] = new_x;
+        };
+        if (displayheight[idx][type] !== new_y) {
+          $('#imagespace' + type + idx).attr('height', new_y + 'px');
+          displayheight[idx][type] = new_y;
+        };
+	      const indicator = e.data.slice(0, 9);
+        const imageBuffer = e.data.slice(17);
+        const blob = new Blob([imageBuffer], { type: "image/jpeg" });
+	      let url = URL.createObjectURL(blob);
+	      $('#imagespace' + type + idx).prop('src', url);
+        trigger_Socket.socket.send(indicator);
       };
     };
 {% for item in camlist %} 
     setInterval(() => {
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
-        'mode' : 'C',
+        'type' : 'C',
         'idx' : {{ item.id }},
       })
       .then((result) => {
@@ -234,10 +237,12 @@ $(document).ready(function() {
       })
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
-        'mode' : 'D',
+        'type' : 'D',
         'idx' : {{ item.id }},
       })
       .then((result) => {
+        $('#xdimtagD{{ item.id }}').text(result.xdim);
+        $('#ydimtagD{{ item.id }}').text(result.ydim);
         $('#fpstagD{{ item.id }}').text(result.fps);
         {% if user.is_superuser %}
           $('#vnrtagD{{ item.id }}').text(result.viewers);
@@ -245,10 +250,12 @@ $(document).ready(function() {
       })
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
-        'mode' : 'E',
+        'type' : 'E',
         'idx' : {{ item.id }},
       })
       .then((result) => {
+        $('#xdimtagE{{ item.id }}').text(result.xdim);
+        $('#ydimtagE{{ item.id }}').text(result.ydim);
         $('#fpstagE{{ item.id }}').text(result.fps);
         {% if user.is_superuser %}
           $('#vnrtagE{{ item.id }}').text(result.viewers);

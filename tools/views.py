@@ -207,7 +207,7 @@ class inst_virt_cam(cam_inst_view):
     evt_condition.objects.filter(eventer = newstream).delete()
     new_condition = evt_condition(reaction = 1, eventer = newstream, y = 1)
     my_eventer = viewables[newstream.id]['E']
-    my_eventer.inqueue.put(('new_condition', 1, model_to_dict(new_condition)))
+    my_eventer.eve_worker.inqueue.put(('new_condition', 1, model_to_dict(new_condition)))
     new_condition.save()
     return redirect('/')
     

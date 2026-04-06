@@ -1,5 +1,5 @@
 """
-Copyright (C) 2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -97,14 +97,25 @@ class new_redis(saferedis):
     else:
       return(0.0)  
 
-  def x_y_res_to_cam(self, idx, xres, yres):
-    self.set(self.stringbase + 'xres:'+str(idx)+':', xres)
-    self.set(self.stringbase + 'yres:'+str(idx)+':', yres)
+  def xdim_to_dev(self, type, idx, value):
+    self.set(self.stringbase + 'xdim:' + type + ':' + str(idx) + ':', str(value))
 
-  def x_y_res_from_cam(self, idx):
-    x = int(self.get(self.stringbase + 'xres:'+str(idx)+':'))
-    y = int(self.get(self.stringbase + 'yres:'+str(idx)+':'))
-    return((x, y))
+  def xdim_from_dev(self, type, idx):
+    result = self.get(self.stringbase + 'xdim:' + type + ':' + str(idx) + ':')
+    if result:
+      return(int(result))
+    else:
+      return(0)   
+
+  def ydim_to_dev(self, type, idx, value):
+    self.set(self.stringbase + 'ydim:' + type + ':' + str(idx) + ':', str(value))
+
+  def ydim_from_dev(self, type, idx):
+    result = self.get(self.stringbase + 'ydim:' + type + ':' + str(idx) + ':')
+    if result:
+      return(int(result))
+    else:
+      return(0)  
     
   def set_ptz(self, idx, value):
     self.set(self.stringbase + 'ptz:'+str(idx)+':', str(json.dumps(value)))
@@ -129,6 +140,15 @@ class new_redis(saferedis):
     self.set(self.stringbase + 'virt_time:'+str(idx)+':', value) 
     
   def get_virt_time(self, idx):  
-    return(float(self.get(self.stringbase + 'virt_time:'+str(idx)+':')))  
+    return(float(self.get(self.stringbase + 'virt_time:'+str(idx)+':'))) 
+
+  def set_ffmpeg_running(self, value):
+    self.set(self.stringbase + 'ffmpeg_running:', str(value))
+    
+  def get_ffmpeg_running(self):
+    if (result := self.get(self.stringbase + 'ffmpeg_running:')):
+      return(result.lower() == b'true')
+    else:
+      return(False)   
       
 my_redis = new_redis()      

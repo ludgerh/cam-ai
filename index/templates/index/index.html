@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -20,8 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <script src="{% static 'camai/git/js/wstools.js' %}"></script>
   <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
 {% else %}
-  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
-    </script>
+  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
   <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
     </script>
 {% endif %}
@@ -32,7 +31,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     {% for item in camlist %} 
       <div class="col-sm-auto box">
       <h2>{{ mode }}{{ item.id }}: {{ item.name }}</h2>
-      <h5>{{ item.cam_xres }}x{{ item.cam_yres }}, 
+      <h5>
+        <span id="xdimtag{{ item.id }}">{{ item.cam_xres }}</span>x
+        <span id="ydimtag{{ item.id }}">{{ item.cam_yres }}</span>,
         fps = <span id="fpstag{{ item.id }}">?</span>
         {% if user.is_superuser %}
           views = <span id="vnrtag{{ item.id }}">?</span>
@@ -65,23 +66,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 let c_view_Socket;
 let trigger_Socket;
-let displaywidth = 375 // Screen width IPhone 7
-
-let imageElements = [];
-{% for item in camlist %} 
-  let displayheight{{ item.id }} = 
-    Math.round(displaywidth * {{ item.cam_yres }} / {{ item.cam_xres }})
-  let xinput{{ item.id }}
-  let yinput{{ item.id }}
-  let wait{{ item.id }} = 0;
-  imageElements[{{ item.id }}] = document.getElementById("imagespace{{ item.id }}");
-{% endfor %}
+let imagewidth = 375 // Screen width IPhone 7
+const displaywidth = {};
+const displayheight = {};
 
 $(document).ready(function() {
-{% for item in camlist %} 
-    $('#imagespace{{ item.id }}').attr('width', displaywidth+'px');
-    $('#imagespace{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
-{% endfor %}
   WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
   .then((result) => {
     c_view_Socket = result;
@@ -92,56 +81,74 @@ $(document).ready(function() {
 {% for item in camlist %} 
     return(trigger_Socket.sendandwait({
       'command' : 'starttrigger',
-      'mode' : '{{ mode }}',
+      'type' : '{{ mode }}',
       'idx' : {{ item.id }},
-      'width' : displaywidth,
+      'width' : imagewidth,
+      'do_compress' : false,
     }));
   })
   .then((result) => {
     show_cam{{ item.id }} = result.show_cam;
-    xinput{{ item.id }} = result.outx;
-    yinput{{ item.id }} = 
-      Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
-    onf_nr{{ item.id }} = result.on_frame_nr; 
-{% endfor %}
-{% for item in camlist %} 
+    onf_nr{{ item.id }} = result.on_frame_nr;  
+    displaywidth[{{ item.id }}] = -1; 
+    displayheight[{{ item.id }}] = -1;
     if (show_cam{{ item.id }}) {
-      vnrcode = '{{ mode }}' + String({{ item.id }}).padStart(6,'0') + String(onf_nr{{ item.id }}).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, '{{ mode }}'.charCodeAt(0));
+      view.setUint32(1, {{ item.id }}, true);
+      view.setUint32(5, onf_nr{{ item.id }}, true);
+      trigger_Socket.socket.send(buf); 
     } else {
       $('#imagespace{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElements[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespace{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElements[{{ item.id }}].src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespace{{ item.id }}').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
-    };
-{% endfor %}
+    }; 
+{% endfor %} 
     trigger_Socket.socket.onclose = function(e) {
       console.log('Trigger-Socket closed');
     };
+		trigger_Socket.socket.binaryType = 'arraybuffer';
     trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-		    blob = e.data.slice(13, e.data.size, "image/jpeg");
-		    indicator = e.data.slice(0, 13);
-		    let url = URL.createObjectURL(blob);
-        indicator.text()
-        .then((result) => {
-          vnr = parseInt(result.slice(1,7));
-		      imageElements[vnr].src = url;
-          trigger_Socket.socket.send(result);
-        })
+        const view = new DataView(e.data);
+        const idx = view.getInt32(1, true);
+        const new_x = view.getInt32(9, true);
+        const new_y = view.getInt32(13, true);
+        if (displaywidth[idx] !== new_x) {
+          $('#imagespace' + idx).attr('width', new_x + 'px');
+          displaywidth[idx] = new_x;
+        };
+        if (displayheight[idx] !== new_y) {
+          $('#imagespace' + idx).attr('height', new_y + 'px');
+          displayheight[idx] = new_y;
+        };
+	      const indicator = e.data.slice(0, 9);
+        const imageBuffer = e.data.slice(17);
+        const blob = new Blob([imageBuffer], { type: "image/jpeg" });
+	      let url = URL.createObjectURL(blob);
+	      $('#imagespace' + idx).prop('src', url);
+        trigger_Socket.socket.send(indicator);
       };
     };
 {% for item in camlist %} 
     setInterval(() => {
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
-        'mode' : '{{ mode }}',
+        'type' : '{{ mode }}',
         'idx' : {{ item.id }},
       })
       .then((result) => {
+        if ('{{ mode }}' != 'C') {
+          $('#xdimtag{{ item.id }}').text(result.xdim);
+          $('#ydimtag{{ item.id }}').text(result.ydim);
+        };  
         $('#fpstag{{ item.id }}').text(result.fps);
         {% if user.is_superuser %}
           $('#vnrtag{{ item.id }}').text(result.viewers);

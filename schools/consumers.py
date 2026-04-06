@@ -425,7 +425,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           })
           getbmp_dict[1][self.consumer_id].setdefault(line.id, {
             'path' : self.school_dir + '*****/' + line.name,
-            'school' :self.myschool,
+            'school' :self.myschool_nr,
           })
         outlist['data'] = lines
         logger.debug('--> ' + str(outlist))
@@ -611,15 +611,15 @@ class schooldbutil(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))
 
       elif params['command'] == 'register_ai':
-        self.myschool = int(params['school'])
-        if self.myschool not in self.school_lines:
-          self.school_lines[self.myschool] = await school.objects.aget(id = self.myschool)
+        self.myschool_nr = int(params['school'])
+        if self.myschool_nr not in self.school_lines:
+          self.school_lines[self.myschool_nr] = await school.objects.aget(id = self.myschool_nr)
           self.check_ts = time()
-        self.school_dir = self.school_lines[self.myschool].dir
-        if ('logout' in params) and params['logout'] and (self.myschool > 0):
+        self.school_dir = self.school_lines[self.myschool_nr].dir
+        if ('logout' in params) and params['logout'] and (self.myschool_nr > 0):
           await self.disconnect()
-        if self.myschool > 0:
-          schoolline = await school.objects.aget(id=self.myschool)
+        if self.myschool_nr > 0:
+          schoolline = await school.objects.aget(id=self.myschool_nr)
           workerline = await worker.objects.aget(school__id=schoolline.id)
           self.tf_worker = tf_workers[workerline.id]
           self.tf_worker = tf_worker_client(self.tf_worker.inqueue, self.tf_worker.registerqueue, )

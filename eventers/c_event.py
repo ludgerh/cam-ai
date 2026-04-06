@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -101,7 +101,7 @@ class c_event(list):
   crypt = None
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
-      idx, logger):
+      idx, shrink_factor, logger):
     self.event_lock = t_lock()
     with self.event_lock:
       super().__init__()
@@ -118,7 +118,7 @@ class c_event(list):
       self.to_email = ''
       self.ts = None
       self.savename = ''
-      self.schoolnr = eventer_dbl.eve_school.id
+      self.schoolnr = school_nr
       self.dbline = event()
       self.dbline.camera = eventer_dbl
       self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
@@ -132,18 +132,17 @@ class c_event(list):
       self.logger = logger
       self.frames = OrderedDict([(0, frame)])
       self.last_frame_index = 1
-      self.shrink_factor = eventer_dbl.eve_shrink_factor
+      self.shrink_factor = shrink_factor
       self.focus_max = np.max(frame[5][1:])
       self.focus_time = frame[2]
       self.check_out_ts = None
       self.dirs_checked = False
-      self.remaining_alarms = eventer_dbl.eve_alarm_max_nr
   
   @classmethod  
   async def create(cls, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
-      idx, logger):
+      idx, shrink_factor, logger):
     instance = cls(tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
-      idx, logger)
+      idx, shrink_factor, logger)
     instance.stream_creator = await database_sync_to_async(lambda: instance.dbline.camera.creator)()
     if c_event.crypt is None:
       if instance.dbline.camera.encrypted:
@@ -298,7 +297,7 @@ class c_event(list):
       await self.send_emails()
 
   async def send_emails(self):
-    print('Sending Email:', self.to_email)
+    self.logger.info('Sending Email: ' + self.to_email)
     self.to_email = self.to_email.split()
     for receiver in self.to_email:
       mytoken = await maketoken_async('EVR', self.dbline.id, receiver)

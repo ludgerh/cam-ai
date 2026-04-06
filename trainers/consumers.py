@@ -697,10 +697,9 @@ class trainerutil(AsyncWebsocketConsumer):
           model_type_lines = model_type.objects.all()
           async for item in  model_type_lines:
             search_path = modeldir + 'model/' + item.name
-            logger.info('trainers/consumers.py:699: Checking file ' + search_path + '.keras')
             if os.path.exists(search_path + '.keras'):
               outlist['data'].append(item.name)
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
         
       elif params['command'] == 'get_count':

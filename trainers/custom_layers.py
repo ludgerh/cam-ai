@@ -1,5 +1,5 @@
 """
-Copyright (C) 2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@ class AdaptiveFocalLoss(Loss):
     Gamma can be changed dynamically during training.
     """
 
-    def __init__(self, gamma=2.0, name="adaptive_focal_loss"):
+    def __init__(self, gamma=2.0, from_logits=False, name="adaptive_focal_loss"):
         super().__init__(name=name)
         self.gamma = gamma
 

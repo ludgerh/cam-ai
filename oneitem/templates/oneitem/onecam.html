@@ -65,7 +65,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               views = <span id="vnrtag">?</span>
 					  {% endif %}
           </h5>
-          <img class="noselect img-rounded" id="imagespace" />
+          <img id="imagespace" class="img-rounded" draggable="false"/>
         </div>
 		  </div>
 	  </div>
@@ -193,21 +193,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <script>
 
-xscale = ($(window).width() - 60) / {{ dbline.cam_xres }};
-let displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
-let displayheight = Math.round({{ dbline.cam_yres }}* xscale);
-//yscale = ($(window).height() - 230) / {{ dbline.cam_yres }};
-//let displaywidth;
-//let displayheight;
-//if (xscale > yscale) {
-//  displaywidth = Math.round({{ dbline.cam_xres }} * yscale);
-//  displayheight = Math.round({{ dbline.cam_yres }} * yscale);
-//} else {
-//  displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
-//  displayheight = Math.round({{ dbline.cam_yres }}* xscale);
-//};
-let xinput;
-let yinput;
+let displaywidth = -1;
+let displayheight = -1;
+let onf_nr;
 let ptz_data;
 let ptz_active;
 let c_view_Socket;
@@ -216,64 +204,9 @@ let trigger_Socket;
 let oneitemSocket;
 {% endif %}
 let wait = 0;
-let imageElement = document.getElementById("imagespace");
-
-function jpegToRawData(jpegBlob) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    // Set up the image onload event to process the image data once it's loaded
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-
-      // Zeichne das Bild auf das Canvas
-      ctx.drawImage(img, 0, 0);
-
-      // Extrahiere die Pixel-Daten
-      const imageData = ctx.getImageData(0, 0, img.width, img.height);
-      resolve(imageData);
-    };
-
-    img.onerror = (err) => {
-      reject(new Error("Fehler beim Laden des JPEG-Bildes: " + err.message));
-    };
-
-    // Lade das Bild aus dem Blob
-    img.src = URL.createObjectURL(jpegBlob);
-  });
-}
-
-function rawDataToJpeg(rawData, width, height, quality = 0.8) {
-  return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-
-    const ctx = canvas.getContext('2d');
-
-    // ImageData aus den Rohdaten erstellen
-    const imageData = new ImageData(new Uint8ClampedArray(rawData), width, height);
-
-    // ImageData auf das Canvas zeichnen
-    ctx.putImageData(imageData, 0, 0);
-
-    // Canvas in JPEG exportieren
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error("Fehler bei der JPEG-Komprimierung."));
-      }
-    }, 'image/jpeg', quality);
-  });
-}
 
 $(document).ready(function() {
-  $('#imagespace').attr('width', displaywidth+'px');
-  $('#imagespace').attr('height', displayheight+'px');
+	$('#imagespace').attr('draggable', false);
 {% if may_write %}
 	$('#ch_show').change((evt) => {
 		oneitemSocket.sendandwait({
@@ -360,74 +293,59 @@ $(document).ready(function() {
     trigger_Socket = result;
     return(trigger_Socket.sendandwait({
 	    'command' : 'starttrigger',
-	    'mode' : 'C',
+	    'type' : 'C',
       'idx' : {{ dbline.id }},
-      'width' : displaywidth,
+      'x_screen' : $(window).width(),
+      'y_screen' : $(window).height(),
       'tokennr' : {{ tokennr }},
       'token' : '{{ token }}',
     }));
   })
   .then((result) => {
     show_cam = result.show_cam;
-    xinput = result.outx;
-    yinput = 
-      Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }});
     onf_nr = result.on_frame_nr; 
     if (show_cam) {
-      vnrcode = 'C' + String({{ dbline.id }}).padStart(6,'0') + String(onf_nr).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'C'.charCodeAt(0));
+      view.setUint32(1, {{ dbline.id }}, true);
+      view.setUint32(5, onf_nr, true);
+      trigger_Socket.socket.send(buf);
 		  trigger_Socket.socket.onclose = function(e) {
 			  console.log('Trigger-Socket closed');
 		  };
+		  trigger_Socket.socket.binaryType = 'arraybuffer';
 		  trigger_Socket.socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
-		      indicator = e.data.slice(0, 13);
-		      blob = e.data.slice(13, e.data.size, "image/jpeg")
-		      // New Output Start
-          /* jpegToRawData(blob).then((imageData) => {
-            // Hier ist imageData eine Instanz von ImageData, die die Roh-Pixeldaten enthält
-            console.log('Raw:', imageData.data); // Uint8ClampedArray mit den RGBA-Werten
-            console.log(imageData.width); // Bildbreite
-            console.log(imageData.height); // Bildhöhe
-            rawDataToJpeg(imageData.data, imageData.width, imageData.height, 0.8).then((jpegBlob) => {
-              // Hier ist jpegBlob das komprimierte JPEG-Bild als Blob
-              console.log('JPEG:', jpegBlob);
-
-              // Um das JPEG anzuzeigen oder zu speichern
-              //const jpegUrl = URL.createObjectURL(jpegBlob);
-              //console.log(jpegUrl);
-              // Du kannst das Bild jetzt in einem img-Tag verwenden oder herunterladen
-                let url = URL.createObjectURL(jpegBlob);
-                imageElement.src = url;
-                indicator.text()
-                .then((result) => {
-                  trigger_Socket.socket.send(result);
-                })
-            }).catch((error) => {
-                console.error("Fehler bei der JPEG-Komprimierung:", error);
-            });   
-          }).catch((error) => {
-              console.error("Fehler beim Dekomprimieren des JPEG:", error);
-          }); */
-		      // New Output End
-		      // Old Output Start
+          const view = new DataView(e.data);
+          const new_x = view.getInt32(9, true);
+          const new_y = view.getInt32(13, true);
+          if (displaywidth != new_x) {
+            $('#imagespace').attr('width', new_x + 'px');
+            displaywidth = new_x;
+          };
+          if (displayheight != new_y) {
+            $('#imagespace').attr('height', new_y + 'px');
+            displayheight = new_y;
+          };
+		      const indicator = e.data.slice(0, 9);
+          const imageBuffer = e.data.slice(17);
+          const blob = new Blob([imageBuffer], { type: "image/jpeg" });
 		      let url = URL.createObjectURL(blob);
-		      imageElement.src = url;
-		      indicator.text()
-          .then((result) => {
-            trigger_Socket.socket.send(result);
-          })
-		      // Old Output End
+		      $('#imagespace').prop('src', url);
+          trigger_Socket.socket.send(indicator);
         };
 		  };
     } else {
       $('#maskedit').addClass('d-none');
       $('#imagespace').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElement.src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespace').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElement.src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespace').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
     };  
 {% if may_write %}
@@ -441,8 +359,6 @@ $(document).ready(function() {
 	})
 	.then((result) => {
 		oneitemSocket = result;
-		
-		
     $('.delbutton').click(function() {
       $('#deleteModal').modal('hide');
       oneitemSocket.sendandwait({
@@ -455,9 +371,9 @@ $(document).ready(function() {
     });
 		return(oneitemSocket.sendandwait({
 			'command' : 'setmyitem',
-			'mode' : 'C',
+			'type' : 'C',
 			'itemid' : {{ dbline.id }},
-      'scaling' : displaywidth / {{ dbline.cam_xres }}
+			'onf_nr' : onf_nr,
 		}))
 	})
 	.then((result) => {
@@ -613,48 +529,52 @@ $(document).ready(function() {
 	})
 	.then(() => {
 {% if may_write %}
-		myimage = $('#imagespace');
-		myimage.attr('draggable', false);
+		$('#imagespace').attr('draggable', false);
 		let overimage = false;
-		myimage.mousedown((evt) => {
-			let x = evt.originalEvent.pageX - myimage.offset().left;
-			let y = evt.originalEvent.pageY - myimage.offset().top;
-			oneitemSocket.sendandwait({
-				'command' : 'mousedown',
-				'x' : x,
-				'y' : y,
-			})
+		$('#imagespace').mousedown((evt) => {
+		  evt.preventDefault(); 
+      const rect = $('#imagespace')[0].getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      oneitemSocket.sendandwait({
+        'command': 'mousedown',
+        'x': Math.floor(x),
+        'y': Math.floor(y),
+      });
 			overimage = true;
 		});
 		$(document).mouseup((evt) => {
-      let x = evt.originalEvent.pageX - myimage.offset().left;
-      let y = evt.originalEvent.pageY - myimage.offset().top;
+      const rect = $('#imagespace')[0].getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
       oneitemSocket.sendandwait({
 	      'command' : 'mouseup',
-	      'x' : x,
-	      'y' : y,
+        'x': Math.floor(x),
+        'y': Math.floor(y),
       })
 			overimage = false;
 		});
 		$(document).mousemove((evt) => {
       if($('#ch_edit').prop('checked')) {
-        let x = evt.originalEvent.pageX - myimage.offset().left;
-        let y = evt.originalEvent.pageY - myimage.offset().top;
+        const rect = $('#imagespace')[0].getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
         oneitemSocket.sendandwait({
           'command' : 'mousemove',
-          'x' : x,
-          'y' : y,
+          'x': Math.floor(x),
+          'y': Math.floor(y),
         })
       };  
 		});
-		myimage.dblclick((evt) => {
+		$('#imagespace').dblclick((evt) => {
 			if($('#ch_edit').prop('checked')) {
-			  let x = evt.originalEvent.pageX - myimage.offset().left;
-			  let y = evt.originalEvent.pageY - myimage.offset().top;
+        const rect = $('#imagespace')[0].getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
 			  oneitemSocket.sendandwait({
 				  'command' : 'dblclick',
-				  'x' : x,
-				  'y' : y,
+          'x': Math.floor(x),
+          'y': Math.floor(y),
 			  })
 			};
 		});
@@ -662,7 +582,7 @@ $(document).ready(function() {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     });
 		if (ptz_active) {
-      myimage.mousewheel(function(event) {
+      $('#imagespace').mousewheel(function(event) {
 			  if(!($('#ch_edit').prop('checked'))) {
 			    oneitemSocket.sendandwait({
 				    'command' : 'mousewheel',
@@ -683,7 +603,7 @@ $(document).ready(function() {
     setInterval(() => {
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
-        'mode' : 'C',
+        'type' : 'C',
         'idx' : {{ dbline.id }},
         'tokennr' : {{ tokennr }},
         'token' : '{{ token }}',

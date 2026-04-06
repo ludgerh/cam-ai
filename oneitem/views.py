@@ -107,7 +107,7 @@ class OneCamView(View):
         'name', 'cam_pause', 'cam_fpslimit', 'cam_ffmpeg_fps',
         'cam_url', 'cam_checkdoubles',
     ])
-    await asyncio.to_thread(mycam.inqueue.put, (('reset_cam',)), )
+    await asyncio.to_thread(mycam.cam_worker.inqueue.put, (('reset_cam',)), )
     return HttpResponseRedirect(f'{myurl}{camnr}/')
 
   async def check_access(self, request, camnr, tokennr, token):
@@ -200,7 +200,6 @@ class OneDetView(View):
       'det_max_rect',
       'det_scaledown',
     ])
-    await asyncio.to_thread(mycam.inqueue.put, (('reset_cam',)), )
     return HttpResponseRedirect(myurl+str(detnr)+'/')
 
   async def check_access(self, request, detnr, tokennr, token):
@@ -297,7 +296,6 @@ class OneEveView(View):
       'eve_alarm_email',
       'eve_one_frame_per_event',
     ])
-    await asyncio.to_thread(mycam.inqueue.put, (('reset_cam',)), )
     return HttpResponseRedirect(myurl+str(evenr)+'/')
 
   async def check_access(self, request, evenr, tokennr, token):

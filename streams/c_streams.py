@@ -14,7 +14,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
  
-import asyncio                
+import asyncio     
+from asgiref.sync import sync_to_async          
 from logging import getLogger
 from traceback import format_exc
 from logging import getLogger
@@ -47,37 +48,32 @@ class c_stream():
         my_worker = tf_workers[tf_worker_db.id] 
         self.myeventer = c_eventer(
           self.dbline, 
-          my_worker.inqueue,
-          my_worker.registerqueue,
-          my_worker.id,
+          my_worker,
           self.logger,
         )
         add_viewable(self.myeventer)
       if self.dbline.det_mode_flag:
-        self.mydetector = c_detector(
+        self.mydetector = await sync_to_async(c_detector)(
           self.dbline, 
-          self.myeventer.detectorqueue,
+          self.myeventer,
           my_worker.id,
           self.logger,
         )
         add_viewable(self.mydetector)
-      self.mycam = c_cam(
-        self.dbline, 
-        self.mydetector.dataqueue,
-        self.myeventer.dataqueue,
-        self.myeventer.inqueue,
-        self.logger,
-      )
+      if self.dbline.cam_mode_flag:
+        self.mycam = await sync_to_async(c_cam)(
+          self.dbline, 
+          self.mydetector,
+          self.myeventer,
+          self.logger,
+        )
       add_viewable(self.mycam)
       if self.dbline.cam_mode_flag == 2:
         self.mycam.start() 
-        await self.mycam.run_here()
         if self.dbline.det_mode_flag == 2:
           self.mydetector.start()
-          await self.mydetector.run_here()
         if self.dbline.eve_mode_flag == 2:
           self.myeventer.start()
-          await self.myeventer.run_here()
     except:
       self.logger.error('Error in process: ' + self.logname)
       self.logger.error(format_exc()) 

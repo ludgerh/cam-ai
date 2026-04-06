@@ -1,5 +1,6 @@
 """
-Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 3
@@ -14,7 +15,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from django_tables2 import Table, Column, DateTimeColumn
-from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import archive
 
 class archivetable(Table):
@@ -42,16 +43,16 @@ class archivetable(Table):
     if record.typecode == 0:
       htmlline = '<a href="/schools/getbigbmp/2/' + str(record.id) + '/" target="_blank">'
       htmlline += ('<img style="width: 210px; height: 210px; object-fit: contain" src="'
-        + '/schools/getbmp/2/' + str(record.id) + '/3/1/210/210/">')
+        + '/schools/getbmp/2/0/' + str(record.id) + '/3/1/210/210/">')
     elif record.typecode == 1:  
       htmlline = '<a href="/schools/getbigmp4/' + str(record.id) + '/video.html" target="_blank">'
       htmlline += ('<img style="width: 210px; height: 210px; object-fit: contain" src="'
-        + '/schools/getbmp/3/' + str(record.id) + '/3/1/210/210/">')
+        + '/schools/getbmp/3/0/' + str(record.id) + '/3/1/210/210/">')
     htmlline +=  '</a><br>' 
-    return(format_html(htmlline))
+    return(mark_safe(htmlline))
 
   def render_name(self, value):
-    return format_html('<b>{}</b>', value)
+    return mark_safe('<b>' + value + '</b>')
 
   def render_action(self, value, record):
     htmlline = '<div>'
@@ -60,4 +61,4 @@ class archivetable(Table):
     htmlline += '<div>'
     htmlline += '<button type="button" class="btn btn-primary m-2 dldbtn" idx="' + str(record.id) + '" style="width: 120px;">Download</button>'
     htmlline += '</div>'
-    return format_html(htmlline)
+    return mark_safe(htmlline)

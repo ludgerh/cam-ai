@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -16,6 +16,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import json
 import asyncio
+import struct
 from logging import getLogger
 from traceback import format_exc
 from django.utils import timezone
@@ -66,25 +67,27 @@ class triggerConsumer(AsyncWebsocketConsumer):
       logger.error(format_exc())
             
   @staticmethod
-  def check_conditions(user, mystream):
+  def check_conditions(user, dbline):
     return not (
       user.is_superuser 
       and is_public_server
-      and mystream.dbline.encrypted
-      and mystream.dbline.creator.id != user.id
+      and dbline.encrypted
+      and dbline.creator.id != user.id
     )
 
-  async def receive(self, text_data):
+  async def receive(self, text_data=None, bytes_data=None):
     try:
-      #logger.info('<-- ' + str(text_data))
-      if text_data[0] in {'C', 'D', 'E'}:
-        mode = text_data[0]
-        idx = int(text_data[1:7])
-        self.viewer_dict[mode][idx]['viewer'].clear_busy(int(text_data[7:13]))
+      if bytes_data is not None:
+        #logger.info('<-- ' + str(bytes_data))
+        mode = chr(bytes_data[0])
+        idx, count = struct.unpack('<2I', bytes_data[1:9])
+        self.viewer_dict[mode][idx]['viewer'].clear_busy(count)
         return()
+        
       params = json.loads(text_data)['data']
       outlist = {'tracker' : json.loads(text_data)['tracker']}
-
+      #logger.info('<-- ' + str(text_data))
+      
       if params['command'] == 'starttrigger':
         if 'do_compress' in params:
           do_compress = params['do_compress']
@@ -93,53 +96,47 @@ class triggerConsumer(AsyncWebsocketConsumer):
         while not (params['idx'] in viewables and 'stream' in viewables[params['idx']]):
           await asyncio.sleep(longbreak)
         mystream = viewables[params['idx']]['stream']
-        mystream.dbline = await stream.objects.aget(id = params['idx'])
+        dbline = await stream.objects.aget(id = params['idx'])
         show_cam = await database_sync_to_async(self.check_conditions)(
           self.scope['user'], 
           mystream,
         )
-        if access.check(params['mode'], params['idx'], self.scope['user'], 'R'):
-          outx = params['width']
-          if params['mode'] == 'C':
-            if outx > mystream.dbline.cam_min_x_view:
-              outx *= mystream.dbline.cam_scale_x_view
-              outx = max(mystream.dbline.cam_min_x_view, outx)
-              if mystream.dbline.cam_max_x_view:
-                outx = min(mystream.dbline.cam_max_x_view, outx)
-            while not hasattr(mystream, 'mycam'):
-              await asyncio.sleep(longbreak)
-            myviewer = viewers[params['idx']][params['mode']]
-          elif params['mode'] == 'D':
-            mydetector = viewables[params['idx']]['D']
-            while mydetector.scaledown is None:
-              await asyncio.sleep(longbreak)
-            if outx > mystream.dbline.det_min_x_view:
-              outx *= mystream.dbline.det_scale_x_view
-              outx = max(mystream.dbline.det_min_x_view, outx)
-              if mystream.dbline.det_max_x_view:
-                outx = min(mystream.dbline.det_max_x_view, outx)
-              if mydetector.scaledown > 1:
-                outx = min(outx, mystream.dbline.cam_xres / mydetector.scaledown)
-            myviewer = viewers[params['idx']][params['mode']]
-          elif params['mode'] == 'E':
-            myeventer = viewables[params['idx']]['E']
-            myeventer.inqueue.put(('setdscrwidth', outx, ))
-            if outx > mystream.dbline.eve_min_x_view:
-              outx *= mystream.dbline.eve_scale_x_view
-              outx = max(mystream.dbline.eve_min_x_view, outx)
-              if mystream.dbline.eve_max_x_view:
-                outx = min(mystream.dbline.eve_max_x_view, outx)
-            myviewer = viewers[params['idx']][params['mode']]
+        if access.check(params['type'], params['idx'], self.scope['user'], 'R'):
+          if 'width' in params:
+            x_canvas = params['width']
+          else:  
+            x_canvas = params['x_screen'] - 60
+          if params['type'] == 'C':
+            y_canvas =  round(x_canvas * dbline.cam_yres / dbline.cam_xres)
+            outx = min(x_canvas, round(dbline.cam_xres / dbline.cam_scaledown))
+            outy = min(y_canvas, round(dbline.cam_yres / dbline.cam_scaledown))
+            x_scaling = dbline.cam_xres / x_canvas
+            y_scaling = dbline.cam_yres / y_canvas   
+          elif params['type'] in {'D', 'E'}:
+            y_canvas = -1
+            outx = -1
+            outy = -1
+            x_scaling = -1.0
+            y_scaling = -1.0
+          myviewer = viewers[params['idx']][params['type']]
           myviewer.websocket = self
           myviewer.event_loop = asyncio.get_event_loop()
-          outx = round(min(mystream.dbline.cam_xres, outx))
           if show_cam:
-            onf_index = myviewer.push_to_onf(outx, do_compress, self)
+            onf_index = myviewer.push_to_onf(
+              outx = outx, 
+              outy = outy, 
+              x_canvas = x_canvas,
+              y_canvas = y_canvas,
+              x_scaling = x_scaling,
+              y_scaling = y_scaling,
+              do_compress = do_compress, 
+              websocket = self, 
+            )
           else:
             onf_index = None  
-          if params['mode'] not in self.viewer_dict:
-            self.viewer_dict[params['mode']] = {}
-          self.viewer_dict[params['mode']][params['idx']] = {
+          if params['type'] not in self.viewer_dict:
+            self.viewer_dict[params['type']] = {}
+          self.viewer_dict[params['type']][params['idx']] = {
             'onf' : onf_index,
             'viewer' : myviewer,
             'show_cam' : show_cam,
@@ -149,11 +146,10 @@ class triggerConsumer(AsyncWebsocketConsumer):
           else:
             myuser = -1
           outlist['data'] = {
-            'outx' : outx, 
             'show_cam' : show_cam,
             'on_frame_nr' : onf_index,
           }
-          logger.debug('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))
         else:
           await self.close()
@@ -182,12 +178,30 @@ class c_viewConsumer(AsyncWebsocketConsumer):
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'getcaminfo':
-        go_on = await access.check_async(params['mode'], params['idx'], self.scope['user'], 'R')
+        go_on = await access.check_async(
+          params['type'], 
+          params['idx'], 
+          self.scope['user'], 
+          'R', 
+        )
         if go_on:
           outlist['data'] = {}
-          outlist['data']['fps'] = round(streams_redis.fps_from_dev(params['mode'], params['idx'], ), 2, )
-          outlist['data']['viewers'] = streams_redis.view_from_dev(params['mode'], params['idx'], )
-          logger.debug('--> ' + str(outlist))
+          outlist['data']['fps'] = round(
+            streams_redis.fps_from_dev(params['type'], params['idx'], ), 
+            2, 
+          )
+          outlist['data']['viewers'] = streams_redis.view_from_dev(
+            params['type'], 
+            params['idx'], 
+          )
+          if params['type'] in {'D', 'E'}:
+            myitem = viewables[params['idx']][params['type']]
+            try:
+              outlist['data']['xdim'] = myitem.shared_mem.read_1_meta('aoi_xdim')
+              outlist['data']['ydim'] = myitem.shared_mem.read_1_meta('aoi_ydim')
+            except TypeError:
+              pass  
+          #logger.info('--> ' + str(outlist))
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:

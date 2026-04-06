@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -161,7 +161,7 @@ def getbmp(request, mode, consumer_id, framenr, outtype, xycontained, x, y,
     elif mode == 1:
       go_on = access.check(
         'S', 
-        getbmp_dict[1][consumer_id][framenr]['path'], 
+        getbmp_dict[1][consumer_id][framenr]['school'], 
         request.user, 
         'R', 
       )

@@ -107,15 +107,15 @@ async def db_ini():
   })
   await add_if_none(camurl, 'type', {
     'type' : 'Reolink E1 Zoom',
-    'url' : 'rtsp://{user}:{pass}@{address}:{port}/Preview_01_main', 
+    'url' : 'rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}', 
   })
   await add_if_none(camurl, 'type', {
     'type' : 'Reolink RLC-410W',
-    'url' : 'rtsp://{user}:{pass}@{address}:{port}/Preview_01_main', 
+    'url' : 'rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}', 
   })
   await add_if_none(camurl, 'type', {
     'type' : 'Reolink RLC-510WA',
-    'url' : 'rtsp://{user}:{pass}@{address}:{port}/Preview_01_main', 
+    'url' : 'rtmp://{address}:{port}/bcs/channel0_main.bcs?channel=0&stream=1&user={user}&password={pass}', 
   })
   await add_if_none(camurl, 'type', {
     'type' : 'TP-Link Tapo C200',

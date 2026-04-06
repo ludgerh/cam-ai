@@ -69,7 +69,7 @@ opencv-contrib-python==4.12.0.88
 opencv-python==4.12.0.88
 opt_einsum==3.4.0
 optree==0.18.0
-packaging==25.0
+packaging @ file:///home/task_176104874243446/conda-bld/packaging_1761049080023/work
 pillow==12.1.0
 platformdirs==4.5.1
 propcache==0.4.1

@@ -1,6 +1,6 @@
 {% extends 'main/gridbasis.html' %}
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -86,22 +86,17 @@ $(window).on('load', function() {
         $('#myModal').modal('show');
     });
 
-let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
 let c_view_Socket;
 let trigger_Socket;
 let divisor;
-let imageElements = [];
-
 var windowWidth = $(window).width();
 var windowHeight = $(window).height();
-
-
+const displaywidth = {};
+const displayheight = {};
 let cam_object = {};
 {% for item in camlist %}
     cam_object[{{ item.id }}] = {"name":"{{ item.name }}","width":{{ item.cam_xres }},"height":{{ item.cam_yres }}}
 {% endfor %}
-
-console.log(cam_object);
 camamount = Object.keys(cam_object).length;
 if (camamount == 1) {
     divisor = 1;
@@ -114,37 +109,13 @@ if (camamount == 1) {
 } else {
     divisor = 5;
 }
-
-let xspace = Math.floor(windowWidth / divisor);
-let yspace = Math.floor(windowHeight / divisor);
-
-console.log(xspace, yspace);
-
-{% for item in camlist %}
-  let displaywidth{{ item.id }}
-  let displayheight{{ item.id }}
-  if (({{ item.cam_xres }} / {{ item.cam_yres }}) >= ( xspace / yspace )) {
-    displaywidth{{ item.id }} = xspace;
-    displayheight{{ item.id }} = Math.round(displaywidth{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
-  } else {
-    displayheight{{ item.id }} = yspace;
-    displaywidth{{ item.id }} = Math.round(displayheight{{ item.id }} * {{ item.cam_xres }} / {{ item.cam_yres }})
-  }
-  console.log(displaywidth{{ item.id }},displayheight{{ item.id }})
-  let xinput{{ item.id }}
-  let yinput{{ item.id }}
-  let wait{{ item.id }} = 0;
-  imageElements[{{ item.id }}] = document.getElementById("imagespace{{ item.id }}");
-{% endfor %} 
+imagewidth = Math.floor(windowWidth / divisor);
+imageheight = Math.floor(windowHeight / divisor);
 
 $(document).ready(function() {
-$('.infobutton').click(function(evt) {
-      $('#myModal').modal('hide');
-});
-{% for item in camlist %} 
-    $('#imagespace{{ item.id }}').attr('width', displaywidth{{ item.id }}+'px');
-    $('#imagespace{{ item.id }}').attr('height', displayheight{{ item.id }}+'px');
-{% endfor %}
+  $('.infobutton').click(function(evt) {
+        $('#myModal').modal('hide');
+  });
 	document.addEventListener('keydown', function(event) {
       if (event.key === 'Escape') {
           window.location.href = window.location.protocol + '//' + window.location.host;
@@ -160,63 +131,61 @@ $('.infobutton').click(function(evt) {
 {% for item in camlist %} 
     return(trigger_Socket.sendandwait({
       'command' : 'starttrigger',
-      'mode' : '{{ mode }}',
+      'type' : '{{ mode }}',
       'idx' : {{ item.id }},
-      'width' : displaywidth{{ item.id }},
+      'width' : imagewidth,
     }));
   })
   .then((result) => {
     show_cam{{ item.id }} = result.show_cam;
-    xinput{{ item.id }} = result.outx;
-    yinput{{ item.id }} = 
-      Math.round(xinput{{ item.id }} * {{ item.cam_yres }} / {{ item.cam_xres }});
     onf_nr{{ item.id }} = result.on_frame_nr; 
-{% endfor %}
-{% for item in camlist %} 
+    displaywidth[{{ item.id }}] = -1; 
+    displayheight[{{ item.id }}] = -1;
     if (show_cam{{ item.id }}) {
-      vnrcode = '{{ mode }}' + String({{ item.id }}).padStart(6,'0') + String(onf_nr{{ item.id }}).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, '{{ mode }}'.charCodeAt(0));
+      view.setUint32(1, {{ item.id }}, true);
+      view.setUint32(5, onf_nr{{ item.id }}, true);
+      trigger_Socket.socket.send(buf); 
     } else {
       $('#imagespace{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElements[{{ item.id }}].src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespace{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElements[{{ item.id }}].src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespace{{ item.id }}').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
-    };
-{% endfor %}
+    }; 
+{% endfor %} 
     trigger_Socket.socket.onclose = function(e) {
       console.log('Trigger-Socket closed');
     };
+		trigger_Socket.socket.binaryType = 'arraybuffer';
     trigger_Socket.socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
-		    blob = e.data.slice(13, e.data.size, "image/jpeg");
-		    indicator = e.data.slice(0, 13);
-		    let url = URL.createObjectURL(blob);
-        indicator.text()
-        .then((result) => {
-          vnr = parseInt(result.slice(1,7));
-		      imageElements[vnr].src = url;
-          trigger_Socket.socket.send(result);
-        })
+        const view = new DataView(e.data);
+        const idx = view.getInt32(1, true);
+        const new_x = view.getInt32(9, true);
+        const new_y = view.getInt32(13, true);
+        if (displaywidth[idx] !== new_x) {
+          $('#imagespace' + idx).attr('width', new_x + 'px');
+          displaywidth[idx] = new_x;
+        };
+        if (displayheight[idx] !== new_y) {
+          $('#imagespace' + idx).attr('height', new_y + 'px');
+          displayheight[idx] = new_y;
+        };
+	      const indicator = e.data.slice(0, 9);
+        const imageBuffer = e.data.slice(17);
+        const blob = new Blob([imageBuffer], { type: "image/jpeg" });
+	      let url = URL.createObjectURL(blob);
+	      $('#imagespace' + idx).prop('src', url);
+        trigger_Socket.socket.send(indicator);
       };
-    };
-{% for item in camlist %} 
-    setInterval(() => {
-      c_view_Socket.sendandwait({
-        'command' : 'getcaminfo',
-        'mode' : '{{ mode }}',
-        'idx' : {{ item.id }},
-      })
-      .then((result) => {
-        $('#fpstag{{ item.id }}').text(result.fps);
-        {% if user.is_superuser %}
-          $('#vnrtag{{ item.id }}').text(result.viewers);
-        {% endif %}
-      })
-    }, 5000);
-{% endfor %}
+    }; 
 	})
 });
 	

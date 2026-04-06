@@ -31,13 +31,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 		  <div class="col-auto">
         <div>
           <h2>Detector: {{ dbline.name }}</h2>
-	        <h5>{{ dbline.cam_xres }}x{{ dbline.cam_yres }}, 
+          <h5>
+            <span id="xdimtag">{{ dbline.cam_xres }}</span>x<!--
+            --><span id="ydimtag">{{ dbline.cam_yres }}</span>,
             fps = <span id="fpstag">?</span>
             {% if user.is_superuser %}
               views = <span id="vnrtag">?</span>
 					  {% endif %}
           </h5>
-          <img id="imagespace" class="img-rounded" />
+          <img id="imagespace" class="img-rounded" draggable="false"/>
         </div>
 		  </div>
 	  </div>
@@ -47,13 +49,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <div class="accordion" id="accordionExample">
     <div class="accordion-item">
       <h2 class="accordion-header" id="headingOne">
-        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" 
+           data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
           General settings
         </button>
       </h2>
-      <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
+      <div id="collapseOne" class="accordion-collapse collapse" 
+          aria-labelledby="headingOne" data-bs-parent="#accordionExample">
         <div class="accordion-body">
-          <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" method="post" id="oneform">
+          <form action="{{ myurl }}{{ dbline.id }}/" autocomplete="off" method="post" 
+              id="oneform">
 	          <div class="container-fluid float-left">
 		          <div class="row my-2">
 			          {% csrf_token %}
@@ -114,31 +119,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <script>
 
-xscale = ($(window).width() - 60) / {{ dbline.cam_xres }};
-let displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
-let displayheight = Math.round({{ dbline.cam_yres }}* xscale);
-//yscale = ($(window).height() - 230) / {{ dbline.cam_yres }};
-//let displaywidth;
-//let displayheight;
-//if (xscale > yscale) {
-//  displaywidth = Math.round({{ dbline.cam_xres }} * yscale);
-//  displayheight = Math.round({{ dbline.cam_yres }} * yscale);
-//} else {
-//  displaywidth = Math.round({{ dbline.cam_xres }} * xscale);
-//  displayheight = Math.round({{ dbline.cam_yres }}* xscale);
-//};
-let r_array = {};
+let displaywidth = -1;
+let displayheight = -1;
+let onf_nr;
 let c_view_Socket;
 let trigger_Socket;
 {% if may_write %}
 let oneitemSocket;
 {% endif %}
 let wait = 0;
-let imageElement = document.getElementById("imagespace");
 
 $(document).ready(function() {
-  $('#imagespace').attr('width', displaywidth+'px');
-  $('#imagespace').attr('height', displayheight+'px');
+	$('#imagespace').attr('draggable', false);
 {% if may_write %}
 	$('#ch_show').change((evt) => {
 		oneitemSocket.sendandwait({
@@ -182,51 +174,54 @@ $(document).ready(function() {
 			'bt_new' : 'click',
 		})
 	});
-	myimage = $('#imagespace');
-	myimage.attr('draggable', false);
 	let overimage = false;
-	myimage.mousedown((evt) => {
-		let x = evt.originalEvent.pageX - myimage.offset().left;
-		let y = evt.originalEvent.pageY - myimage.offset().top;
-		oneitemSocket.sendandwait({
-			'command' : 'mousedown',
-			'x' : x,
-			'y' : y,
-		})
-		overimage = true;
-	});
-	$(document).mouseup((evt) => {
-    let x = evt.originalEvent.pageX - myimage.offset().left;
-    let y = evt.originalEvent.pageY - myimage.offset().top;
-    oneitemSocket.sendandwait({
-      'command' : 'mouseup',
-      'x' : x,
-      'y' : y,
-    })
-		overimage = false;
-	});
-	$(document).mousemove((evt) => {
-    if($('#ch_edit').prop('checked')) {
-      let x = evt.originalEvent.pageX - myimage.offset().left;
-      let y = evt.originalEvent.pageY - myimage.offset().top;
+		$('#imagespace').mousedown((evt) => {
+		  evt.preventDefault(); 
+      const rect = $('#imagespace')[0].getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
       oneitemSocket.sendandwait({
-        'command' : 'mousemove',
-        'x' : x,
-        'y' : y,
+        'command': 'mousedown',
+        'x': Math.floor(x),
+        'y': Math.floor(y),
+      });
+			overimage = true;
+		});
+		$(document).mouseup((evt) => {
+      const rect = $('#imagespace')[0].getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      oneitemSocket.sendandwait({
+	      'command' : 'mouseup',
+        'x': Math.floor(x),
+        'y': Math.floor(y),
       })
-    };  
-	});
-	myimage.dblclick((evt) => {
-		if($('#ch_edit').prop('checked')) {
-		  let x = evt.originalEvent.pageX - myimage.offset().left;
-		  let y = evt.originalEvent.pageY - myimage.offset().top;
-		  oneitemSocket.sendandwait({
-			  'command' : 'dblclick',
-			  'x' : x,
-			  'y' : y,
-		  })
-		};
-	});
+			overimage = false;
+		});
+		$(document).mousemove((evt) => {
+      if($('#ch_edit').prop('checked')) {
+        const rect = $('#imagespace')[0].getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
+        oneitemSocket.sendandwait({
+          'command' : 'mousemove',
+          'x': Math.floor(x),
+          'y': Math.floor(y),
+        })
+      };  
+		});
+		$('#imagespace').dblclick((evt) => {
+			if($('#ch_edit').prop('checked')) {
+        const rect = $('#imagespace')[0].getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
+			  oneitemSocket.sendandwait({
+				  'command' : 'dblclick',
+          'x': Math.floor(x),
+          'y': Math.floor(y),
+			  })
+			};
+		});
 	$('#collapseTwo').on('shown.bs.collapse', function () {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   });
@@ -266,45 +261,59 @@ $(document).ready(function() {
     trigger_Socket = result;
     return(trigger_Socket.sendandwait({
 	    'command' : 'starttrigger',
-	    'mode' : 'D',
+	    'type' : 'D',
       'idx' : {{ dbline.id }},
-      'width' : displaywidth,
+      'x_screen' : $(window).width(),
+      'y_screen' : $(window).height(),
       'tokennr' : {{ tokennr }},
       'token' : '{{ token }}',
     }));
   })
   .then((result) => {
     show_cam = result.show_cam;
-    xinput = result.outx;
-    yinput = 
-      Math.round(xinput * {{ dbline.cam_yres }} / {{ dbline.cam_xres }});
     onf_nr = result.on_frame_nr; 
     if (show_cam) {
-      vnrcode = 'D' + String({{ dbline.id }}).padStart(6,'0') + String(onf_nr).padStart(6,'0');
-      trigger_Socket.socket.send(vnrcode);
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'D'.charCodeAt(0));
+      view.setUint32(1, {{ dbline.id }}, true);
+      view.setUint32(5, onf_nr, true);
+      trigger_Socket.socket.send(buf);
 		  trigger_Socket.socket.onclose = function(e) {
 			  console.log('Trigger-Socket closed');
 		  };
+		  trigger_Socket.socket.binaryType = 'arraybuffer';
 		  trigger_Socket.socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
-		      indicator = e.data.slice(0, 13);
-		      blob = e.data.slice(13, e.data.size, "image/jpeg")
+          const view = new DataView(e.data);
+          const new_x = view.getInt32(9, true);
+          const new_y = view.getInt32(13, true);
+          if (displaywidth != new_x) {
+            $('#imagespace').attr('width', new_x + 'px');
+            displaywidth = new_x;
+          };
+          if (displayheight != new_y) {
+            $('#imagespace').attr('height', new_y + 'px');
+            displayheight = new_y;
+          };
+		      const indicator = e.data.slice(0, 9);
+          const imageBuffer = e.data.slice(17);
+          const blob = new Blob([imageBuffer], { type: "image/jpeg" });
 		      let url = URL.createObjectURL(blob);
-		      imageElement.src = url;
-		      indicator.text()
-          .then((result) => {
-            trigger_Socket.socket.send(result);
-          })
+		      $('#imagespace').prop('src', url);
+          trigger_Socket.socket.send(indicator);
         };
 		  };
     } else {
       $('#maskedit').addClass('d-none');
       $('#imagespace').css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  imageElement.src = "{% static 'camai/git/img/privacy.jpg' %}";
+		  $('#imagespace').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-      imageElement.src 
-        = "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg";
+		  $('#imagespace').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
 {% endif %}
     };  
 {% if may_write %}
@@ -320,9 +329,9 @@ $(document).ready(function() {
 		oneitemSocket = result;
 		oneitemSocket.sendandwait({
 			'command' : 'setmyitem',
-			'mode' : 'D',
+			'type' : 'D',
 			'itemid' : {{ dbline.id }},
-      'scaling' : displaywidth / {{ dbline.cam_xres }}
+			'onf_nr' : onf_nr,
 		})
 	})
 	.then(() => {
@@ -339,12 +348,14 @@ $(document).ready(function() {
     setInterval(() => {
       c_view_Socket.sendandwait({
         'command' : 'getcaminfo',
-        'mode' : 'D',
+        'type' : 'D',
         'idx' : {{ dbline.id }},
         'tokennr' : {{ tokennr }},
         'token' : '{{ token }}',
       })
       .then((result) => {
+        $('#xdimtag').text(result.xdim);
+        $('#ydimtag').text(result.ydim);
         $('#fpstag').text(result.fps);
         {% if user.is_superuser %}
           $('#vnrtag').text(result.viewers);
