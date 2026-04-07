@@ -91,15 +91,18 @@ function isInViewport(el) {
 };
 
 $(document).ready(function() {
-  WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
+  const viewer_id = crypto.randomUUID();
+  WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
   .then((result) => {
     c_view_Socket = result;
-    return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/trigger/'));
+    return(createWebSocket(
+      `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
+    ));
   })
   .then((result) => {
     trigger_Socket = result;
 {% for item in camlist %}
-    return(trigger_Socket.sendandwait({
+    return(c_view_Socket.sendandwait({
       'command' : 'starttrigger',
       'type' : 'C',
       'idx' : {{ item.id }},
@@ -110,7 +113,7 @@ $(document).ready(function() {
   .then((result) => {
     show_camC{{ item.id }} = result.show_cam;
     onf_nrC{{ item.id }} = result.on_frame_nr; 
-    return(trigger_Socket.sendandwait({
+    return(c_view_Socket.sendandwait({
       'command' : 'starttrigger',
       'type' : 'D',
       'idx' : {{ item.id }},
@@ -121,7 +124,7 @@ $(document).ready(function() {
   .then((result) => {
     show_camD{{ item.id }} = result.show_cam;
     onf_nrD{{ item.id }} = result.on_frame_nr; 
-    return(trigger_Socket.sendandwait({
+    return(c_view_Socket.sendandwait({
       'command' : 'starttrigger',
       'type' : 'E',
       'idx' : {{ item.id }},
@@ -146,7 +149,7 @@ $(document).ready(function() {
       view.setUint8(0, 'C'.charCodeAt(0));
       view.setUint32(1, {{ item.id }}, true);
       view.setUint32(5, onf_nrC{{ item.id }}, true);
-      trigger_Socket.socket.send(buf);
+      trigger_Socket.send(buf);
     } else {
       $('#imagespaceC{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
@@ -164,7 +167,7 @@ $(document).ready(function() {
       view.setUint8(0, 'D'.charCodeAt(0));
       view.setUint32(1, {{ item.id }}, true);
       view.setUint32(5, onf_nrD{{ item.id }}, true);
-      trigger_Socket.socket.send(buf);
+      trigger_Socket.send(buf);
     } else {
       $('#imagespaceD{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
@@ -182,7 +185,7 @@ $(document).ready(function() {
       view.setUint8(0, 'E'.charCodeAt(0));
       view.setUint32(1, {{ item.id }}, true);
       view.setUint32(5, onf_nrE{{ item.id }}, true);
-      trigger_Socket.socket.send(buf);
+      trigger_Socket.send(buf);
     } else {
       $('#imagespaceE{{ item.id }}').css({'object-fit':'cover'});
 {% if emulatestatic %}
@@ -195,11 +198,11 @@ $(document).ready(function() {
 {% endif %}
     };
 {% endfor %}
-    trigger_Socket.socket.onclose = function(e) {
+    trigger_Socket.onclose = function(e) {
       console.log('Trigger-Socket closed');
     };
-		trigger_Socket.socket.binaryType = 'arraybuffer';
-    trigger_Socket.socket.onmessage = function(e) {
+		trigger_Socket.binaryType = 'arraybuffer';
+    trigger_Socket.onmessage = function(e) {
       if (typeof(e.data) === 'object') {
         const view = new DataView(e.data);
         const type = String.fromCharCode(view.getUint8(0));
@@ -219,7 +222,7 @@ $(document).ready(function() {
         const blob = new Blob([imageBuffer], { type: "image/jpeg" });
 	      let url = URL.createObjectURL(blob);
 	      $('#imagespace' + type + idx).prop('src', url);
-        trigger_Socket.socket.send(indicator);
+        trigger_Socket.send(indicator);
       };
     };
 {% for item in camlist %} 

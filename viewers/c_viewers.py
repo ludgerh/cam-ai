@@ -137,9 +137,6 @@ class c_viewer():
           self.client_dict[client_nr]['y_canvas'], 
         )
         try: 
-          #await self.client_dict[client_nr]['socket'].send(bytes_data = (
-          #  self.client_dict[client_nr]['index'].encode()+frame
-          #+))
           await self.client_dict[client_nr]['socket'].send(bytes_data = (
             self.client_dict[client_nr]['type']
               + indicator

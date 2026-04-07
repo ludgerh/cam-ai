@@ -424,6 +424,7 @@ function reset_triggers(first = false) {
 
 $(document).ready(function() {
 	$('#imagespace').attr('draggable', false);
+  const viewer_id = crypto.randomUUID();
 {% if may_write %}
 	$('#oneform').children(':first').children(':first').children('.col-auto')
 			.children(
@@ -489,18 +490,20 @@ $(document).ready(function() {
   })
 	.then((result) => {
 		taglines = result;
-	  return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/'));
+	  return(WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`));
 	})
 {% else %}
-	WSAsync(ws_scheme+'//'+window.location.host+'/ws/c_view/')
+	WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
 {% endif %}
 	.then((result) => {
 		c_view_Socket = result;
-    return(WSAsync(ws_scheme+'//'+window.location.host+'/ws/trigger/'));
+    return(createWebSocket(
+      `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
+    ));
   })
 	.then((result) => {
     trigger_Socket = result;
-    return(trigger_Socket.sendandwait({
+    return(c_view_Socket.sendandwait({
 	    'command' : 'starttrigger',
 	    'type' : 'E',
       'idx' : {{ dbline.id }},
@@ -519,12 +522,12 @@ $(document).ready(function() {
       view.setUint8(0, 'E'.charCodeAt(0));
       view.setUint32(1, {{ dbline.id }}, true);
       view.setUint32(5, onf_nr, true);
-      trigger_Socket.socket.send(buf);
-		  trigger_Socket.socket.onclose = function(e) {
+      trigger_Socket.send(buf);
+		  trigger_Socket.onclose = function(e) {
 			  console.log('Trigger-Socket closed');
 		  };
-		  trigger_Socket.socket.binaryType = 'arraybuffer';
-		  trigger_Socket.socket.onmessage = function(e) {
+		  trigger_Socket.binaryType = 'arraybuffer';
+		  trigger_Socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
           const view = new DataView(e.data);
           const new_x = view.getInt32(9, true);
@@ -542,7 +545,7 @@ $(document).ready(function() {
           const blob = new Blob([imageBuffer], { type: "image/jpeg" });
 		      let url = URL.createObjectURL(blob);
 		      $('#imagespace').prop('src', url);
-          trigger_Socket.socket.send(indicator);
+          trigger_Socket.send(indicator);
         };
 		  };
     } else {

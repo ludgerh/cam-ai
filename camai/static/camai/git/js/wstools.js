@@ -26,6 +26,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *  - Optional callback mode for streaming responses
  */
 
+function createWebSocket(url) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url);
+
+    ws.onopen = () => resolve(ws);
+    ws.onerror = (err) => reject(err);
+  });
+}
 
 function WSAsync(url) {
   return new Promise((resolve, reject) => {
@@ -53,11 +61,6 @@ function WSAsync(url) {
       };
       // Handle incoming messages
       result.socket.onmessage = function(e) {
-        //console.log('e.data:',e.data)
-        if (e.data instanceof Blob) {
-          result.socket.send(e.data);
-          return;
-        }
         // NOTE: expects JSON messages here
         let received = JSON.parse(e.data);
         // Callback mode (streaming / partial responses)
