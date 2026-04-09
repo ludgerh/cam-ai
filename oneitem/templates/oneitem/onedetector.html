@@ -155,12 +155,6 @@ $(document).ready(function() {
     show_cam = result.show_cam;
     onf_nr = result.on_frame_nr; 
     if (show_cam) {
-      const buf = new ArrayBuffer(9);
-      const view = new DataView(buf);
-      view.setUint8(0, 'D'.charCodeAt(0));
-      view.setUint32(1, {{ dbline.id }}, true);
-      view.setUint32(5, onf_nr, true);
-      trigger_Socket.send(buf);
 		  trigger_Socket.onclose = function(e) {
 			  console.log('Trigger-Socket closed');
 		  };
@@ -191,6 +185,12 @@ $(document).ready(function() {
           trigger_Socket.send(indicator);
         };
 		  };
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'D'.charCodeAt(0));
+      view.setUint32(1, {{ dbline.id }}, true);
+      view.setUint32(5, onf_nr, true);
+      trigger_Socket.send(buf);
     } else {
       $('#maskedit').addClass('d-none');
       $('#imagespace').css({'object-fit':'cover'});

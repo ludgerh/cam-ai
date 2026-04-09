@@ -150,37 +150,6 @@ $(document).ready(async function() {
   trigger_Socket = await createWebSocket(
     `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
   );
-  for (const cam of cams) {
-    let result = await c_view_Socket.sendandwait({
-      'command' : 'starttrigger',
-      'type' : '{{ mode }}',
-      'idx' : cam.id,
-      'width' : imagewidth,
-      'do_compress' : false,
-    });
-    cam.show_cam = result.show_cam;
-    cam.onf_nr = result.on_frame_nr; 
-    displaywidth[cam.id] = -1;
-    displayheight[cam.id] = -1;
-    if (cam.show_cam) {
-      const buf = new ArrayBuffer(9);
-      const view = new DataView(buf);
-      view.setUint8(0, '{{ mode }}'.charCodeAt(0));
-      view.setUint32(1, cam.id, true);
-      view.setUint32(5, cam.onf_nrE, true);
-      trigger_Socket.send(buf); 
-    } else {
-      $('#imagespace' + cam.id).css({'object-fit':'cover'});
-{% if emulatestatic %}
-		  $('#imagespace' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-{% else %}
-		  $('#imagespace' + cam.id).prop(
-		    'src', 
-		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-		  );
-{% endif %}
-    }; 
-  };  
   trigger_Socket.onclose = function(e) {
     console.log('Trigger-Socket closed');
   };
@@ -216,6 +185,37 @@ $(document).ready(async function() {
       trigger_Socket.send(indicator);
     };
   };
+  for (const cam of cams) {
+    let result = await c_view_Socket.sendandwait({
+      'command' : 'starttrigger',
+      'type' : '{{ mode }}',
+      'idx' : cam.id,
+      'width' : imagewidth,
+      'do_compress' : false,
+    });
+    cam.show_cam = result.show_cam;
+    cam.onf_nr = result.on_frame_nr; 
+    displaywidth[cam.id] = -1;
+    displayheight[cam.id] = -1;
+    if (cam.show_cam) {
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, '{{ mode }}'.charCodeAt(0));
+      view.setUint32(1, cam.id, true);
+      view.setUint32(5, cam.onf_nrE, true);
+      trigger_Socket.send(buf); 
+    } else {
+      $('#imagespace' + cam.id).css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  $('#imagespace' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
+{% else %}
+		  $('#imagespace' + cam.id).prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
+{% endif %}
+    }; 
+  };  
 });
 	
 </script>

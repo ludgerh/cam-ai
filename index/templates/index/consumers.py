@@ -168,9 +168,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           do_compress = params['do_compress']
         else:
           do_compress = True 
-        while not (params['idx'] in viewables 
-            and 'stream' in viewables[params['idx']]
-            and params['type'] in viewables[params['idx']]):
+        while not (params['idx'] in viewables and 'stream' in viewables[params['idx']]):
           await asyncio.sleep(longbreak)
         mystream = viewables[params['idx']]['stream']
         myitem = viewables[params['idx']][params['type']]

@@ -68,8 +68,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     try:
       params = json.loads(text_data)['data']
-      if params['command'] != 'mousemove':
-        logger.info('<-- ' + str(text_data))
+      #if params['command'] != 'mousemove':
+      #  logger.info('<-- ' + str(text_data))
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'setmyitem':
