@@ -147,8 +147,11 @@ class c_eventer():
         await asyncio.to_thread(self.eve_worker.join, 5.0)
       except RuntimeError:
         pass  # executor already shutting down
-    self.shared_mem.shm.close() 
-    self.shared_mem.shm.unlink()
+      self.shared_mem.shm.close() 
+      try:
+        self.shared_mem.shm.unlink()
+      except FileNotFoundError:
+        pass
     
 class eve_worker(mp_process):
   def __init__(self, 

@@ -105,10 +105,13 @@ class c_cam():
       await asyncio.to_thread(self.cam_worker.inqueue.put, ('stop',))
       try:
         await asyncio.to_thread(self.cam_worker.join, 5.0)
-        self.shared_mem.shm.close() 
-        self.shared_mem.shm.unlink()
       except RuntimeError:
         pass  # executor already shutting down
+      self.shared_mem.shm.close() 
+      try:
+        self.shared_mem.shm.unlink()
+      except FileNotFoundError:
+        pass
 
 class cam_worker(mp_process):
   def __init__(self, 

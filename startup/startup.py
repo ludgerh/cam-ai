@@ -178,7 +178,10 @@ async def newexit():
   my_health_runner.stop()
   glob_startup.cleanup.stop()
   for i in viewables:
-    await viewables[i]['stream'].stop()
+    try:
+      await viewables[i]['stream'].stop()
+    except FileNotFoundError:
+      pass
   for i in tf_workers:
     await tf_workers[i].stop()
   for i in trainers:
