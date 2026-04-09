@@ -78,14 +78,6 @@ class c_viewer():
               * self.my_item.shared_mem.read_1_meta('aoi_ydim') 
               / self.my_item.shared_mem.read_1_meta('aoi_xdim')
             )
-            self.client_dict[client_nr]['outx'] = min(
-              self.client_dict[client_nr]['x_canvas'], 
-              self.my_item.shared_mem.read_1_meta('aoi_xdim') // scaledown, 
-            )
-            self.client_dict[client_nr]['outy'] = min(
-              self.client_dict[client_nr]['y_canvas'], 
-              self.my_item.shared_mem.read_1_meta('aoi_ydim') // scaledown, 
-            )
             self.client_dict[client_nr]['x_scaling'] = (
               self.my_item.shared_mem.read_1_meta('aoi_xdim') 
               / self.client_dict[client_nr]['x_canvas']
@@ -94,10 +86,18 @@ class c_viewer():
               self.my_item.shared_mem.read_1_meta('aoi_ydim') 
               / self.client_dict[client_nr]['y_canvas']
             ) / scaledown 
+            self.client_dict[client_nr]['outx'] = min(
+              self.client_dict[client_nr]['x_canvas'], 
+              self.my_item.shared_mem.read_1_meta('aoi_xdim') // scaledown, 
+            )
+            self.client_dict[client_nr]['outy'] = min(
+              self.client_dict[client_nr]['y_canvas'], 
+              self.my_item.shared_mem.read_1_meta('aoi_ydim') // scaledown, 
+            )
             if self.type == 'D':  
               self.my_item.viewer.drawpad.set_xy((
-                self.client_dict[client_nr]['outx'], 
-                self.client_dict[client_nr]['outy'], 
+                self.my_item.shared_mem.read_1_meta('aoi_xdim') // scaledown, 
+                self.my_item.shared_mem.read_1_meta('aoi_ydim') // scaledown, 
               )) 
               await self.my_item.viewer.drawpad.aload_ringlist()
               self.my_item.viewer.drawpad.make_screen()
@@ -133,7 +133,7 @@ class c_viewer():
         if self.client_dict[client_nr]['do_compress']:
           to = 3 #jpg
         else:
-          to = 2 #bmp    
+          to = 2 #bmp  
         frame = c_convert(
           frame, 
           typein=1, 
