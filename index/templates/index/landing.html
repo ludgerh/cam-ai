@@ -79,9 +79,17 @@ let trigger_Socket;
 let imagewidth = 375 // Screen width IPhone 7
 const displaywidth = {};
 const displayheight = {};
+const cams = [
+{% for item in camlist %}
+{% if not item.cam_pause %}
+  { id: {{ item.id }} },
+{% endif %}
+{% endfor %}
+];
 
 function isInViewport(el) {
-  let rect = el.getBoundingClientRect();
+  if (!el.length) return false;
+  const rect = el[0].getBoundingClientRect();
   return (
     rect.top >= 0 &&
     rect.left >= 0 &&
@@ -90,183 +98,187 @@ function isInViewport(el) {
   );
 };
 
-$(document).ready(function() {
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+$(document).ready(async function() {
   const viewer_id = crypto.randomUUID();
-  WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
-  .then((result) => {
-    c_view_Socket = result;
-    return(createWebSocket(
-      `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
-    ));
-  })
-  .then((result) => {
-    trigger_Socket = result;
-{% for item in camlist %}
-    return(c_view_Socket.sendandwait({
+  c_view_Socket = await WSAsync(
+    `${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`
+  );
+  trigger_Socket = await createWebSocket(
+    `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
+  );
+  for (const cam of cams) {
+    let result = await c_view_Socket.sendandwait({
       'command' : 'starttrigger',
       'type' : 'C',
-      'idx' : {{ item.id }},
+      'idx' : cam.id,
       'width' : imagewidth,
       'do_compress' : false,
-    }));
-  })
-  .then((result) => {
-    show_camC{{ item.id }} = result.show_cam;
-    onf_nrC{{ item.id }} = result.on_frame_nr; 
-    return(c_view_Socket.sendandwait({
+    });
+    cam.show_camC = result.show_cam;
+    cam.onf_nrC = result.on_frame_nr; 
+    result = await c_view_Socket.sendandwait({
       'command' : 'starttrigger',
       'type' : 'D',
-      'idx' : {{ item.id }},
+      'idx' : cam.id,
       'width' : imagewidth,
       'do_compress' : false,
-    }));
-  })
-  .then((result) => {
-    show_camD{{ item.id }} = result.show_cam;
-    onf_nrD{{ item.id }} = result.on_frame_nr; 
-    return(c_view_Socket.sendandwait({
+    });
+    cam.show_camD = result.show_cam;
+    cam.onf_nrD = result.on_frame_nr; 
+    result = await c_view_Socket.sendandwait({
       'command' : 'starttrigger',
       'type' : 'E',
-      'idx' : {{ item.id }},
+      'idx' : cam.id,
       'width' : imagewidth,
       'do_compress' : false,
-    }));
-  })
-  .then((result) => {
-    show_camE{{ item.id }} = result.show_cam;
-    onf_nrE{{ item.id }} = result.on_frame_nr; 
-    displaywidth[{{ item.id }}] = {};
-    displaywidth[{{ item.id }}].C = -1;
-    displaywidth[{{ item.id }}].D = -1;
-    displaywidth[{{ item.id }}].E  = -1; 
-    displayheight[{{ item.id }}] = {};
-    displayheight[{{ item.id }}].C = -1;
-    displayheight[{{ item.id }}].D = -1;
-    displayheight[{{ item.id }}].E  = -1;
-    if (show_camC{{ item.id }}) {
+    });
+    cam.show_camE = result.show_cam;
+    cam.onf_nrE = result.on_frame_nr;
+    displaywidth[cam.id] = { C: -1, D: -1, E: -1 };
+    displayheight[cam.id] = { C: -1, D: -1, E: -1 };
+    if (cam.show_camC) {
       const buf = new ArrayBuffer(9);
       const view = new DataView(buf);
       view.setUint8(0, 'C'.charCodeAt(0));
-      view.setUint32(1, {{ item.id }}, true);
-      view.setUint32(5, onf_nrC{{ item.id }}, true);
+      view.setUint32(1, cam.id, true);
+      view.setUint32(5, cam.onf_nrC, true);
       trigger_Socket.send(buf);
     } else {
-      $('#imagespaceC{{ item.id }}').css({'object-fit':'cover'});
-{% if emulatestatic %}
-		  $('#imagespaceC{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-{% else %}
-		  $('#imagespaceC{{ item.id }}').prop(
-		    'src', 
-		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-		  );
-{% endif %}
+      $('#imagespaceC' + cam.id).css({'object-fit':'cover'});
+  {% if emulatestatic %}
+	    $('#imagespaceC' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
+  {% else %}
+	    $('#imagespaceC' + cam.id).prop(
+	      'src', 
+	      "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+	    );
+  {% endif %}
     };
-    if (show_camD{{ item.id }}) {
+    if (cam.show_camD) {
       const buf = new ArrayBuffer(9);
       const view = new DataView(buf);
       view.setUint8(0, 'D'.charCodeAt(0));
-      view.setUint32(1, {{ item.id }}, true);
-      view.setUint32(5, onf_nrD{{ item.id }}, true);
+      view.setUint32(1, cam.id, true);
+      view.setUint32(5, cam.onf_nrD, true);
       trigger_Socket.send(buf);
     } else {
-      $('#imagespaceD{{ item.id }}').css({'object-fit':'cover'});
-{% if emulatestatic %}
-		  $('#imagespaceD{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-{% else %}
-		  $('#imagespaceD{{ item.id }}').prop(
-		    'src', 
-		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-		  );
-{% endif %}
+      $('#imagespaceD' + cam.id).css({'object-fit':'cover'});
+  {% if emulatestatic %}
+	    $('#imagespaceD' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
+  {% else %}
+	    $('#imagespaceD' + cam.id).prop(
+	      'src', 
+	      "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+	    );
+  {% endif %}
     };
-    if (show_camE{{ item.id }}) {
+    if (cam.show_camE) {
       const buf = new ArrayBuffer(9);
       const view = new DataView(buf);
       view.setUint8(0, 'E'.charCodeAt(0));
-      view.setUint32(1, {{ item.id }}, true);
-      view.setUint32(5, onf_nrE{{ item.id }}, true);
+      view.setUint32(1, cam.id, true);
+      view.setUint32(5, cam.onf_nrE, true);
       trigger_Socket.send(buf);
     } else {
-      $('#imagespaceE{{ item.id }}').css({'object-fit':'cover'});
-{% if emulatestatic %}
-		  $('#imagespaceE{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-{% else %}
-		  $('#imagespaceE{{ item.id }}').prop(
-		    'src', 
-		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-		  );
-{% endif %}
-    };
-{% endfor %}
-    trigger_Socket.onclose = function(e) {
-      console.log('Trigger-Socket closed');
-    };
-		trigger_Socket.binaryType = 'arraybuffer';
-    trigger_Socket.onmessage = function(e) {
-      if (typeof(e.data) === 'object') {
-        const view = new DataView(e.data);
-        const type = String.fromCharCode(view.getUint8(0));
-        const idx = view.getInt32(1, true);
-        const new_x = view.getInt32(9, true);
-        const new_y = view.getInt32(13, true);
-        if (displaywidth[idx][type] !== new_x) {
-          $('#imagespace' + type + idx).attr('width', new_x + 'px');
-          displaywidth[idx][type] = new_x;
-        };
-        if (displayheight[idx][type] !== new_y) {
-          $('#imagespace' + type + idx).attr('height', new_y + 'px');
-          displayheight[idx][type] = new_y;
-        };
-	      const indicator = e.data.slice(0, 9);
+      $('#imagespaceE' + cam.id).css({'object-fit':'cover'});
+  {% if emulatestatic %}
+	    $('#imagespaceE' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
+  {% else %}
+	    $('#imagespaceE' + cam.id).prop(
+	      'src', 
+	      "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+	    );
+  {% endif %}
+    }; 
+  };
+  trigger_Socket.onclose = function(e) {
+    console.log('Trigger-Socket closed');
+  };
+	trigger_Socket.binaryType = 'arraybuffer';
+  trigger_Socket.onmessage = async function(e) {
+    if (typeof(e.data) === 'object') {
+      const view = new DataView(e.data);
+      const type = String.fromCharCode(view.getUint8(0));
+      const idx = view.getInt32(1, true);
+      const new_x = view.getInt32(9, true);
+      const new_y = view.getInt32(13, true);
+      if (displaywidth[idx][type] !== new_x) {
+        $('#imagespace' + type + idx).attr('width', new_x + 'px');
+        displaywidth[idx][type] = new_x;
+      };
+      if (displayheight[idx][type] !== new_y) {
+        $('#imagespace' + type + idx).attr('height', new_y + 'px');
+        displayheight[idx][type] = new_y;
+      };
+      const indicator = e.data.slice(0, 9);
+      if (isInViewport($('#imagespace' + type + idx))) {
         const imageBuffer = e.data.slice(17);
         const blob = new Blob([imageBuffer], { type: "image/jpeg" });
-	      let url = URL.createObjectURL(blob);
-	      $('#imagespace' + type + idx).prop('src', url);
-        trigger_Socket.send(indicator);
+        const img = $('#imagespace' + type + idx);
+        if (img.data('url')) {
+          URL.revokeObjectURL(img.data('url'));
+        }
+        let url = URL.createObjectURL(blob);
+        img.prop('src', url);
+        img.data('url', url);
+      } else {
+        await delay(1000);
       };
-    };
-{% for item in camlist %} 
-    setInterval(() => {
-      c_view_Socket.sendandwait({
-        'command' : 'getcaminfo',
-        'type' : 'C',
-        'idx' : {{ item.id }},
-      })
-      .then((result) => {
-        $('#fpstagC{{ item.id }}').text(result.fps);
-        {% if user.is_superuser %}
-          $('#vnrtagC{{ item.id }}').text(result.viewers);
-        {% endif %}
-      })
-      c_view_Socket.sendandwait({
-        'command' : 'getcaminfo',
-        'type' : 'D',
-        'idx' : {{ item.id }},
-      })
-      .then((result) => {
-        $('#xdimtagD{{ item.id }}').text(result.xdim);
-        $('#ydimtagD{{ item.id }}').text(result.ydim);
-        $('#fpstagD{{ item.id }}').text(result.fps);
-        {% if user.is_superuser %}
-          $('#vnrtagD{{ item.id }}').text(result.viewers);
-        {% endif %}
-      })
-      c_view_Socket.sendandwait({
-        'command' : 'getcaminfo',
-        'type' : 'E',
-        'idx' : {{ item.id }},
-      })
-      .then((result) => {
-        $('#xdimtagE{{ item.id }}').text(result.xdim);
-        $('#ydimtagE{{ item.id }}').text(result.ydim);
-        $('#fpstagE{{ item.id }}').text(result.fps);
-        {% if user.is_superuser %}
-          $('#vnrtagE{{ item.id }}').text(result.viewers);
-        {% endif %}
-      })
-    }, 5000);
-{% endfor %}
-	})
+      trigger_Socket.send(indicator);
+    }
+  };
+
+  async function updateCams() {
+    for (const cam of cams) {
+      if (!isInViewport($('#imagespaceC' + cam.id))) continue;
+      let result = await c_view_Socket.sendandwait({
+        command: 'getcaminfo',
+        type: 'C',
+        idx: cam.id,
+      });
+      $('#fpstagC' + cam.id).text(result.fps);
+      {% if user.is_superuser %}
+        $('#vnrtagC' + cam.id).text(result.viewers);
+      {% endif %}
+      if (!isInViewport($('#imagespaceD' + cam.id))) continue;
+      result = await c_view_Socket.sendandwait({
+        command: 'getcaminfo',
+        type: 'D',
+        idx: cam.id,
+      });
+      $('#xdimtagD' + cam.id).text(result.xdim);
+      $('#ydimtagD' + cam.id).text(result.ydim);
+      $('#fpstagD' + cam.id).text(result.fps);
+      {% if user.is_superuser %}
+        $('#vnrtagD' + cam.id).text(result.viewers);
+      {% endif %}
+      if (!isInViewport($('#imagespaceE' + cam.id))) continue;
+      result = await c_view_Socket.sendandwait({
+        command: 'getcaminfo',
+        type: 'E',
+        idx: cam.id,
+      });
+      $('#xdimtagE' + cam.id).text(result.xdim);
+      $('#ydimtagE' + cam.id).text(result.ydim);
+      $('#fpstagE' + cam.id).text(result.fps);
+      {% if user.is_superuser %}
+        $('#vnrtagE' + cam.id).text(result.viewers);
+      {% endif %}
+    }
+  }
+  
+  async function loop() {
+    while (true) {
+      await updateCams();
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+
+  loop();
 });
 	
 </script>

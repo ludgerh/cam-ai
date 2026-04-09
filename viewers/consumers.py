@@ -171,6 +171,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
         while not (params['idx'] in viewables and 'stream' in viewables[params['idx']]):
           await asyncio.sleep(longbreak)
         mystream = viewables[params['idx']]['stream']
+        myitem = viewables[params['idx']][params['type']]
         dbline = await stream.objects.aget(id = params['idx'])
         show_cam = await database_sync_to_async(self.check_conditions)(
           self.scope['user'], 
@@ -181,6 +182,9 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             x_canvas = params['width']
           else:  
             x_canvas = params['x_screen'] - 60
+          myviewer = viewers[params['idx']][params['type']]
+          myviewer.websocket = self
+          myviewer.event_loop = asyncio.get_event_loop()
           if params['type'] == 'C':
             y_canvas =  round(x_canvas * dbline.cam_yres / dbline.cam_xres)
             outx = min(x_canvas, round(dbline.cam_xres / dbline.cam_scaledown))
@@ -193,11 +197,10 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             outy = -1
             x_scaling = -1.0
             y_scaling = -1.0 
+          if params['type'] == 'E':
+            myitem.shared_mem.write_1_meta('x_canvas', x_canvas)
           while not (params['idx'] in viewers and params['type'] in viewers[params['idx']]):
             await asyncio.sleep(longbreak)
-          myviewer = viewers[params['idx']][params['type']]
-          myviewer.websocket = self
-          myviewer.event_loop = asyncio.get_event_loop()
           if show_cam:
             onf_index = myviewer.push_to_onf(
               outx = outx, 
@@ -230,7 +233,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           #logger.info('--> ' + str(outlist))
           await self.send(json.dumps(outlist))
         else:
-          logger.info('--> Close')
+          #logger.info('--> Close')
           await self.close()
           
     except:

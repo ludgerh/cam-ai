@@ -64,32 +64,41 @@ class c_viewer():
         self.client_dict[client_nr]['lat_ts'] = time()
         ts = time()
         frame = (await self.inqueue.get())[1]
-        if self.type in {'D', 'E'}:
-          if self.type == 'D':  
-            scaledown = self.my_item.shared_mem.read_1_meta('scaledown')
-          else: #'E'
-            scaledown = 1 
-          outx = (self.my_item.shared_mem.read_1_meta('aoi_xdim') // scaledown)
-          outy = (self.my_item.shared_mem.read_1_meta('aoi_ydim') // scaledown)
-          if (self.client_dict[client_nr]['outx'] != outx 
-              or self.client_dict[client_nr]['outy'] != outy):
-            self.client_dict[client_nr]['outx'] = outx
+        if self.type in {'D', 'E'}:  
+          if (self.my_item.shared_mem.read_1_meta('aoi_xdim') != self.client_dict[client_nr]['old_x'] 
+              or self.my_item.shared_mem.read_1_meta('aoi_ydim') != self.client_dict[client_nr]['old_y']):
+            self.client_dict[client_nr]['old_x'] = self.my_item.shared_mem.read_1_meta('aoi_xdim')
+            self.client_dict[client_nr]['old_y'] = self.my_item.shared_mem.read_1_meta('aoi_ydim') 
+            if self.type == 'D':  
+              scaledown = self.my_item.shared_mem.read_1_meta('scaledown')
+            else: #'E'
+              scaledown = 1 
+            self.client_dict[client_nr]['y_canvas'] =  round(
+              self.client_dict[client_nr]['x_canvas'] 
+              * self.my_item.shared_mem.read_1_meta('aoi_ydim') 
+              / self.my_item.shared_mem.read_1_meta('aoi_xdim')
+            )
+            self.client_dict[client_nr]['outx'] = min(
+              self.client_dict[client_nr]['x_canvas'], 
+              self.my_item.shared_mem.read_1_meta('aoi_xdim') // scaledown, 
+            )
+            self.client_dict[client_nr]['outy'] = min(
+              self.client_dict[client_nr]['y_canvas'], 
+              self.my_item.shared_mem.read_1_meta('aoi_ydim') // scaledown, 
+            )
             self.client_dict[client_nr]['x_scaling'] = (
               self.my_item.shared_mem.read_1_meta('aoi_xdim') 
-                / self.client_dict[client_nr]['x_canvas']
-                / scaledown
-            )
-            self.client_dict[client_nr]['outy'] = outy
-            self.client_dict[client_nr]['y_canvas'] = round(
-              self.client_dict[client_nr]['x_canvas'] * outy / outx
+              / self.client_dict[client_nr]['x_canvas']
             )
             self.client_dict[client_nr]['y_scaling'] = (
               self.my_item.shared_mem.read_1_meta('aoi_ydim') 
-                / self.client_dict[client_nr]['y_canvas']
-                / scaledown
-            )
+              / self.client_dict[client_nr]['y_canvas']
+            ) 
             if self.type == 'D':  
-              self.my_item.viewer.drawpad.set_xy((outx, outy)) 
+              self.my_item.viewer.drawpad.set_xy((
+                self.client_dict[client_nr]['outx'], 
+                self.client_dict[client_nr]['outy'], 
+              )) 
               await self.my_item.viewer.drawpad.aload_ringlist()
               self.my_item.viewer.drawpad.make_screen()
               self.my_item.viewer.drawpad.mask_from_polygons()
@@ -124,9 +133,13 @@ class c_viewer():
         if self.client_dict[client_nr]['do_compress']:
           to = 3 #jpg
         else:
-          to = 2 #bmp   
-        frame = c_convert(frame, typein=1, typeout=to, 
-          xout=self.client_dict[client_nr]['outx'])
+          to = 2 #bmp    
+        frame = c_convert(
+          frame, 
+          typein=1, 
+          typeout=to, 
+          xout=self.client_dict[client_nr]['outx'], 
+        )
         if not startup_redis.get_running() or streams_redis.get_killing_stream(self.id):  
           return()  
         indicator = struct.pack(
@@ -184,6 +197,8 @@ class c_viewer():
         'lat_ts' : 0.0,
         'lat_arr' : [],
         'do_compress' : do_compress,
+        'old_x' : -1,
+        'old_y' : -1,
       }
       client_info['busy'].set()
       self.client_dict[count] = client_info

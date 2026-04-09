@@ -36,15 +36,15 @@ def index(request, mode='C'):
     'mode' : mode,
     'tf_debug' : request.user.is_superuser and djconf.getconfigbool('do_tf_debug', True),
     'camlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0, demo=0), 'C', 
+      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0, demo=False), 'C', 
       request.user, 'R'
     ),
     'detectorlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(det_mode_flag__gt=0, demo=0), 'D', 
+      stream.objects.filter(active=True).filter(det_mode_flag__gt=0, demo=False), 'D', 
       request.user, 'R'
     ),
     'eventerlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0, demo=0), 'E', 
+      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0, demo=False), 'E', 
       request.user, 'R'
     ),
     'schoollist' : access.filter_items(
@@ -67,15 +67,15 @@ def indexgrid(request, mode='C', start=0, end=0):
     'debug' : settings.DEBUG,
     'mode' : mode,
     'camlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0, demo=0), 'C', 
+      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0, demo=False), 'C', 
       request.user, 'R'
     ),
     'detectorlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(det_mode_flag__gt=0, demo=0), 'D', 
+      stream.objects.filter(active=True).filter(det_mode_flag__gt=0, demo=False), 'D', 
       request.user, 'R'
     ),
     'eventerlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0, demo=0), 'E', 
+      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0, demo=False), 'E', 
       request.user, 'R'
     ),
     'user' : request.user,

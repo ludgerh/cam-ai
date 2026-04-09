@@ -347,14 +347,17 @@ class eve_worker(mp_process):
             self.y_from_cam, self.x_from_cam = frameline[1].shape[:2]
             self.shared_mem.write_1_meta('aoi_xdim', self.x_from_cam)
             self.shared_mem.write_1_meta('aoi_ydim', self.y_from_cam)
-            x_canvas = self.shared_mem.read_1_meta('x_canvas')
-            if x_canvas and frameline[1].shape[1] > x_canvas:
-              scaling = x_canvas / frameline[1].shape[1]
-            else:
-              scaling = 1.0  
-            self.linewidth = round(4.0 / scaling)
-            self.textheight = round(0.51 / scaling)
-            self.textthickness = round(2.0 / scaling)  
+            #x_canvas = self.shared_mem.read_1_meta('x_canvas')
+            #if x_canvas and frameline[1].shape[1] > x_canvas:
+            #  scaling = max(x_canvas / frameline[1].shape[1], 0.125)
+            #else:
+            #  scaling = 1.0  
+            #self.linewidth = round(4.0 / scaling)
+            #self.textheight = round(0.51 / scaling)
+            #self.textthickness = round(2.0 / scaling)  
+            self.linewidth = 4
+            self.textheight = 1
+            self.textthickness = 2  
           await self.run_one(frameline)  
         else:
           await a_break_type(BR_MEDIUM)

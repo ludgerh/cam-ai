@@ -302,8 +302,13 @@ $(document).ready(function() {
 		      const indicator = e.data.slice(0, 9);
           const imageBuffer = e.data.slice(17);
           const blob = new Blob([imageBuffer], { type: "image/jpeg" });
-		      let url = URL.createObjectURL(blob);
-		      $('#imagespace').prop('src', url);
+          const img = $('#imagespace');
+          if (img.data('url')) {
+            URL.revokeObjectURL(img.data('url'));
+          }
+          let url = URL.createObjectURL(blob);
+          img.prop('src', url);
+          img.data('url', url);
           trigger_Socket.send(indicator);
         };
 		  };

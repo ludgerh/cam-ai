@@ -69,97 +69,130 @@ let trigger_Socket;
 let imagewidth = 375 // Screen width IPhone 7
 const displaywidth = {};
 const displayheight = {};
+const cams = [
+{% for item in camlist %}
+{% if not item.cam_pause %}
+  { id: {{ item.id }} },
+{% endif %}
+{% endfor %}
+];
 
-$(document).ready(function() {
+function isInViewport(el) {
+  if (!el.length) return false;
+  const rect = el[0].getBoundingClientRect();
+  return (
+    rect.top >= 0 &&
+    rect.left >= 0 &&
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+  );
+};
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+$(document).ready(async function() {
   const viewer_id = crypto.randomUUID();
-  WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
-  .then((result) => {
-    c_view_Socket = result;
-    return(createWebSocket(
-      `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
-    ));
-  })
-  .then((result) => {
-    trigger_Socket = result;
-{% for item in camlist %} 
-    return(c_view_Socket.sendandwait({
+  c_view_Socket = await WSAsync(
+    `${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`
+  );
+  trigger_Socket = await createWebSocket(
+    `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
+  );
+  for (const cam of cams) {
+    let result = await c_view_Socket.sendandwait({
       'command' : 'starttrigger',
       'type' : '{{ mode }}',
-      'idx' : {{ item.id }},
+      'idx' : cam.id,
       'width' : imagewidth,
       'do_compress' : false,
-    }));
-  })
-  .then((result) => {
-    show_cam{{ item.id }} = result.show_cam;
-    onf_nr{{ item.id }} = result.on_frame_nr;  
-    displaywidth[{{ item.id }}] = -1; 
-    displayheight[{{ item.id }}] = -1;
-    if (show_cam{{ item.id }}) {
+    });
+    cam.show_cam = result.show_cam;
+    cam.onf_nr = result.on_frame_nr; 
+    displaywidth[cam.id] = -1;
+    displayheight[cam.id] = -1;
+    if (cam.show_cam) {
       const buf = new ArrayBuffer(9);
       const view = new DataView(buf);
       view.setUint8(0, '{{ mode }}'.charCodeAt(0));
-      view.setUint32(1, {{ item.id }}, true);
-      view.setUint32(5, onf_nr{{ item.id }}, true);
+      view.setUint32(1, cam.id, true);
+      view.setUint32(5, cam.onf_nrE, true);
       trigger_Socket.send(buf); 
     } else {
-      $('#imagespace{{ item.id }}').css({'object-fit':'cover'});
+      $('#imagespace' + cam.id).css({'object-fit':'cover'});
 {% if emulatestatic %}
-		  $('#imagespace{{ item.id }}').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
+		  $('#imagespace' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
 {% else %}
-		  $('#imagespace{{ item.id }}').prop(
+		  $('#imagespace' + cam.id).prop(
 		    'src', 
 		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
 		  );
 {% endif %}
     }; 
-{% endfor %} 
-    trigger_Socket.onclose = function(e) {
-      console.log('Trigger-Socket closed');
-    };
-		trigger_Socket.binaryType = 'arraybuffer';
-    trigger_Socket.onmessage = function(e) {
-      if (typeof(e.data) === 'object') {
-        const view = new DataView(e.data);
-        const idx = view.getInt32(1, true);
-        const new_x = view.getInt32(9, true);
-        const new_y = view.getInt32(13, true);
-        if (displaywidth[idx] !== new_x) {
-          $('#imagespace' + idx).attr('width', new_x + 'px');
-          displaywidth[idx] = new_x;
-        };
-        if (displayheight[idx] !== new_y) {
-          $('#imagespace' + idx).attr('height', new_y + 'px');
-          displayheight[idx] = new_y;
-        };
-	      const indicator = e.data.slice(0, 9);
+  };
+  trigger_Socket.onclose = function(e) {
+    console.log('Trigger-Socket closed');
+  };
+	trigger_Socket.binaryType = 'arraybuffer';
+  trigger_Socket.onmessage = async function(e) {
+    if (typeof(e.data) === 'object') {
+      const view = new DataView(e.data);
+      const idx = view.getInt32(1, true);
+      const new_x = view.getInt32(9, true);
+      const new_y = view.getInt32(13, true);
+      if (displaywidth[idx] !== new_x) {
+        $('#imagespace' + idx).attr('width', new_x + 'px');
+        displaywidth[idx] = new_x;
+      };
+      if (displayheight[idx] !== new_y) {
+        $('#imagespace' + idx).attr('height', new_y + 'px');
+        displayheight[idx] = new_y;
+      };
+      const indicator = e.data.slice(0, 9);
+      if (isInViewport($('#imagespace' + idx))) {
         const imageBuffer = e.data.slice(17);
         const blob = new Blob([imageBuffer], { type: "image/jpeg" });
-	      let url = URL.createObjectURL(blob);
-	      $('#imagespace' + idx).prop('src', url);
-        trigger_Socket.send(indicator);
+        const img = $('#imagespace' + idx);
+        if (img.data('url')) {
+          URL.revokeObjectURL(img.data('url'));
+        }
+        let url = URL.createObjectURL(blob);
+        img.prop('src', url);
+        img.data('url', url);
+      } else {
+        await delay(1000);
       };
+      trigger_Socket.send(indicator);
     };
-{% for item in camlist %} 
-    setInterval(() => {
-      c_view_Socket.sendandwait({
-        'command' : 'getcaminfo',
-        'type' : '{{ mode }}',
-        'idx' : {{ item.id }},
-      })
-      .then((result) => {
-        if ('{{ mode }}' != 'C') {
-          $('#xdimtag{{ item.id }}').text(result.xdim);
-          $('#ydimtag{{ item.id }}').text(result.ydim);
-        };  
-        $('#fpstag{{ item.id }}').text(result.fps);
-        {% if user.is_superuser %}
-          $('#vnrtag{{ item.id }}').text(result.viewers);
-        {% endif %}
-      })
-    }, 5000);
-{% endfor %}
-	})
+  };
+  
+  async function updateCams() {
+    for (const cam of cams) {
+      let result = await c_view_Socket.sendandwait({
+        command: 'getcaminfo',
+        type: '{{ mode }}',
+        idx: cam.id,
+      });
+      if ('{{ mode }}' != 'C') {
+        $('#xdimtag' + cam.id).text(result.xdim);
+        $('#ydimtag' + cam.id).text(result.ydim);
+      };  
+      $('#fpstag' + cam.id).text(result.fps);
+      {% if user.is_superuser %}
+        $('#vnrtag' + cam.id).text(result.viewers);
+      {% endif %}
+    }
+  }
+  
+  async function loop() {
+    while (true) {
+      await updateCams();
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+
+  loop();
 });
 	
 </script>
