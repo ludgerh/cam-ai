@@ -89,11 +89,11 @@ class c_viewer():
             self.client_dict[client_nr]['x_scaling'] = (
               self.my_item.shared_mem.read_1_meta('aoi_xdim') 
               / self.client_dict[client_nr]['x_canvas']
-            )
+            ) / scaledown
             self.client_dict[client_nr]['y_scaling'] = (
               self.my_item.shared_mem.read_1_meta('aoi_ydim') 
               / self.client_dict[client_nr]['y_canvas']
-            ) 
+            ) / scaledown 
             if self.type == 'D':  
               self.my_item.viewer.drawpad.set_xy((
                 self.client_dict[client_nr]['outx'], 

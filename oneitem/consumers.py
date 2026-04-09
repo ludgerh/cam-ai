@@ -68,8 +68,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
   async def receive(self, text_data):
     try:
       params = json.loads(text_data)['data']
-      #if params['command'] != 'mousemove':
-      #  logger.info('<-- ' + str(text_data))
+      if params['command'] != 'mousemove':
+        logger.info('<-- ' + str(text_data))
       outlist = {'tracker' : json.loads(text_data)['tracker']}
 
       if params['command'] == 'setmyitem':
@@ -237,12 +237,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       elif params['command'] == 'mousedown':
         if self.my_viewer.drawpad.edit_active:
           if self.may_write:
-            print(
-              round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
-              round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']), 
-              self.my_viewer.client_dict[self.v_client_nr]['x_scaling'],
-              self.my_viewer.client_dict[self.v_client_nr]['y_scaling'],
-            )
             self.my_viewer.drawpad.mousedownhandler(
               round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
               round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']), 

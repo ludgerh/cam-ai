@@ -293,11 +293,9 @@ class drawpad():
 
   def point_clicked(self, x, y):
     click_point = Point(x,y) 
-    print('Click', click_point)
     for i in range(len(self.ringlist.rings)):
       for j in range(len(self.ringlist.rings[i].points)):
         check_point = Point(self.ringlist.rings[i].points[j])
-        print('Check', check_point, self.radius)
         if check_point.distance(click_point) <= self.radius:
           return((i,j))
     return(None)
@@ -306,7 +304,6 @@ class drawpad():
     self.mypoint = self.point_clicked(x, y) 
 
   def move_point(self, x, y):
-    print('move_point', x, y)
     try:
       buffer = self.ringlist.rings[self.mypoint[0]].points[self.mypoint[1]]
     except IndexError:
@@ -374,7 +371,6 @@ class drawpad():
   async def mouseuphandler(self, x, y):
     if self.mypoint is not None:
       self.mousemovehandler(x, y)
-      print('MyPoint', self.ringlist.rings[self.mypoint[0]].mask_id)
       await self.ringlist.rings[self.mypoint[0]].asave(type = self.type, idx = self.id)
       self.mypoint = None
       self.mask_from_polygons()

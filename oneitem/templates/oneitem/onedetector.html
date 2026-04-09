@@ -131,6 +131,125 @@ let wait = 0;
 
 $(document).ready(function() {
 	$('#imagespace').attr('draggable', false);
+  const viewer_id = crypto.randomUUID();
+  WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
+	.then((result) => {
+		c_view_Socket = result;
+    return(createWebSocket(
+      `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
+    ));
+  })
+	.then((result) => {
+    trigger_Socket = result;
+    return(c_view_Socket.sendandwait({
+	    'command' : 'starttrigger',
+	    'type' : 'D',
+      'idx' : {{ dbline.id }},
+      'x_screen' : $(window).width(),
+      'y_screen' : $(window).height(),
+      'tokennr' : {{ tokennr }},
+      'token' : '{{ token }}',
+    }));
+  })
+  .then((result) => {
+    show_cam = result.show_cam;
+    onf_nr = result.on_frame_nr; 
+    if (show_cam) {
+      const buf = new ArrayBuffer(9);
+      const view = new DataView(buf);
+      view.setUint8(0, 'D'.charCodeAt(0));
+      view.setUint32(1, {{ dbline.id }}, true);
+      view.setUint32(5, onf_nr, true);
+      trigger_Socket.send(buf);
+		  trigger_Socket.onclose = function(e) {
+			  console.log('Trigger-Socket closed');
+		  };
+		  trigger_Socket.binaryType = 'arraybuffer';
+		  trigger_Socket.onmessage = function(e) {
+        if (typeof(e.data) === 'object') {
+          const view = new DataView(e.data);
+          const new_x = view.getInt32(9, true);
+          const new_y = view.getInt32(13, true);
+          if (displaywidth != new_x) {
+            $('#imagespace').attr('width', new_x + 'px');
+            displaywidth = new_x;
+          };
+          if (displayheight != new_y) {
+            $('#imagespace').attr('height', new_y + 'px');
+            displayheight = new_y;
+          };
+		      const indicator = e.data.slice(0, 9);
+          const imageBuffer = e.data.slice(17);
+          const blob = new Blob([imageBuffer], { type: "image/jpeg" });
+          const img = $('#imagespace');
+          if (img.data('url')) {
+            URL.revokeObjectURL(img.data('url'));
+          }
+          let url = URL.createObjectURL(blob);
+          img.prop('src', url);
+          img.data('url', url);
+          trigger_Socket.send(indicator);
+        };
+		  };
+    } else {
+      $('#maskedit').addClass('d-none');
+      $('#imagespace').css({'object-fit':'cover'});
+{% if emulatestatic %}
+		  $('#imagespace').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
+{% else %}
+		  $('#imagespace').prop(
+		    'src', 
+		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		  );
+{% endif %}
+    };  
+{% if may_write %}
+		$('#ch_show').prop('checked', false);
+		$('#ch_apply').prop('checked', ('{{ dbline.det_apply_mask }}' == 'True'));
+		$('#ch_edit').prop('checked', false);
+		$('#ch_white').prop('checked', true);
+		$('#ch_positive').prop('checked', ('{{ dbline.det_positive_mask }}' == 'True'));
+		$('#ch_rectangular').prop('checked', false);
+		return(WSAsync(ws_scheme + '//' + window.location.host + '/ws/oneitem/'));
+	})
+	.then((result) => {
+		oneitemSocket = result;
+		oneitemSocket.sendandwait({
+			'command' : 'setmyitem',
+			'type' : 'D',
+			'itemid' : {{ dbline.id }},
+			'onf_nr' : onf_nr,
+		})
+	})
+	.then(() => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_show' : $('#ch_show').prop('checked'),
+			'ch_apply' : $('#ch_apply').prop('checked'),
+			'ch_positive' : $('#ch_positive').prop('checked'),
+			'ch_rectangular' : $('#ch_rectangular').prop('checked'),
+		})
+{% endif %}
+	})
+	.then(() => {
+    setInterval(() => {
+      c_view_Socket.sendandwait({
+        'command' : 'getcaminfo',
+        'type' : 'D',
+        'idx' : {{ dbline.id }},
+        'tokennr' : {{ tokennr }},
+        'token' : '{{ token }}',
+      })
+      .then((result) => {
+        $('#xdimtag').text(result.xdim);
+        $('#ydimtag').text(result.ydim);
+        $('#fpstag').text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtag').text(result.viewers);
+        {% endif %}
+      })
+    }, 5000);
+	});
 {% if may_write %}
 	$('#ch_show').change((evt) => {
 		oneitemSocket.sendandwait({
@@ -252,125 +371,6 @@ $(document).ready(function() {
 		$('html, body').animate({scrollTop:$(document).height()}, 'slow');
 	})
 {% endif %}
-  const viewer_id = crypto.randomUUID();
-  WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
-	.then((result) => {
-		c_view_Socket = result;
-    return(createWebSocket(
-      `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
-    ));
-  })
-	.then((result) => {
-    trigger_Socket = result;
-    return(c_view_Socket.sendandwait({
-	    'command' : 'starttrigger',
-	    'type' : 'D',
-      'idx' : {{ dbline.id }},
-      'x_screen' : $(window).width(),
-      'y_screen' : $(window).height(),
-      'tokennr' : {{ tokennr }},
-      'token' : '{{ token }}',
-    }));
-  })
-  .then((result) => {
-    show_cam = result.show_cam;
-    onf_nr = result.on_frame_nr; 
-    if (show_cam) {
-      const buf = new ArrayBuffer(9);
-      const view = new DataView(buf);
-      view.setUint8(0, 'D'.charCodeAt(0));
-      view.setUint32(1, {{ dbline.id }}, true);
-      view.setUint32(5, onf_nr, true);
-      trigger_Socket.send(buf);
-		  trigger_Socket.onclose = function(e) {
-			  console.log('Trigger-Socket closed');
-		  };
-		  trigger_Socket.binaryType = 'arraybuffer';
-		  trigger_Socket.onmessage = function(e) {
-        if (typeof(e.data) === 'object') {
-          const view = new DataView(e.data);
-          const new_x = view.getInt32(9, true);
-          const new_y = view.getInt32(13, true);
-          if (displaywidth != new_x) {
-            $('#imagespace').attr('width', new_x + 'px');
-            displaywidth = new_x;
-          };
-          if (displayheight != new_y) {
-            $('#imagespace').attr('height', new_y + 'px');
-            displayheight = new_y;
-          };
-		      const indicator = e.data.slice(0, 9);
-          const imageBuffer = e.data.slice(17);
-          const blob = new Blob([imageBuffer], { type: "image/jpeg" });
-          const img = $('#imagespace');
-          if (img.data('url')) {
-            URL.revokeObjectURL(img.data('url'));
-          }
-          let url = URL.createObjectURL(blob);
-          img.prop('src', url);
-          img.data('url', url);
-          trigger_Socket.send(indicator);
-        };
-		  };
-    } else {
-      $('#maskedit').addClass('d-none');
-      $('#imagespace').css({'object-fit':'cover'});
-{% if emulatestatic %}
-		  $('#imagespace').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-{% else %}
-		  $('#imagespace').prop(
-		    'src', 
-		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-		  );
-{% endif %}
-    };  
-{% if may_write %}
-		$('#ch_show').prop('checked', false);
-		$('#ch_apply').prop('checked', ('{{ dbline.det_apply_mask }}' == 'True'));
-		$('#ch_edit').prop('checked', false);
-		$('#ch_white').prop('checked', true);
-		$('#ch_positive').prop('checked', ('{{ dbline.det_positive_mask }}' == 'True'));
-		$('#ch_rectangular').prop('checked', false);
-		return(WSAsync(ws_scheme + '//' + window.location.host + '/ws/oneitem/'));
-	})
-	.then((result) => {
-		oneitemSocket = result;
-		oneitemSocket.sendandwait({
-			'command' : 'setmyitem',
-			'type' : 'D',
-			'itemid' : {{ dbline.id }},
-			'onf_nr' : onf_nr,
-		})
-	})
-	.then(() => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_show' : $('#ch_show').prop('checked'),
-			'ch_apply' : $('#ch_apply').prop('checked'),
-			'ch_positive' : $('#ch_positive').prop('checked'),
-			'ch_rectangular' : $('#ch_rectangular').prop('checked'),
-		})
-{% endif %}
-	})
-	.then(() => {
-    setInterval(() => {
-      c_view_Socket.sendandwait({
-        'command' : 'getcaminfo',
-        'type' : 'D',
-        'idx' : {{ dbline.id }},
-        'tokennr' : {{ tokennr }},
-        'token' : '{{ token }}',
-      })
-      .then((result) => {
-        $('#xdimtag').text(result.xdim);
-        $('#ydimtag').text(result.ydim);
-        $('#fpstag').text(result.fps);
-        {% if user.is_superuser %}
-          $('#vnrtag').text(result.viewers);
-        {% endif %}
-      })
-    }, 5000);
-	})
 });
 	
 </script>

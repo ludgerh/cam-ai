@@ -207,83 +207,6 @@ let wait = 0;
 
 $(document).ready(function() {
 	$('#imagespace').attr('draggable', false);
-{% if may_write %}
-	$('#ch_show').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_show' : $('#ch_show').prop('checked'),
-		})
-	});
-	$('#ch_apply').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_apply' : $('#ch_apply').prop('checked'),
-		})
-	});
-	$('#ch_edit').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_edit' : $('#ch_edit').prop('checked'),
-		})
-	});
-	$('#ch_white').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_white' : $('#ch_white').prop('checked'),
-		})
-	});
-	$('#ch_positive').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_positive' : $('#ch_positive').prop('checked'),
-		})
-	});
-	$('#ch_rectangular').change((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setcbstatus',
-			'ch_rectangular' : $('#ch_rectangular').prop('checked'),
-		})
-	});
-	$('#bt_new').click((evt) => {
-		oneitemSocket.sendandwait({
-			'command' : 'setbtevent',
-			'bt_new' : 'click',
-		})
-	});
-	$('#id_cam_fpslimit, '
-    +'#id_cam_feed_type, '
-    +'#id_cam_url, '
-    +'#id_cam_repeater'
-  ).change(function(evt) {
-		oneitemSocket.sendandwait({
-			'command' : 'setonefield',
-			'pname' : $(evt.target).attr('name'),
-			'value' : $(evt.target).val(),
-		})
-		.then((result) => {
-			if (result === 'OK') {
-				$(evt.target).addClass('bluegrey');
-			};
-		})
-	});
-	$('#id_cam_pause').change(function(evt) {
-		oneitemSocket.sendandwait({
-			'command' : 'setonefield',
-			'pname' : $(evt.target).attr('name'),
-			'value' : $(evt.target).prop('checked'),
-		})
-		.then((result) => {
-			if (result === 'OK') {
-				$(evt.target).addClass('bluegrey');
-			};
-		})
-	});
-	$('#conditions').children(':even').click((evt) => {
-		let bstr_row = $(evt.target).closest('.row').next();
-	  bstr_row.toggleClass('d-none');
-		$('html, body').animate({scrollTop:$(document).height()}, 'slow');
-	});
-{% endif %}
   const viewer_id = crypto.randomUUID();
   WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
 	.then((result) => {
@@ -623,7 +546,84 @@ $(document).ready(function() {
         {% endif %}
       })
     }, 5000);
-	})
+	});
+{% if may_write %}
+	$('#ch_show').change((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_show' : $('#ch_show').prop('checked'),
+		})
+	});
+	$('#ch_apply').change((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_apply' : $('#ch_apply').prop('checked'),
+		})
+	});
+	$('#ch_edit').change((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_edit' : $('#ch_edit').prop('checked'),
+		})
+	});
+	$('#ch_white').change((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_white' : $('#ch_white').prop('checked'),
+		})
+	});
+	$('#ch_positive').change((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_positive' : $('#ch_positive').prop('checked'),
+		})
+	});
+	$('#ch_rectangular').change((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setcbstatus',
+			'ch_rectangular' : $('#ch_rectangular').prop('checked'),
+		})
+	});
+	$('#bt_new').click((evt) => {
+		oneitemSocket.sendandwait({
+			'command' : 'setbtevent',
+			'bt_new' : 'click',
+		})
+	});
+	$('#id_cam_fpslimit, '
+    +'#id_cam_feed_type, '
+    +'#id_cam_url, '
+    +'#id_cam_repeater'
+  ).change(function(evt) {
+		oneitemSocket.sendandwait({
+			'command' : 'setonefield',
+			'pname' : $(evt.target).attr('name'),
+			'value' : $(evt.target).val(),
+		})
+		.then((result) => {
+			if (result === 'OK') {
+				$(evt.target).addClass('bluegrey');
+			};
+		})
+	});
+	$('#id_cam_pause').change(function(evt) {
+		oneitemSocket.sendandwait({
+			'command' : 'setonefield',
+			'pname' : $(evt.target).attr('name'),
+			'value' : $(evt.target).prop('checked'),
+		})
+		.then((result) => {
+			if (result === 'OK') {
+				$(evt.target).addClass('bluegrey');
+			};
+		})
+	});
+	$('#conditions').children(':even').click((evt) => {
+		let bstr_row = $(evt.target).closest('.row').next();
+	  bstr_row.toggleClass('d-none');
+		$('html, body').animate({scrollTop:$(document).height()}, 'slow');
+	});
+{% endif %}
 });
 	
 </script>
