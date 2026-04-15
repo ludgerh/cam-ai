@@ -3,7 +3,7 @@
 from django.db import migrations, models
 
 def create_initial_plugin(apps, schema_editor):
-    Plugin = apps.get_model('DEINE_APP', 'plugin')
+    Plugin = apps.get_model('core', 'plugin')
     Plugin.objects.create(
         type='D',
         default=True,
