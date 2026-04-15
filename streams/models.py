@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from tf_workers.models import school
-from multiprocessing import Lock as p_lock
+from core.models import plugin
 
 class stream(models.Model):
   active = models.BooleanField(default=True)
@@ -62,6 +62,7 @@ class stream(models.Model):
   det_view = models.BooleanField(default=True)
   det_fpslimit = models.FloatField("FPS limit", default=2.0)
   det_fpsactual = models.FloatField(default=0)
+  det_plugin = models.ForeignKey(plugin, on_delete=models.SET_DEFAULT, default=1)
   det_threshold = models.IntegerField("threshold", default=40)
   det_backgr_delay = models.IntegerField("background delay", default=1)
   det_dilation = models.IntegerField("dilation", default=20)

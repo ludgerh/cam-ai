@@ -191,7 +191,6 @@ class trainer(spawn_process):
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg)
       self.tf_w_index = await self.tf_worker.register(1, prio = 8)
       await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
-      self.finished = False
       self.job_queue = asyncio.Queue()
       self.school_cache = {}
       self.frames_cache = {}
@@ -266,7 +265,6 @@ class trainer(spawn_process):
         await a_break_time(10.0)
       await self.tf_worker.stop_out(self.tf_w_index)
       await self.tf_worker.unregister(self.tf_w_index) 
-      self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
     except Exception as fatal:
       self.logger.error(

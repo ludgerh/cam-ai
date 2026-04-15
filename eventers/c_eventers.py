@@ -312,7 +312,6 @@ class eve_worker(mp_process):
       self.tf_worker = tf_worker_client(self.worker_in, self.worker_reg, )
       self.tf_w_index = await self.tf_worker.register(self.tf_worker_id, prio = 2)
       await self.tf_worker.run_out(self.tf_w_index, self.logger, self.logname)
-      self.finished = False
       self.motion_frame = [0,0,0.0]
       self.last_insert_ready = 0.0
       self.last_insert_start = float('inf')
@@ -365,7 +364,6 @@ class eve_worker(mp_process):
         else:
           await a_break_type(BR_MEDIUM)
       await self.dataqueue.stop()
-      self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
       await self.tf_worker.stop_out(self.tf_w_index)
       await self.tf_worker.unregister(self.tf_w_index)

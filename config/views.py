@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -32,9 +32,11 @@ from tools.l_tools import djconf
 from tools.l_smtp import l_smtp, l_msg
 from access.c_access import access
 from streams.models import stream
+from core.models import plugin as plugin_db
 from tf_workers.models import school
 from schools.c_schools import get_taglist
 from schools.models import tag as dbtag
+import core.plugin_conf
 from .forms import smtp_form
 
 emulatestatic = safe_import('emulatestatic') 
@@ -284,3 +286,24 @@ class tags(myTemplateView):
       return redirect('/config/config/tags/none/')
     else:
       return(HttpResponse('No Access'))
+
+class plugins(myTemplateView):
+  template_name = 'config/plugins.html'
+  def __init__(self, *args, **kwargs):
+    self.stream_list = stream.objects.filter(active = True)
+    super().__init__(*args, **kwargs)
+    
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    context.update({
+      'stream_list' : self.stream_list,  
+      'plugin_list' : plugin_db.objects.all(),  
+    })
+    return context
+  
+  def post(self, request, *args, **kwargs):
+    for s_item in self.stream_list:
+      if access.check('D', s_item, request.user, 'W'):
+        plugin_id = request.POST.get(f'det_plugin_{s_item.id}')
+        stream.objects.filter(id=s_item.id).update(det_plugin_id=plugin_id)
+    return redirect('/config/config/plugins/none/')

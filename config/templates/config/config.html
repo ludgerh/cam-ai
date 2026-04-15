@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -60,6 +60,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
       </div>
     </div>
+    <div class="accordion-item" id="plugins_item">
+      <h2 class="accordion-header" id="panels-heading-plugins">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+            data-bs-target="#panels-collapse-plugins" aria-expanded="false" 
+            aria-controls="panels-collapse-plugins">
+          <h4>Plugins configuration</h4>
+        </button>
+      </h2>
+      <div id="panels-collapse-plugins" class="accordion-collapse collapse" 
+          aria-labelledby="panels-heading-plugins">
+        <div class="accordion-body">
+          <div id="plugins-body">plugins-body</div>
+        </div>
+      </div>
+    </div>
   </div>
 </main>
 <script>
@@ -84,6 +99,16 @@ $(document).ready(function() {
   });
   {% if open == 'tags' %}
     $('#panels-collapse-tags').collapse('show');
+  {% endif %}
+  $('#plugins_item').on('show.bs.collapse', function () {
+    {% if info %}
+      $('#plugins-body').load("/config/plugins/{{ info }}/");
+    {% else %}
+      $('#plugins-body').load("/config/plugins/");
+    {% endif %}
+  });
+  {% if open == 'plugins' %}
+    $('#panels-collapse-plugins').collapse('show');
   {% endif %}
 });
 </script>

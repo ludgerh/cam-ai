@@ -236,7 +236,6 @@ class cam_worker(mp_process):
       self.ff_proc = None
       self.getting_newprozess = False
       self.wd_proc = None
-      self.finished = False
       self.framewait = 0.0
       self.reset_buffer = False
       datapath = await djconf.agetconfig('datapath', 'data/')
@@ -359,7 +358,6 @@ class cam_worker(mp_process):
           break
         except OperationalError:
           await aclose_old_connections()
-      self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
       await self.stopprocess()
       if self.wd_proc is not None:

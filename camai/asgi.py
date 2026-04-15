@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -21,7 +21,6 @@ from django.core.asgi import get_asgi_application
 import viewers.routing
 import oneitem.routing
 import schools.routing
-import ws_predictions.routing
 import users.routing
 import trainers.routing
 import tools.routing
@@ -39,7 +38,6 @@ application = ProtocolTypeRouter({
       viewers.routing.websocket_urlpatterns
         + oneitem.routing.websocket_urlpatterns
         + schools.routing.websocket_urlpatterns
-        + ws_predictions.routing.websocket_urlpatterns
         + users.routing.websocket_urlpatterns
         + trainers.routing.websocket_urlpatterns
         + tools.routing.websocket_urlpatterns

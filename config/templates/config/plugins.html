@@ -1,0 +1,55 @@
+{% comment %}
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+{% endcomment %}
+
+<div class="container-fluid float-left">
+  <div class="row" id="menulist">
+  <div class="h3">Detector Plugins</div>
+  <form method="post" action="/config/plugins/">
+    {% csrf_token %}
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Stream ID</th>
+          <th>Name</th>
+          <th>Detector Plugin</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s_item in stream_list %}
+        <tr>
+          <td>{{ s_item.id }}</td>
+          <td>{{ s_item.name }}</td>
+          <td>
+            <select name="det_plugin_{{ s_item.id }}">
+              {% for plugin in plugin_list %}
+              <option value="{{ plugin.id }}"
+                {% if plugin.id == s_item.det_plugin_id %}selected{% endif %}>
+                {{ plugin.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3">Keine Einträge vorhanden.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="submit">Submit</button>
+  </form>
+</div>

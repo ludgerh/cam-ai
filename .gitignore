@@ -1,5 +1,4 @@
 /data/
-/plugins/
 /camai/static/camai/nogit/
 /temp/
 /shm/
@@ -22,3 +21,17 @@ __pycache__/
 github-recovery-codes.txt
 cam-ai_project.zip
 gpt_zip.sh
+# alles unter plugins ignorieren
+plugins/*
+
+# aber die Ordner selbst behalten
+!plugins/
+!plugins/detectors/
+
+# alles unter detectors ignorieren
+plugins/detectors/*
+
+# außer default komplett erlauben
+!plugins/detectors/default/
+!plugins/detectors/default/**
+plugins/detectors/default/__pycache__/*

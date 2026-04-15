@@ -334,7 +334,6 @@ class tf_worker(spawn_process):
       self.tf_load_lock = asyncio.Lock()
       while not (self.got_sigint or self.model_buffers):
         await a_break_type(BR_LONG)
-      self.finished = False
       wait_autos = {}
       while not self.got_sigint:
         while not self.got_sigint:
@@ -370,7 +369,6 @@ class tf_worker(spawn_process):
               self.model_buffers[schoolnr].ts = time() 
             else:
               await wait_autos[schoolnr].wait() 
-      self.finished = True
       self.logger.info('Finished Process '+self.logname+'...')
     except Exception as fatal:
       self.logger.error(
