@@ -34,6 +34,11 @@ def temp_func():
     )
 proc_dict[version_flat('1.9.9')] = temp_func   
 
+def temp_func():
+  from drawpad.models import mask
+  mask.objects.filter(type = 'D').delete()
+proc_dict[version_flat('2.1.0')] = temp_func   
+
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)
   newflat = version_flat(new_str)

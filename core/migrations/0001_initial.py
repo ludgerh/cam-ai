@@ -2,6 +2,19 @@
 
 from django.db import migrations, models
 
+def create_initial_plugin(apps, schema_editor):
+    Plugin = apps.get_model('DEINE_APP', 'plugin')
+    Plugin.objects.create(
+        type='D',
+        default=True,
+        name='CAM-AI Generic Detector Plugin',
+        version='1.0',
+        maker='The CAM-AI-Team',
+        copyright='GNU General Public License',
+        description='Default detector plugin',
+        path='/home/cam_ai/cam-ai/plugins/detectors/default/plugin.py'
+    )
+
 
 class Migration(migrations.Migration):
 
@@ -25,4 +38,5 @@ class Migration(migrations.Migration):
                 ('path', models.CharField(max_length=2048)),
             ],
         ),
+        migrations.RunPython(create_initial_plugin),
     ]
