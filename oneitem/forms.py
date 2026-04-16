@@ -51,6 +51,7 @@ class DetectorForm(forms.ModelForm):
       'det_max_size', 
       'det_max_rect',
       'det_scaledown',
+      'det_mode_code',
     )
     widgets = {
       'det_fpslimit' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 100, 'step' : 0.1}), 
@@ -61,6 +62,7 @@ class DetectorForm(forms.ModelForm):
       'det_max_size' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 200}), 
       'det_max_rect' : forms.NumberInput(attrs={'size': 10, 'min' : 1, 'max' : 100}), 
       'det_scaledown' : forms.NumberInput(attrs={'size': 10, 'min' : 0, 'max' : 256}), 
+      'det_mode_code' : forms.TextInput(attrs={'size': 10}),
     }
 
 class EventerForm(forms.ModelForm):

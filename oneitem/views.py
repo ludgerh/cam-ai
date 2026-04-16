@@ -142,6 +142,7 @@ class OneDetView(View):
       'det_max_rect' : dbline.det_max_rect,
       'det_scaledown' : dbline.det_scaledown,
       'det_positive_mask': dbline.det_positive_mask,
+      'det_mode_code': dbline.det_mode_code,
     })
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -173,10 +174,7 @@ class OneDetView(View):
     if not go_on:
         return HttpResponse('No Access!')
     dbline = await stream.objects.aget(id=detnr)
-    
     await dbline.arefresh_from_db()
-    print('11111', dbline.det_fpslimit)
-    
     mycam = viewables[detnr]['C']
     myurl = '/oneitem/detector/'
     form = DetectorForm(request.POST)
@@ -190,6 +188,7 @@ class OneDetView(View):
     dbline.det_max_size = form.cleaned_data['det_max_size']
     dbline.det_max_rect = form.cleaned_data['det_max_rect']
     dbline.det_scaledown = form.cleaned_data['det_scaledown']
+    dbline.det_mode_code = form.cleaned_data['det_mode_code']
     await dbline.asave(update_fields=[
       'det_fpslimit', 
       'det_threshold',
@@ -199,6 +198,7 @@ class OneDetView(View):
       'det_max_size',
       'det_max_rect',
       'det_scaledown',
+      'det_mode_code',
     ])
     return HttpResponseRedirect(myurl+str(detnr)+'/')
 

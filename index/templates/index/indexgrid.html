@@ -124,9 +124,7 @@ function isInViewport(el) {
   const rect = el[0].getBoundingClientRect();
   return (
     rect.top >= 0 &&
-    rect.left >= 0 &&
-    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
   );
 };
 
@@ -202,7 +200,7 @@ $(document).ready(async function() {
       const view = new DataView(buf);
       view.setUint8(0, '{{ mode }}'.charCodeAt(0));
       view.setUint32(1, cam.id, true);
-      view.setUint32(5, cam.onf_nrE, true);
+      view.setUint32(5, cam.onf_nr, true);
       trigger_Socket.send(buf); 
     } else {
       $('#imagespace' + cam.id).css({'object-fit':'cover'});

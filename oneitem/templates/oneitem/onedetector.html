@@ -352,7 +352,8 @@ $(document).ready(function() {
         +'#id_det_dilation, '
         +'#id_det_erosion, '
         +'#id_det_max_size, '
-        +'#id_det_max_rect'
+        +'#id_det_max_rect, '
+        +'#id_det_mode_code'
       ).change(function(evt) {
 		oneitemSocket.sendandwait({
 			'command' : 'setonefield',

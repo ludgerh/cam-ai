@@ -32,12 +32,12 @@ class shared_mem():
       }
     self.source_dict = {**new_items, **source_dict}
     self.offsets = {}
-    self.meta_format = ''
+    self.meta_format = []
     count = 0
     for item in self.source_dict:
       self.offsets[item] = count
       count += struct.calcsize(self.source_dict[item])
-      self.meta_format += self.source_dict[item]
+      self.meta_format.append(self.source_dict[item])
     self.dtype = np.uint8
     # metadata layout
     self.meta_format = ' '.join(self.meta_format)

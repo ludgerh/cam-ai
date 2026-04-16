@@ -45,6 +45,7 @@ class det_plugin(temp_plugin):
       'aoi_xdim' : 'i',
       'aoi_ydim' : 'i',
       'scaledown' : 'i',
+      'mode_code' : '50p'
   }
   
   def init_shared_mem(self, shared_mem, dbline):
@@ -57,6 +58,7 @@ class det_plugin(temp_plugin):
     shared_mem.write_1_meta('max_rect', dbline.det_max_rect)
     shared_mem.write_1_meta('apply_mask', dbline.det_apply_mask)
     shared_mem.write_1_meta('scaledown', 0)
+    shared_mem.write_1_meta('mode_code', dbline.det_mode_code.encode('utf-8'))
     
   async def async_init(self):
     self.sl = speedlimit(period = 0.0)
@@ -101,7 +103,9 @@ class det_plugin(temp_plugin):
     erosion, 
     dilation, 
     backgr_delay, 
+    mode_code,
   ): 
+    self.mode_code = mode_code
     if (mask is not None 
         and not edit_active 
         and frame.shape[:2] == mask.shape[:2]): 

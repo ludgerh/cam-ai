@@ -144,6 +144,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             value = int(params['value'])
             self.myitem.shared_mem.write_1_meta('max_rect', value)
             self.dbline.det_max_rect = value
+          elif params['pname'] == 'det_mode_code':
+            self.myitem.shared_mem.write_1_meta(
+              'mode_code', 
+              params['value'].encode('utf-8'), 
+            )
+            self.dbline.det_mode_code = params['value']
           elif params['pname'] == 'eve_fpslimit':
             value = float(params['value'])
             self.dbline.eve_fpslimit = value

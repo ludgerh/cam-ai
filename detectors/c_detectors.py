@@ -277,6 +277,7 @@ class det_worker(mp_process):
       erosion = self.shared_mem.read_1_meta('erosion'), 
       dilation = self.shared_mem.read_1_meta('dilation'), 
       backgr_delay = self.shared_mem.read_1_meta('backgr_delay'), 
+      mode_code = self.shared_mem.read_1_meta('mode_code').decode('utf-8'), 
     )
     if len(rect_list):  
       objectmaxsize = round(max(
