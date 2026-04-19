@@ -246,6 +246,7 @@ class cam_worker(mp_process):
           datapath + 'virt_cam_path/', 
         )
         self.virt_cam_path_ram = await djconf.agetconfig('virt_cam_path_ram', '')
+        #print('00000', self.virt_cam_path + self.dbline.cam_url, self.virt_cam_path_ram + self.dbline.cam_url)
         if self.virt_cam_path_ram:
           await aiofiles.os.makedirs(self.virt_cam_path_ram, exist_ok=True)
           await aioshutil.copy(
@@ -326,9 +327,9 @@ class cam_worker(mp_process):
               frameline[2],
             ]
           else:  
-            aoi = None  
+            aoi = None 
           if (self.dbline.cam_view 
-              and streams_redis.view_from_dev('C', self.id)):
+              or streams_redis.view_from_dev('C', self.id)):
             await self.viewer_queue.put(frameline)
           if (self.dbline.det_mode_flag 
               and (streams_redis.view_from_dev('D', self.id) 
@@ -544,7 +545,7 @@ class cam_worker(mp_process):
   async def run_one(self):
     if self.got_sigint:
       await a_break_type(BR_LONG)
-      return(None)   
+      return(None) 
     if self.dbline.cam_virtual_fps:
       self.virt_ts += self.virt_step
       streams_redis.set_virt_time(self.id, self.virt_ts)
@@ -759,6 +760,8 @@ class cam_worker(mp_process):
         await a_break_type(BR_LONG)
       streams_redis.set_ffmpeg_running(True)  
       ff_ts = time()
+      if log_ffmpeg:
+        log = open(logpath + f'ffmpeg{self.id}.log', "ab")
       self.ff_proc = await asyncio.create_subprocess_exec(
         '/usr/bin/ffmpeg',
         *cmd,

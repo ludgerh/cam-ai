@@ -108,7 +108,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
     try:
       await aclose_old_connections()
       await self.accept()
-      self.viewer_id = self.scope["query_string"].decode().split("vid=")[1]
+      self.viewer_id = self.scope["query_string"].decode().split('vid=')[1]
       async with viewer_dict_lock:
         self.status = viewer_dict.setdefault(self.viewer_id, {'connections' : 2, })
     except:
@@ -164,6 +164,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           await self.close()
       
       elif params['command'] == 'starttrigger':
+        #logger.info('<-- ' + str(text_data))
         if 'do_compress' in params:
           do_compress = params['do_compress']
         else:
@@ -202,7 +203,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           if params['type'] == 'E':
             myitem.shared_mem.write_1_meta('x_canvas', x_canvas)
           while not (params['idx'] in viewers and params['type'] in viewers[params['idx']]):
-            await asyncio.sleep(longbreak)
+            await asyncio.sleep(longbreak) 
           if show_cam:
             onf_index = myviewer.push_to_onf(
               outx = outx, 

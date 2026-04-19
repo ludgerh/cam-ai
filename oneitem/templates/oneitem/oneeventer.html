@@ -424,7 +424,7 @@ function reset_triggers(first = false) {
 
 $(document).ready(function() {
 	$('#imagespace').attr('draggable', false);
-  const viewer_id = crypto.randomUUID();
+  const viewer_id = Date.now().toString(36) + Math.random().toString(36).slice(2);
 {% if may_write %}
 	$('#oneform').children(':first').children(':first').children('.col-auto')
 			.children(
@@ -524,16 +524,6 @@ $(document).ready(function() {
 		  trigger_Socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
           const view = new DataView(e.data);
-          const new_x = view.getInt32(9, true);
-          const new_y = view.getInt32(13, true);
-          if (displaywidth != new_x) {
-            $('#imagespace').attr('width', new_x + 'px');
-            displaywidth = new_x;
-          };
-          if (displayheight != new_y) {
-            $('#imagespace').attr('height', new_y + 'px');
-            displayheight = new_y;
-          };
 		      const indicator = e.data.slice(0, 9);
           const imageBuffer = e.data.slice(17);
           const blob = new Blob([imageBuffer], { type: "image/jpeg" });
@@ -599,6 +589,7 @@ $(document).ready(function() {
         'token' : '{{ token }}',
       })
       .then((result) => {
+        console.log(result);
         $('#xdimtag').text(result.xdim);
         $('#ydimtag').text(result.ydim);
         $('#fpstag').text(result.fps);

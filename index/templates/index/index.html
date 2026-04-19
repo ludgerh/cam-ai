@@ -93,7 +93,7 @@ function delay(ms) {
 }
 
 $(document).ready(async function() {
-  const viewer_id = crypto.randomUUID();
+  const viewer_id = Date.now().toString(36) + Math.random().toString(36).slice(2);
   c_view_Socket = await WSAsync(
     `${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`
   );
@@ -108,16 +108,6 @@ $(document).ready(async function() {
     if (typeof(e.data) === 'object') {
       const view = new DataView(e.data);
       const idx = view.getInt32(1, true);
-      const new_x = view.getInt32(9, true);
-      const new_y = view.getInt32(13, true);
-      if (displaywidth[idx] !== new_x) {
-        $('#imagespace' + idx).attr('width', new_x + 'px');
-        displaywidth[idx] = new_x;
-      };
-      if (displayheight[idx] !== new_y) {
-        $('#imagespace' + idx).attr('height', new_y + 'px');
-        displayheight[idx] = new_y;
-      };
       const indicator = e.data.slice(0, 9);
       if (isInViewport($('#imagespace' + idx))) {
         const imageBuffer = e.data.slice(17);
@@ -169,19 +159,21 @@ $(document).ready(async function() {
   
   async function updateCams() {
     for (const cam of cams) {
-      let result = await c_view_Socket.sendandwait({
-        command: 'getcaminfo',
-        type: '{{ mode }}',
-        idx: cam.id,
-      });
-      if ('{{ mode }}' != 'C') {
-        $('#xdimtag' + cam.id).text(result.xdim);
-        $('#ydimtag' + cam.id).text(result.ydim);
-      };  
-      $('#fpstag' + cam.id).text(result.fps);
-      {% if user.is_superuser %}
-        $('#vnrtag' + cam.id).text(result.viewers);
-      {% endif %}
+      if (isInViewport($('#imagespace' + cam.id))) {
+        let result = await c_view_Socket.sendandwait({
+          command: 'getcaminfo',
+          type: '{{ mode }}',
+          idx: cam.id,
+        });
+        if ('{{ mode }}' != 'C') {
+          $('#xdimtag' + cam.id).text(result.xdim);
+          $('#ydimtag' + cam.id).text(result.ydim);
+        };  
+        $('#fpstag' + cam.id).text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtag' + cam.id).text(result.viewers);
+        {% endif %}
+      }
     }
   }
   

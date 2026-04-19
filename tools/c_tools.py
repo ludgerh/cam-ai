@@ -249,7 +249,7 @@ class c_buffer(l_buffer):
       frame = None  
     return(frame)
     
-debug = False    
+debug = False 
 
 def add_view_count(type, idx):
   streams_redis.inc_view_dev(type, idx)

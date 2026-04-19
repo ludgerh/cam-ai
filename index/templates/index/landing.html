@@ -101,7 +101,7 @@ function delay(ms) {
 }
 
 $(document).ready(async function() {
-  const viewer_id = crypto.randomUUID();
+  const viewer_id = Date.now().toString(36) + Math.random().toString(36).slice(2);
   c_view_Socket = await WSAsync(
     `${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`
   );
@@ -117,16 +117,6 @@ $(document).ready(async function() {
       const view = new DataView(e.data);
       const type = String.fromCharCode(view.getUint8(0));
       const idx = view.getInt32(1, true);
-      const new_x = view.getInt32(9, true);
-      const new_y = view.getInt32(13, true);
-      if (displaywidth[idx][type] !== new_x) {
-        $('#imagespace' + type + idx).attr('width', new_x + 'px');
-        displaywidth[idx][type] = new_x;
-      };
-      if (displayheight[idx][type] !== new_y) {
-        $('#imagespace' + type + idx).attr('height', new_y + 'px');
-        displayheight[idx][type] = new_y;
-      };
       const indicator = e.data.slice(0, 9);
       if (isInViewport($('#imagespace' + type + idx))) {
         const imageBuffer = e.data.slice(17);
@@ -232,40 +222,43 @@ $(document).ready(async function() {
   
   async function updateCams() {
     for (const cam of cams) {
-      if (!isInViewport($('#imagespaceC' + cam.id))) continue;
-      let result = await c_view_Socket.sendandwait({
-        command: 'getcaminfo',
-        type: 'C',
-        idx: cam.id,
-      });
-      $('#fpstagC' + cam.id).text(result.fps);
-      {% if user.is_superuser %}
-        $('#vnrtagC' + cam.id).text(result.viewers);
-      {% endif %}
-      if (!isInViewport($('#imagespaceD' + cam.id))) continue;
-      result = await c_view_Socket.sendandwait({
-        command: 'getcaminfo',
-        type: 'D',
-        idx: cam.id,
-      });
-      $('#xdimtagD' + cam.id).text(result.xdim);
-      $('#ydimtagD' + cam.id).text(result.ydim);
-      $('#fpstagD' + cam.id).text(result.fps);
-      {% if user.is_superuser %}
-        $('#vnrtagD' + cam.id).text(result.viewers);
-      {% endif %}
-      if (!isInViewport($('#imagespaceE' + cam.id))) continue;
-      result = await c_view_Socket.sendandwait({
-        command: 'getcaminfo',
-        type: 'E',
-        idx: cam.id,
-      });
-      $('#xdimtagE' + cam.id).text(result.xdim);
-      $('#ydimtagE' + cam.id).text(result.ydim);
-      $('#fpstagE' + cam.id).text(result.fps);
-      {% if user.is_superuser %}
-        $('#vnrtagE' + cam.id).text(result.viewers);
-      {% endif %}
+      if (isInViewport($('#imagespaceC' + cam.id))) {
+        let result = await c_view_Socket.sendandwait({
+          command: 'getcaminfo',
+          type: 'C',
+          idx: cam.id,
+        });
+        $('#fpstagC' + cam.id).text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtagC' + cam.id).text(result.viewers);
+        {% endif %}
+      };  
+      if (isInViewport($('#imagespaceD' + cam.id))) {
+        result = await c_view_Socket.sendandwait({
+          command: 'getcaminfo',
+          type: 'D',
+          idx: cam.id,
+        });
+        $('#xdimtagD' + cam.id).text(result.xdim);
+        $('#ydimtagD' + cam.id).text(result.ydim);
+        $('#fpstagD' + cam.id).text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtagD' + cam.id).text(result.viewers);
+        {% endif %}
+      };
+      if (isInViewport($('#imagespaceE' + cam.id))) {
+        result = await c_view_Socket.sendandwait({
+          command: 'getcaminfo',
+          type: 'E',
+          idx: cam.id,
+        });
+        $('#xdimtagE' + cam.id).text(result.xdim);
+        $('#ydimtagE' + cam.id).text(result.ydim);
+        $('#fpstagE' + cam.id).text(result.fps);
+        {% if user.is_superuser %}
+          $('#vnrtagE' + cam.id).text(result.viewers);
+        {% endif %}
+      }
     }
   }
   

@@ -207,7 +207,7 @@ let wait = 0;
 
 $(document).ready(function() {
 	$('#imagespace').attr('draggable', false);
-  const viewer_id = crypto.randomUUID();
+  const viewer_id = Date.now().toString(36) + Math.random().toString(36).slice(2);
   WSAsync(`${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`)
 	.then((result) => {
 		c_view_Socket = result;
@@ -238,16 +238,6 @@ $(document).ready(function() {
 		  trigger_Socket.onmessage = function(e) {
         if (typeof(e.data) === 'object') {
           const view = new DataView(e.data);
-          const new_x = view.getInt32(9, true);
-          const new_y = view.getInt32(13, true);
-          if (displaywidth != new_x) {
-            $('#imagespace').attr('width', new_x + 'px');
-            displaywidth = new_x;
-          };
-          if (displayheight != new_y) {
-            $('#imagespace').attr('height', new_y + 'px');
-            displayheight = new_y;
-          };
 		      const indicator = e.data.slice(0, 9);
           const imageBuffer = e.data.slice(17);
           const blob = new Blob([imageBuffer], { type: "image/jpeg" });

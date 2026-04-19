@@ -141,7 +141,7 @@ $(document).ready(async function() {
           window.location.href = window.location.protocol + '//' + window.location.host;
       }
   });
-  const viewer_id = crypto.randomUUID();
+  const viewer_id = Date.now().toString(36) + Math.random().toString(36).slice(2);
   c_view_Socket = await WSAsync(
     `${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`
   );
@@ -156,16 +156,6 @@ $(document).ready(async function() {
     if (typeof(e.data) === 'object') {
       const view = new DataView(e.data);
       const idx = view.getInt32(1, true);
-      const new_x = view.getInt32(9, true);
-      const new_y = view.getInt32(13, true);
-      if (displaywidth[idx] !== new_x) {
-        $('#imagespace' + idx).attr('width', new_x + 'px');
-        displaywidth[idx] = new_x;
-      };
-      if (displayheight[idx] !== new_y) {
-        $('#imagespace' + idx).attr('height', new_y + 'px');
-        displayheight[idx] = new_y;
-      };
       const indicator = e.data.slice(0, 9);
       //if (isInViewport($('#imagespace' + idx))) {
         const imageBuffer = e.data.slice(17);
