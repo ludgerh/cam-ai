@@ -39,7 +39,7 @@ from oneitem.shared_mem import shared_mem
 from streams.models import stream
 
 class c_detector():
-  def __init__(self, dbline, myeventer, worker_id, logger, ):
+  def __init__(self, dbline, my_eventer, my_worker, logger, ):
     self.type = 'D'
     self.id = dbline.id
     add_viewer((my_viewer := c_viewer(self.type, self.id, logger,)))
@@ -62,8 +62,11 @@ class c_detector():
     self.det_worker = det_worker(
       dbline, 
       my_viewer.inqueue,
-      myeventer.eve_worker.detectorqueue,
-      worker_id,
+      my_eventer.eve_worker.inqueue,
+      my_eventer.eve_worker.detectorqueue,
+      my_worker.inqueue,
+      my_worker.registerqueue,
+      my_worker.id,
       logger, 
       self.shared_mem.shm.name, 
       plugin_line.path,
@@ -91,7 +94,10 @@ class det_worker(mp_process):
   def __init__(self, 
       dbline, 
       myviewer_queue, 
+      myeventer_in_queue,
       myeventer_det_queue, 
+      worker_inqueue, 
+      worker_registerqueue, 
       worker_id,
       logger, 
       shm_name, 
@@ -109,7 +115,10 @@ class det_worker(mp_process):
         block_put = False, 
         #debug = 'Det' + str(self.id), 
       )
-    self.myeventer_det_queue = myeventer_det_queue 
+    self.myeventer_in_queue = myeventer_in_queue 
+    self.myeventer_det_queue = myeventer_det_queue
+    self.myworker_inqueue = worker_inqueue
+    self.myworker_registerqueue = worker_registerqueue
     self.tf_worker_id = worker_id
     self.viewer_queue = myviewer_queue
     self.inqueue = s_queue()
@@ -176,7 +185,7 @@ class det_worker(mp_process):
         name = 'in_queue_thread', 
       )
       self.do_run = True
-      await self.plugin.async_init()
+      await self.plugin.async_init(self)
       self.x_from_cam = -1
       self.y_from_cam = -1
       self.run_lock = False
@@ -227,6 +236,7 @@ class det_worker(mp_process):
           if self.dbline.det_view and streams_redis.view_from_dev('D', self.id):
             await self.viewer_queue.put(frameline)
         await a_break_type(BR_SHORT)
+      await self.plugin.async_stop(self)
       await self.dataqueue.stop()
       self.logger.info('Finished Process '+self.logname+'...')
     except Exception as fatal:
@@ -239,16 +249,13 @@ class det_worker(mp_process):
 
   async def run_one(self, frameline): 
     if frameline[2] == 0.0:
-      return(None)
-    frametime = frameline[2]
+      return(None) 
     greenlight = await self.plugin.check_time(
-      frametime,
-      self.shared_mem.read_1_meta('fps_limit'),
-      self.dbline.cam_virtual_fps > 0.0,
-      tf_workers_redis.get_buf_size_10(self.tf_worker_id),
-      self.id,
+      self, 
+      tf_workers_redis.get_buf_size_10(self.tf_worker_id), 
+      frameline[2],
       self.logger,
-    )
+    ) 
     if self.got_sigint or not greenlight:
       return(None)
     if self.run_lock and not self.dbline.cam_virtual_fps: 
@@ -297,7 +304,7 @@ class det_worker(mp_process):
               await self.myeventer_det_queue.put((
                 3, 
                 aoi, 
-                frametime, 
+                frameline[2], 
                 rect, 
                 (await asyncio.to_thread(cv.imencode, '.bmp', aoi))[1].tobytes(),
               ))  
@@ -310,7 +317,7 @@ class det_worker(mp_process):
       self.dbline.det_fpsactual = fps
       streams_redis.fps_to_dev(self.type, self.id, fps)
     self.run_lock = False
-    return([3, frame, frametime])
+    return([3, frame, frameline[2]])
 
   async def stop(self):
     await self.dbline.asave(update_fields = ['det_fpsactual', ])

@@ -109,7 +109,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.dbline.cam_pause = params['value']
             self.myitem.shared_mem.write_1_meta('apply_pause', bool(params['value']))
           elif params['pname'] == 'cam_fpslimit':
-            self.dbline.cam_fpslimit = float(params['value'])
+            value = float(params['value'])
+            self.myitem.shared_mem.write_1_meta('fps_limit', value)
+            self.dbline.cam_fpslimit = value
           elif params['pname'] == 'cam_feed_type':
             self.dbline.cam_feed_type = int(params['value'])
           elif params['pname'] == 'cam_url':
@@ -243,6 +245,10 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       elif params['command'] == 'mousedown':
         if self.my_viewer.drawpad.edit_active:
           if self.may_write:
+            #print(
+            #  round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
+            #  round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']),
+            #)
             self.my_viewer.drawpad.mousedownhandler(
               round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
               round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']), 

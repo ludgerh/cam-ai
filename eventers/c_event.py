@@ -101,7 +101,7 @@ class c_event(list):
   crypt = None
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
-      idx, shrink_factor, logger):
+      idx, shrink_factor, logger, max_items = None, name = None):
     self.event_lock = t_lock()
     with self.event_lock:
       super().__init__()
@@ -110,6 +110,7 @@ class c_event(list):
       self.eventer_id = eventer_dbl.id
       self.eventer_name = eventer_dbl.name
       self.tf_w_index = tf_w_index
+      self.max_items = max_items
       self.xmax = eventer_dbl.cam_xres - 1
       self.ymax = eventer_dbl.cam_yres - 1
       self.margin = margin
@@ -137,12 +138,11 @@ class c_event(list):
       self.focus_time = frame[2]
       self.check_out_ts = None
       self.dirs_checked = False
+      self.name = name
   
   @classmethod  
-  async def create(cls, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
-      idx, shrink_factor, logger):
-    instance = cls(tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
-      idx, shrink_factor, logger)
+  async def create(cls, **kwargs):
+    instance = cls(**kwargs)
     instance.stream_creator = await database_sync_to_async(lambda: instance.dbline.camera.creator)()
     if c_event.crypt is None:
       if instance.dbline.camera.encrypted:
@@ -164,7 +164,8 @@ class c_event(list):
       for i in range(100):
         pathadd = str(self.dbline.camera.id) + '/' + str(i)
         await aiofiles.os.makedirs(self.schoolpath + pathadd, exist_ok=True)
-      self.number_of_frames = await djconf.agetconfigint('frames_event', 32) 
+      if self.max_items is None:  
+        self.max_items = await djconf.agetconfigint('frames_event', 32) 
     self.tag_list = await database_sync_to_async(get_taglist)(self.schoolnr)
 
   def add_frame(self, frame):
@@ -231,17 +232,22 @@ class c_event(list):
         predline += str(self.tag_list[i].name)[:3]
     return(predline+']')
 
-  async def frames_filter(self, outlength, cond_dict):  
-    sortindex = [x for x in self.frames if (
-      await resolve_rules(cond_dict[2],  self.frames[x][5])
-        or await resolve_rules(cond_dict[3], self.frames[x][5])
-        or await resolve_rules(cond_dict[4],  self.frames[x][5])
-    )] 
-    if len(sortindex) > outlength:
+  async def frames_filter(self, cond_dict):
+    if cond_dict: 
+      sortindex = [x for x in self.frames if (
+        await resolve_rules(cond_dict[2],  self.frames[x][5])
+          or await resolve_rules(cond_dict[3], self.frames[x][5])
+          or await resolve_rules(cond_dict[4],  self.frames[x][5])
+      )] 
+    else:  
+      sortindex = list(self.frames.keys())
+    if self.max_items and len(sortindex) > self.max_items:
       sortindex.sort(key=lambda x: np.max(self.frames[x][5][1:]), reverse=True) #prediction
-      sortindex = sortindex[:outlength]
+      sortindex = sortindex[:self.max_items]
       sortindex.sort(key=lambda x: self.frames[x][2]) #timestamp
-    self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
+    if len(self.frames) > len(sortindex):  
+      self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
+      
     
   async def process_frame(self, frame):
     pathadd = str(self.dbline.camera.id) + '/' + str(randint(0,99))
@@ -269,12 +275,17 @@ class c_event(list):
     if self.to_email:
       frame.append(frameline.id)
 
-  async def save(self, cond_dict):
-    #print('*** Saving Event:', self.id)
-    await self.frames_filter(self.number_of_frames, cond_dict)
+  async def save(self, cond_dict = None):
+    print('*** Saving Event:', self.id)
+    await self.frames_filter(cond_dict)
     frames_to_save = self.frames.values()
-    self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
-      + await self.p_string())
+    if self.name == 'Active robot':
+      frames_to_save = list(frames_to_save)[:-6]
+    if self.name is None:
+      self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
+        + await self.p_string())
+    else:  
+      self.dbline.p_string = self.name
     self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
     self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
     self.dbline.xmin=self[0]

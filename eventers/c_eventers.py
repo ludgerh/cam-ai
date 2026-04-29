@@ -66,8 +66,6 @@ from .redis import my_redis as eventers_redis
 from .c_alarm import alarm, alarm_init
 from .c_event import resolve_rules, c_event
 
-MAX_EVENT_LENGTH = 120
-
 _SH_MEM_ITEMS = {
     'fps_limit' : 'd',
     'margin' : 'i',
@@ -188,6 +186,10 @@ class eve_worker(mp_process):
     self.last_saved_event_end = 0.0
     self.inqueue = s_queue()
     self.shm_name = shm_name
+    self.event_name = None
+    self.event_max_items = 32
+    self.event_max_time = 120.0
+    self.plugin_active = False
 
   def run(self):
     asyncio.run(self.async_runner()) 
@@ -200,7 +202,7 @@ class eve_worker(mp_process):
     try:
       while self.do_run:
         received = await asyncio.to_thread(self.inqueue.get)
-        #print(f'***** EVE Inqueue #{self.id}:', received) 
+        print(f'***** EVE Inqueue #{self.id}:', received) 
         if (received[0] == 'new_video'):
           async with self.vid_deque_lock:
             self.vid_deque.append(received[1:])
@@ -240,6 +242,19 @@ class eve_worker(mp_process):
         elif (received[0] == 'save_conditions'):
           self.cond_dict[received[1]] = json.loads(received[2])
           await self.set_cam_counts()
+        elif (received[0] == 'set_event_params'):
+          if (temp := received[1].get('event_name')) is not None:
+            self.event_name = temp
+            print('event_name --> ', temp)
+          if (temp := received[1].get('event_max_items')) is not None:
+            self.event_max_items = temp
+            print('event_max_items --> ', temp)
+          if (temp := received[1].get('event_max_time')) is not None:
+            self.event_max_time = temp
+            print('event_max_time --> ', temp)
+          if (temp := received[1].get('plugin_active')) is not None:
+            self.plugin_active = temp
+            print('plugin_active --> ', temp)
         elif (received[0] == 'stop'):
           self.got_sigint = True
           self.do_run = False  
@@ -325,7 +340,7 @@ class eve_worker(mp_process):
       self._tasks.append(asyncio.create_task(self.inserter(), name="E:inserter"))
       if self.dbline.eve_webm_doit:
         self._tasks.append(asyncio.create_task(self.make_webm(), name="E:make_webm"))
-      self.inferencing_status = 0
+      #self.inferencing_status = 0
       self.fps_limit_old = -1
       self.email_address = self.dbline.eve_alarm_email
       #print(f'Launch: eventer #{self.id}')
@@ -336,11 +351,11 @@ class eve_worker(mp_process):
         frameline = await self.dataqueue.get(timeout = 2.0)
         if frameline is None:
           continue
-        if self.inferencing_status == 1:
-          await a_break_type(BR_LONG)
-          continue
-        elif self.inferencing_status == 0:  
-          self.inferencing_status = 1  
+        #if self.inferencing_status == 1:
+        #  await a_break_type(BR_LONG)
+        #  continue
+        #elif self.inferencing_status == 0:  
+        #  self.inferencing_status = 1  
         if not self.do_run:
           break  
         if (frameline[0] is not None 
@@ -349,17 +364,9 @@ class eve_worker(mp_process):
             self.y_from_cam, self.x_from_cam = frameline[1].shape[:2]
             self.shared_mem.write_1_meta('aoi_xdim', self.x_from_cam)
             self.shared_mem.write_1_meta('aoi_ydim', self.y_from_cam)
-            #x_canvas = self.shared_mem.read_1_meta('x_canvas')
-            #if x_canvas and frameline[1].shape[1] > x_canvas:
-            #  scaling = max(x_canvas / frameline[1].shape[1], 0.125)
-            #else:
-            #  scaling = 1.0  
-            #self.linewidth = round(4.0 / scaling)
-            #self.textheight = round(0.51 / scaling)
-            #self.textthickness = round(2.0 / scaling)  
             self.linewidth = 4
             self.textheight = 1
-            self.textthickness = 2  
+            self.textthickness = 2
           await self.run_one(frameline)  
         else:
           await a_break_type(BR_MEDIUM)
@@ -400,9 +407,6 @@ class eve_worker(mp_process):
       self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
 
   async def run_one(self, frame):
-    if streams_redis.check_if_counts_zero('E', self.id):
-      await a_break_type(BR_LONG)
-      return()
     if streams_redis.view_from_dev('E', self.id):
       if self.fps_limit_old != (new_fps := self.shared_mem.read_1_meta('fps_limit')):
         if new_fps == 0:
@@ -438,7 +442,7 @@ class eve_worker(mp_process):
       newtime = streams_redis.get_virt_time(self.id)
     else:
       newtime = time() 
-    if item.end < newtime - 2 * MAX_EVENT_LENGTH:
+    if item.end < newtime - 2 * self.event_max_time:
       async with self.event_dict_lock:
         self.event_dict.pop(i, None)
       return()
@@ -446,7 +450,8 @@ class eve_worker(mp_process):
       item.check_out_ts = item.end
     else:  
       if (item.end < newtime - self.shared_mem.read_1_meta('event_time_gap')
-          or item.end > item.start + MAX_EVENT_LENGTH):
+          or item.end > item.start + self.event_max_time
+          or item.name != self.event_name):
         item.check_out_ts = item.end
     if self.cond_dict[5]:
       predictions = await item.pred_read(max=1.0)
@@ -573,7 +578,11 @@ class eve_worker(mp_process):
         else:  
           is_done = False
       if is_done:
-        await item.save(self.cond_dict)
+        if self.plugin_active:
+          temp = None  
+        else:
+          temp = self.cond_dict
+        await item.save(cond_dict = temp)
     if is_done: 
       self.last_saved_event_end = item.check_out_ts
       async with self.event_dict_lock:
@@ -654,9 +663,11 @@ class eve_worker(mp_process):
             if not self.shared_mem.read_1_meta('one_frame_per_event'):
               async with self.event_dict_lock:
                 check_list = list(self.event_dict.items())
+                
               for j, item in check_list:
-                if hasoverlap((frame[3][0] - margin, frame[3][1] + margin, 
-                    frame[3][2] - margin, frame[3][3] + margin), item):
+                if (self.plugin_active 
+                    or hasoverlap((frame[3][0] - margin, frame[3][1] + margin, 
+                    frame[3][2] - margin, frame[3][3] + margin), item)):
                   found = item
                   break
                 await a_break_type(BR_SHORT)
@@ -666,15 +677,17 @@ class eve_worker(mp_process):
                 while count in self.event_dict:
                   count += 1  
                 new_event = await c_event.create(
-                  self.tf_worker, 
-                  self.tf_w_index, 
-                  frame, 
-                  margin, 
-                  self.dbline, 
-                  self.shared_mem.read_1_meta('school'), 
-                  count, 
-                  self.shared_mem.read_1_meta('shrink_factor'), 
-                  self.logger, 
+                  tf_worker = self.tf_worker, 
+                  tf_w_index = self.tf_w_index, 
+                  frame = frame, 
+                  margin = margin, 
+                  eventer_dbl = self.dbline, 
+                  school_nr = self.shared_mem.read_1_meta('school'), 
+                  idx = count, 
+                  shrink_factor = self.shared_mem.read_1_meta('shrink_factor'), 
+                  logger = self.logger, 
+                  max_items = self.event_max_items,
+                  name = self.event_name,
                 )
                 new_event.remaining_alarms = self.shared_mem.read_1_meta('alarm_max_nr')
                 self.event_dict[count] = new_event
@@ -684,7 +697,7 @@ class eve_worker(mp_process):
                 found.add_frame(frame)
                 await self.merge_events()
           self.last_insert_ready = frame[2]
-          self.inferencing_status = 2
+          #self.inferencing_status = 2
           del frame
           detector_buffer.clear()
         else:

@@ -248,7 +248,7 @@ $(document).ready(function() {
           $('#vnrtag').text(result.viewers);
         {% endif %}
       })
-    }, 5000);
+    }, 500); // 1/2 second
 	});
 {% if may_write %}
 	$('#ch_show').change((evt) => {

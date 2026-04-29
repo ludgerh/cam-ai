@@ -15,6 +15,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import asyncio
+import aioshutil
 import aiofiles.os
 import os
 import psutil
@@ -471,4 +472,19 @@ def kill_all_processes():
     for child in still_alive:
       child.kill()
   os._exit(0)
+  
+async def merge_move(src: Path, dst: Path):
+  await aiofiles.os.makedirs(dst, exist_ok=True)
+  for item in src.iterdir():
+    target = dst / item.name
+    if item.is_dir():
+      if target.exists():
+        await merge_move(item, target)
+        await aiofiles.os.rmdir(item)
+      else:
+        await aioshutil.move(item, target)
+    else:
+      if target.exists():
+        await aiofiles.os.remove(target)
+      await aioshutil.move(item, target)
 

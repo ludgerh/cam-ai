@@ -44,7 +44,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import aclose_old_connections
-from tools.l_tools import djconf, displaybytes
+from tools.l_tools import djconf, displaybytes, merge_move
 from tools.l_smtp import l_smtp, l_msg
 from tools.l_break import a_break_type, BR_LONG
 from camai.c_settings import safe_import
@@ -604,11 +604,10 @@ class admin_tools_async(AsyncWebsocketConsumer):
             backup_path / 'accounts' / 'templates' / 'registration' / 'terms.html',
             BASE_PATH / 'accounts' / 'templates' / 'registration' / 'terms.html',
           )
-        with suppress(FileNotFoundError):
-          await aioshutil.move(
-            backup_path / 'plugins',
-            BASE_PATH / 'plugins',
-          )
+        src = backup_path / 'plugins'
+        dst = BASE_PATH / 'plugins'
+        if src.exists():
+          await merge_move(src, dst)
         datapath_rel = DATAPATH.relative_to(BASE_PATH) #not complete if DATAPATH absolute
         await aioshutil.move(backup_path / datapath_rel, DATAPATH)
         src = BASE_PATH / "runserver.sh"

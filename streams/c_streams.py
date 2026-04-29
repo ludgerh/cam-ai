@@ -56,7 +56,7 @@ class c_stream():
         self.mydetector = await sync_to_async(c_detector)(
           self.dbline, 
           self.myeventer,
-          my_worker.id,
+          my_worker,
           self.logger,
         )
         add_viewable(self.mydetector)

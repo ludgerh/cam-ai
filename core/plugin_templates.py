@@ -60,38 +60,51 @@ class det_plugin(temp_plugin):
     shared_mem.write_1_meta('scaledown', 0)
     shared_mem.write_1_meta('mode_code', dbline.det_mode_code.encode('utf-8'))
     
-  async def async_init(self):
-    self.sl = speedlimit(period = 0.0)
+  async def async_init(self, my_detector):
+    self.my_detector = my_detector
+    self.speed_factor = 1.0
+    self.divisor = 1.0
+    self.sl = speedlimit(
+      period = self.divisor / self.my_detector.dbline.det_fpslimit / self.speed_factor
+    )
     self.som = speedometer()
     self.div_ts = 0.0
     self.div_old = 1.0
     self.ts_background = time()
+  
+  def set_speed_factor(self, value):
+    if value != self.speed_factor:
+      #print('$$$$$ New Speed Factor:', value)
+      self.speed_factor = value
+      if (fps_limit := self.my_detector.shared_mem.read_1_meta('fps_limit')):
+        self.sl.period = self.divisor / fps_limit / value
+      else:   
+        self.sl.period = 0.0
     
-  async def check_time(self, 
-      frame_time, 
-      fps_limit, 
-      virtual_cam, 
-      buffer_size,
-      self_id,
-      logger, 
-    ):  
-    if (new_time := time()) - self.div_ts >= 5.0 and not virtual_cam:  
+  async def check_time(self, my_detector, buffer_size, frame_time, logger):
+    if (new_time := time()) - self.div_ts >= 5.0:  
       if buffer_size < 2.5:
-        divisor = 1.0  
+        self.divisor = 1.0  
       elif buffer_size < 5.0:
-        divisor = 2.0   
+        self.divisor = 2.0   
       elif buffer_size < 10.0:
-        divisor = 4.0  
+        self.divisor = 4.0  
       else:  
-        divisor = 8.0  
-      new_period = 0.0 if fps_limit == 0 else divisor / fps_limit
+        self.divisor = 8.0  
+      if (fps_limit := my_detector.shared_mem.read_1_meta('fps_limit')):
+        new_period = self.divisor / fps_limit
+      else:   
+        new_period = 0.0
       if self.sl.period != new_period:
-        self.sl.period = new_period
-      if divisor != self.div_old:
-        self.div_old = divisor
-        logger.warning(f'DE{self_id}: Fpm divisor = {divisor}')
-      self.div_ts = new_time
+        self.sl.period = new_period / self.speed_factor
+      if self.divisor != self.div_old:
+        self.div_old = self.divisor
+        logger.warning(f'DE{my_detector.id}: Fpm divisor = {self.divisor}')
+      self.div_ts = new_time  
     return(self.sl.greenlight(frame_time))
+    
+  async def async_stop(self, my_detector):
+    pass
     
   async def process_frame(self, 
     frame, 
