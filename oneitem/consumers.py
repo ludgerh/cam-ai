@@ -246,6 +246,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         if self.my_viewer.drawpad.edit_active:
           if self.may_write:
             #print(
+            #  self.my_viewer.client_dict[self.v_client_nr]['x_scaling'],
+            #  self.my_viewer.client_dict[self.v_client_nr]['y_scaling'],
             #  round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
             #  round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']),
             #)

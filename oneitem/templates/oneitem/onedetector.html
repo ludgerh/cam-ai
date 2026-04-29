@@ -164,18 +164,18 @@ $(document).ready(function() {
           const view = new DataView(e.data);
           const new_x = view.getInt32(9, true);
           const new_y = view.getInt32(13, true);
-          if (displaywidth != new_x) {
-            $('#imagespace').attr('width', new_x);
-            displaywidth = new_x;
-          };
-          if (displayheight != new_y) {
-            $('#imagespace').attr('height', new_y);
-            displayheight = new_y;
-          };
 		      const indicator = e.data.slice(0, 9);
           const imageBuffer = e.data.slice(17);
           const blob = new Blob([imageBuffer], { type: "image/jpeg" });
           const img = $('#imagespace');
+          if (displaywidth != new_x) {
+            img.attr('width', new_x);
+            displaywidth = new_x;
+          };
+          if (displayheight != new_y) {
+            img.attr('height', new_y);
+            displayheight = new_y;
+          };
           if (img.data('url')) {
             URL.revokeObjectURL(img.data('url'));
           }
