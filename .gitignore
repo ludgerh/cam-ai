@@ -27,9 +27,11 @@ plugins/*
 # aber die Ordner selbst behalten
 !plugins/
 !plugins/detectors/
+!plugins/alarms/
 
 # alles unter detectors ignorieren
 plugins/detectors/*
+plugins/alarms/*
 
 # außer detectors/default komplett erlauben
 !plugins/detectors/default/

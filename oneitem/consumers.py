@@ -182,7 +182,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.myitem.shared_mem.write_1_meta('alarm_max_nr', value)
           elif params['pname'] == 'eve_alarm_email':
             self.dbline.eve_alarm_email = params['value']
-            self.myitem.eve_worker.inqueue.put(('set_alarm_email', params['value']))
+            self.myitem.inqueue.put(('set_alarm_email', params['value']))
           elif params['pname'] == 'eve_one_frame_per_event':
             self.dbline.eve_eve_one_frame_per_event = params['value']
             self.myitem.shared_mem.write_1_meta('one_frame_per_event', params['value'])
@@ -391,7 +391,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
       elif params['command'] == 'save_conditions':
         if self.may_write:
-          self.myitem.eve_worker.inqueue.put((
+          self.myitem.inqueue.put((
             'save_conditions', params['reaction'], params['conditions']))
           cond_dict = json.loads(params['conditions'])
           conditionlines = evt_condition.objects.filter(
