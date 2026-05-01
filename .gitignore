@@ -36,11 +36,11 @@ plugins/alarms/*
 # außer detectors/default komplett erlauben
 !plugins/detectors/default/
 !plugins/detectors/default/**
-# plugins/detectors/default/*.py~
+plugins/detectors/default/*.py~
 plugins/detectors/default/__pycache__/*
 
 # außer alarms/default komplett erlauben
 !plugins/alarms/default/
 !plugins/alarms/default/**
-# plugins/alarms/default/*.py~
+plugins/alarms/default/*.py~
 plugins/alarms/default/__pycache__/*

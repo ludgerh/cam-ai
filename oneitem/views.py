@@ -107,7 +107,7 @@ class OneCamView(View):
         'name', 'cam_pause', 'cam_fpslimit', 'cam_ffmpeg_fps',
         'cam_url', 'cam_checkdoubles',
     ])
-    await asyncio.to_thread(mycam.cam_worker.inqueue.put, (('reset_cam',)), )
+    await asyncio.to_thread(mycam.inqueue.put, (('reset_cam',)), )
     return HttpResponseRedirect(f'{myurl}{camnr}/')
 
   async def check_access(self, request, camnr, tokennr, token):

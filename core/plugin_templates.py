@@ -178,7 +178,7 @@ class alarm_plugin(temp_plugin):
   def action(self, predictions):
     mylist = list(predictions)[1:]
     maxpos = mylist.index(max(mylist))
-    self.logger.info(f'{self.settings.settings['output']} {self.eve_dbline.name}'
+    self.logger.info(f'{self.settings.settings["output"]} {self.eve_dbline.name}'
       f'({self.eve_dbline.id}) : {self.tag_list[maxpos+1].name}')
       
 
