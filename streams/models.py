@@ -62,7 +62,12 @@ class stream(models.Model):
   det_view = models.BooleanField(default=True)
   det_fpslimit = models.FloatField('FPS limit', default=2.0)
   det_fpsactual = models.FloatField(default=0)
-  det_plugin = models.ForeignKey(plugin, on_delete=models.SET_DEFAULT, default=1)
+  det_plugin = models.ForeignKey(
+    plugin, 
+    on_delete=models.SET_DEFAULT, 
+    default=1, 
+    related_name='det_streams',
+  )
   det_threshold = models.IntegerField('threshold', default=40)
   det_backgr_delay = models.IntegerField('background delay', default=1)
   det_dilation = models.IntegerField('dilation', default=20)
@@ -81,10 +86,15 @@ class stream(models.Model):
   eve_view = models.BooleanField(default=True)
   eve_fpslimit = models.FloatField('FPS limit', default=0.0)
   eve_fpsactual = models.FloatField(default=0)
+  eve_alarm_plugin = models.ForeignKey(
+    plugin, 
+    on_delete=models.SET_DEFAULT, 
+    default=1,
+    related_name='alarm_streams',
+  )
   cam_scaledown = models.IntegerField('scaledown', default=1)
   eve_shrink_factor = models.FloatField('shrink factor', default=0.2) # 0.0 -> No Shrinking 1.0 50%
   eve_sync_factor = models.FloatField('sync factor', default=0.0) # in seconds
-  eve_alarm_max_nr = models.IntegerField('max alarm nr', default=99)
   eve_alarm_email = models.CharField('alarm email', max_length=255, default='')
   eve_one_frame_per_event = models.BooleanField('one frame per event', default=False)
   eve_event_time_gap = models.IntegerField('new event gap', default=60)

@@ -23,6 +23,9 @@ import aiofiles
 import aiofiles.os
 import aioshutil
 import signal
+import importlib.util
+import sys
+from pathlib import Path
 from logging import getLogger
 from signal import SIGKILL
 from setproctitle import setproctitle
@@ -73,7 +76,6 @@ _SH_MEM_ITEMS = {
     'shrink_factor' : 'd',
     'sync_factor' : 'd',
     'school' : 'i',
-    'alarm_max_nr' : 'i',
     'one_frame_per_event' : 'i',
     'nr_of_cond_ed' : 'i',
     'last_cond_ed' : 'i',
@@ -87,14 +89,11 @@ class c_eventer():
     self.type = 'E'
     self.dbline = dbline
     self.id = dbline.id
-    add_viewer((my_viewer := c_viewer(
-      self.type, 
-      self.id, 
-      logger,
-    )))
+    add_viewer((my_viewer := c_viewer(self.type, self.id, logger)))
     self.viewer = my_viewer
     streams_redis.zero_to_dev(self.type, self.id)
     streams_redis.fps_to_dev(self.type, self.id, 0.0)
+    plugin_line = dbline.eve_alarm_plugin
     self.shared_mem = shared_mem(
       source_dict = _SH_MEM_ITEMS, 
     )
@@ -104,17 +103,33 @@ class c_eventer():
     self.shared_mem.write_1_meta('shrink_factor', dbline.eve_shrink_factor)
     self.shared_mem.write_1_meta('sync_factor', dbline.eve_sync_factor)
     self.shared_mem.write_1_meta('school', dbline.eve_school.id)
-    self.shared_mem.write_1_meta('alarm_max_nr', dbline.eve_alarm_max_nr)
     self.shared_mem.write_1_meta('one_frame_per_event', dbline.eve_one_frame_per_event)
     self.shared_mem.write_1_meta('nr_of_cond_ed', 0)
+    
+    # Create dataqueue, detectorqueue and inqueue in the parent process,
+    # since other processes (c_cam, c_detector) need to access them
+    if dbline.cam_virtual_fps:
+      self.dataqueue = c_buffer()
+    else:
+      self.dataqueue = c_buffer(block_put=False)
+    self.detectorqueue = l_buffer('ONOOB')
+    self.inqueue = s_queue()
+    
     self.eve_worker = eve_worker(
       dbline, 
-      my_viewer.inqueue,
-      my_worker.inqueue,
-      my_worker.registerqueue,
       my_worker.id,
-      logger, 
       self.shared_mem.shm.name, 
+      plugin_line.path,
+      plugin_line.id,
+      # Pass queues via args= to Process (do NOT store as self.xxx!):
+      queues = (
+        self.dataqueue,                    # 0: dataqueue
+        self.detectorqueue,                # 1: detectorqueue
+        self.inqueue,                      # 2: inqueue
+        my_viewer.inqueue,                 # 3: viewer_queue
+        my_worker.inqueue,                 # 4: worker_in
+        my_worker.registerqueue,           # 5: worker_reg
+      ),
     ) 
 
   def build_string(self, i):
@@ -140,7 +155,7 @@ class c_eventer():
   
   async def stop(self):
     if self.eve_worker.is_alive():
-      await asyncio.to_thread(self.eve_worker.inqueue.put, ('stop',))
+      await asyncio.to_thread(self.inqueue.put, ('stop',))
       try:
         await asyncio.to_thread(self.eve_worker.join, 5.0)
       except RuntimeError:
@@ -154,45 +169,38 @@ class c_eventer():
 class eve_worker(mp_process):
   def __init__(self, 
       dbline, 
-      myviewer_queue, 
-      worker_inqueue, 
-      worker_registerqueue, 
       worker_id,
-      logger, 
       shm_name, 
+      plugin_path,
+      plugin_id,
+      queues,
     ):
-    super().__init__()
+    # Pass queues via args= to Process - this is the mechanism that actually
+    # works with spawn (queues get pickled at handover time, while
+    # multiprocessing has its special reduction mode active):
+    super().__init__(args=queues)
     self.type = 'E'
     self.id = dbline.id
     self.dbline = dbline
-    if self.dbline.cam_virtual_fps:
-      self.dataqueue = c_buffer(
-        #debug = 'Eve' + str(self.id), 
-      )
-    else:  
-      self.dataqueue = c_buffer(
-        block_put = False, 
-        #debug = 'Eve' + str(self.id), 
-      )
-    self.detectorqueue = l_buffer(
-      'ONOOB', 
-      #debug = '?????' + self.type + str(self.id),
-    )
-    self.viewer_queue = myviewer_queue
-    self.worker_in = worker_inqueue
-    self.worker_reg = worker_registerqueue
+    # Only store pickleable data as instance attributes:
     self.tf_worker_id = worker_id
     self.cond_dict = {1:[], 2:[], 3:[], 4:[], 5:[]}
     self.last_saved_event_end = 0.0
-    self.inqueue = s_queue()
     self.shm_name = shm_name
     self.event_name = None
     self.event_max_items = 32
     self.event_max_time = 120.0
     self.plugin_active = False
+    self.plugin_path = plugin_path
+    self.plugin_id = plugin_id
 
   def run(self):
-    asyncio.run(self.async_runner()) 
+    # self._args holds the queues we passed to __init__ as args=queues
+    (dataqueue, detectorqueue, inqueue, viewer_queue, 
+     worker_in, worker_reg) = self._args
+    asyncio.run(self.async_runner(
+      dataqueue, detectorqueue, inqueue, viewer_queue, worker_in, worker_reg,
+    )) 
     
   def sigint_handler(self, signal = None, frame = None ):
     self.got_sigint = True 
@@ -202,7 +210,7 @@ class eve_worker(mp_process):
     try:
       while self.do_run:
         received = await asyncio.to_thread(self.inqueue.get)
-        print(f'***** EVE Inqueue #{self.id}:', received) 
+        #print(f'***** EVE Inqueue #{self.id}:', received) 
         if (received[0] == 'new_video'):
           async with self.vid_deque_lock:
             self.vid_deque.append(received[1:])
@@ -215,7 +223,7 @@ class eve_worker(mp_process):
                   await a_break_type(BR_SHORT)
                 except FileNotFoundError:
                   self.logger.warning('c_eventers.py:new_video - Delete did not find: '
-                    + self.recordingspath + listitem[1])# Liste der zu löschenden Schlüssel
+                    + self.recordingspath + listitem[1])# Liste der zu loeschenden Schluessel
                 keys_to_delete = [item 
                   for item in self.vid_str_dict 
                   if item == str(listitem[0]) or item.endswith('_' + str(listitem[0]))]
@@ -245,16 +253,12 @@ class eve_worker(mp_process):
         elif (received[0] == 'set_event_params'):
           if (temp := received[1].get('event_name')) is not None:
             self.event_name = temp
-            print('event_name --> ', temp)
           if (temp := received[1].get('event_max_items')) is not None:
             self.event_max_items = temp
-            print('event_max_items --> ', temp)
           if (temp := received[1].get('event_max_time')) is not None:
             self.event_max_time = temp
-            print('event_max_time --> ', temp)
           if (temp := received[1].get('plugin_active')) is not None:
             self.plugin_active = temp
-            print('plugin_active --> ', temp)
         elif (received[0] == 'stop'):
           self.got_sigint = True
           self.do_run = False  
@@ -276,8 +280,18 @@ class eve_worker(mp_process):
       )
       self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True) 
     
-  async def async_runner(self):
+  async def async_runner(self, dataqueue, detectorqueue, inqueue, 
+      viewer_queue, worker_in, worker_reg):
     try:
+      # Set queues as instance attributes so the rest of the code
+      # can access them via self.xxx as before:
+      self.dataqueue = dataqueue
+      self.detectorqueue = detectorqueue
+      self.inqueue = inqueue
+      self.viewer_queue = viewer_queue
+      self.worker_in = worker_in
+      self.worker_reg = worker_reg
+      
       self.logname = 'eventer #'+str(self.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
@@ -287,6 +301,16 @@ class eve_worker(mp_process):
         source_dict = _SH_MEM_ITEMS, 
         shm_name=self.shm_name, 
       )
+      self.tag_list_active = self.shared_mem.read_1_meta('school')
+      self.tag_list = await asyncio.to_thread(get_taglist, self.tag_list_active)
+      p = Path(self.plugin_path)
+      plugin_name = f'alarm_plugin_{self.plugin_id}'
+      spec = importlib.util.spec_from_file_location(plugin_name, p)
+      plugin_mod = importlib.util.module_from_spec(spec)
+      sys.modules[plugin_name] = plugin_mod
+      spec.loader.exec_module(plugin_mod)
+      self.plugin = plugin_mod.plugin(self.dbline, self.tag_list, p, self.logger)
+      self.logger.info(f'**** Eventer #{self.id} running Plugin: {self.plugin.name}')
       self.got_sigint = False
       self._inq_task = None
       self.sl = speedlimit(period = 0.0)
@@ -303,8 +327,6 @@ class eve_worker(mp_process):
       condition_lines = evt_condition.objects.filter(eventer_id=self.id)
       async for item in condition_lines:
         self.cond_dict[item.reaction].append(model_to_dict(item)) 
-      self.tag_list_active = self.shared_mem.read_1_meta('school')
-      self.tag_list = await asyncio.to_thread(get_taglist, self.tag_list_active)
       datapath = await djconf.agetconfig('datapath', 'data/')
       self.recordingspath = await djconf.agetconfig(
         'recordingspath', datapath + 'recordings/', 
@@ -458,9 +480,7 @@ class eve_worker(mp_process):
     else:
       predictions = None  
     if await resolve_rules(self.cond_dict[5], predictions):
-      if item.remaining_alarms:
-        await alarm(self.id, predictions) 
-        item.remaining_alarms -= 1
+      self.plugin.action(predictions) 
     if item.check_out_ts is None:
       return()
     if predictions is None and self.cond_dict[2]:
@@ -689,7 +709,6 @@ class eve_worker(mp_process):
                   max_items = self.event_max_items,
                   name = self.event_name,
                 )
-                new_event.remaining_alarms = self.shared_mem.read_1_meta('alarm_max_nr')
                 self.event_dict[count] = new_event
                 await self.merge_events()
             else: 

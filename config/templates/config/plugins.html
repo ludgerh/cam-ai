@@ -16,40 +16,79 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <div class="container-fluid float-left">
   <div class="row" id="menulist">
-  <div class="h3">Detector Plugins</div>
-  <form method="post" action="/config/plugins/">
-    {% csrf_token %}
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>Stream ID</th>
-          <th>Name</th>
-          <th>Detector Plugin</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s_item in stream_list %}
-        <tr>
-          <td>{{ s_item.id }}</td>
-          <td>{{ s_item.name }}</td>
-          <td>
-            <select name="det_plugin_{{ s_item.id }}">
-              {% for plugin in plugin_list %}
-              <option value="{{ plugin.id }}"
-                {% if plugin.id == s_item.det_plugin_id %}selected{% endif %}>
-                {{ plugin.name }}
-              </option>
-              {% endfor %}
-            </select>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="3">Keine Einträge vorhanden.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <button type="submit">Submit</button>
-  </form>
+    <div class="h3">Detector Plugins</div>
+    <form method="post" action="/config/plugins/">
+      {% csrf_token %}
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Stream ID</th>
+            <th>Name</th>
+            <th>Detector Plugin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s_item in stream_list %}
+          <tr>
+            <td>{{ s_item.id }}</td>
+            <td>{{ s_item.name }}</td>
+            <td>
+              <select name="det_plugin_{{ s_item.id }}">
+                {% for plugin in det_plugin_list %}
+                <option value="{{ plugin.id }}"
+                  {% if plugin.id == s_item.det_plugin_id %}selected{% endif %}>
+                  {{ plugin.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3">Keine Einträge vorhanden.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+  <div class="row" id="menulist">
+    <div class="h3">Alarm Plugins</div>
+    <form method="post" action="/config/plugins/">
+      {% csrf_token %}
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Stream ID</th>
+            <th>Name</th>
+            <th>Detector Plugin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s_item in stream_list %}
+          <tr>
+            <td>{{ s_item.id }}</td>
+            <td>{{ s_item.name }}</td>
+            <td>
+              <select name="alarm_plugin_{{ s_item.id }}">
+                {% for plugin in alarm_plugin_list %}
+                <option value="{{ plugin.id }}"
+                  {% if plugin.id == s_item.eve_alarm_plugin_id %}selected{% endif %}>
+                  {{ plugin.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3">Keine Einträge vorhanden.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit">Submit</button>
+    </form>
+  </div>
 </div>

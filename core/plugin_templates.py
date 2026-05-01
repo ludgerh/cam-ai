@@ -18,7 +18,10 @@ import numpy as np
 import cv2 as cv
 from camai.version import version
 from time import time
+from pathlib import Path
+from tools.l_tools import load_plugin
 from tools.c_tools import speedlimit, speedometer, rect_atob
+from schools.c_schools import get_taglist
 
 class temp_plugin():
   name = 'CAM-AI Generic Plugin'
@@ -157,4 +160,25 @@ class det_plugin(temp_plugin):
         cv.accumulateWeighted(frame_unmodified, background, 0.5, background_mask)
       last_frame = np.uint8(background) 
     return((frame, last_frame, background, rect_list))
+    
+class alarm_plugin(temp_plugin):
+  type = 'A'
+  name = 'CAM-AI Generic Console Alarm Plugin'
+  version = version
+  
+  def __init__(self, eve_dbline, tag_list, plugin_path, logger):
+    self.logger = logger
+    self.eve_dbline = eve_dbline
+    self.tag_list = tag_list
+    plugin_mod = load_plugin(plugin_path)
+    plugin_dir = Path(plugin_path).parent
+    settings_path = plugin_dir / "settings.py"
+    self.settings = load_plugin(settings_path)
+    
+  def action(self, predictions):
+    mylist = list(predictions)[1:]
+    maxpos = mylist.index(max(mylist))
+    self.logger.info(f'{self.settings.settings['output']} {self.eve_dbline.name}'
+      f'({self.eve_dbline.id}) : {self.tag_list[maxpos+1].name}')
+      
 

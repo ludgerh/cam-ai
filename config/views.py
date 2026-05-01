@@ -297,7 +297,8 @@ class plugins(myTemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'stream_list' : self.stream_list,  
-      'plugin_list' : plugin_db.objects.all(),  
+      'det_plugin_list' : plugin_db.objects.filter(type = 'D'), 
+      'alarm_plugin_list' : plugin_db.objects.filter(type = 'A'),  
     })
     return context
   
@@ -305,5 +306,10 @@ class plugins(myTemplateView):
     for s_item in self.stream_list:
       if access.check('D', s_item, request.user, 'W'):
         plugin_id = request.POST.get(f'det_plugin_{s_item.id}')
-        stream.objects.filter(id=s_item.id).update(det_plugin_id=plugin_id)
+        if plugin_id:
+          stream.objects.filter(id=s_item.id).update(det_plugin_id=plugin_id)
+      if access.check('E', s_item, request.user, 'W'):
+        plugin_id = request.POST.get(f'alarm_plugin_{s_item.id}')
+        if plugin_id:
+          stream.objects.filter(id=s_item.id).update(eve_alarm_plugin_id=plugin_id)
     return redirect('/config/config/plugins/none/')

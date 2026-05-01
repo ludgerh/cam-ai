@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -46,7 +46,7 @@ class c_stream():
         eve_school = await database_sync_to_async(lambda: self.dbline.eve_school)() 
         tf_worker_db = await database_sync_to_async(lambda: eve_school.tf_worker)()
         my_worker = tf_workers[tf_worker_db.id] 
-        self.myeventer = c_eventer(
+        self.myeventer =  await sync_to_async(c_eventer)(
           self.dbline, 
           my_worker,
           self.logger,

@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import sys
 import importlib.util
 from pathlib import Path
+from streams.models import stream
 from .models import plugin as plugin_dbline
 
 def get_subdirs(path):
@@ -29,7 +30,7 @@ def update_db(file_path, default):
   sys.modules[module_name] = module
   spec.loader.exec_module(module)
   plugin_class = getattr(module, 'plugin')
-  plugin_dbline.objects.update_or_create(
+  result = plugin_dbline.objects.update_or_create(
     defaults = {
       'type' : plugin_class.type,
       'default' : default,
@@ -41,9 +42,21 @@ def update_db(file_path, default):
     }, 
     path = file_path,
   )
+  if default and result[0].id != 1 and result[1]:
+    if plugin_class.type == 'D':
+      stream.objects.filter(det_plugin_id = 1).update(
+        det_plugin_id = result[0].id,
+      )
+    elif plugin_class.type == 'A':
+      stream.objects.filter(eve_alarm_plugin_id = 1).update(
+        eve_alarm_plugin_id = result[0].id, 
+      )
   del module
 
 for item in get_subdirs(Path.cwd() / 'plugins' / 'detectors'):
+  plugin_file = item / 'plugin.py'
+  update_db(plugin_file, item.name == 'default')
+for item in get_subdirs(Path.cwd() / 'plugins' / 'alarms'):
   plugin_file = item / 'plugin.py'
   update_db(plugin_file, item.name == 'default')
     

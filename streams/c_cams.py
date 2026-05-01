@@ -26,6 +26,7 @@ import threading
 import socket
 import json
 import signal
+import select
 #from pprint import pprint
 from multiprocessing import Process as mp_process, SimpleQueue as s_queue
 from aiopath import AsyncPath
@@ -80,14 +81,22 @@ class c_cam():
       source_dict = _SH_MEM_ITEMS, 
       shape = (dbline.cam_yres, dbline.cam_xres, 3), 
     )
+    
+    # Create inqueue in the parent process so c_cam.stop() can access it
+    self.inqueue = s_queue()
+    
     self.cam_worker = cam_worker(
       self.id, 
-      my_viewer.inqueue,
-      mydetector.det_worker.dataqueue, 
-      myeventer.eve_worker.dataqueue, 
-      myeventer.eve_worker.inqueue, 
       logger, 
       self.shared_mem.shm.name, 
+      # Pass queues via args= to Process (do NOT store as self.xxx!):
+      queues = (
+        self.inqueue,                      # 0: inqueue
+        my_viewer.inqueue,                 # 1: viewer_queue
+        mydetector.dataqueue,              # 2: detector_data
+        myeventer.dataqueue,               # 3: eventer_data
+        myeventer.inqueue,                  # 4: eventer_in
+      ),
     )
     self.shared_mem.write_1_meta('fps_limit', dbline.cam_fpslimit)
     self.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
@@ -105,7 +114,7 @@ class c_cam():
   
   async def stop(self):
     if self.cam_worker.is_alive():
-      await asyncio.to_thread(self.cam_worker.inqueue.put, ('stop',))
+      await asyncio.to_thread(self.inqueue.put, ('stop',))
       try:
         await asyncio.to_thread(self.cam_worker.join, 5.0)
       except RuntimeError:
@@ -117,27 +126,23 @@ class c_cam():
         pass
 
 class cam_worker(mp_process):
-  def __init__(self, 
-      idx, 
-      myviewer_queue, 
-      mydetector_data, 
-      myeventer_data, 
-      myeventer_in, 
-      logger, 
-      shm_name, 
-    ):
-    super().__init__()
+  def __init__(self, idx, logger, shm_name, queues):
+    # Pass queues via args= to Process - this is the mechanism that actually
+    # works with spawn (queues get pickled at handover time, while
+    # multiprocessing has its special reduction mode active):
+    super().__init__(args=queues)
     self.type = 'C'
     self.id = idx
-    self.viewer_queue = myviewer_queue
-    self.mydetector_data = mydetector_data
-    self.myeventer_data = myeventer_data
-    self.myeventer_in = myeventer_in
-    self.inqueue = s_queue()
+    # Only store pickleable data as instance attributes:
     self.shm_name = shm_name
 
   def run(self):
-    asyncio.run(self.async_runner()) 
+    # self._args holds the queues we passed to __init__ as args=queues
+    (inqueue, viewer_queue, mydetector_data, 
+     myeventer_data, myeventer_in) = self._args
+    asyncio.run(self.async_runner(
+      inqueue, viewer_queue, mydetector_data, myeventer_data, myeventer_in,
+    )) 
     
   def sigint_handler(self, signal = None, frame = None ):
     self.got_sigint = True 
@@ -191,8 +196,17 @@ class cam_worker(mp_process):
       )
       self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True)
     
-  async def async_runner(self):
+  async def async_runner(self, inqueue, viewer_queue, 
+      mydetector_data, myeventer_data, myeventer_in):
     try:
+      # Set queues as instance attributes so the rest of the code
+      # can access them via self.xxx as before:
+      self.inqueue = inqueue
+      self.viewer_queue = viewer_queue
+      self.mydetector_data = mydetector_data
+      self.myeventer_data = myeventer_data
+      self.myeventer_in = myeventer_in
+      
       self.mycam = None
       self.reader_thread = None
       self.got_sigint = False
@@ -761,7 +775,7 @@ class cam_worker(mp_process):
       self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    self.logger.info('#####' + str(cmd))
+    #self.logger.info('#####' + str(cmd))
     #self.logger.info('#'+str(self.id) + ' 00000')
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)
@@ -815,47 +829,37 @@ class cam_worker(mp_process):
     
   def _raw_reader(self):
     self.raw_running = True
-    #self.logger.info(f'CA{self.id}: +++++ Starting Reader')
-    #self.logger.info(
-    #  f"RCVBUF={self.sock_conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}"
-    #)
+    os.set_blocking(self.fd, True)
     try:
-      while self.raw_running and not self.got_sigint:
-        buf = b''
-        bytes_left = self.bytes_per_frame
-        while bytes_left > 0:
-          if not self.raw_running or self.got_sigint:
-            buf = b''
-            break
-          try:
-            chunk = os.read(self.fd, bytes_left)
-            #print(len(chunk), self.bytes_per_frame - bytes_left, self.bytes_per_frame)
-          except BlockingIOError:
-            #break_type(BR_MEDIUM)
-            continue
-          except OSError as e:
-            self.logger.warning(
-              f'CA{self.id}: FD error mid-frame → dropping partial frame: {e}'
-            )
-            buf = b''
-            bytes_left = self.bytes_per_frame
-            continue
-          if not chunk:
-            continue
-            self.logger.error(
-              f'CA{self.id}: EOF mid-frame ({len(buf)} bytes read)'
-            )
-          buf += chunk
-          bytes_left -= len(chunk)
-        try:
-          self.raw_queue.put(buf, block=False)
-        except queue.Full:
-          pass
+        while self.raw_running and not self.got_sigint:
+            buf = bytearray(self.bytes_per_frame)
+            view = memoryview(buf)
+            offset = 0
+            while offset < self.bytes_per_frame:
+                if not self.raw_running or self.got_sigint:
+                    buf = None
+                    break
+                try:
+                    n = self.sock_conn.recv_into(view[offset:])
+                except OSError as e:
+                    self.logger.warning(
+                        f'CA{self.id}: FD error mid-frame: {e}'
+                    )
+                    buf = None
+                    break
+                if n == 0:
+                    break  # EOF
+                offset += n
+            if buf is not None and offset == self.bytes_per_frame:
+                try:
+                    self.raw_queue.put(bytes(buf), block=False)
+                except queue.Full:
+                    pass
     except Exception as fatal:
-      self.logger.critical(
-        f'CA{self.id}: Rawfeed crashed: {fatal}',
-        exc_info=True
-      )
+        self.logger.critical(
+            f'CA{self.id}: Rawfeed crashed: {fatal}',
+            exc_info=True
+        )
     finally:
       pass
       #self.logger.info(f'CA{self.id}: ----- Stopping Reader')
@@ -926,4 +930,3 @@ class cam_worker(mp_process):
           pass
       self.shared_mem.shm.close() 
       await asyncio.to_thread(self.join, 5.0)
-

@@ -19,7 +19,9 @@ import aioshutil
 import aiofiles.os
 import os
 import psutil
+import sys
 import numpy as np
+import importlib.util
 from pathlib import Path
 from time import sleep
 from pathlib import Path
@@ -487,4 +489,20 @@ async def merge_move(src: Path, dst: Path):
       if target.exists():
         await aiofiles.os.remove(target)
       await aioshutil.move(item, target)
+
+def load_plugin(plugin_path: str | Path, base_package: str = "plugins"):
+  p = Path(plugin_path).resolve()
+  parts = p.parts
+  try:
+    idx = parts.index(base_package)
+  except ValueError:
+    raise ValueError(f"{base_package} not found in path {p}")
+  module_name = ".".join(parts[idx:]).replace(".py", "")
+  if module_name in sys.modules:
+    return(sys.modules[module_name])
+  spec = importlib.util.spec_from_file_location(module_name, p)
+  module = importlib.util.module_from_spec(spec)
+  sys.modules[module_name] = module
+  spec.loader.exec_module(module)
+  return(module)
 

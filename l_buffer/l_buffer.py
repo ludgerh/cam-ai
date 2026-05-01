@@ -108,9 +108,7 @@ class l_buffer():
       if self.q_len is not None:
         self.data_queue = mt_queue(maxsize = self.q_len)
     if self.q_len is not None:
-      self.data_loop_task = None
-    self.multi_get_lock = p_lock()  
-    self.multi_put_lock = p_lock()  
+      self.data_loop_task = None 
     self.do_run = True
     if self.block_put:
       self.shelf = False
@@ -199,18 +197,6 @@ class l_buffer():
         await self.put_to_shelf(data_out) 
         if self.debug:
           print(self.debug, '--- Loop:', debug_display(data_out)) 
-        
-  async def multi_put(self, data): #not tested
-    i = 0
-    part = []
-    with self.multi_put_lock:
-      for item in data:
-        part.append(data[i])
-        i += 1
-        if not i % len(self.struct) or i == len(data):
-          await self.put(part) 
-          part = []
-      await self.put('stop')
     
   async def put(self, data):
     if self.debug:
@@ -269,19 +255,24 @@ class l_buffer():
       else:
         break  
     for i, item in enumerate(data):
-      if not self.m_proc or  self.put_struct[storage_idx][i] == 'O':
+      if not self.m_proc or self.put_struct[storage_idx][i] == 'O':
         processed_item = item
       else:
-        if self.put_struct[storage_idx][i] == 'L':
+        item_type = self.put_struct[storage_idx][i]
+        # For numpy arrays compute size without serializing to bytes -
+        # the actual copy happens directly into shared memory below
+        if item_type == 'L':
           data_bytes = pickle.dumps(item)
-        elif self.put_struct[storage_idx][i] == 'B':
+          data_length = len(data_bytes)
+        elif item_type == 'B':
           data_bytes = item 
-        elif self.put_struct[storage_idx][i] == 'N':
-          data_bytes = item.tobytes()  
-        data_length = len(data_bytes)
+          data_length = len(data_bytes)
+        elif item_type == 'N':
+          data_bytes = None  # no intermediate bytes copy needed for numpy
+          data_length = item.nbytes
         storage = self.put_storage[storage_idx][i]
         processed_item = {}
-        if self.put_struct[storage_idx][i] == 'N' and (item.shape != storage['shape'] 
+        if item_type == 'N' and (item.shape != storage['shape'] 
             or item.dtype != storage['dtype']):
           processed_item.update({'shape': item.shape, 'dtype': item.dtype})
           storage.update({'shape': item.shape, 'dtype': item.dtype})
@@ -297,7 +288,19 @@ class l_buffer():
         while storage['shm'].buf is None or storage['shm'].buf[0] == 1:
           await asyncio.sleep(0.01)
         storage['shm'].buf[0] = 1 # busy
-        storage['shm'].buf[1:data_length + 1] = data_bytes
+        # For numpy: direct copy from source array into shared memory,
+        # avoiding the intermediate tobytes() copy.
+        # For L/B: copy the prepared bytes object as before.
+        if item_type == 'N':
+          target = np.ndarray(
+            item.shape, 
+            dtype=item.dtype, 
+            buffer=storage['shm'].buf, 
+            offset=1,
+          )
+          np.copyto(target, item)
+        else:
+          storage['shm'].buf[1:data_length + 1] = data_bytes
       data_for_send.append((i, processed_item))
     if self.m_proc:  
       if self.put_count < 0xFFFF:
@@ -318,7 +321,7 @@ class l_buffer():
     except asyncio.exceptions.CancelledError:
       pass  
     if self.debug:
-      print(self.debug, '--- Put:', debug_display(data_for_send)) 
+      print(self.debug, '--- Put:', debug_display(data_for_send))
       
   def start_data_loop(self):   
     if self.q_len is not None and self.data_loop_task is None:
@@ -327,16 +330,7 @@ class l_buffer():
       self.data_loop_task = asyncio.create_task(
         self.data_loop_runner(), 
         name = str(self.debug) + 'l_buffer_data_loop',
-      ) 
-      
-  async def multi_get(self): #not tested
-    result = []
-    with self.multi_get_lock:
-      while True:
-        if (item := (await self.get())) == 'stop':
-          return(result)
-        else:
-          result.extend(item)      
+      )    
 
   async def get(self, timeout = None):
     if self.debug:
