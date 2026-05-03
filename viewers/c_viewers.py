@@ -1,3 +1,4 @@
+# viewers/c_viewers.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -17,8 +18,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import cv2 as cv
 import asyncio
 import struct
+import traceback
 from threading import Event
-from multiprocessing import Lock as p_lock
 from time import time
 from autobahn.exception import Disconnected
 from globals.c_globals import viewables
@@ -44,61 +45,41 @@ class c_viewer():
     )
     self.dbline = viewables[self.id]['stream'].dbline
     self.my_item = None
-    #self.inqueue.display_qinfo('Init 1: ')
-    self.client_dict_lock = p_lock()
     self.client_dict = {}
-    self.event_loop = None #see consumers
     if self.type == 'E':
       self.drawpad = None
     else:  
       self.drawpad = drawpad(self, self.logger)
-    self.framebuffer = None 
+    self.framebuffer = None
+    self._next_client_nr = 0
           
   async def onf(self, client_nr):
-    import traceback
+    client = None
+    send_succeeded = False
     try:
       if self.my_item is None:
         self.my_item = viewables[self.id][self.type]
-      if not self.client_dict[client_nr]['busy'].is_set():
-        self.client_dict[client_nr]['busy'].set()
-        self.client_dict[client_nr]['lat_ts'] = time()
-        ts = time()
+      client = self.client_dict[client_nr]
+      if not client['busy'].is_set():
+        client['busy'].set()
         frame = (await self.inqueue.get())[1]
         if self.type in {'D', 'E'}:  
-          if (self.my_item.shared_mem.read_1_meta('aoi_xdim') != self.client_dict[client_nr]['old_x'] 
-              or self.my_item.shared_mem.read_1_meta('aoi_ydim') != self.client_dict[client_nr]['old_y']):
-            self.client_dict[client_nr]['old_x'] = self.my_item.shared_mem.read_1_meta('aoi_xdim')
-            self.client_dict[client_nr]['old_y'] = self.my_item.shared_mem.read_1_meta('aoi_ydim') 
+          xdim = self.my_item.shared_mem.read_1_meta('aoi_xdim')
+          ydim = self.my_item.shared_mem.read_1_meta('aoi_ydim')
+          if xdim != client['old_x'] or ydim != client['old_y']:
+            client['old_x'] = xdim
+            client['old_y'] = ydim 
             if self.type == 'D':  
               scaledown = self.my_item.shared_mem.read_1_meta('scaledown')
             else: #'E'
               scaledown = 1 
-            self.client_dict[client_nr]['y_canvas'] =  round(
-              self.client_dict[client_nr]['x_canvas'] 
-              * self.my_item.shared_mem.read_1_meta('aoi_ydim') 
-              / self.my_item.shared_mem.read_1_meta('aoi_xdim')
-            )
-            self.client_dict[client_nr]['x_scaling'] = (
-              self.my_item.shared_mem.read_1_meta('aoi_xdim') 
-              / self.client_dict[client_nr]['x_canvas']
-            ) / scaledown
-            self.client_dict[client_nr]['y_scaling'] = (
-              self.my_item.shared_mem.read_1_meta('aoi_ydim') 
-              / self.client_dict[client_nr]['y_canvas']
-            ) / scaledown 
-            self.client_dict[client_nr]['outx'] = min(
-              self.client_dict[client_nr]['x_canvas'], 
-              self.my_item.shared_mem.read_1_meta('aoi_xdim') // scaledown, 
-            )
-            self.client_dict[client_nr]['outy'] = min(
-              self.client_dict[client_nr]['y_canvas'], 
-              self.my_item.shared_mem.read_1_meta('aoi_ydim') // scaledown, 
-            )
+            client['y_canvas'] =  round(client['x_canvas'] * ydim / xdim)
+            client['x_scaling'] = xdim / client['x_canvas'] / scaledown
+            client['y_scaling'] = ydim / client['y_canvas'] / scaledown 
+            client['outx'] = min(client['x_canvas'], xdim // scaledown)
+            client['outy'] = min(client['y_canvas'], ydim // scaledown)
             if self.type == 'D':  
-              self.my_item.viewer.drawpad.set_xy((
-                self.my_item.shared_mem.read_1_meta('aoi_xdim') // scaledown, 
-                self.my_item.shared_mem.read_1_meta('aoi_ydim') // scaledown, 
-              )) 
+              self.my_item.viewer.drawpad.set_xy((xdim // scaledown, ydim // scaledown)) 
               await self.my_item.viewer.drawpad.aload_ringlist()
               self.my_item.viewer.drawpad.make_screen()
               self.my_item.viewer.drawpad.mask_from_polygons()
@@ -130,40 +111,35 @@ class c_viewer():
               (255, 255, 0),
               4,
             ) 
-        if self.client_dict[client_nr]['do_compress']:
+        if client['do_compress']:
           to = 3 #jpg
         else:
           to = 2 #bmp  
-        frame = c_convert(
-          frame, 
-          typein=1, 
-          typeout=to, 
-          xout=self.client_dict[client_nr]['outx'], 
-        )
+        frame = c_convert(frame, typein=1, typeout=to, xout=client['outx'])
         if not startup_redis.get_running() or streams_redis.get_killing_stream(self.id):  
           return()  
         indicator = struct.pack(
           '<4I', 
-          self.client_dict[client_nr]['idx'], 
-          self.client_dict[client_nr]['count'], 
-          self.client_dict[client_nr]['x_canvas'],
-          self.client_dict[client_nr]['y_canvas'], 
+          client['idx'], 
+          client['count'], 
+          client['x_canvas'],
+          client['y_canvas'], 
         )
         try: 
-          await self.client_dict[client_nr]['socket'].send(bytes_data = (
-            self.client_dict[client_nr]['type']
-              + indicator
-              + frame
-          )) 
+          await client['socket'].send(bytes_data = (client['type'] + indicator + frame))
+          send_succeeded = True 
         except Disconnected:
           self.logger.warning('*** Could not send Frame, socket closed...') 
     except Exception as e:
-      print(e)
-      traceback.print_exc()
-
+      self.logger.exception('Error in onf()')
+    finally:
+      if client is not None and not send_succeeded and client['busy'].is_set():
+        client['busy'].clear()
+      
   async def callback(self):  
-    with self.client_dict_lock: 
-      for item in self.client_dict:
+    clients = list(self.client_dict.keys())
+    for item in clients:
+      if item in self.client_dict:
         await self.onf(item)
 
   def push_to_onf(self, 
@@ -177,47 +153,36 @@ class c_viewer():
       websocket = None, 
     ):
     add_view_count(self.type, self.id)
-    count = 0
-    with self.client_dict_lock:
-      while count in self.client_dict:
-        count += 1
-      client_info = {
-        'index' : self.type + str(self.id).zfill(6) + str(count).zfill(6), #raus
-        'type' : self.type.encode(),
-        'idx' : self.id,
-        'count' : count,
-        'busy' : Event(),
-        'outx' : outx,
-        'outy' : outy,
-        'x_canvas' : x_canvas,
-        'y_canvas' : y_canvas,
-        'x_scaling' : x_scaling,
-        'y_scaling' : y_scaling,
-        'socket' : websocket,
-        'lat_ts' : 0.0,
-        'lat_arr' : [],
-        'do_compress' : do_compress,
-        'old_x' : -1,
-        'old_y' : -1,
-      }
-      client_info['busy'].set()
-      self.client_dict[count] = client_info
+    count = self._next_client_nr
+    self._next_client_nr += 1
+    client_info = {
+      'type' : self.type.encode(),
+      'idx' : self.id,
+      'count' : count,
+      'busy' : Event(),
+      'outx' : outx,
+      'outy' : outy,
+      'x_canvas' : x_canvas,
+      'y_canvas' : y_canvas,
+      'x_scaling' : x_scaling,
+      'y_scaling' : y_scaling,
+      'socket' : websocket,
+      'do_compress' : do_compress,
+      'old_x' : -1,
+      'old_y' : -1,
+    }
+    client_info['busy'].set()
+    self.client_dict[count] = client_info
     return(count)
 
   def pop_from_onf(self, client_nr):
-    with self.client_dict_lock:
-      del self.client_dict[client_nr]
+    del self.client_dict[client_nr]
     take_view_count(self.type, self.id)
       
   def clear_busy(self, client_nr):
-    if self.client_dict[client_nr]['lat_ts']:
-      self.client_dict[client_nr]['lat_arr'].append(
-        time() - self.client_dict[client_nr]['lat_ts']
-      )
-      if len(self.client_dict[client_nr]['lat_arr']) >= 10:
-        #print('Latency:', self.parent.type, self.parent.id, mean(self.client_dict[client_nr]['lat_arr']))
-        self.client_dict[client_nr]['lat_arr'] = []
-    self.client_dict[client_nr]['busy'].clear()   
+    client = self.client_dict.get(client_nr)
+    if client is not None:
+      client['busy'].clear()
 
   def stop(self):
     self.inqueue.stop()

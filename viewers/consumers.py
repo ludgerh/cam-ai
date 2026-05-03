@@ -1,3 +1,4 @@
+# viewers/consumers.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -28,6 +29,7 @@ from globals.c_globals import viewables, viewers
 from streams.redis import my_redis as streams_redis
 from streams.models import stream
 from tools.l_tools import djconf
+from tools.l_break import a_break_type, BR_LONG
 from tools.c_logger import log_ini
 from tools.tokens import checktoken
 
@@ -43,7 +45,6 @@ viewer_dict_lock = asyncio.Lock()
 
 #*****************************************************************************
 # triggerConsumer
-# This is not async because the funtion ONF gets called from Sync
 #*****************************************************************************
 
 class triggerConsumer(AsyncWebsocketConsumer):
@@ -54,8 +55,12 @@ class triggerConsumer(AsyncWebsocketConsumer):
       await self.accept()
       self.viewer_id = self.scope["query_string"].decode().split("vid=")[1]
       async with viewer_dict_lock:
-        self.status = viewer_dict.setdefault(self.viewer_id, {'connections' : 2, })
-        self.status['socket'] = self
+        if self.viewer_id in viewer_dict:
+          viewer_dict[self.viewer_id]['connections'] += 1
+        else:
+          viewer_dict[self.viewer_id] = {'connections' : 1}
+        self.status = viewer_dict[self.viewer_id]   
+      self.status['socket'] = self
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
@@ -68,7 +73,6 @@ class triggerConsumer(AsyncWebsocketConsumer):
           if mode in {'connections', 'socket'}:
             continue
           for idx in self.status[mode]:
-            #print('Disconnecting', mode, idx)
             dict_item = self.status[mode][idx]
             if dict_item['show_cam']:
               dict_item['viewer'].pop_from_onf(dict_item['onf'])
@@ -78,7 +82,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
 
-  async def receive(self, bytes_data):
+  async def receive(self, text_data = None, bytes_data = None):
     try:
       #logger.info('<-- ' + str(bytes_data))
       mode = chr(bytes_data[0])
@@ -110,7 +114,11 @@ class c_viewConsumer(AsyncWebsocketConsumer):
       await self.accept()
       self.viewer_id = self.scope["query_string"].decode().split('vid=')[1]
       async with viewer_dict_lock:
-        self.status = viewer_dict.setdefault(self.viewer_id, {'connections' : 2, })
+        if self.viewer_id in viewer_dict:
+          viewer_dict[self.viewer_id]['connections'] += 1
+        else:
+          viewer_dict[self.viewer_id] = {'connections' : 1}
+        self.status = viewer_dict[self.viewer_id]   
     except:
       logger.error('Error in consumer: ' + logname + ' (c_view)')
       logger.error(format_exc())
@@ -165,29 +173,30 @@ class c_viewConsumer(AsyncWebsocketConsumer):
       
       elif params['command'] == 'starttrigger':
         #logger.info('<-- ' + str(text_data))
-        if 'do_compress' in params:
-          do_compress = params['do_compress']
-        else:
-          do_compress = True 
         while not (params['idx'] in viewables 
             and 'stream' in viewables[params['idx']]
             and params['type'] in viewables[params['idx']]):
-          await asyncio.sleep(longbreak)
-        mystream = viewables[params['idx']]['stream']
+          await a_break_type(BR_LONG)
         myitem = viewables[params['idx']][params['type']]
         dbline = await stream.objects.aget(id = params['idx'])
         show_cam = await database_sync_to_async(self.check_conditions)(
           self.scope['user'], 
           dbline,
         )
-        if access.check(params['type'], params['idx'], self.scope['user'], 'R'):
-          if 'width' in params:
-            x_canvas = params['width']
-          else:  
-            x_canvas = params['x_screen'] - 60
+        if await access.check_async(
+            params['type'], 
+            params['idx'], 
+            self.scope['user'], 
+            'R', 
+          ):
+          x_canvas = params.get('width') or params['x_screen'] - 60
+          while (not (params['idx'] in viewers 
+              and params['type'] in viewers[params['idx']])):
+            await a_break_type(BR_LONG)
+          while 'socket' not in self.status:
+            await a_break_type(BR_LONG)
           myviewer = viewers[params['idx']][params['type']]
           myviewer.websocket = self
-          myviewer.event_loop = asyncio.get_event_loop()
           if params['type'] == 'C':
             y_canvas =  round(x_canvas * dbline.cam_yres / dbline.cam_xres)
             outx = min(x_canvas, round(dbline.cam_xres / dbline.cam_scaledown))
@@ -202,8 +211,6 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             y_scaling = -1.0 
           if params['type'] == 'E':
             myitem.shared_mem.write_1_meta('x_canvas', x_canvas)
-          while not (params['idx'] in viewers and params['type'] in viewers[params['idx']]):
-            await asyncio.sleep(longbreak) 
           if show_cam:
             onf_index = myviewer.push_to_onf(
               outx = outx, 
@@ -212,7 +219,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
               y_canvas = y_canvas,
               x_scaling = x_scaling,
               y_scaling = y_scaling,
-              do_compress = do_compress, 
+              do_compress = params.get('do_compress', True), 
               websocket = self.status['socket'], 
             )
           else:
@@ -225,16 +232,15 @@ class c_viewConsumer(AsyncWebsocketConsumer):
               'viewer' : myviewer,
               'show_cam' : show_cam,
             }
-          if self.scope['user'].is_authenticated:
-            myuser = self.scope['user'].id
-          else:
-            myuser = -1
           outlist['data'] = {
             'show_cam' : show_cam,
             'on_frame_nr' : onf_index,
           }
           #logger.info('--> ' + str(outlist))
-          await self.send(json.dumps(outlist))
+          try:
+            await self.send(json.dumps(outlist))	
+          except Disconnected:
+            logger.warning('*** Could not send Cam Info , socket closed...')
         else:
           #logger.info('--> Close')
           await self.close()

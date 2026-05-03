@@ -37,6 +37,8 @@ from time import time
 from django.db import OperationalError
 from channels.db import aclose_old_connections
 from globals.c_globals import add_viewer
+from tools.l_tools import djconf, ts2filename
+from tools.l_sysinfo import gpuinfo
 from tools.c_spawn import viewable
 from tools.c_logger import alog_ini
 from tools.l_break import (
@@ -48,7 +50,6 @@ from tools.l_break import (
   BR_LONG, 
 )
 from tools.c_tools import speedometer
-from tools.l_tools import djconf, ts2filename
 from drawpad.models import mask
 from viewers.c_viewers import c_viewer
 from oneitem.shared_mem import shared_mem
@@ -676,6 +677,7 @@ class cam_worker(mp_process):
     return([3, frame, in_ts])
 
   async def newprocess(self):
+    print('GPUInfo:', gpuinfo())
     while True:
       try:
         await self.dbline.arefresh_from_db()
@@ -721,6 +723,8 @@ class cam_worker(mp_process):
       generalparams += ['-thread_queue_size', '1024']
       generalparams += ['-fflags', 'genpts']
       generalparams += ['-use_wallclock_as_timestamps', '1']
+    if gpuinfo():
+      generalparams += ['-hwaccel', 'cuda', '-hwaccel_output_format',  'cuda']
     inparams = ['-i', source_string]
     outparams1 = []
     if not self.dbline.cam_virtual_fps:
@@ -731,6 +735,8 @@ class cam_worker(mp_process):
       outparams1 += ['-vf', 'fps=' + str(inp_frame_rate)]
     else:
       outparams1 += ['-fps_mode', 'passthrough']
+    if gpuinfo():
+      outparams1 += ['-vf', 'hwdownload,format=nv12,format=bgr24'] 
     outparams1 += ['-f', 'rawvideo']
     outparams1 += ['-pix_fmt', 'bgr24']
     outparams1 += ['unix://' + self.socket_path]
@@ -775,7 +781,7 @@ class cam_worker(mp_process):
       self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    #self.logger.info('#####' + str(cmd))
+    self.logger.info('#####' + str(cmd))
     #self.logger.info('#'+str(self.id) + ' 00000')
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)
@@ -801,16 +807,15 @@ class cam_worker(mp_process):
         stdout=None,
         stderr=log if log_ffmpeg else None,
       )
-      ff_ts1 = time()
       try:
         await asyncio.wait_for(self.ff_proc.wait(), timeout=30.0)
         self.logger.warning(f'#{self.id} CamProc exited quickly ' 
-          f'after {round(time() - ff_ts, 3)} seconds {round(time() - ff_ts1, 3)}')
+          f'after {round(time() - ff_ts, 3)} seconds')
         streams_redis.set_ffmpeg_running(False)
         await a_break_time(60.0) 
       except asyncio.TimeoutError:
         self.logger.info(f'#{self.id} CamProc still running ' 
-          f'after {round(time() - ff_ts, 3)} seconds {round(time() - ff_ts1, 3)}')
+          f'after {round(time() - ff_ts, 3)} seconds')
         streams_redis.set_ffmpeg_running(False)
         break
     #self.logger.info('#'+str(self.id) + ' 33333')

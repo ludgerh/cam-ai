@@ -15,6 +15,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import platform
+import shutil
+import subprocess
 from pathlib import Path
 
 def _freedesktop_os_release_fallback():
@@ -79,6 +81,19 @@ def osinfo():
   }
   return(result) 
   
+def gpuinfo():
+  if not shutil.which("nvidia-smi"):
+    return({})
+  try:
+    r = subprocess.run(
+      ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"],
+      capture_output=True, text=True, timeout=5, check=True,
+    )
+    return({0 : r.stdout.strip()}) 
+  except (subprocess.SubprocessError, FileNotFoundError):
+      return({})
+  return(result)
+  
 def sysinfo():
   result = {}
   cpu = cpuinfo()
@@ -93,6 +108,7 @@ def sysinfo():
   myos = osinfo()
   result['dist'] = myos['dist']['ID']
   result['dist_version'] = myos['dist']['VERSION_ID']
+  result['gpu'] = gpuinfo()
   return(result) 
   
 def is_raspi():
