@@ -1,5 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
+index/templates/index/index.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -67,8 +68,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let c_view_Socket;
 let trigger_Socket;
 let imagewidth = 375 // Screen width IPhone 7
-const displaywidth = {};
-const displayheight = {};
 const cams = [
 {% for item in camlist %}
 {% if not item.cam_pause %}
@@ -135,8 +134,6 @@ $(document).ready(async function() {
     });
     cam.show_cam = result.show_cam;
     cam.onf_nr = result.on_frame_nr; 
-    displaywidth[cam.id] = -1;
-    displayheight[cam.id] = -1;
     if (cam.show_cam) {
       const buf = new ArrayBuffer(9);
       const view = new DataView(buf);

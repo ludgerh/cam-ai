@@ -55,7 +55,6 @@ class c_viewer():
           
   async def onf(self, client_nr):
     client = None
-    send_succeeded = False
     try:
       if self.my_item is None:
         self.my_item = viewables[self.id][self.type]
@@ -127,14 +126,12 @@ class c_viewer():
         )
         try: 
           await client['socket'].send(bytes_data = (client['type'] + indicator + frame))
-          send_succeeded = True 
         except Disconnected:
-          self.logger.warning('*** Could not send Frame, socket closed...') 
+          pass
     except Exception as e:
-      self.logger.exception('Error in onf()')
-    finally:
-      if client is not None and not send_succeeded and client['busy'].is_set():
-        client['busy'].clear()
+      self.logger.warning(f'*** ONF {self.type}'
+        f'{self.id} could not send info , socket closed...')
+      self.logger.error(format_exc())
       
   async def callback(self):  
     clients = list(self.client_dict.keys())

@@ -77,8 +77,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 let c_view_Socket;
 let trigger_Socket;
 let imagewidth = 375 // Screen width IPhone 7
-const displaywidth = {};
-const displayheight = {};
 const cams = [
 {% for item in camlist %}
 {% if not item.cam_pause %}
@@ -162,8 +160,6 @@ $(document).ready(async function() {
     });
     cam.show_camE = result.show_cam;
     cam.onf_nrE = result.on_frame_nr;
-    displaywidth[cam.id] = { C: -1, D: -1, E: -1 };
-    displayheight[cam.id] = { C: -1, D: -1, E: -1 };
     if (cam.show_camC) {
       const buf = new ArrayBuffer(9);
       const view = new DataView(buf);

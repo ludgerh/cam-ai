@@ -91,8 +91,6 @@ let trigger_Socket;
 let divisor;
 var windowWidth = $(window).width();
 var windowHeight = $(window).height();
-const displaywidth = {};
-const displayheight = {};
 const cams = [
 {% for item in camlist %}
 {% if not item.cam_pause %}
@@ -183,8 +181,6 @@ $(document).ready(async function() {
     });
     cam.show_cam = result.show_cam;
     cam.onf_nr = result.on_frame_nr; 
-    displaywidth[cam.id] = -1;
-    displayheight[cam.id] = -1;
     if (cam.show_cam) {
       const buf = new ArrayBuffer(9);
       const view = new DataView(buf);

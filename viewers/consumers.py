@@ -20,7 +20,6 @@ import asyncio
 import struct
 from logging import getLogger
 from traceback import format_exc
-from django.utils import timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async, aclose_old_connections
 from autobahn.exception import Disconnected
@@ -31,7 +30,6 @@ from streams.models import stream
 from tools.l_tools import djconf
 from tools.l_break import a_break_type, BR_LONG
 from tools.c_logger import log_ini
-from tools.tokens import checktoken
 
 logname = 'ws_viewers'
 logger = getLogger(logname)
@@ -60,7 +58,7 @@ class triggerConsumer(AsyncWebsocketConsumer):
         else:
           viewer_dict[self.viewer_id] = {'connections' : 1}
         self.status = viewer_dict[self.viewer_id]   
-      self.status['socket'] = self
+        self.status['socket'] = self
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
@@ -167,12 +165,13 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning('*** Could not send Cam Info , socket closed...')
+            logger.warning(f'*** GetCamInfo {params['type']}'
+              f'{params['idx']} could not send info , socket closed...')
         else:
           await self.close()
       
       elif params['command'] == 'starttrigger':
-        #logger.info('<-- ' + str(text_data))
+        logger.info('<-- ' + str(text_data))
         while not (params['idx'] in viewables 
             and 'stream' in viewables[params['idx']]
             and params['type'] in viewables[params['idx']]):
@@ -236,11 +235,12 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             'show_cam' : show_cam,
             'on_frame_nr' : onf_index,
           }
-          #logger.info('--> ' + str(outlist))
+          logger.info('--> ' + str(outlist))
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning('*** Could not send Cam Info , socket closed...')
+            logger.warning(f'*** Starttrigger {params['type']}'
+              f'{params['idx']} could not send info , socket closed...')
         else:
           #logger.info('--> Close')
           await self.close()

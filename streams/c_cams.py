@@ -1,3 +1,4 @@
+# streams/c_cams.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -781,7 +782,7 @@ class cam_worker(mp_process):
       self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    self.logger.info('#####' + str(cmd))
+    #self.logger.info('#####' + str(cmd))
     #self.logger.info('#'+str(self.id) + ' 00000')
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)
@@ -793,36 +794,70 @@ class cam_worker(mp_process):
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(self.socket_path)
     srv.listen(1)
-    #self.logger.info('#'+str(self.id) + ' 22222')
+    srv.setblocking(False)  # required for sock_accept
+    loop = asyncio.get_running_loop()
+    conn = None
     while True:
       while streams_redis.get_ffmpeg_running():
         await a_break_type(BR_LONG)
-      streams_redis.set_ffmpeg_running(True)  
+      streams_redis.set_ffmpeg_running(True)
       ff_ts = time()
       if log_ffmpeg:
         log = open(logpath + f'ffmpeg{self.id}.log', "ab")
       self.ff_proc = await asyncio.create_subprocess_exec(
         '/usr/bin/ffmpeg',
         *cmd,
-        stdout=None,
-        stderr=log if log_ffmpeg else None,
+        stdout = None,
+        stderr = log if log_ffmpeg else None,
       )
-      try:
-        await asyncio.wait_for(self.ff_proc.wait(), timeout=30.0)
-        self.logger.warning(f'#{self.id} CamProc exited quickly ' 
-          f'after {round(time() - ff_ts, 3)} seconds')
-        streams_redis.set_ffmpeg_running(False)
-        await a_break_time(60.0) 
-      except asyncio.TimeoutError:
-        self.logger.info(f'#{self.id} CamProc still running ' 
-          f'after {round(time() - ff_ts, 3)} seconds')
+      # Race: process death vs first socket connect from ffmpeg.
+      # Whoever finishes first decides our verdict.
+      proc_task = asyncio.create_task(self.ff_proc.wait())
+      accept_task = asyncio.create_task(loop.sock_accept(srv))
+      done, pending = await asyncio.wait(
+        {proc_task, accept_task},
+        timeout = 30.0,  # safety net only
+        return_when = asyncio.FIRST_COMPLETED,
+      )
+
+      if accept_task in done:
+        # ffmpeg connected -> healthy
+        conn, _ = accept_task.result()
+        proc_task.cancel()
+        self.logger.info(
+          f'#{self.id} CamProc connected after '
+          f'{round(time() - ff_ts, 3)} seconds'
+        )
         streams_redis.set_ffmpeg_running(False)
         break
-    #self.logger.info('#'+str(self.id) + ' 33333')
-    conn, _ = await asyncio.to_thread(srv.accept)
+      # Either ffmpeg exited or hit the 30s safety net -> retry
+      for t in pending:
+        t.cancel()
+      for t in pending:
+        try:
+          await t
+        except (asyncio.CancelledError, Exception):
+          pass
+      if proc_task in done:
+        self.logger.warning(
+          f'#{self.id} CamProc exited quickly after '
+          f'{round(time() - ff_ts, 3)} seconds'
+        )
+      else:
+        self.logger.warning(
+          f'#{self.id} CamProc neither connected nor died within 30s'
+        )
+        # process still alive but mute -> kill it before next attempt
+        try:
+          self.ff_proc.send_signal(signal.SIGKILL)
+          await self.ff_proc.wait()
+        except ProcessLookupError:
+          pass
+      streams_redis.set_ffmpeg_running(False)
+      await a_break_time(60.0)
+    # After the loop: conn is already accepted, no second srv.accept() needed
     conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 * self.bytes_per_frame)
     conn.setblocking(False)
-    #self.logger.info(f'SocketSize: {conn.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)}')    
     self.fd = conn.fileno()
     self.sock_conn = conn
     self.reader_thread = threading.Thread(
@@ -857,7 +892,7 @@ class cam_worker(mp_process):
                 offset += n
             if buf is not None and offset == self.bytes_per_frame:
                 try:
-                    self.raw_queue.put(bytes(buf), block=False)
+                    self.raw_queue.put(buf, block=False)
                 except queue.Full:
                     pass
     except Exception as fatal:
