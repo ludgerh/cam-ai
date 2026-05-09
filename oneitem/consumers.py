@@ -191,6 +191,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         await self.safe_send(outlist)	
 
       elif params['command'] == 'setcbstatus':
+        #logger.info(f' {self.type}{self.idx} <-- {text_data}')
         if self.may_write:
           if 'ch_show' in params:
             self.my_viewer.drawpad.show_mask = params['ch_show']
@@ -206,6 +207,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               self.dbline.cam_apply_mask = params['ch_apply']
               await self.dbline.asave(update_fields=('cam_apply_mask', ))
             elif self.type == 'D':
+              self.myitem.shared_mem.write_mask(self.my_viewer.drawpad.mask) 
               self.dbline.det_apply_mask = params['ch_apply']
               await self.dbline.asave(update_fields=('det_apply_mask', ))
           if 'ch_white' in params:

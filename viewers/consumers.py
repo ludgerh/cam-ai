@@ -178,6 +178,18 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           await a_break_type(BR_LONG)
         myitem = viewables[params['idx']][params['type']]
         dbline = await stream.objects.aget(id = params['idx'])
+        myviewer = viewers[params['idx']][params['type']]
+        myviewer.websocket = self
+        #if params['type'] in {'C', 'D'}:
+        if params['type'] == 'C':
+          myitem.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
+          myviewer.drawpad.positive_mask = dbline.cam_positive_mask
+        if params['type'] == 'D':
+          myitem.shared_mem.write_1_meta('apply_mask', dbline.det_apply_mask)
+          myviewer.drawpad.positive_mask = dbline.det_positive_mask
+        if params['type'] in {'C', 'D'}:
+          await myviewer.drawpad.set_mask_local()
+          myitem.shared_mem.write_mask(myviewer.drawpad.mask) 
         show_cam = await database_sync_to_async(self.check_conditions)(
           self.scope['user'], 
           dbline,
@@ -194,8 +206,6 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             await a_break_type(BR_LONG)
           while 'socket' not in self.status:
             await a_break_type(BR_LONG)
-          myviewer = viewers[params['idx']][params['type']]
-          myviewer.websocket = self
           if params['type'] == 'C':
             y_canvas =  round(x_canvas * dbline.cam_yres / dbline.cam_xres)
             outx = min(x_canvas, round(dbline.cam_xres / dbline.cam_scaledown))

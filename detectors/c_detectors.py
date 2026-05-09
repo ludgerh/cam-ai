@@ -59,6 +59,7 @@ class c_detector():
       shape = (dbline.cam_yres, dbline.cam_xres, 3), 
     )
     self.plugin.init_shared_mem(self.shared_mem, dbline)
+    self.viewer.drawpad.positive_mask = dbline.det_positive_mask
     
     # Create dataqueue and inqueue in the parent process, since c_cam needs to access them
     if dbline.cam_virtual_fps:
