@@ -726,18 +726,22 @@ class cam_worker(mp_process):
       generalparams += ['-use_wallclock_as_timestamps', '1']
     if gpuinfo():
       generalparams += ['-hwaccel', 'cuda', '-hwaccel_output_format',  'cuda']
+      generalparams += ['-threads', '1']
     inparams = ['-i', source_string]
     outparams1 = []
     if not self.dbline.cam_virtual_fps:
       #outparams1 += ['-map', '0:' + str(self.video_codec)]
       outparams1 += ['-map', '0:v:0']
       outparams1 += ['-an']
+    vf_filters = []
+    if gpuinfo():
+      vf_filters.append('hwdownload,format=nv12,format=bgr24')
     if inp_frame_rate:
-      outparams1 += ['-vf', 'fps=' + str(inp_frame_rate)]
+      vf_filters.append('fps=' + str(inp_frame_rate))
     else:
       outparams1 += ['-fps_mode', 'passthrough']
-    if gpuinfo():
-      outparams1 += ['-vf', 'hwdownload,format=nv12,format=bgr24'] 
+    if vf_filters:
+      outparams1 += ['-vf', ','.join(vf_filters)]
     outparams1 += ['-f', 'rawvideo']
     outparams1 += ['-pix_fmt', 'bgr24']
     outparams1 += ['unix://' + self.socket_path]
@@ -782,7 +786,7 @@ class cam_worker(mp_process):
       self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    #self.logger.info('#####' + str(cmd))
+    self.logger.info('#####' + str(cmd))
     #self.logger.info('#'+str(self.id) + ' 00000')
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)

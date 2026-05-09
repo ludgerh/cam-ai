@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -24,6 +24,8 @@ from aiosmtplib import (
   SMTPRecipientsRefused,
   SMTPConnectError,
   SMTPSenderRefused,
+  SMTPResponseException,
+  SMTPTimeoutError,
 )
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -77,7 +79,6 @@ class l_smtp(SMTP):
       self.last_error = (6, 'No SMTP config')
       self.result_code = 6
       self.ready = False
-      return(None)
     else:
       self.ready = True  
     self.allowed_size = None
@@ -167,8 +168,8 @@ class l_smtp(SMTP):
     self.answer = 'OK'
     self.last_error = (0, 'OK')
     try:
-      return await super().sendmail(*args[:2], msg.as_string()) 
       self.result_code = 0
+      return await super().sendmail(*args[:2], msg.as_string()) 
     except SMTPRecipientsRefused as e:
       self.answer = 'Server refused to take the mail. Wrong username? Wrong password? Wrong testing email?'
       self.last_error = e.args
@@ -192,30 +193,48 @@ class l_smtp(SMTP):
     except SMTPServerDisconnected:
       return(False)
       
+      
   async def quit(self):
     if not self.ready:
       return(None)
-    if await self.is_connected():
-      await super().quit()
+    # Best-effort QUIT: mail is already sent at this point, so we don't care
+    # about the server's reply. Just try to send QUIT politely, then close
+    # the socket no matter what happens.
+    try:
+      await asyncio.wait_for(super().quit(), timeout=2.0)
+    except (
+      SMTPServerDisconnected,    # already gone
+      SMTPResponseException,     # unexpected reply code
+      SMTPTimeoutError,          # server didn't reply to QUIT
+      asyncio.TimeoutError,      # our wait_for fired
+      OSError,                   # socket-level glitches
+    ) as e:
+      # Cosmetic - mail is sent, we just want to release the socket
+      print(f'QUIT cleanup ignored: {type(e).__name__}: {e}')
+    finally:
+      self.close()
 
-def async_sendmail(receiver_email, subject, message, html = None):
+def async_sendmail(receiver_email, subject, message, html=None):
   smtp_conf = get_smtp_conf()
-  my_smtp = l_smtp(**smtp_conf)
-  loop = asyncio.new_event_loop()
-  asyncio.set_event_loop(loop)
-  loop.run_until_complete(my_smtp.async_init())
-  my_msg = l_msg(
-    smtp_conf['sender_email'],
-    receiver_email,
-    subject,
-    message,
-    html,
-  )
-  loop.run_until_complete(my_smtp.sendmail(
-    smtp_conf['sender_email'],
-    receiver_email,
-    my_msg,
-  ))
-  loop.run_until_complete(my_smtp.quit())
-  loop.close()
+
+  async def _run():
+    my_smtp = l_smtp(**smtp_conf)
+    await my_smtp.async_init()
+    my_msg = l_msg(
+      smtp_conf['sender_email'],
+      receiver_email,
+      subject,
+      message,
+      html,
+    )
+    try:
+      await my_smtp.sendmail(
+        smtp_conf['sender_email'],
+        receiver_email,
+        my_msg,
+      )
+    finally:
+      await my_smtp.quit()
+
+  asyncio.run(_run())
       

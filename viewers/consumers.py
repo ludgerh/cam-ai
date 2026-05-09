@@ -165,13 +165,13 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning(f'*** GetCamInfo {params['type']}'
-              f'{params['idx']} could not send info , socket closed...')
+            logger.warning(f'*** GetCamInfo {params["type"]}'
+              f'{params["idx"]} could not send info , socket closed...')
         else:
           await self.close()
       
       elif params['command'] == 'starttrigger':
-        logger.info('<-- ' + str(text_data))
+        #logger.info('<-- ' + str(text_data))
         while not (params['idx'] in viewables 
             and 'stream' in viewables[params['idx']]
             and params['type'] in viewables[params['idx']]):
@@ -235,12 +235,12 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             'show_cam' : show_cam,
             'on_frame_nr' : onf_index,
           }
-          logger.info('--> ' + str(outlist))
+          #logger.info('--> ' + str(outlist))
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning(f'*** Starttrigger {params['type']}'
-              f'{params['idx']} could not send info , socket closed...')
+            logger.warning(f'*** Starttrigger {params["type"]}'
+              f'{params["idx"]} could not send info , socket closed...')
         else:
           #logger.info('--> Close')
           await self.close()

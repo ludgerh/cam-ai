@@ -365,6 +365,7 @@ class eve_worker(mp_process):
       #self.inferencing_status = 0
       self.fps_limit_old = -1
       self.email_address = self.dbline.eve_alarm_email
+      self.event_index_alt = 0
       #print(f'Launch: eventer #{self.id}')
       while not self.got_sigint:
         if streams_redis.check_if_counts_zero('E', self.id):
@@ -692,10 +693,11 @@ class eve_worker(mp_process):
                   break
                 await a_break_type(BR_SHORT)
             if found is None or found.check_out_ts:
-              count = 0 
               async with self.event_dict_lock:
-                while count in self.event_dict:
-                  count += 1  
+                event_index = round(time() * 1000)
+                while event_index <= self.event_index_alt:
+                  event_index += 1
+                self.event_index_alt = event_index  
                 new_event = await c_event.create(
                   tf_worker = self.tf_worker, 
                   tf_w_index = self.tf_w_index, 
@@ -703,13 +705,13 @@ class eve_worker(mp_process):
                   margin = margin, 
                   eventer_dbl = self.dbline, 
                   school_nr = self.shared_mem.read_1_meta('school'), 
-                  idx = count, 
+                  idx = event_index, 
                   shrink_factor = self.shared_mem.read_1_meta('shrink_factor'), 
                   logger = self.logger, 
                   max_items = self.event_max_items,
                   name = self.event_name,
                 )
-                self.event_dict[count] = new_event
+                self.event_dict[event_index] = new_event
                 await self.merge_events()
             else: 
               async with self.event_dict_lock:

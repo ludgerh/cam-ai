@@ -102,7 +102,10 @@ class det_plugin(temp_plugin):
         self.sl.period = new_period / self.speed_factor
       if self.divisor != self.div_old:
         self.div_old = self.divisor
-        logger.warning(f'DE{my_detector.id}: Fpm divisor = {self.divisor}')
+        if self.divisor <= 1.0:
+          logger.info(f'DE{my_detector.id}: Fpm divisor = {self.divisor}')
+        else:
+          logger.warning(f'DE{my_detector.id}: Fpm divisor = {self.divisor}')
       self.div_ts = new_time  
     return(self.sl.greenlight(frame_time))
     

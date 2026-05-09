@@ -179,18 +179,47 @@ class l_buffer():
                   storage['shape'] = data['shape']
                 if 'dtype' in data:
                   storage['dtype'] = data['dtype']
-              in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
-              storage['shm'].buf[0] = 0
-              if self.get_struct[storage_idx][i] == 'L':
-                data_out.append(pickle.loads(in_bytes))
+              #in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
+              #storage['shm'].buf[0] = 0
+              #if self.get_struct[storage_idx][i] == 'L':
+              #  data_out.append(pickle.loads(in_bytes))
+              #elif self.get_struct[storage_idx][i] == 'B':
+              #  data_out.append(in_bytes)
+              #elif self.get_struct[storage_idx][i] == 'N':
+              #  data_out.append(np.ndarray(
+              #    storage['shape'], 
+              #    dtype=storage['dtype'], 
+              #    buffer=in_bytes,
+              #  )) 
+              # Numpy: direct copy from SHM into a new ndarray (one memcpy, numpy-internal)
+              if self.get_struct[storage_idx][i] == 'N':
+                shm_view = np.ndarray(
+                  storage['shape'],
+                  dtype = storage['dtype'],
+                  buffer = storage['shm'].buf,
+                  offset = 1,
+                )
+                out = shm_view.copy()
+                storage['shm'].buf[0] = 0
+                data_out.append(out)
+
+              # Large pickle: pickle.loads accepts buffer protocol objects directly
+              elif self.get_struct[storage_idx][i] == 'L':
+                out = pickle.loads(storage['shm'].buf[1:storage['last_size'] + 1])
+                storage['shm'].buf[0] = 0
+                data_out.append(out)
+
+              # Raw bytes: tobytes() is genuinely needed here -
+              # we need an object that outlives the SHM release
               elif self.get_struct[storage_idx][i] == 'B':
-                data_out.append(in_bytes)
-              elif self.get_struct[storage_idx][i] == 'N':
-                data_out.append(np.ndarray(
-                  storage['shape'], 
-                  dtype=storage['dtype'], 
-                  buffer=in_bytes,
-                )) 
+                out = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
+                storage['shm'].buf[0] = 0
+                data_out.append(out)
+              
+              
+              
+              
+              
       except Empty:
         await asyncio.sleep(self.brake_time) 
         data_out = ''  
