@@ -25,7 +25,6 @@ from sysinfo import sysinfo
 
 ctrl_c_count = 2
 ts = 0
-first_round = True
 
 def sigint_handler(signal, frame):
   global ctrl_c_count
@@ -84,11 +83,6 @@ if len(call_pars) > 1:
       cmd = 'pip install -r requirements.' + my_sysinfo['hw'] + '_' 
     cmd += my_sysinfo['dist_version']
     call_in_env(cmd, my_sysinfo)
-    if first_round:
-      now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-      with open("last_run.dat", "w", encoding="utf-8") as f:
-          f.write(now + "\n")
-      first_round = False
     call_in_env('python manage.py migrate', my_sysinfo)
     subprocess.call(call_pars)
     if startup_redis.get_shutdown_command() in {0, 10, 11}:

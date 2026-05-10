@@ -217,7 +217,7 @@ class drawpad():
       cv.polylines(self.screen, [pts], True, colour, 2) 
       for item in ring.points:
         cv.circle(self.screen,(round(item[0]), round(item[1])), radius, colour, -1)
-
+        
   def make_screen(self, x=None, y=None, radius=None):
     if self.ringlist is None:
       return()
@@ -227,10 +227,15 @@ class drawpad():
       y = self.ydim
     if radius is None:
       radius = self.radius
-    # Use np.empty + slice-assign instead of np.full with a tuple fill_value.
-    # np.full((h, w, 3), (255, 255, 255), ...) can return a non-contiguous
-    # array in newer NumPy versions, which OpenCV >= 4.7 rejects in
-    # polylines / fillPoly / circle with "Layout ... incompatible with cv::Mat".
+    # Guard: cv.polylines / fillPoly / circle reject 0-sized images with
+    # a misleading "Layout ... incompatible with cv::Mat" error. Skip
+    # silently if set_xy() has not been called yet.
+    if x <= 0 or y <= 0:
+      self.logger.warning(
+        f'make_screen() called before set_xy(): xdim={x}, ydim={y}'
+      )
+      self.screen = None
+      return()
     self.screen = np.empty((y, x, 3), np.uint8)
     self.screen[:] = self.backgr
     self.draw_rings(radius)
