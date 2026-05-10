@@ -1,3 +1,4 @@
+# eventers/c_eventers.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -14,10 +15,15 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+
+# Spawn workers re-import this module from scratch in a fresh Python process,
+# so Django's app registry must be initialized before any models module is
+# pulled in via tools.c_tools / streams.models / .models / etc.
+import django
+django.setup()
 import os
 import cv2 as cv
 import json
-import numpy as np
 import asyncio
 import aiofiles
 import aiofiles.os
@@ -32,24 +38,19 @@ from setproctitle import setproctitle
 from collections import deque
 from time import time
 from multiprocessing import Process as mp_process, SimpleQueue as s_queue
-from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from django.forms.models import model_to_dict
 from globals.c_globals import add_viewer
-from tools.l_break import (
-  a_break_type, 
-  break_type, 
-  a_break_time, 
-  BR_SHORT, 
-  BR_MEDIUM, 
-  BR_LONG,
-)
-from tools.c_spawn import viewable
+from tools.l_break import a_break_type, a_break_time, BR_SHORT, BR_MEDIUM, BR_LONG
 from tools.c_tools import (
   add_record_count, 
   take_record_count, 
   add_data_count, 
   take_data_count, 
+  c_buffer, 
+  speedlimit, 
+  speedometer, 
+  hasoverlap, 
 )
 from tf_workers.models import school
 from startup.redis import my_redis as startup_redis
@@ -60,13 +61,11 @@ from oneitem.shared_mem import shared_mem
 from l_buffer.l_buffer import l_buffer
 from viewers.c_viewers import c_viewer
 from tools.l_tools import djconf
-from tools.c_tools import c_buffer, speedlimit, speedometer, hasoverlap, rect_btoa
 from tools.c_logger import alog_ini
 from streams.models import stream
 from tf_workers.c_tf_workers import tf_worker_client
 from .models import evt_condition
 from .redis import my_redis as eventers_redis
-from .c_alarm import alarm, alarm_init
 from .c_event import resolve_rules, c_event
 
 _SH_MEM_ITEMS = {
@@ -85,7 +84,7 @@ _SH_MEM_ITEMS = {
 }
 
 class c_eventer():
-  def __init__(self, dbline, my_worker, logger, ):
+  def __init__(self, dbline, smtp_lock, my_worker, logger):
     self.type = 'E'
     self.dbline = dbline
     self.id = dbline.id
@@ -129,24 +128,30 @@ class c_eventer():
         my_viewer.inqueue,                 # 3: viewer_queue
         my_worker.inqueue,                 # 4: worker_in
         my_worker.registerqueue,           # 5: worker_reg
+        smtp_lock,                         # 6: smtp_lock (cross-process)
       ),
     ) 
 
   def build_string(self, i):
+    # Build first half of the description (subject)
     if i['c_type'] == 1:
-	    result = 'Any movement detected'
-    elif  i['c_type'] in {2, 3}:
-	    result = str(i['x'])+' predictions are '
-    elif i['c_type']  in {4, 5}:
-	    result = 'Tag "'+self.tag_list[i['x']].name+'" is '
+      result = 'Any movement detected'
+    elif i['c_type'] in {2, 3}:
+      result = str(i['x']) + ' predictions are '
+    elif i['c_type'] in {4, 5}:
+      result = 'Tag "' + self.tag_list[i['x']].name + '" is '
     elif i['c_type'] == 6:
-	    result = ('Tag "'+self.tag_list[i['x']].name+'" is in top '
-        +str(round(i['y'])))
-    if i['c_type'] in {2,4}:
-	    result += 'above or equal '+str(i['y'])
-    elif i['c_type'] in {3,5}:
-	    result += 'below or equal '+str(i['y'])
-    return(result)   
+      result = ('Tag "' + self.tag_list[i['x']].name + '" is in top '
+        + str(round(i['y'])))
+    else:
+      result = ''   # safety fallback for unexpected c_type
+    # Append comparison clause where applicable - c_type 1 and 6 are
+    # already complete sentences and need no suffix
+    if i['c_type'] in {2, 4}:
+      result += 'above or equal ' + str(i['y'])
+    elif i['c_type'] in {3, 5}:
+      result += 'below or equal ' + str(i['y'])
+    return(result) 
     
   def start(self):
     self.eve_worker.start()
@@ -197,9 +202,9 @@ class eve_worker(mp_process):
   def run(self):
     # self._args holds the queues we passed to __init__ as args=queues
     (dataqueue, detectorqueue, inqueue, viewer_queue, 
-     worker_in, worker_reg) = self._args
+     worker_in, worker_reg, smtp_lock) = self._args
     asyncio.run(self.async_runner(
-      dataqueue, detectorqueue, inqueue, viewer_queue, worker_in, worker_reg,
+      dataqueue, detectorqueue, inqueue, viewer_queue, worker_in, worker_reg, smtp_lock, 
     )) 
     
   def sigint_handler(self, signal = None, frame = None ):
@@ -281,7 +286,7 @@ class eve_worker(mp_process):
       self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True) 
     
   async def async_runner(self, dataqueue, detectorqueue, inqueue, 
-      viewer_queue, worker_in, worker_reg):
+      viewer_queue, worker_in, worker_reg, smtp_lock):
     try:
       # Set queues as instance attributes so the rest of the code
       # can access them via self.xxx as before:
@@ -291,6 +296,9 @@ class eve_worker(mp_process):
       self.viewer_queue = viewer_queue
       self.worker_in = worker_in
       self.worker_reg = worker_reg
+      # Inject lock into c_event class so send_emails() can reach it
+      # without threading it through every method call:
+      c_event.smtp_lock = smtp_lock
       
       self.logname = 'eventer #'+str(self.id)
       self.logger = getLogger(self.logname)
@@ -329,9 +337,9 @@ class eve_worker(mp_process):
         self.cond_dict[item.reaction].append(model_to_dict(item)) 
       datapath = await djconf.agetconfig('datapath', 'data/')
       self.recordingspath = await djconf.agetconfig(
-        'recordingspath', datapath + 'recordings/', 
+        'recordingspath', 
+        datapath + 'recordings/', 
       )
-      await database_sync_to_async(alarm_init)(self.logger) 
       os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
       if self.dbline.eve_gpu_nr_cv== -1:
         os.environ["CUDA_VISIBLE_DEVICES"] = ''

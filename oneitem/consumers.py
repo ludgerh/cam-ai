@@ -1,3 +1,4 @@
+# oneitem/consumers.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -26,9 +27,8 @@ from tools.c_logger import log_ini
 from tf_workers.models import school
 from streams.models import stream
 from streams.redis import my_redis as streams_redis
-from globals.c_globals import viewers, viewables
+from globals.c_globals import viewables
 from eventers.models import evt_condition
-from drawpad.models import mask
 
 logname = 'ws_oneitem'
 logger = getLogger(logname)
@@ -51,7 +51,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
       try:
         self.my_viewer.drawpad.edit_active = False
       except AttributeError:
-          pass  # ignore missing attributes
+        pass  # ignore missing attributes
       if self.myitem is not None:
         self.myitem.nr_of_cond_ed = 0
         self.myitem.last_cond_ed = 0
@@ -184,7 +184,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.dbline.eve_alarm_email = params['value']
             self.myitem.inqueue.put(('set_alarm_email', params['value']))
           elif params['pname'] == 'eve_one_frame_per_event':
-            self.dbline.eve_eve_one_frame_per_event = params['value']
+            self.dbline.eve_one_frame_per_event = params['value']
             self.myitem.shared_mem.write_1_meta('one_frame_per_event', params['value'])
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
@@ -329,10 +329,12 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
 
-      elif params['command'] == 'getcondition': #xxx
+      elif params['command'] == 'getcondition':
         if self.may_write:
           filterline = await evt_condition.objects.aget(id=params['c_nr'])
-        outlist['data'] = model_to_dict(filterline, exclude=[])
+          outlist['data'] = model_to_dict(filterline, exclude=[])
+        else:
+          outlist['data'] = 'No Access'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)		
 

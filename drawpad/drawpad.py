@@ -1,3 +1,4 @@
+# drawpad/drawpad.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -226,7 +227,12 @@ class drawpad():
       y = self.ydim
     if radius is None:
       radius = self.radius
-    self.screen = np.full((y, x, 3), self.backgr, np.uint8)
+    # Use np.empty + slice-assign instead of np.full with a tuple fill_value.
+    # np.full((h, w, 3), (255, 255, 255), ...) can return a non-contiguous
+    # array in newer NumPy versions, which OpenCV >= 4.7 rejects in
+    # polylines / fillPoly / circle with "Layout ... incompatible with cv::Mat".
+    self.screen = np.empty((y, x, 3), np.uint8)
+    self.screen[:] = self.backgr
     self.draw_rings(radius)
 
   async def new_ring(self):

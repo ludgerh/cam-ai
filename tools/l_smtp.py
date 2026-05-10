@@ -1,3 +1,4 @@
+# tools/l_smtp.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -72,21 +73,23 @@ class l_msg(MIMEMultipart):
     return len(self.as_string())    
 
 class l_smtp(SMTP):
-
   def __init__(self, **kwargs):
-    if kwargs['host'] == '':
-      self.answer = 'There is no valid SMTP configuration.'
-      self.last_error = (6, 'No SMTP config')
-      self.result_code = 6
-      self.ready = False
-    else:
-      self.ready = True  
     self.allowed_size = None
     self.answer = 'OK'
     self.last_error = (0, 'OK')
     self.result_code = 0
+    if kwargs.get('host', '') == '':
+      self.answer = 'There is no valid SMTP configuration.'
+      self.last_error = (6, 'No SMTP config')
+      self.result_code = 6
+      self.ready = False
+      # Initialize base class with safe defaults so later attribute access doesn't blow up
+      super().__init__(hostname='localhost', port=25, timeout=5.0, start_tls=False)
+      self._kwargs = kwargs
+      return
+    self.ready = True
     if 'timeout' not in kwargs:
-      kwargs['timeout'] = 5.0
+      kwargs['timeout'] = 30.0
     if 'user' in kwargs:
       self.user = kwargs['user']
     else:
@@ -182,17 +185,7 @@ class l_smtp(SMTP):
       self.answer = 'Something else went wrong: ' + str(e.args) 
       self.last_error = e.args 
       self.result_code = 11001
-      return({'Server-Error' : 'Other error', })
- 
-  async def is_connected(self):
-    if not self.ready:
-      return(None)
-    try:
-      await self.noop()
-      return(True)
-    except SMTPServerDisconnected:
-      return(False)
-      
+      return({'Server-Error' : 'Other error', })      
       
   async def quit(self):
     if not self.ready:

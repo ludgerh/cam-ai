@@ -21,9 +21,8 @@ import asyncio
 import numpy as np
 from time import time
 from threading import Lock as t_lock
-from traceback import format_exc
 from collections import deque
-from multiprocessing import shared_memory as sm, Queue as mp_queue, Lock as p_lock, queues
+from multiprocessing import shared_memory as sm, Queue as mp_queue
 from queue import Empty, Full, Queue as mt_queue
 from copy import deepcopy
 import pickle

@@ -1,5 +1,6 @@
+# globals/c_globals.py
 """
-Copyright (C) 2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -14,10 +15,18 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+from multiprocessing import get_context
+
 trainers = {}
 tf_workers = {}
 viewables = {}
 viewers = {}
+# Cross-process lock for SMTP: ensures only one eventer worker at a time
+# opens an SMTP session. Created once in the parent process; inherited by
+# every spawned eve_worker via args= in __init__.
+_mp_ctx = get_context('spawn')
+smtp_lock = _mp_ctx.Lock()
+trainer_glob_lock = _mp_ctx.Lock()
 
 def initialize():
   from sys import argv
@@ -25,7 +34,6 @@ def initialize():
     return()
   import django
   django.setup()
-  from multiprocessing import SimpleQueue, Lock as p_lock
   from tf_workers.models import worker as worker_mod
   from tf_workers.c_tf_workers import tf_worker
   for item in worker_mod.objects.filter(active=True):
@@ -33,14 +41,14 @@ def initialize():
     #Tricky: Queues and buffers stay in this Process, even if not named
   from trainers.models import trainer as trainer_mod
   from trainers.c_trainers import trainer
-  glob_lock = p_lock()
+  #glob_lock = mp_lock()
   my_worker = tf_workers[1] #may be variable in the future 
   for item in trainer_mod.objects.filter(active=True):
     trainers[item.id] = trainer(
       item.id, 
       my_worker.inqueue,
       my_worker.registerqueue,
-      glob_lock,
+      trainer_glob_lock,
     )
     #Tricky: Queues and buffers stay in this Process, even if not named
   from streams.models import stream as stream_mod

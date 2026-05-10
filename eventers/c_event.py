@@ -1,3 +1,4 @@
+# eventers.py/c_event.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -21,7 +22,7 @@ import aiofiles
 import aiofiles.os
 from datetime import datetime
 from random import randint
-from os import path, makedirs
+from os import path
 from time import time
 from collections import OrderedDict
 from threading import Lock as t_lock
@@ -34,10 +35,7 @@ from tools.l_smtp import l_smtp, l_msg
 from tools.c_tools import do_reduction, aget_smtp_conf
 from tools.tokens import maketoken_async
 from schools.c_schools import get_taglist
-from streams.models import stream as db_stream
 from .models import event, event_frame
-
-import os
 
 async def resolve_rules(conditions, predictions):
   if predictions is None:
@@ -99,6 +97,7 @@ async def resolve_rules(conditions, predictions):
 
 class c_event(list):
   crypt = None
+  smtp_lock = None
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
       idx, shrink_factor, logger, max_items = None, name = None):
@@ -309,72 +308,95 @@ class c_event(list):
 
   async def send_emails(self):
     self.logger.info('Sending Email: ' + self.to_email)
-    self.to_email = self.to_email.split()
-    for receiver in self.to_email:
-      mytoken = await maketoken_async('EVR', self.dbline.id, receiver)
-      subject = ('#'+str(self.eventer_id) + '(' + self.eventer_name + '): '
-        + await self.p_string())
-      to_email = receiver
-      plain_text = 'Hello CAM-AI user,\n' 
-      plain_text += 'We had some movement.\n'  
-      if self.savename:
-        plain_text += 'Here is the movie: \n' 
-        plain_text += self.clienturl + 'schools/getbigmp4/' + str(self.dbline.id) + '/'
-        plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
-      plain_text += 'Here are the images: \n'  
-      for item in self.mailimages:
-        plain_text += self.clienturl + 'schools/getbmp/0/' + str(item[0]) + '/3/1/200/200/'
-        plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/ \n' 
-      html_text = '<html><body><p>Hello CAM-AI user, <br>\n' 
-      html_text += 'We had some movement. <br> \n' 
-      if self.savename:
-        filepath = (await djconf.agetconfig('recordingspath', self.datapath + 'recordings/')
-          + self.dbline.videoclip + '.jpg')
-        if path.exists(filepath):
-          with open(filepath, "rb") as f:
-            jpegdata = f.read()
-          jpegdata = cv.imdecode(
-            np.frombuffer(jpegdata, dtype=np.uint8), cv.IMREAD_UNCHANGED
-          )
-          jpegdata = do_reduction(jpegdata, 400, 400)
-          jpegdata = cv.imencode('.jpg', jpegdata)[1].tobytes()
-          self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
-          html_text += '<br>Here is the movie (click on the image to see): <br> \n' 
-          html_text += ('<a href="' + self.clienturl + 'schools/getbigmp4/' 
-            + str(self.dbline.id) + '/')
-          html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
-          html_text += '" target="_blank">'
-          html_text += '<img src="cid:image0" style="width: 400px; height: auto"></a> <br>\n'
-        else:
-          self.logger.error('JPG-File not found: ' + filepath)
-      html_text += 'Here are the images: <br> \n'
-      for item in self.mailimages:
-        if item[4] == 'image':
-          html_text += '<a href="' + self.clienturl + 'schools/getbigbmp/0/' + str(item[0]) + '/'
-          html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
-          html_text += '" target="_blank">'
-          html_text += ('<img src="cid:image' + str(item[0]) 
-            + '" style="width: 200px; height: 200px; object-fit: contain"></a> \n')
-      html_text += '<br> \n'
+    receivers = self.to_email.split()
+    if not receivers:
+      return
+    # Build the message ONCE - same content, same token for the whole event
+    mytoken = await maketoken_async('EVR', self.dbline.id, receivers[0])
+    subject = ('#' + str(self.eventer_id) + '(' + self.eventer_name + '): '
+      + await self.p_string())
+    plain_text = 'Hello CAM-AI user,\n' 
+    plain_text += 'We had some movement.\n'  
+    if self.savename:
+      plain_text += 'Here is the movie: \n' 
+      plain_text += (self.clienturl + 'schools/getbigmp4/' 
+        + str(self.dbline.id) + '/')
+      plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
+    plain_text += 'Here are the images: \n'  
+    for item in self.mailimages:
+      plain_text += (self.clienturl + 'schools/getbmp/0/' 
+        + str(item[0]) + '/3/1/200/200/')
+      plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/ \n' 
+    html_text = '<html><body><p>Hello CAM-AI user, <br>\n' 
+    html_text += 'We had some movement. <br> \n' 
+    if self.savename:
+      filepath = (await djconf.agetconfig(
+          'recordingspath', self.datapath + 'recordings/')
+        + self.dbline.videoclip + '.jpg')
+      if path.exists(filepath):
+        with open(filepath, "rb") as f:
+          jpegdata = f.read()
+        jpegdata = cv.imdecode(
+          np.frombuffer(jpegdata, dtype=np.uint8), cv.IMREAD_UNCHANGED
+        )
+        jpegdata = do_reduction(jpegdata, 400, 400)
+        jpegdata = cv.imencode('.jpg', jpegdata)[1].tobytes()
+        self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
+        html_text += '<br>Here is the movie (click on the image to see): <br>\n' 
+        html_text += ('<a href="' + self.clienturl + 'schools/getbigmp4/' 
+          + str(self.dbline.id) + '/')
+        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
+        html_text += '" target="_blank">'
+        html_text += ('<img src="cid:image0" '
+          'style="width: 400px; height: auto"></a> <br>\n')
+      else:
+        self.logger.error('JPG-File not found: ' + filepath)
+    html_text += 'Here are the images: <br> \n'
+    for item in self.mailimages:
+      if item[4] == 'image':
+        html_text += ('<a href="' + self.clienturl + 'schools/getbigbmp/0/' 
+          + str(item[0]) + '/')
+        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
+        html_text += '" target="_blank">'
+        html_text += ('<img src="cid:image' + str(item[0]) 
+          + '" style="width: 200px; height: 200px; '
+          'object-fit: contain"></a> \n')
+    html_text += '<br> \n'
+    # Acquire the cross-process lock in a thread so the event loop stays
+    # responsive while another eventer worker is sending mail.
+    await asyncio.to_thread(c_event.smtp_lock.acquire)
+    try:
       smtp_conf = await aget_smtp_conf()
       my_smtp = l_smtp(**smtp_conf)
-      await my_smtp.async_init()
-      my_msg = l_msg(
-        smtp_conf['sender_email'],
-        receiver,
-        subject,
-        plain_text,
-        html = html_text,
-      )
-      for item in self.mailimages:
-        my_msg.attach_jpeg(item[2], 'image' + str(item[0]))  
-      await my_smtp.sendmail(
-        smtp_conf['sender_email'],
-        receiver,
-        my_msg,
-      )
-      if my_smtp.result_code:
-        self.logger.error('SMTP: ' + my_smtp.answer)
-        self.logger.error(str(my_smtp.last_error))
-      await my_smtp.quit()
+      try:
+        await my_smtp.async_init()
+        if not my_smtp.ready or my_smtp.result_code != 0:
+          self.logger.error('SMTP init failed: ' + my_smtp.answer)
+          self.logger.error(str(my_smtp.last_error))
+          return
+        my_msg = l_msg(
+          smtp_conf['sender_email'],
+          ', '.join(receivers),    # joined string for the To: header
+          subject,
+          plain_text,
+          html=html_text,
+        )
+        for item in self.mailimages:
+          my_msg.attach_jpeg(item[2], 'image' + str(item[0]))  
+        await my_smtp.sendmail(
+          smtp_conf['sender_email'],
+          receivers,                # list - SMTP envelope recipients
+          my_msg,
+        )
+        if my_smtp.result_code:
+          self.logger.error('SMTP: ' + my_smtp.answer)
+          self.logger.error(str(my_smtp.last_error))
+      finally:
+        await my_smtp.quit()
+        # Cooldown between sends - keeps the mailserver happy when many events
+        # fire in quick succession. We hold the lock during the sleep so the
+        # next eventer worker has to wait for it.
+        await asyncio.sleep(2.0)
+    finally:
+      c_event.smtp_lock.release()
 
