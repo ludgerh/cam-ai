@@ -116,6 +116,19 @@ class l_buffer():
       self.shelf = None 
     if not self.m_proc:
       self.lock = t_lock()
+      
+  def __getstate__(self):
+    # Strip parent-only state that can't (and shouldn't) cross the process
+    # boundary: bound-method callbacks, threading locks, asyncio tasks.
+    state = self.__dict__.copy()
+    state['call'] = None
+    state.pop('lock', None)
+    state['data_loop_task'] = None
+    return(state)
+
+  def __setstate__(self, state):
+    self.__dict__.update(state)
+    # Lock will be (re-)created lazily in start_data_loop() if needed.
     
   def display_qinfo(self, info : 'Queue_Info: '): 
     if self.debug and self.m_proc:
