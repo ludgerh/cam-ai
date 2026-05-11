@@ -189,7 +189,13 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           myviewer.drawpad.positive_mask = dbline.det_positive_mask
         if params['type'] in {'C', 'D'}:
           await myviewer.drawpad.set_mask_local()
-          myitem.shared_mem.write_mask(myviewer.drawpad.mask) 
+          if myviewer.drawpad.mask is not None:
+            myitem.shared_mem.write_mask(myviewer.drawpad.mask)
+          else:
+            logger.warning(
+              f'set_mask_local() left mask=None for '
+              f'{params["type"]}{params["idx"]}, skipping write_mask()'
+            )
         show_cam = await database_sync_to_async(self.check_conditions)(
           self.scope['user'], 
           dbline,

@@ -18,11 +18,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import sys
 import numpy as np
 import cv2 as cv
+from time import monotonic
 from asgiref.sync import sync_to_async
 from json import dumps, loads
 from shapely.geometry import Point, LinearRing
 from django.db import close_old_connections
 from channels.db import database_sync_to_async
+from tools.l_break import a_break_type, BR_LONG
 from globals.c_globals import viewables
 from .models import mask as mask_db
 
@@ -170,6 +172,20 @@ class drawpad():
     self.radius = round(min(self.xdim, self.ydim) / 50)
     
   async def set_mask_local(self, ringlist = None):
+    # Race: on slow hardware (e.g. Raspi 5), the websocket consumer can
+    # arrive here before the frame loop (c_viewers) or cam init (c_cams)
+    # has called set_xy(). Poll until xdim/ydim are valid, with a
+    # generous timeout so we never hang the consumer task.
+    WAIT_TIMEOUT = 10.0  # seconds
+    t_start = monotonic()
+    while self.xdim <= 0 or self.ydim <= 0:
+      if monotonic() - t_start > WAIT_TIMEOUT:
+        self.logger.warning(
+          f'set_mask_local() timed out waiting for set_xy(): '
+          f'xdim={self.xdim}, ydim={self.ydim}'
+        )
+        return()
+      await a_break_type(BR_LONG)
     if ringlist is None:
       await self.aload_ringlist()
     else:  
@@ -262,6 +278,17 @@ class drawpad():
       x = self.xdim
     if y is None:
       y = self.ydim
+    # Guard: np.empty((0, 0, 3)) feeds cv.fillPoly a zero-sized Mat, which
+    # raises a misleading "Layout ... incompatible with cv::Mat" error.
+    # Race: on slow hardware (e.g. Raspi 5) the websocket consumer can call
+    # set_mask_local() before the frame loop has called set_xy().
+    # Mirrors the guard in make_screen().
+    if x <= 0 or y <= 0:
+      self.logger.warning(
+        f'mask_from_polygons() called before set_xy(): xdim={x}, ydim={y}'
+      )
+      self.mask = None
+      return()
     result = np.empty((y, x, 3), np.uint8)
     if self.positive_mask:
       result[:] = foregr
