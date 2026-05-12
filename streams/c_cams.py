@@ -721,6 +721,11 @@ class cam_worker(mp_process):
     if not self.dbline.cam_virtual_fps:
       if source_string[:4].upper() == 'RTSP':
         generalparams += ['-rtsp_transport', 'tcp']
+        # Socket I/O timeout for RTSP (microseconds)
+        generalparams += ["-stimeout", "30000000"]   # 10s
+      elif source_string[:4].upper() == "RTMP":
+        # Socket I/O timeout for RTMP (microseconds, ffmpeg >= 4.x)
+        generalparams += ["-rw_timeout", "30000000"]  # 10s
       generalparams += ['-thread_queue_size', '1024']
       generalparams += ['-fflags', 'genpts']
       generalparams += ['-use_wallclock_as_timestamps', '1']
@@ -806,21 +811,29 @@ class cam_worker(mp_process):
         await a_break_type(BR_LONG)
       streams_redis.set_ffmpeg_running(True)
       ff_ts = time()
-      if log_ffmpeg:
-        log = open(logpath + f'ffmpeg{self.id}.log', "ab")
-      self.ff_proc = await asyncio.create_subprocess_exec(
-        '/usr/bin/ffmpeg',
-        *cmd,
-        stdout = None,
-        stderr = log if log_ffmpeg else None,
-      )
+      # Open the log file only for the duration of the spawn.
+      # Once the subprocess has started, the child holds its own dup'd FD
+      # (as stderr) and the parent's handle is no longer needed.
+      log = None
+      try:
+        if log_ffmpeg:
+          log = open(logpath + f'ffmpeg{self.id}.log', "ab")
+        self.ff_proc = await asyncio.create_subprocess_exec(
+          '/usr/bin/ffmpeg',
+          *cmd,
+          stdout = None,
+          stderr = log,
+        )
+      finally:
+        if log is not None:
+          log.close()
       # Race: process death vs first socket connect from ffmpeg.
       # Whoever finishes first decides our verdict.
       proc_task = asyncio.create_task(self.ff_proc.wait())
       accept_task = asyncio.create_task(loop.sock_accept(srv))
       done, pending = await asyncio.wait(
         {proc_task, accept_task},
-        timeout = 30.0,  # safety net only
+        timeout = 60.0,  # safety net only
         return_when = asyncio.FIRST_COMPLETED,
       )
 
@@ -907,13 +920,32 @@ class cam_worker(mp_process):
     finally:
       pass
       #self.logger.info(f'CA{self.id}: ----- Stopping Reader')
-
+      
   async def stopprocess(self):
-    self.logger.info('#'+str(self.id) + ' aaaaa')
+    self.logger.info("#" + str(self.id) + " aaaaa")
     self.raw_running = False
+    # Unblock the reader thread: shut down the socket so any in-flight
+    # recv_into() returns immediately. Without this, _raw_reader stays
+    # stuck forever whenever ffmpeg has gone mute (Reolink RTMP quirk).
+    sc = getattr(self, "sock_conn", None)
+    if sc is not None:
+      try:
+        sc.shutdown(socket.SHUT_RDWR)
+      except OSError:
+        pass
     if self.reader_thread and self.reader_thread.is_alive():
-      await asyncio.to_thread(self.reader_thread.join)
-    self.logger.info('#'+str(self.id) + ' bbbbb')
+      await asyncio.to_thread(self.reader_thread.join, 5.0)
+      if self.reader_thread.is_alive():
+        self.logger.warning(
+          f"#{self.id} reader_thread did not exit within 5s, abandoning"
+        )
+    if sc is not None:
+      try:
+        sc.close()
+      except OSError:
+        pass
+      self.sock_conn = None
+    self.logger.info("#" + str(self.id) + " bbbbb")
     if self.ff_proc is not None and self.ff_proc.returncode is None:
       try:
         p = Process(self.ff_proc.pid)
