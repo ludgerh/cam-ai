@@ -722,7 +722,7 @@ class cam_worker(mp_process):
       if source_string[:4].upper() == 'RTSP':
         generalparams += ['-rtsp_transport', 'tcp']
         # Socket I/O timeout for RTSP (microseconds)
-        generalparams += ["-stimeout", "30000000"]   # 10s
+        generalparams += ["-timeout", "30000000"]   # 10s
       elif source_string[:4].upper() == "RTMP":
         # Socket I/O timeout for RTMP (microseconds, ffmpeg >= 4.x)
         generalparams += ["-rw_timeout", "30000000"]  # 10s
