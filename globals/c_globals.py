@@ -29,9 +29,24 @@ smtp_lock = _mp_ctx.Lock()
 trainer_glob_lock = _mp_ctx.Lock()
 
 def initialize():
+  # Clean up orphaned shared-memory segments from previous runs.
+  # Safe at startup since this process has not created any of its own yet,
+  # and no other CAM-AI instance should be running.
   from sys import argv
-  if not((argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith('gunicorn'))):
+  if not((argv[0].endswith('manage.py') and 'runserver' in argv) 
+      or (argv[0].endswith('gunicorn'))):
     return()
+  import glob
+  import os
+  cleaned = 0
+  for shm_path in glob.glob('/dev/shm/psm_*'):
+    try:
+      os.unlink(shm_path)
+      cleaned += 1
+    except OSError:
+      pass
+  if cleaned:
+    print(f'Cleaned up {cleaned} orphaned shared-memory segments')
   import django
   django.setup()
   from tf_workers.models import worker as worker_mod

@@ -174,6 +174,8 @@ class inst_virt_cam(cam_inst_view):
     newstream.cam_url = filename
     newstream.eve_school = school.objects.filter(active=True).first()
     newstream.creator = request.user
+    newstream.det_plugin = plugin.objects.get(type = 'D', default = True)
+    newstream.eve_alarm_plugin = plugin.objects.get(type = 'A', default = True)
     cap = cv.VideoCapture(VIRT_CAM_PATH / filename)
     try:
       newstream.cam_xres = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))

@@ -1,4 +1,3 @@
-# l_buffer/l_buffer.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -21,8 +20,9 @@ import asyncio
 import numpy as np
 from time import time
 from threading import Lock as t_lock
+from traceback import format_exc
 from collections import deque
-from multiprocessing import shared_memory as sm, Queue as mp_queue
+from multiprocessing import shared_memory as sm, Queue as mp_queue, Lock as p_lock, queues
 from queue import Empty, Full, Queue as mt_queue
 from copy import deepcopy
 import pickle
@@ -103,6 +103,10 @@ class l_buffer():
       self.get_struct = {}
       self.get_storage = {}
       self.put_count = 0
+      # Holds REPLACED shared-memory segments scheduled for delayed cleanup.
+      # A segment is appended when storage['shm'] is overwritten with a larger
+      # one; consumers still have q_len+2 puts to finish reading from it, then
+      # it gets close()'d AND unlink()'d in the cleanup loop at the top of put().
       self.shm_deque = deque()
     else:
       if self.q_len is not None:
@@ -116,19 +120,6 @@ class l_buffer():
       self.shelf = None 
     if not self.m_proc:
       self.lock = t_lock()
-      
-  def __getstate__(self):
-    # Strip parent-only state that can't (and shouldn't) cross the process
-    # boundary: bound-method callbacks, threading locks, asyncio tasks.
-    state = self.__dict__.copy()
-    state['call'] = None
-    state.pop('lock', None)
-    state['data_loop_task'] = None
-    return(state)
-
-  def __setstate__(self, state):
-    self.__dict__.update(state)
-    # Lock will be (re-)created lazily in start_data_loop() if needed.
     
   def display_qinfo(self, info : 'Queue_Info: '): 
     if self.debug and self.m_proc:
@@ -184,6 +175,14 @@ class l_buffer():
                 storage['last_size'] = data['len']
               if 'name' in data:
                 if data['name'] != storage['name']:
+                  # Release the FD of the previously attached segment before
+                  # attaching to a new one. Consumer side only - never unlink(),
+                  # the producer is responsible for that.
+                  if storage['shm'] is not None:
+                    try:
+                      storage['shm'].close()
+                    except Exception:
+                      pass
                   storage['shm'] = sm.SharedMemory(name=data['name'])
                   storage['name'] = data['name']
               if self.get_struct[storage_idx][i] == 'N':
@@ -191,47 +190,18 @@ class l_buffer():
                   storage['shape'] = data['shape']
                 if 'dtype' in data:
                   storage['dtype'] = data['dtype']
-              #in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
-              #storage['shm'].buf[0] = 0
-              #if self.get_struct[storage_idx][i] == 'L':
-              #  data_out.append(pickle.loads(in_bytes))
-              #elif self.get_struct[storage_idx][i] == 'B':
-              #  data_out.append(in_bytes)
-              #elif self.get_struct[storage_idx][i] == 'N':
-              #  data_out.append(np.ndarray(
-              #    storage['shape'], 
-              #    dtype=storage['dtype'], 
-              #    buffer=in_bytes,
-              #  )) 
-              # Numpy: direct copy from SHM into a new ndarray (one memcpy, numpy-internal)
-              if self.get_struct[storage_idx][i] == 'N':
-                shm_view = np.ndarray(
-                  storage['shape'],
-                  dtype = storage['dtype'],
-                  buffer = storage['shm'].buf,
-                  offset = 1,
-                )
-                out = shm_view.copy()
-                storage['shm'].buf[0] = 0
-                data_out.append(out)
-
-              # Large pickle: pickle.loads accepts buffer protocol objects directly
-              elif self.get_struct[storage_idx][i] == 'L':
-                out = pickle.loads(storage['shm'].buf[1:storage['last_size'] + 1])
-                storage['shm'].buf[0] = 0
-                data_out.append(out)
-
-              # Raw bytes: tobytes() is genuinely needed here -
-              # we need an object that outlives the SHM release
+              in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
+              storage['shm'].buf[0] = 0
+              if self.get_struct[storage_idx][i] == 'L':
+                data_out.append(pickle.loads(in_bytes))
               elif self.get_struct[storage_idx][i] == 'B':
-                out = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
-                storage['shm'].buf[0] = 0
-                data_out.append(out)
-              
-              
-              
-              
-              
+                data_out.append(in_bytes)
+              elif self.get_struct[storage_idx][i] == 'N':
+                data_out.append(np.ndarray(
+                  storage['shape'], 
+                  dtype=storage['dtype'], 
+                  buffer=in_bytes,
+                )) 
       except Empty:
         await asyncio.sleep(self.brake_time) 
         data_out = ''  
@@ -293,7 +263,15 @@ class l_buffer():
       if age < 0:
         age += 0xFFFF
       if age > self.q_len + 2:
-        self.shm_deque.popleft()
+        # Segment is past its lifetime - consumers had q_len+2 puts to finish
+        # reading. Release the FD AND remove the /dev/shm/psm_* file,
+        # otherwise both leak.
+        _, old_shm = self.shm_deque.popleft()
+        try:
+          old_shm.close()
+          old_shm.unlink()
+        except FileNotFoundError:
+          pass  # already unlinked elsewhere
       else:
         break  
     for i, item in enumerate(data):
@@ -322,9 +300,13 @@ class l_buffer():
           processed_item['len'] = data_length
           storage['last_size'] = data_length
           if data_length > storage['max_size']:
+            # Schedule the previous segment for delayed cleanup BEFORE replacing
+            # it. Consumers might still be reading from it - shm_deque keeps it
+            # alive for q_len+2 more puts, then it gets close()'d + unlink()'d.
+            if storage['shm'] is not None:
+              self.shm_deque.append((self.put_count, storage['shm']))
             storage['shm'] = sm.SharedMemory(create=True, size=data_length + 1)
             storage['shm'].buf[0] = 0 # free
-            self.shm_deque.append((self.put_count, storage['shm']))
             processed_item['name'] = storage['shm'].name
             storage['max_size'] = data_length
         while storage['shm'].buf is None or storage['shm'].buf[0] == 1:
@@ -414,11 +396,39 @@ class l_buffer():
       if self.m_proc:
         while not self.data_queue.empty():
           await asyncio.sleep(self.brake_time) 
-        for item in self.shm_deque:
-          item[1].close()
-          item[1].unlink()
+        # Clean up segments still pending in the delayed-cleanup deque.
+        for _, old_shm in self.shm_deque:
+          try:
+            old_shm.close()
+            old_shm.unlink()
+          except FileNotFoundError:
+            pass  # already unlinked elsewhere
+        self.shm_deque.clear()
+        # Clean up the currently active segments held in put_storage.
+        # Without this they would leak as /dev/shm/psm_* until process exit.
+        for storage_list in self.put_storage.values():
+          for storage in storage_list:
+            if storage['shm'] is not None:
+              try:
+                storage['shm'].close()
+                storage['shm'].unlink()
+              except FileNotFoundError:
+                pass
+              storage['shm'] = None
     else:   
       self.data_queue = None
       if self.data_loop_task is not None:
         self.data_loop_task.cancel()
+      # Consumer-side cleanup: close every attached segment.
+      # No unlink() here - the producer is responsible for that.
+      if self.m_proc:
+        for storage_list in self.get_storage.values():
+          for storage in storage_list:
+            if storage['shm'] is not None:
+              try:
+                storage['shm'].close()
+              except Exception:
+                pass
+              storage['shm'] = None
+              storage['name'] = ''
       

@@ -791,11 +791,11 @@ class cam_worker(mp_process):
       self.ffmpeg_recording = True
     cmd = (generalparams + inparams + outparams1 
       + outparams2)
-    self.logger.info('#####' + str(cmd))
-    self.logger.info('#'+str(self.id) + ' 00000')
+    #self.logger.info('#####' + str(cmd))
+    #self.logger.info('#'+str(self.id) + ' 00000')
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)
-    self.logger.info('#'+str(self.id) + ' 11111')
+    #self.logger.info('#'+str(self.id) + ' 11111')
     try:
       os.unlink(self.socket_path)
     except FileNotFoundError:
@@ -882,7 +882,7 @@ class cam_worker(mp_process):
       daemon=True,
     )
     self.reader_thread.start()
-    self.logger.info('#'+str(self.id) + ' 44444')
+    #self.logger.info('#'+str(self.id) + ' 44444')
     
   def _raw_reader(self):
     self.raw_running = True
@@ -922,7 +922,7 @@ class cam_worker(mp_process):
       #self.logger.info(f'CA{self.id}: ----- Stopping Reader')
       
   async def stopprocess(self):
-    self.logger.info("#" + str(self.id) + " aaaaa")
+    #self.logger.info("#" + str(self.id) + " aaaaa")
     self.raw_running = False
     # Unblock the reader thread: shut down the socket so any in-flight
     # recv_into() returns immediately. Without this, _raw_reader stays
@@ -945,7 +945,7 @@ class cam_worker(mp_process):
       except OSError:
         pass
       self.sock_conn = None
-    self.logger.info("#" + str(self.id) + " bbbbb")
+    #self.logger.info("#" + str(self.id) + " bbbbb")
     if self.ff_proc is not None and self.ff_proc.returncode is None:
       try:
         p = Process(self.ff_proc.pid)
@@ -957,16 +957,16 @@ class cam_worker(mp_process):
             pass        
       except NoSuchProcess:
         pass        
-      self.logger.info('#'+str(self.id) + ' ccccc')
+      #self.logger.info('#'+str(self.id) + ' ccccc')
       try:
         self.ff_proc.send_signal(signal.SIGKILL)
       except ProcessLookupError:
         pass
-      self.logger.info('#'+str(self.id) + ' ddddd')
+      #self.logger.info('#'+str(self.id) + ' ddddd')
       await self.ff_proc.wait()
-      self.logger.info('#'+str(self.id) + ' eeeee')
+      #self.logger.info('#'+str(self.id) + ' eeeee')
     self.ff_proc = None
-    self.logger.info('#'+str(self.id) + ' fffff')
+    #self.logger.info('#'+str(self.id) + ' fffff')
 
   def ts_targetname(self, ts):
     return('C'+str(self.id).zfill(4) + '_'

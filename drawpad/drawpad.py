@@ -28,8 +28,7 @@ from tools.l_break import a_break_type, BR_LONG
 from globals.c_globals import viewables
 from .models import mask as mask_db
 
-
-MIN_RECT = 75
+MIN_RECT = 40
 
 class ring_class():
   def __init__(self, 

@@ -25,6 +25,7 @@ from validators.ip_address import ipv4, ipv6
 from django.forms.models import model_to_dict
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import aclose_old_connections
+from core.models import plugin
 from tools.c_logger import log_ini
 from startup.redis import my_redis as startup_redis
 from tools.l_tools import djconf
@@ -103,6 +104,8 @@ class acaminst(AsyncWebsocketConsumer):
         newstream.eve_gpu_nr_cv = cv_gpu_nr
         newstream.eve_school = myschool
         newstream.creator = self.scope['user']
+        newstream.det_plugin = await plugin.objects.aget(type = 'D', default = True)
+        newstream.eve_alarm_plugin = await plugin.objects.aget(type = 'A', default = True)
         await newstream.asave()
         newlineid = newstream.id
         if not self.scope['user'].is_superuser:
