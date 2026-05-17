@@ -120,6 +120,30 @@ class l_buffer():
       self.shelf = None 
     if not self.m_proc:
       self.lock = t_lock()
+      
+      
+  def __getstate__(self):
+    # When this buffer is sent to a child process via multiprocessing
+    # spawn, three attributes must not be pickled:
+    #
+    # - self.call: usually a bound method (e.g. c_viewer.callback). Its
+    #   __self__ transitively pulls in non-picklable Django middleware
+    #   closures (convert_exception_to_response.<locals>.inner) via the
+    #   attached Channels consumer. The callback is only meaningful on
+    #   the consumer side that lives in the parent process.
+    # - self.lock: threading.Lock is not picklable; locks are also not
+    #   shared across processes.
+    # - self.data_loop_task: asyncio.Task is bound to the parent event
+    #   loop and not picklable.
+    state = self.__dict__.copy()
+    state['call'] = None
+    state.pop('lock', None)
+    state['data_loop_task'] = None
+    return(state)
+
+  def __setstate__(self, state):
+    self.__dict__.update(state)
+      
     
   def display_qinfo(self, info : 'Queue_Info: '): 
     if self.debug and self.m_proc:

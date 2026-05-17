@@ -96,7 +96,6 @@ async def resolve_rules(conditions, predictions):
     return(False)
 
 class c_event(list):
-  crypt = None
   smtp_lock = None
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
@@ -143,14 +142,16 @@ class c_event(list):
   async def create(cls, **kwargs):
     instance = cls(**kwargs)
     instance.stream_creator = await database_sync_to_async(lambda: instance.dbline.camera.creator)()
-    if c_event.crypt is None:
-      if instance.dbline.camera.encrypted:
-        if instance.dbline.camera.crypt_key:
-          c_event.crypt = l_crypt(key=instance.dbline.camera.crypt_key)
-        else:
-          c_event.crypt = l_crypt()
-          instance.dbline.camera.crypt_key = c_event.crypt.key
-          await instance.dbline.camera.asave(update_fields=['crypt_key'])
+    if instance.dbline.camera.encrypted:
+      if instance.dbline.camera.crypt_key:
+        instance.crypt = l_crypt(key=instance.dbline.camera.crypt_key)
+      else:
+        instance.crypt = l_crypt()
+        instance.dbline.camera.crypt_key = self.crypt.key
+        await instance.dbline.camera.asave(update_fields=['crypt_key'])
+      instance.do_crypt = True   
+    else:
+      instance.do_crypt = False    
     await instance.a_init()   
     return instance 
     
@@ -256,14 +257,14 @@ class c_event(list):
       'bmp', 
     )
     bmp_data =  frame[4]
-    if c_event.crypt is not None:
-      bmp_data = c_event.crypt.encrypt(bmp_data)
+    if self.do_crypt:
+      bmp_data = self.crypt.encrypt(bmp_data)
     async with aiofiles.open(self.schoolpath+filename, "wb") as f:
       await f.write(bmp_data)
     frameline = event_frame(
       time = timezone.make_aware(datetime.fromtimestamp(frame[2])),
       name = filename,
-      encrypted = c_event.crypt is not None,
+      encrypted = self.do_crypt,
       x1 = frame[3][0],
       x2 = frame[3][1],
       y1 = frame[3][2],

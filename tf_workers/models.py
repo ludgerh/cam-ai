@@ -50,7 +50,7 @@ class school(models.Model):
     on_delete=models.SET_DEFAULT, default = 1, related_name = 'remotely_created_schools')
   storage_quota = models.BigIntegerField(default = 1)
   delegation_level = models.IntegerField(default = 1)
-  encrypted = models.BooleanField(default = True)
+  encrypted = models.BooleanField(default = False)
   dir = models.CharField(max_length = 256, default = 'data/schools/model1/')
   trigger = models.IntegerField(default = 1000000)
   last_fit = models.IntegerField(default = 0)

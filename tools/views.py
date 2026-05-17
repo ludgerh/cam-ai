@@ -35,6 +35,7 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse, FileResponse
 from django.forms.models import model_to_dict
 from globals.c_globals import viewables, trainers, tf_workers
+from core.models import plugin
 from camai.c_settings import safe_import
 from camai.passwords import db_password
 from camai.version import version
@@ -176,6 +177,7 @@ class inst_virt_cam(cam_inst_view):
     newstream.creator = request.user
     newstream.det_plugin = plugin.objects.get(type = 'D', default = True)
     newstream.eve_alarm_plugin = plugin.objects.get(type = 'A', default = True)
+    newstream.encrypted = djconf.getconfigbool('is_public_server', False)
     cap = cv.VideoCapture(VIRT_CAM_PATH / filename)
     try:
       newstream.cam_xres = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
@@ -190,6 +192,9 @@ class inst_virt_cam(cam_inst_view):
         'cam_xres', 
         'cam_yres', 
         'cam_virtual_fps', 
+        'det_plugin', 
+        'eve_alarm_plugin', 
+        'encrypted', 
       ))
     finally:
       cap.release()

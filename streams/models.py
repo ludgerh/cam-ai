@@ -28,7 +28,7 @@ class stream(models.Model):
   lastused = models.DateTimeField(default=timezone.now)
   creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_DEFAULT, default=1)
   storage_quota = models.BigIntegerField(default=0)
-  encrypted = models.BooleanField(default=True)
+  encrypted = models.BooleanField(default=False)
   crypt_key = models.BinaryField(max_length=256, default=b'')
   cam_mode_flag = models.IntegerField(default=2)
   # 0: Not active  1: Runnin in parents process  2: Running in own process  

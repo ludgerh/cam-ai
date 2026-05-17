@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -34,7 +34,7 @@ class event(models.Model):
   camera = models.ForeignKey(stream, on_delete=models.CASCADE, default=1)
   done = models.BooleanField(default=False)
   videoclip = models.CharField(max_length=256, default='')
-  video_encrypted = models.BooleanField(default=True)
+  video_encrypted = models.BooleanField(default=False)
   double = models.BooleanField(default=False)
   hasarchive = models.BooleanField(default=False)
 
@@ -46,7 +46,7 @@ class event_frame(models.Model):
   time = models.DateTimeField(default=timezone.make_aware(datetime(1900, 1, 1)))
   status = models.SmallIntegerField(default=0)
   name = models.CharField(max_length=100)
-  encrypted = models.BooleanField(default=True)
+  encrypted = models.BooleanField(default=False)
   x1 = models.IntegerField(default=0)
   x2 = models.IntegerField(default=0)
   y1 = models.IntegerField(default=0)

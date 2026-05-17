@@ -106,6 +106,7 @@ class acaminst(AsyncWebsocketConsumer):
         newstream.creator = self.scope['user']
         newstream.det_plugin = await plugin.objects.aget(type = 'D', default = True)
         newstream.eve_alarm_plugin = await plugin.objects.aget(type = 'A', default = True)
+        newstream.encrypted = is_public_server
         await newstream.asave()
         newlineid = newstream.id
         if not self.scope['user'].is_superuser:
