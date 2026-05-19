@@ -1,6 +1,7 @@
 {% extends 'eventers/basis.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+eventers/templates/eventers/events.html
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -96,6 +97,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </main>
 <script>
 
+(function() {
 {% if may_write_stream %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
   const button = event.relatedTarget;
@@ -122,7 +124,6 @@ let events_ready;
 let events_count;
 let last_event_visible;
 let get_cards_active = false;
-let consumer_id = 0;
 
 function isInViewport(elementid) {
   element = document.getElementById(elementid)
@@ -285,7 +286,7 @@ getimages = function() {
             const active = (j === 0) ? ' active' : '';
             const src =
               window.location.protocol + '//' + window.location.host +
-              '/schools/getbmp/0/' + consumer_id + '/' + framelines[j] + '/3/1/375/375/';
+              '/schools/getbmp/0/' + framelines[j] + '/3/1/375/375/';
             const $item = $('<div class="carousel-item' + active + '"></div>');
             const $img  = $('<img>', {
               src: src,
@@ -324,12 +325,6 @@ $(document).ready(function() {
 	)
 	.then((result) => {
 		SchoolDBUtilSocket = result;
-    return(SchoolDBUtilSocket.sendandwait({
-      'command' : 'get_consumer_id',
-    }));
-  })
-  .then((result) => {
-    consumer_id = result;
     $(window).on('resize scroll', function() {
       getcards();
     });
@@ -380,6 +375,7 @@ $(document).ready(function() {
     draw_all_cards();
   })
 });
+})();
 </script>
 
 {% endblock %}

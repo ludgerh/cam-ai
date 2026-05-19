@@ -117,24 +117,30 @@ def imexport(request, schoolnr):
   else:
     return render(request, 'schools/imexport.html', context)
 
-getbmp_dict = {}
 #mode == 0: Classroom Dir, mode == 1: Model Dir
 #mode == 2: Archive Image, mode == 3: Archive video 
-def getbmp(request, mode, consumer_id, framenr, outtype, xycontained, x, y, 
+def getbmp(request, mode, framenr, outtype, xycontained, x, y, 
     tokennr=None, token=None): 
   global crypter_dict
   if mode == 0:
-    frame_info = getbmp_dict[0][consumer_id][framenr]
-    if frame_info['crypt']:
-      crypter_dict.setdefault(frame_info['stream'], l_crypt(key=frame_info['crypt']))
-    filepath = schoolframespath + frame_info['path']
-    crypt = frame_info['crypt']
+    event_frame_line = event_frame.objects.get(id = framenr)
+    crypt = event_frame_line.encrypted
+    filepath = schoolframespath + event_frame_line.name
+    stream_nr = event_frame_line.event.camera.id
+    if crypt:
+      crypter_dict.setdefault(
+        stream_nr, 
+        l_crypt(key = event_frame_line.event.camera.crypt_key), 
+      )
   elif mode == 1:
-    filepath_raw = getbmp_dict[1][consumer_id][framenr]['path']
+    trainframe_line = trainframe.objects.get(id = framenr)
+    school_nr = trainframe_line.school
+    schoolline = school.objects.get(id = school_nr)
+    filepath_raw = schoolline.dir + '*****/' + trainframe_line.name
     filepath = filepath_raw.replace('*****', 'frames', 1)
     if not os.path.exists(filepath):
       filepath = filepath_raw.split("*****/", 1)[0]
-      filepath = filepath + 'coded/' + '224x224/' + frameline.name[:-3] + 'cod'
+      filepath = filepath + 'coded/' + '224x224/' + trainframe_line.name[:-3] + 'cod'
       filepath = filepath[:-3]+'cod'
     crypt = False
   elif mode == 2:
@@ -157,14 +163,9 @@ def getbmp(request, mode, consumer_id, framenr, outtype, xycontained, x, y,
       go_on = False
   else:
     if mode == 0:
-      go_on = access.check('C', frame_info['stream'], request.user, 'R')
+      go_on = access.check('C', stream_nr, request.user, 'R')
     elif mode == 1:
-      go_on = access.check(
-        'S', 
-        getbmp_dict[1][consumer_id][framenr]['school'], 
-        request.user, 
-        'R', 
-      )
+      go_on = access.check('S', school_nr, request.user, 'R')
     else:
       go_on = (request.user in userset)
   if not go_on:
@@ -173,15 +174,14 @@ def getbmp(request, mode, consumer_id, framenr, outtype, xycontained, x, y,
     image_data = f.read()
   if crypt: 
     myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
-      xout=x, yout=y, incrypt=crypter_dict[frame_info['stream']]) 
+      xout=x, yout=y, incrypt=crypter_dict[stream_nr]) 
   else:
     myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
       xout=x, yout=y)  
-          
   return HttpResponse(myframe, content_type="image/jpeg")
 
 #schoolnr = 0 --> from classroom directory
-def getbigbmp(request, mode, consumer_id, framenr, tokennr=0, token=''): 
+def getbigbmp(request, mode, framenr, tokennr=0, token=''): 
   if mode == 0:
     frameline = event_frame.objects.get(id = framenr)
     eventline = frameline.event
@@ -210,7 +210,6 @@ def getbigbmp(request, mode, consumer_id, framenr, tokennr=0, token=''):
   template = loader.get_template('schools/bigbmp.html')
   context = {
     'mode' : mode,
-    'consumer_id' : consumer_id,
     'framenr' : framenr,
     'tokennr' : tokennr,
     'token' : token,

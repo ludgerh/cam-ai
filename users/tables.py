@@ -43,11 +43,11 @@ class archivetable(Table):
     if record.typecode == 0:
       htmlline = '<a href="/schools/getbigbmp/2/' + str(record.id) + '/" target="_blank">'
       htmlline += ('<img style="width: 210px; height: 210px; object-fit: contain" src="'
-        + '/schools/getbmp/2/0/' + str(record.id) + '/3/1/210/210/">')
+        + '/schools/getbmp/2/' + str(record.id) + '/3/1/210/210/">')
     elif record.typecode == 1:  
       htmlline = '<a href="/schools/getbigmp4/' + str(record.id) + '/video.html" target="_blank">'
       htmlline += ('<img style="width: 210px; height: 210px; object-fit: contain" src="'
-        + '/schools/getbmp/3/0/' + str(record.id) + '/3/1/210/210/">')
+        + '/schools/getbmp/3/' + str(record.id) + '/3/1/210/210/">')
     htmlline +=  '</a><br>' 
     return(mark_safe(htmlline))
 

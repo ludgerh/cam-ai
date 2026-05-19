@@ -314,20 +314,17 @@ class c_event(list):
       return
     # Build the message ONCE - same content, same token for the whole event
     mytoken = await maketoken_async('EVR', self.dbline.id, receivers[0])
-    subject = ('#' + str(self.eventer_id) + '(' + self.eventer_name + '): '
-      + await self.p_string())
+    subject = f'#{self.eventer_id}({self.eventer_name}): {await self.p_string()}'
     plain_text = 'Hello CAM-AI user,\n' 
     plain_text += 'We had some movement.\n'  
     if self.savename:
       plain_text += 'Here is the movie: \n' 
-      plain_text += (self.clienturl + 'schools/getbigmp4/' 
-        + str(self.dbline.id) + '/')
-      plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html \n' 
+      plain_text += f'{self.clienturl}schools/getbigmp4/{self.dbline.id}/'
+      plain_text += f'{mytoken[0]}/{mytoken[1]}/video.html \n' 
     plain_text += 'Here are the images: \n'  
     for item in self.mailimages:
-      plain_text += (self.clienturl + 'schools/getbmp/0/' 
-        + str(item[0]) + '/3/1/200/200/')
-      plain_text += str(mytoken[0]) + '/' + mytoken[1] + '/ \n' 
+      plain_text += f'{self.clienturl}schools/getbmp/0/{item[0]}/3/1/200/200/'
+      plain_text += f'{mytoken[0]}/{mytoken[1]}/ \n' 
     html_text = '<html><body><p>Hello CAM-AI user, <br>\n' 
     html_text += 'We had some movement. <br> \n' 
     if self.savename:
@@ -344,9 +341,8 @@ class c_event(list):
         jpegdata = cv.imencode('.jpg', jpegdata)[1].tobytes()
         self.mailimages.append([0, None, jpegdata, 'jpeg', 'video'])
         html_text += '<br>Here is the movie (click on the image to see): <br>\n' 
-        html_text += ('<a href="' + self.clienturl + 'schools/getbigmp4/' 
-          + str(self.dbline.id) + '/')
-        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/video.html' 
+        html_text += f'<a href="{self.clienturl}schools/getbigmp4/{self.dbline.id}/'
+        html_text += f'{mytoken[0]}/{mytoken[1]}/video.html' 
         html_text += '" target="_blank">'
         html_text += ('<img src="cid:image0" '
           'style="width: 400px; height: auto"></a> <br>\n')
@@ -355,12 +351,10 @@ class c_event(list):
     html_text += 'Here are the images: <br> \n'
     for item in self.mailimages:
       if item[4] == 'image':
-        html_text += ('<a href="' + self.clienturl + 'schools/getbigbmp/0/' 
-          + str(item[0]) + '/')
-        html_text += str(mytoken[0]) + '/' + mytoken[1] + '/' 
-        html_text += '" target="_blank">'
-        html_text += ('<img src="cid:image' + str(item[0]) 
-          + '" style="width: 200px; height: 200px; '
+        html_text += f'<a href="{self.clienturl}schools/getbigbmp/0/{item[0]}/'
+        html_text += f'{mytoken[0]}/{mytoken[1]}/" target="_blank">'
+        html_text += (f'<img src="cid:image{item[0]} '
+          '" style="width: 200px; height: 200px; '
           'object-fit: contain"></a> \n')
     html_text += '<br> \n'
     # Acquire the cross-process lock in a thread so the event loop stays

@@ -1,6 +1,7 @@
 {% extends 'eventers/basis.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+eventers/templates/eventers/oneevent.html
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -131,8 +132,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <script >
 
+(function() {
 let displaywidth = Math.round($(window).width() * 0.97);
-let consumer_id = 0;
 
 {% if may_write_stream %}
 $('#deleteModal').on('shown.bs.modal', function (event) {
@@ -200,26 +201,13 @@ $(document).ready(function() {
   })
 	.then((result) => {
 		SchoolDBUtilSocket = result;
-    return(SchoolDBUtilSocket.sendandwait({
-      'command' : 'get_consumer_id',
-    }));
-  })
-  .then((result) => {
-    consumer_id = result;
-    return(SchoolDBUtilSocket.sendandwait({
-      'command' : 'event_to_dict',
-			  'event_nr' : {{ event.id }},
-    }));
-  })
-  .then(() => {
-    // Build URLs after consumer_id is known
     $('.framebig-link').each(function () {
       const id = $(this).data('frameId');
-      $(this).attr('href', `/schools/getbigbmp/0/${consumer_id}/${id}/`);
+      $(this).attr('href', `/schools/getbigbmp/0/${id}/`);
     });
     $('.frame-img').each(function () {
       const id = $(this).data('frameId');
-      $(this).attr('src', `/schools/getbmp/0/${consumer_id}/${id}/3/1/375/375/`);
+      $(this).attr('src', `/schools/getbmp/0/${id}/3/1/375/375/`);
     });
     $('.framearchbutton').each(function() {
       ArchiveSocket.sendandwait({
@@ -293,6 +281,7 @@ $(document).ready(function() {
 {% endif %}
   })
 });
+})();
 </script>
 
 {% endblock %}

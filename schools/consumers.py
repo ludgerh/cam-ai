@@ -49,7 +49,6 @@ from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers
 from schools.c_schools import get_taglist, check_extratags_async
-from schools.views import getbmp_dict
 from tf_workers.models import school, worker
 from tf_workers.c_tf_workers import tf_worker_client
 from eventers.models import event, event_frame
@@ -105,7 +104,6 @@ class schooldbutil(AsyncWebsocketConsumer):
   cache_dict['tagging'] = defaultdict(dict)
   cache_dict['school'] = defaultdict(dict)
   school_lines = {}
-  consumer_id_list = []
   active_getframes_locked = False
   active_getframes_list = []
 
@@ -128,7 +126,6 @@ class schooldbutil(AsyncWebsocketConsumer):
 
   async def connect(self):
     try:
-      global getbmp_dict
       self.check_ts = 0.0
       self.user = self.scope['user']
       self.tf_w_index = None
@@ -137,14 +134,6 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.accept()
       else:
         await self.close()
-      self.consumer_id = 0
-      while self.consumer_id in schooldbutil.consumer_id_list:
-        self.consumer_id += 1
-      schooldbutil.consumer_id_list.append(self.consumer_id)  
-      getbmp_dict.setdefault(0, {})
-      getbmp_dict[0][self.consumer_id] = {}
-      getbmp_dict.setdefault(1, {})
-      getbmp_dict[1][self.consumer_id] = {}
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -154,9 +143,6 @@ class schooldbutil(AsyncWebsocketConsumer):
       if self.tf_w_index is not None:
         await self.tf_worker.stop_out(self.tf_w_index)
         await self.tf_worker.unregister(self.tf_w_index) 
-      del getbmp_dict[0][self.consumer_id]
-      del getbmp_dict[1][self.consumer_id]
-      schooldbutil.consumer_id_list.remove(self.consumer_id) 
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
@@ -180,7 +166,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               item['idx'] in my_cache_dict
               and my_cache_dict[item['idx']]['fit'] == school_dbline.last_fit
             )
-            frameline = await event_frame.objects.aget(id=item['idx'])
+            frameline = await event_frame.objects.select_related('event__camera').aget(id = item['idx'])
             imagepath = schoolframespath + frameline.name
           else:
             my_cache_dict = schooldbutil.cache_dict['school']
@@ -201,6 +187,8 @@ class schooldbutil(AsyncWebsocketConsumer):
                 async with aiofiles.open(imagepath, mode = "rb") as f:
                   myimage = await f.read()
                 if frameline.encrypted:
+                  if self.crypt is None:
+                    self.crypt =  l_crypt(key = frameline.event.camera.crypt_key)
                   myimage = self.crypt.decrypt(myimage) 
                 myimage = await asyncio.to_thread(decode_and_convert_image, myimage)  
                 imglist.append(myimage)
@@ -271,7 +259,6 @@ class schooldbutil(AsyncWebsocketConsumer):
 
   async def receive(self, text_data):
     try:
-      global getbmp_dict
       await aclose_old_connections()
       #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']
@@ -282,33 +269,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       else:
         await self.close()
 
-      if params['command'] == 'get_consumer_id':
-        outlist['data'] = self.consumer_id
-        #logger.info('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))
-
-      if params['command'] == 'event_to_dict':
-        event_line = await event.objects.select_related('camera').aget(
-          id=params['event_nr'], 
-        )
-        stream_line = event_line.camera
-        framelines = await get_framelines(params['event_nr'])
-        frame_info = getbmp_dict[0][self.consumer_id]
-        if stream_line.crypt_key:
-          cryptic = stream_line.crypt_key
-        else:
-          cryptic =''   
-        for item in framelines:
-          frame_info.setdefault(item.id, {
-            'path': item.name,
-            'stream': stream_line.id,
-            'crypt' : cryptic,
-          })
-        outlist['data'] = 'OK'
-        #logger.info('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))
-
-      elif params['command'] == 'settrainpage':
+      if params['command'] == 'settrainpage':
         school_nr = params['school_nr']
         if self.check_ts + 60.0 < time():
           await self.school_lines[school_nr].arefresh_from_db()
@@ -423,10 +384,6 @@ class schooldbutil(AsyncWebsocketConsumer):
             'cs' : [line.c0,line.c1,line.c2,line.c3,line.c4,line.c5,line.c6,
               line.c7,line.c8,line.c9,],
             'made' : line.made.strftime("%d.%m.%Y %H:%M:%S %Z"),
-          })
-          getbmp_dict[1][self.consumer_id].setdefault(line.id, {
-            'path' : self.school_dir + '*****/' + line.name,
-            'school' :self.myschool_nr,
           })
         outlist['data'] = lines
         logger.debug('--> ' + str(outlist))
@@ -649,11 +606,6 @@ class schooldbutil(AsyncWebsocketConsumer):
           result = []
           for item in framelines:
             result.append(item.id)
-            getbmp_dict[0][self.consumer_id].setdefault(item.id, {
-              'path' : item.name,
-              'stream' : self.stream_nr,
-              'crypt' : self.crypt_key,
-            })
           result = [item.id for item in framelines]
           outlist['data'] = (params['count'], result)
         #logger.info('--> ' + str(outlist))
@@ -666,16 +618,6 @@ class schooldbutil(AsyncWebsocketConsumer):
         if schooldbutil.active_getframes_list:
           schooldbutil.active_getframes_list.pop(0)
         schooldbutil.active_getframes_locked = False
-        outlist['data'] = 'OK'
-        #logger.info('--> ' + str(outlist))
-        await self.send(json.dumps(outlist))
-
-      elif params['command'] == 'setcrypt':
-        streamline = await stream.objects.aget(id=params['stream'])
-        if streamline.encrypted:
-          self.crypt =  l_crypt(key=streamline.crypt_key)
-        else:
-          self.crypt = None  
         outlist['data'] = 'OK'
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))

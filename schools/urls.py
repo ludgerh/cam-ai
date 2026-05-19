@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -21,12 +21,12 @@ urlpatterns = [
 	path('images/<int:schoolnr>/', views.images, name='images'),
 	path('classroom/<int:streamnr>/', views.classroom, name='classroom'),
 	path('imexport/<int:schoolnr>/', views.imexport, name='imexport'),
-	path('getbmp/<int:mode>/<int:consumer_id>/<int:framenr>/<int:outtype>/<int:xycontained>'
+	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>'
     + '/<int:x>/<int:y>/', views.getbmp, name='getbmp'),
-	path('getbmp/<int:mode>/<int:consumer_id>/<int:framenr>/<int:outtype>/<int:xycontained>'
+	path('getbmp/<int:mode>/<int:framenr>/<int:outtype>/<int:xycontained>'
     + '/<int:x>/<int:y>/<int:tokennr>/<str:token>/', views.getbmp, name='getbmptoken'),
-	path('getbigbmp/<int:mode>/<int:consumer_id>/<int:framenr>/', views.getbigbmp, name='getbigbmp'),
-	path('getbigbmp/<int:mode>/<int:consumer_id>/<int:framenr>/<int:tokennr>/<str:token>/', 
+	path('getbigbmp/<int:mode>/<int:framenr>/', views.getbigbmp, name='getbigbmp'),
+	path('getbigbmp/<int:mode>/<int:framenr>/<int:tokennr>/<str:token>/', 
     views.getbigbmp, name='getbigbmptoken'),
 	path('getbigmp4/<int:archivenr>/video.html', views.getbigmp4, name='getbigmp4'),
 	path('getbigmp4/<int:eventnr>/<int:tokennr>/<str:token>/video.html', 
