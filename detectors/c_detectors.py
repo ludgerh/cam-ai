@@ -226,16 +226,18 @@ class det_worker(mp_process):
               self.linewidth = 5 
             self.xres = self.x_from_cam // self.scaledown
             self.yres = self.y_from_cam // self.scaledown
-            if self.scaledown > 1:
-              self.last_frame = await asyncio.to_thread(
-                cv.resize, 
-                frameline[1], 
-                (self.xres, self.yres), 
-                interpolation=cv.INTER_NEAREST,
-              )
-            else:
-              self.last_frame = frameline[1]
-            self.background = np.float32(self.last_frame)
+            #if self.scaledown > 1:
+            #  self.last_frame = await asyncio.to_thread(
+            #    cv.resize, 
+            #    frameline[1], 
+            #    (self.xres, self.yres), 
+            #    interpolation=cv.INTER_NEAREST,
+            #  )
+            #else:
+            #  self.last_frame = frameline[1]
+            self.last_frame = None
+            #self.background = np.float32(self.last_frame)
+            self.background = None
             self.shared_mem.write_1_meta('aoi_xdim', self.x_from_cam)
             self.shared_mem.write_1_meta('aoi_ydim', self.y_from_cam)
             self.shared_mem.write_1_meta('scaledown', self.scaledown)

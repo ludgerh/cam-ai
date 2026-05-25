@@ -65,6 +65,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 </main>
 <script >
 
+(function() {
 let c_view_Socket;
 let trigger_Socket;
 let imagewidth = 375 // Screen width IPhone 7
@@ -79,8 +80,6 @@ const cams = [
 function isInViewport(el) {
   if (!el.length) return false;
   const rect = el[0].getBoundingClientRect();
-  console.log('r', rect.top, rect.bottom);
-  console.log('w', window.innerHeight, document.documentElement.clientHeight);
   return (
     rect.top >= 0 &&
     rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
@@ -183,6 +182,7 @@ $(document).ready(async function() {
 
   loop();
 });
+})();
 	
 </script>
 {% endblock %}

@@ -194,6 +194,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 <script>
 
+(function() {
 let acaminstSocket;
 
 let control_mode = 0;
@@ -402,6 +403,7 @@ $(document).ready(function() {
   })  
   .catch(err => {console.log(err);});
 });
+})();
 </script>
 {% else %}
   <div class="h2 m-2">

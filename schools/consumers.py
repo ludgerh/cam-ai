@@ -82,7 +82,7 @@ else:
 
 CHUNK_SIZE = 32
 GETFRAMES_TIMEOUT = 1.0
-GETFRAMES_MAX = 1
+GETFRAMES_MAX = 5
 
 
 def decode_and_convert_image(myimage_bytes):
@@ -130,6 +130,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       self.user = self.scope['user']
       self.tf_w_index = None
       await aclose_old_connections()
+      self.crypt = None
       if self.user.is_authenticated:
         await self.accept()
       else:

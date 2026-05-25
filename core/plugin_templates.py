@@ -129,6 +129,12 @@ class det_plugin(temp_plugin):
         and not edit_active 
         and frame.shape[:2] == mask.shape[:2]): 
       frame = cv.bitwise_and(frame, mask)
+    if last_frame is None:
+      print('last_frame = frame.copy()')
+      last_frame = frame.copy()
+    if background is None: 
+      print('background = np.float32(last_frame)')
+      background = np.float32(last_frame)   
     frame_unmodified = frame.copy() 
     total_diff = np.max(cv.absdiff(last_frame, frame), axis=2)
     if edit_active:

@@ -58,9 +58,6 @@ from .redis import my_redis as streams_redis
 from .models import stream
 from .c_camera import c_camera
 
-datapath = djconf.getconfig('datapath', 'data/')
-logpath = djconf.getconfig('logdir', default = datapath + 'logs/')
-
 _SH_MEM_ITEMS = {
   'fps_limit' : 'd',
   'aoi_xmin' : 'i',
@@ -279,7 +276,6 @@ class cam_worker(mp_process):
         self.file_end = False
       else:
         self.mp4_proc = None
-        datapath = await djconf.agetconfig('datapath', 'data/')
         self.recordingspath = await djconf.agetconfig(
           'recordingspath', 
           datapath + 'recordings/', 
@@ -678,7 +674,6 @@ class cam_worker(mp_process):
     return([3, frame, in_ts])
 
   async def newprocess(self):
-    print('GPUInfo:', gpuinfo())
     while True:
       try:
         await self.dbline.arefresh_from_db()
@@ -817,6 +812,8 @@ class cam_worker(mp_process):
       log = None
       try:
         if log_ffmpeg:
+          datapath = await djconf.agetconfig('datapath', 'data/')
+          logpath = await djconf.agetconfig('logdir', default = datapath + 'logs/')
           log = open(logpath + f'ffmpeg{self.id}.log', "ab")
         self.ff_proc = await asyncio.create_subprocess_exec(
           '/usr/bin/ffmpeg',

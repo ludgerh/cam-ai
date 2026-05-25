@@ -47,6 +47,12 @@ viewer_dict_lock = asyncio.Lock()
 
 class triggerConsumer(AsyncWebsocketConsumer):
 
+  # Per-instance bookkeeping defaults. These guarantee disconnect() stays safe
+  # even when connect() bailed out before this socket was counted:
+  counted = False
+  status = None
+  viewer_id = None
+
   async def connect(self):
     try:
       await aclose_old_connections()
@@ -57,7 +63,10 @@ class triggerConsumer(AsyncWebsocketConsumer):
           viewer_dict[self.viewer_id]['connections'] += 1
         else:
           viewer_dict[self.viewer_id] = {'connections' : 1}
-        self.status = viewer_dict[self.viewer_id]   
+        # Mark as counted only after a successful increment, so disconnect()
+        # decrements exactly once and only for a socket we really counted:
+        self.counted = True
+        self.status = viewer_dict[self.viewer_id]
         self.status['socket'] = self
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
@@ -66,16 +75,27 @@ class triggerConsumer(AsyncWebsocketConsumer):
   async def disconnect(self, code = None):
     try:
       async with viewer_dict_lock:
-        self.status['connections'] -= 1
-        for mode in self.status:
-          if mode in {'connections', 'socket'}:
-            continue
-          for idx in self.status[mode]:
-            dict_item = self.status[mode][idx]
-            if dict_item['show_cam']:
-              dict_item['viewer'].pop_from_onf(dict_item['onf'])
-        if self.status['connections'] <= 0:
-          del viewer_dict[self.viewer_id] 
+        # Clean up on-frame registrations this viewer still holds. Guard
+        # against a missing/partial status (connect() may have bailed early):
+        if self.status is not None:
+          for mode in self.status:
+            if mode in {'connections', 'socket'}:
+              continue
+            for idx in self.status[mode]:
+              dict_item = self.status[mode][idx]
+              if dict_item['show_cam']:
+                dict_item['viewer'].pop_from_onf(dict_item['onf'])
+        # Decrement once, and only if this socket was actually counted. Work
+        # on the captured status object so we never touch a newer generation
+        # that was created under the same vid after a delete:
+        if self.counted and self.status is not None:
+          self.counted = False
+          self.status['connections'] -= 1
+          # Delete the key only if it still points to this very object, so a
+          # stale socket can never remove a freshly created entry:
+          if (self.status['connections'] <= 0
+              and viewer_dict.get(self.viewer_id) is self.status):
+            del viewer_dict[self.viewer_id]
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
@@ -96,7 +116,12 @@ class triggerConsumer(AsyncWebsocketConsumer):
 #*****************************************************************************
 
 class c_viewConsumer(AsyncWebsocketConsumer):
-            
+
+  # Per-instance bookkeeping defaults (see triggerConsumer):
+  counted = False
+  status = None
+  viewer_id = None
+
   @staticmethod
   def check_conditions(user, dbline):
     return not (
@@ -116,7 +141,9 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           viewer_dict[self.viewer_id]['connections'] += 1
         else:
           viewer_dict[self.viewer_id] = {'connections' : 1}
-        self.status = viewer_dict[self.viewer_id]   
+        # Mark as counted only after a successful increment:
+        self.counted = True
+        self.status = viewer_dict[self.viewer_id]
     except:
       logger.error('Error in consumer: ' + logname + ' (c_view)')
       logger.error(format_exc())
@@ -124,9 +151,14 @@ class c_viewConsumer(AsyncWebsocketConsumer):
   async def disconnect(self, code = None):
     try:
       async with viewer_dict_lock:
-        self.status['connections'] -= 1
-        if self.status['connections'] <= 0:
-          del viewer_dict[self.viewer_id]  
+        # Decrement once, only if counted, on the captured object; delete the
+        # key only if it still points to this same object (no stale removal):
+        if self.counted and self.status is not None:
+          self.counted = False
+          self.status['connections'] -= 1
+          if (self.status['connections'] <= 0
+              and viewer_dict.get(self.viewer_id) is self.status):
+            del viewer_dict[self.viewer_id]
     except:
       logger.error('Error in consumer: ' + logname + ' (viewConsumer)')
       logger.error(format_exc())
@@ -165,8 +197,8 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning(f'*** GetCamInfo {params["type"]}'
-              f'{params["idx"]} could not send info , socket closed...')
+            logger.warning(f'*** GetCamInfo {params['type']}'
+              f'{params['idx']} could not send info , socket closed...')
         else:
           await self.close()
       
@@ -178,24 +210,6 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           await a_break_type(BR_LONG)
         myitem = viewables[params['idx']][params['type']]
         dbline = await stream.objects.aget(id = params['idx'])
-        myviewer = viewers[params['idx']][params['type']]
-        myviewer.websocket = self
-        #if params['type'] in {'C', 'D'}:
-        if params['type'] == 'C':
-          myitem.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
-          myviewer.drawpad.positive_mask = dbline.cam_positive_mask
-        if params['type'] == 'D':
-          myitem.shared_mem.write_1_meta('apply_mask', dbline.det_apply_mask)
-          myviewer.drawpad.positive_mask = dbline.det_positive_mask
-        if params['type'] in {'C', 'D'}:
-          await myviewer.drawpad.set_mask_local()
-          if myviewer.drawpad.mask is not None:
-            myitem.shared_mem.write_mask(myviewer.drawpad.mask)
-          else:
-            logger.warning(
-              f'set_mask_local() left mask=None for '
-              f'{params["type"]}{params["idx"]}, skipping write_mask()'
-            )
         show_cam = await database_sync_to_async(self.check_conditions)(
           self.scope['user'], 
           dbline,
@@ -212,6 +226,8 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             await a_break_type(BR_LONG)
           while 'socket' not in self.status:
             await a_break_type(BR_LONG)
+          myviewer = viewers[params['idx']][params['type']]
+          myviewer.websocket = self
           if params['type'] == 'C':
             y_canvas =  round(x_canvas * dbline.cam_yres / dbline.cam_xres)
             outx = min(x_canvas, round(dbline.cam_xres / dbline.cam_scaledown))
@@ -255,8 +271,8 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning(f'*** Starttrigger {params["type"]}'
-              f'{params["idx"]} could not send info , socket closed...')
+            logger.warning(f'*** Starttrigger {params['type']}'
+              f'{params['idx']} could not send info , socket closed...')
         else:
           #logger.info('--> Close')
           await self.close()
