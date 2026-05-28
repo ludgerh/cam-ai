@@ -107,6 +107,8 @@ class triggerConsumer(AsyncWebsocketConsumer):
       idx, count = struct.unpack('<2I', bytes_data[1:9])
       async with viewer_dict_lock:
         self.status[mode][idx]['viewer'].clear_busy(count)
+      if idx == 1:  
+        logger.info(f'!!! clear_busy(count) {mode}{idx}')
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())
@@ -114,6 +116,8 @@ class triggerConsumer(AsyncWebsocketConsumer):
 #*****************************************************************************
 # c_viewConsumer
 #*****************************************************************************
+
+MAX_STARTTRIGGER_TRIES = 10
 
 class c_viewConsumer(AsyncWebsocketConsumer):
 
@@ -203,11 +207,18 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           await self.close()
       
       elif params['command'] == 'starttrigger':
-        #logger.info('<-- ' + str(text_data))
-        while not (params['idx'] in viewables 
+        tries = 0
+        while not (params['idx'] in viewables
             and 'stream' in viewables[params['idx']]
             and params['type'] in viewables[params['idx']]):
           await a_break_type(BR_LONG)
+          tries += 1
+          if tries > MAX_STARTTRIGGER_TRIES:
+            logger.warning(f'starttrigger giving up on {params["type"]}{params["idx"]}')
+            outlist['data'] = {'show_cam': False, 'on_frame_nr': None, 'not_ready': True}
+            await self.send(json.dumps(outlist))
+            logger.info(f'--> {outlist}')
+            return
         myitem = viewables[params['idx']][params['type']]
         dbline = await stream.objects.aget(id = params['idx'])
         show_cam = await database_sync_to_async(self.check_conditions)(
@@ -240,8 +251,6 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             outy = -1
             x_scaling = -1.0
             y_scaling = -1.0 
-          if params['type'] == 'E':
-            myitem.shared_mem.write_1_meta('x_canvas', x_canvas)
           if show_cam:
             onf_index = myviewer.push_to_onf(
               outx = outx, 
@@ -267,7 +276,7 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             'show_cam' : show_cam,
             'on_frame_nr' : onf_index,
           }
-          #logger.info('--> ' + str(outlist))
+          #logger.info(f'--> {outlist}')
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
@@ -276,7 +285,6 @@ class c_viewConsumer(AsyncWebsocketConsumer):
         else:
           #logger.info('--> Close')
           await self.close()
-          
     except:
       logger.error('Error in consumer: ' + logname + ' (c_view)')
       logger.error(format_exc())

@@ -20,15 +20,19 @@ import asyncio
 import struct
 import traceback
 from threading import Event
-from time import time
+from time import monotonic
 from autobahn.exception import Disconnected
 from globals.c_globals import viewables
 from tools.c_tools import c_convert, c_buffer, add_view_count, take_view_count
+from tools.l_break import a_break_type, BR_SHORT
 from startup.redis import my_redis as startup_redis
 from streams.redis import my_redis as streams_redis
 from drawpad.drawpad import drawpad
-
 #from threading import enumerate
+# how long to wait for a client ack before assuming the frame was lost on the
+# wire (or the ack got stuck) and freeing the busy slot, so the stream resumes
+# instead of livelocking forever. comfortably above the 1s off-screen ack delay.
+ACK_TIMEOUT = 3.0
 
 class c_viewer():
 
@@ -52,15 +56,20 @@ class c_viewer():
       self.drawpad = drawpad(self, self.logger)
     self.framebuffer = None
     self._next_client_nr = 0
+    self.x_canvas_max = 0
           
   async def onf(self, client_nr):
     client = None
+    i_set_busy = False  # did THIS call acquire the busy flag?
+    send_succeeded = False
     try:
       if self.my_item is None:
         self.my_item = viewables[self.id][self.type]
       client = self.client_dict[client_nr]
       if not client['busy'].is_set():
         client['busy'].set()
+        i_set_busy = True
+        client['busy_set_at'] = monotonic()  # start the ack watchdog clock
         frame = (await self.inqueue.get())[1]
         if self.type in {'D', 'E'}:  
           xdim = self.my_item.shared_mem.read_1_meta('aoi_xdim')
@@ -126,18 +135,52 @@ class c_viewer():
         )
         try: 
           await client['socket'].send(bytes_data = (client['type'] + indicator + frame))
+          send_succeeded = True
+          if self.id == 1:  
+            print(f'22222 ONF {self.type}{self.id} {client["type"] + indicator}')
         except Disconnected:
           pass
-    except Exception as e:
-      self.logger.warning(f'*** ONF {self.type}'
-        f'{self.id} could not send info , socket closed...')
-      self.logger.error(format_exc())
-      
-  async def callback(self):  
+    except Exception:
+      # use self.logger (there is no module-level logger here);
+      # this handler must never raise, or the data loop dies for good
+      self.logger.warning(f'*** ONF {self.type}{self.id} could not send frame')
+    finally:
+      # only release if we acquired it here and the send did not go out
+      if client is not None and i_set_busy and not send_succeeded and client['busy'].is_set():
+        client['busy'].clear()
+        client['busy_set_at'] = None
+        
+  async def callback(self):
     clients = list(self.client_dict.keys())
+    served = False
     for item in clients:
-      if item in self.client_dict:
+      client = self.client_dict.get(item)
+      if client is None:
+        continue
+      # ack watchdog: if a frame has been in-flight without an ack for longer
+      # than ACK_TIMEOUT, assume it was lost (or the ack got stuck) and free the
+      # slot. without this the client waits for an ack that never comes and the
+      # whole stream livelocks.
+      if (client['busy'].is_set()
+          and client['busy_set_at'] is not None
+          and (monotonic() - client['busy_set_at']) > ACK_TIMEOUT):
+        if self.type == 'E' and self.id == 1:  
+          self.logger.warning(
+            f'*** ONF {self.type}{self.id} ack timeout after '
+            f'{monotonic() - client["busy_set_at"]:.1f}s, freeing busy slot'
+          )
+        client['busy'].clear()
+        client['busy_set_at'] = None
+      if self.type == 'E' and self.id == 1:  
+        print(f'+++++ Callback() {item} {client is not None} {client['busy'].is_set()}')
+      if not client['busy'].is_set():
+        served = True
         await self.onf(item)
+    if not served:
+      # all clients busy: this frame cannot be sent now. Yield, otherwise the
+      # producer-driven loop never hands control back and the ack coroutine
+      # (clear_busy) is starved -> livelock.
+      await a_break_type(BR_SHORT)
 
   def push_to_onf(self, 
       outx = -1, 
@@ -149,6 +192,8 @@ class c_viewer():
       do_compress = None, 
       websocket = None, 
     ):
+    if self.my_item is None:
+      self.my_item = viewables[self.id][self.type]
     add_view_count(self.type, self.id)
     count = self._next_client_nr
     self._next_client_nr += 1
@@ -167,19 +212,30 @@ class c_viewer():
       'do_compress' : do_compress,
       'old_x' : -1,
       'old_y' : -1,
+      'busy_set_at' : None,  # timestamp when busy was set, for the ack watchdog
     }
     client_info['busy'].set()
     self.client_dict[count] = client_info
+    self.x_canvas_max = max(x_canvas, self.x_canvas_max)
+    self.my_item.shared_mem.write_1_meta('x_canvas', self.x_canvas_max)
+    print('+++', self.x_canvas_max)
     return(count)
 
   def pop_from_onf(self, client_nr):
     del self.client_dict[client_nr]
     take_view_count(self.type, self.id)
+    result = 0
+    for item in self.client_dict.items():
+      result = max(item.x_canvas, result)
+    self.x_canvas_max = result   
+    self.my_item.shared_mem.write_1_meta('x_canvas', self.x_canvas_max)
+    print('---', self.x_canvas_max)
       
   def clear_busy(self, client_nr):
     client = self.client_dict.get(client_nr)
     if client is not None:
       client['busy'].clear()
+      client['busy_set_at'] = None  # ack arrived, stop the watchdog clock
 
   def stop(self):
     self.inqueue.stop()

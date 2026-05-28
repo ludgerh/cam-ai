@@ -88,8 +88,6 @@ class oneitemConsumer(AsyncWebsocketConsumer):
           self.my_viewer = self.myitem.viewer
           if self.type in {'C', 'D'}:
             self.mydrawpad = self.my_viewer.drawpad
-          elif self.type == 'E':
-            self.myitem.shared_mem.write_1_meta('x_canvas', params['x_screen'] - 60)
           self.may_write = await access.check_async(
             params['type'], 
             int(params['itemid']), 

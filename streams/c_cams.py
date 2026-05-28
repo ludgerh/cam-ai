@@ -56,6 +56,7 @@ from viewers.c_viewers import c_viewer
 from oneitem.shared_mem import shared_mem
 from .redis import my_redis as streams_redis
 from .models import stream
+from tools.c_tools import c_convert
 from .c_camera import c_camera
 
 _SH_MEM_ITEMS = {
@@ -66,6 +67,7 @@ _SH_MEM_ITEMS = {
   'aoi_ymax' : 'i',
   'apply_mask' : 'i',
   'apply_pause' : 'i',
+  'x_canvas' : 'i', #x_canvas_max
 }
 
 class c_cam():
@@ -352,8 +354,11 @@ class cam_worker(mp_process):
           else:  
             aoi = None 
           if (self.dbline.cam_view 
-              or streams_redis.view_from_dev('C', self.id)):
+              and streams_redis.view_from_dev('C', self.id)):
+            if frameline[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
+              frameline[1] = c_convert(frameline[1], typein=1, xout=new_xdim) 
             await self.viewer_queue.put(frameline)
+            print('C', new_xdim) 
           if (self.dbline.det_mode_flag 
               and (streams_redis.view_from_dev('D', self.id) 
               or streams_redis.data_from_dev('D', self.id))

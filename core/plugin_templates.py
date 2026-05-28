@@ -48,7 +48,8 @@ class det_plugin(temp_plugin):
       'aoi_xdim' : 'i',
       'aoi_ydim' : 'i',
       'scaledown' : 'i',
-      'mode_code' : '50p'
+      'mode_code' : '50p',
+      'x_canvas' : 'i', #x_canvas_max
   }
   
   def init_shared_mem(self, shared_mem, dbline):

@@ -1,5 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
+index/templates/index/landing.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -139,7 +140,7 @@ $(document).ready(async function() {
       'type' : 'C',
       'idx' : cam.id,
       'width' : imagewidth,
-      'do_compress' : false,
+      'do_compress' : true,
     });
     cam.show_camC = result.show_cam;
     cam.onf_nrC = result.on_frame_nr; 
@@ -148,7 +149,7 @@ $(document).ready(async function() {
       'type' : 'D',
       'idx' : cam.id,
       'width' : imagewidth,
-      'do_compress' : false,
+      'do_compress' : true,
     });
     cam.show_camD = result.show_cam;
     cam.onf_nrD = result.on_frame_nr; 
@@ -157,7 +158,7 @@ $(document).ready(async function() {
       'type' : 'E',
       'idx' : cam.id,
       'width' : imagewidth,
-      'do_compress' : false,
+      'do_compress' : true,
     });
     cam.show_camE = result.show_cam;
     cam.onf_nrE = result.on_frame_nr;

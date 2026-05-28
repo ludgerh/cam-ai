@@ -32,7 +32,7 @@ from streams.redis import my_redis as streams_redis
 from tf_workers.redis import my_redis as tf_workers_redis
 from tools.c_logger import alog_ini
 from globals.c_globals import add_viewer
-from tools.c_tools import (rect_btoa, merge_rects, c_buffer)
+from tools.c_tools import rect_btoa, merge_rects, c_buffer, c_convert
 from tools.l_break import a_break_type, BR_SHORT
 from viewers.c_viewers import c_viewer
 from oneitem.shared_mem import shared_mem
@@ -244,7 +244,10 @@ class det_worker(mp_process):
           frameline = await self.run_one(frameline)
         if frameline:
           if self.dbline.det_view and streams_redis.view_from_dev('D', self.id):
+            if frameline[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
+              frameline[1] = c_convert(frameline[1], typein=1, xout=new_xdim) 
             await self.viewer_queue.put(frameline)
+            print('D', self.shared_mem.read_1_meta('x_canvas')) 
         await a_break_type(BR_SHORT)
       await self.plugin.async_stop(self)
       await self.dataqueue.stop()

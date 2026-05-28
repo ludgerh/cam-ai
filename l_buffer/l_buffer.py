@@ -214,18 +214,19 @@ class l_buffer():
                   storage['shape'] = data['shape']
                 if 'dtype' in data:
                   storage['dtype'] = data['dtype']
-              in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
               storage['shm'].buf[0] = 0
               if self.get_struct[storage_idx][i] == 'L':
+                in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
                 data_out.append(pickle.loads(in_bytes))
               elif self.get_struct[storage_idx][i] == 'B':
+                in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
                 data_out.append(in_bytes)
               elif self.get_struct[storage_idx][i] == 'N':
-                data_out.append(np.ndarray(
-                  storage['shape'], 
-                  dtype=storage['dtype'], 
-                  buffer=in_bytes,
-                )) 
+                arr = np.frombuffer(
+                  storage['shm'].buf[1:storage['last_size'] + 1],
+                  dtype = storage['shape'] and np.dtype(storage['dtype']),
+                ).reshape(storage['shape']).copy()
+                data_out.append(arr)
       except Empty:
         await asyncio.sleep(self.brake_time) 
         data_out = ''  

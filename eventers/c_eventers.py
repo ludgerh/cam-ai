@@ -51,6 +51,7 @@ from tools.c_tools import (
   speedlimit, 
   speedometer, 
   hasoverlap, 
+  c_convert,
 )
 from tf_workers.models import school
 from startup.redis import my_redis as startup_redis
@@ -78,9 +79,9 @@ _SH_MEM_ITEMS = {
     'one_frame_per_event' : 'i',
     'nr_of_cond_ed' : 'i',
     'last_cond_ed' : 'i',
-    'x_canvas' : 'i',
     'aoi_xdim' : 'i',
     'aoi_ydim' : 'i',
+    'x_canvas' : 'i', #x_canvas_max
 }
 
 class c_eventer():
@@ -814,7 +815,10 @@ class eve_worker(mp_process):
             self.textthickness, 
             cv.LINE_AA, 
           ) 
+    if newframe[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
+      newframe[1] = c_convert(newframe[1], typein=1, xout=new_xdim) 
     await self.viewer_queue.put(newframe)
+    print('E', self.shared_mem.read_1_meta('x_canvas')) 
     del newframe  
 
   async def merge_events(self):
