@@ -136,8 +136,6 @@ class c_viewer():
         try: 
           await client['socket'].send(bytes_data = (client['type'] + indicator + frame))
           send_succeeded = True
-          if self.id == 1:  
-            print(f'22222 ONF {self.type}{self.id} {client["type"] + indicator}')
         except Disconnected:
           pass
     except Exception:
@@ -171,8 +169,6 @@ class c_viewer():
           )
         client['busy'].clear()
         client['busy_set_at'] = None
-      if self.type == 'E' and self.id == 1:  
-        print(f'+++++ Callback() {item} {client is not None} {client['busy'].is_set()}')
       if not client['busy'].is_set():
         served = True
         await self.onf(item)
@@ -218,18 +214,16 @@ class c_viewer():
     self.client_dict[count] = client_info
     self.x_canvas_max = max(x_canvas, self.x_canvas_max)
     self.my_item.shared_mem.write_1_meta('x_canvas', self.x_canvas_max)
-    print('+++', self.x_canvas_max)
     return(count)
 
   def pop_from_onf(self, client_nr):
     del self.client_dict[client_nr]
     take_view_count(self.type, self.id)
     result = 0
-    for item in self.client_dict.items():
-      result = max(item.x_canvas, result)
+    for item in self.client_dict.values():
+      result = max(item['x_canvas'], result)
     self.x_canvas_max = result   
     self.my_item.shared_mem.write_1_meta('x_canvas', self.x_canvas_max)
-    print('---', self.x_canvas_max)
       
   def clear_busy(self, client_nr):
     client = self.client_dict.get(client_nr)

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -82,25 +82,46 @@ def indexgrid(request, mode='C', start=0, end=0):
   }
   return(HttpResponse(template.render(context)))
 
-def landing(request):
+def landing(request, start=0):
+  max_num_cams = djconf.getconfigint('max_num_cams', 3)
   template = loader.get_template('index/landing.html')
+  full_cam_list = access.filter_items(
+      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0).order_by('id'), 'C', 
+      request.user, 'R'
+  )
+  full_det_list = access.filter_items(
+      stream.objects.filter(active=True).filter(det_mode_flag__gt=0).order_by('id'), 'D', 
+      request.user, 'R'
+  )
+  full_eve_list = access.filter_items(
+      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0).order_by('id'), 'E', 
+      request.user, 'R'
+  )
+  pos_string = ''
+  for i in range(len(full_cam_list)):
+    if i == start:
+      pos_string += '['
+    pos_string += '•'
+    if i == start + max_num_cams - 1:
+      pos_string += ']'
+     
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
     'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'tf_debug' : request.user.is_superuser and djconf.getconfigbool('do_tf_debug', True),
-    'camlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(cam_mode_flag__gt=0).order_by('-id'), 'C', 
-      request.user, 'R'
-    ),
-    'detectorlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(det_mode_flag__gt=0).order_by('-id'), 'D', 
-      request.user, 'R'
-    ),
-    'eventerlist' : access.filter_items(
-      stream.objects.filter(active=True).filter(eve_mode_flag__gt=0).order_by('-id'), 'E', 
-      request.user, 'R'
-    ),
+    'camlist' : full_cam_list,
+    'detectorlist' : full_det_list,
+    'eventerlist' : full_eve_list,
+    'partial_cam_list' : full_cam_list[start:start + max_num_cams],
+    'cam_count' : len(full_cam_list),
+    'cam_start' : start,
+    'cam_width' : max_num_cams,
+    'pos_string' : pos_string,
+    'cam_width' : max_num_cams,
+    'pos_string' : pos_string,
+    'pos_prev' : max(start - 1, 0),
+    'pos_next' : min(start + 1, len(full_cam_list) - 1),
     'schoollist' : access.filter_items(
       school.objects.filter(active=True), 'S', 
       request.user, 'R'

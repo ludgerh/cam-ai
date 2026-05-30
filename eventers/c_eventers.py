@@ -818,7 +818,6 @@ class eve_worker(mp_process):
     if newframe[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
       newframe[1] = c_convert(newframe[1], typein=1, xout=new_xdim) 
     await self.viewer_queue.put(newframe)
-    print('E', self.shared_mem.read_1_meta('x_canvas')) 
     del newframe  
 
   async def merge_events(self):

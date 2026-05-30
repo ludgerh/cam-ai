@@ -107,8 +107,6 @@ class triggerConsumer(AsyncWebsocketConsumer):
       idx, count = struct.unpack('<2I', bytes_data[1:9])
       async with viewer_dict_lock:
         self.status[mode][idx]['viewer'].clear_busy(count)
-      if idx == 1:  
-        logger.info(f'!!! clear_busy(count) {mode}{idx}')
     except:
       logger.error('Error in consumer: ' + logname + ' (trigger)')
       logger.error(format_exc())

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -19,10 +19,11 @@ from django.urls import path
 from .views import index, landing, indexgrid
 
 urlpatterns = [
-	path('<str:mode>/', index, name='index'),
-	path('landing/', landing, name='landing'),
 	path('', landing, name='landing'),
+	path('landing/', landing, name='landing'),
+	path('landing/<int:start>/', landing, name='landing'),
 	path('grid/<str:mode>/', indexgrid, name='indexgrid'),
 	path('grid/<str:mode>/<int:start>/<int:end>/', indexgrid, name='indexgrid'),
+	path('<str:mode>/', index, name='index'),
 ]
 

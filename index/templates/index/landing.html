@@ -26,8 +26,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     </script>
 {% endif %}
 <main>
+  {% if cam_count > cam_width %}
+    <h2>
+    <div>Showing {{ cam_width }} of {{ cam_count }} cameras:</div>
+    <div class="d-flex justify-content-start align-items-center" style="gap: 0.5rem;">
+      {% if cam_start > 0 %}
+      <a href="/landing/{{ pos_prev }}/" class="btn btn-sm btn-secondary">&lt;</a>
+      {% endif %}  
+      <span>{{ pos_string }}</span>
+      {% if cam_start|add:cam_width < cam_count %}
+      <a href="/landing/{{ pos_next }}/" class="btn btn-sm btn-secondary">&gt;</a>
+      {% endif %}  
+    </div>
+    </h2>
+  {% endif %}  
   <div class="container-fluid float-left">
-    {% for item in camlist %} 
+    {% for item in partial_cam_list %} 
       <div class="row">
         <div class="col-sm-auto box">
           <h2>{{ item.id }}: {{ item.name }}</h2>
@@ -80,7 +94,7 @@ let c_view_Socket;
 let trigger_Socket;
 let imagewidth = 375 // Screen width IPhone 7
 const cams = [
-{% for item in camlist %}
+{% for item in partial_cam_list %}
 {% if not item.cam_pause %}
   { id: {{ item.id }} },
 {% endif %}
