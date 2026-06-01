@@ -185,7 +185,7 @@ class alarm_plugin(temp_plugin):
     settings_path = plugin_dir / "settings.py"
     self.settings = load_plugin(settings_path)
     
-  def action(self, predictions):
+  async def action(self, predictions, event):
     mylist = list(predictions)[1:]
     maxpos = mylist.index(max(mylist))
     self.logger.info(f'{self.settings.settings["output"]} {self.eve_dbline.name}'

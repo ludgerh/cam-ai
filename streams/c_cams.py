@@ -272,7 +272,7 @@ class cam_worker(mp_process):
             self.virt_cam_path + self.dbline.cam_url, 
             self.virt_cam_path_ram + self.dbline.cam_url, 
           )
-        self.virt_ts = 0.0
+        self.virt_ts = time()
         self.file_brake_ts = 0.0
         self.file_over = False
         self.file_end = False
@@ -355,14 +355,14 @@ class cam_worker(mp_process):
             aoi = None 
           if (self.dbline.cam_view 
               and streams_redis.view_from_dev('C', self.id)):
-            if frameline[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
-              await self.viewer_queue.put([
-                frameline[0],
-                c_convert(frameline[1], typein=1, xout=new_xdim), 
-                frameline[2],
-              ])
-            else:  
-              await self.viewer_queue.put(frameline)
+            #if frameline[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
+            #  await self.viewer_queue.put([
+            #    frameline[0],
+            #    c_convert(frameline[1], typein=1, xout=new_xdim), 
+            #    frameline[2],
+            #  ])
+            #else:  
+            await self.viewer_queue.put(frameline)
           if (self.dbline.det_mode_flag 
               and (streams_redis.view_from_dev('D', self.id) 
               or streams_redis.data_from_dev('D', self.id))

@@ -40,7 +40,7 @@ class token(models.Model):
   #'DER' = Detector view read
   #'ETR' = Eventer view read
   #'MOD' = Model file download
-  idx = models.IntegerField(default=0)
+  idx = models.PositiveBigIntegerField(default=0)
   info = models.CharField(max_length=255, default='...')
   count = models.IntegerField(default=0)
   valid = models.BooleanField(default=True)

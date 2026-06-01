@@ -244,8 +244,8 @@ class det_worker(mp_process):
           frameline = await self.run_one(frameline)
         if frameline:
           if self.dbline.det_view and streams_redis.view_from_dev('D', self.id):
-            if frameline[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
-              frameline[1] = c_convert(frameline[1], typein=1, xout=new_xdim) 
+            #if frameline[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
+            #  frameline[1] = c_convert(frameline[1], typein=1, xout=new_xdim) 
             await self.viewer_queue.put(frameline)
         await a_break_type(BR_SHORT)
       await self.plugin.async_stop(self)

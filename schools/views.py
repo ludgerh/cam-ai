@@ -178,7 +178,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y,
   else:
     myframe = c_convert(image_data, typein=2, typeout=outtype, xycontained=xycontained, 
       xout=x, yout=y)  
-  return HttpResponse(myframe, content_type="image/jpeg")
+  return HttpResponse(myframe, content_type="image/bmp")
 
 #schoolnr = 0 --> from classroom directory
 def getbigbmp(request, mode, framenr, tokennr=0, token=''): 

@@ -272,8 +272,7 @@ class c_event(list):
       event = self.dbline,
     )
     await frameline.asave()
-    if self.to_email:
-      frame.append(frameline.id)
+    frame.append(frameline.id)
 
   async def save(self, cond_dict = None):
     print('*** Saving Event:', self.id)

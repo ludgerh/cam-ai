@@ -35,6 +35,7 @@ def maketoken(cat, idx, info='...'):
   return(result)
 
 async def maketoken_async(cat, idx, info='...'):
+  print(cat, idx, info, '#####')
   password = ''.join(choice(ascii_letters) for i in range(20))
   mytoken = token(
     passwd = password,

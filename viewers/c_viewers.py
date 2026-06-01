@@ -138,6 +138,13 @@ class c_viewer():
           send_succeeded = True
         except Disconnected:
           pass
+    except Exception as exc:
+      # use self.logger (there is no module-level logger here);
+      # this handler must never raise, or the data loop dies for good
+      self.logger.warning(
+        f'*** ONF {self.type}{self.id} could not send frame: {exc!r}',
+        exc_info=True,
+      ) 
     except Exception:
       # use self.logger (there is no module-level logger here);
       # this handler must never raise, or the data loop dies for good

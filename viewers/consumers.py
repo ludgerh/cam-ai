@@ -199,8 +199,8 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning(f'*** GetCamInfo {params['type']}'
-              f'{params['idx']} could not send info , socket closed...')
+            logger.warning(f'*** GetCamInfo {params["type"]}'
+              f'{params["idx"]} could not send info , socket closed...')
         else:
           await self.close()
       
@@ -278,8 +278,8 @@ class c_viewConsumer(AsyncWebsocketConsumer):
           try:
             await self.send(json.dumps(outlist))	
           except Disconnected:
-            logger.warning(f'*** Starttrigger {params['type']}'
-              f'{params['idx']} could not send info , socket closed...')
+            logger.warning(f'*** Starttrigger {params["type"]}'
+              f'{params["idx"]} could not send info , socket closed...')
         else:
           #logger.info('--> Close')
           await self.close()

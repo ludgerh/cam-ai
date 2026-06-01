@@ -485,31 +485,25 @@ class eve_worker(mp_process):
           or item.end > item.start + self.event_max_time
           or item.name != self.event_name):
         item.check_out_ts = item.end
-    if self.cond_dict[5]:
-      predictions = await item.pred_read(max=1.0)
-    else:
-      predictions = None  
-    if await resolve_rules(self.cond_dict[5], predictions):
-      self.plugin.action(predictions) 
+    #if await resolve_rules(self.cond_dict[5], predictions): #Alarm
+      #await self.plugin.action(predictions, item)
     if item.check_out_ts is None:
       return()
-    if predictions is None and self.cond_dict[2]:
-      predictions = await item.pred_read(max=1.0)
+    predictions = await item.pred_read(max=1.0)
+    item.do_alarm = await resolve_rules(self.cond_dict[5], predictions) 
     item.goes_to_school = await resolve_rules(self.cond_dict[2], predictions)
-    if predictions is None and self.cond_dict[3]:
+    if self.cond_dict[3]: #Video
       predictions = await item.pred_read(max=1.0)
     if getattr(item, "video_failed", False):
       item.isrecording = False
     else:
       item.isrecording = await resolve_rules(self.cond_dict[3], predictions)
-    if predictions is None and self.cond_dict[4]:
-      predictions = await item.pred_read(max=1.0)
     if await resolve_rules(self.cond_dict[4], predictions):
       item.to_email = self.email_address
     else:
       item.to_email = ''
     is_done = True
-    if item.goes_to_school or item.isrecording or item.to_email:
+    if item.goes_to_school or item.isrecording or item.to_email or item.do_alarm:
       if not await afree_quota(item.stream_creator):
         self.logger.warning(f'EV{self.id}: Did not save the event because of low quota')
         async with self.event_dict_lock:
@@ -613,6 +607,8 @@ class eve_worker(mp_process):
         else:
           temp = self.cond_dict
         await item.save(cond_dict = temp)
+        if item.do_alarm:
+          await self.plugin.action(predictions, item)
     if is_done: 
       self.last_saved_event_end = item.check_out_ts
       async with self.event_dict_lock:

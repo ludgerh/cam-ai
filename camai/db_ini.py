@@ -74,6 +74,10 @@ async def db_ini():
   })
   
   await add_if_none(camurl, 'type', {
+    'type' : 'Axis F9114-B MK II',
+    'url' : 'rtsp://{user}:{pass}@{address}:{port}/axis-media/media.amp?camera=*****1&streamprofile=derry1*****', 
+  })
+  await add_if_none(camurl, 'type', {
     'type' : 'Imou Cruiser SE+',
     'url' : 'rtsp://{user}:{pass}@{address}:{port}/cam/realmonitor?channel=1&subtype=0', 
   })

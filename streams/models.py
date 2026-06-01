@@ -77,7 +77,7 @@ class stream(models.Model):
   det_apply_mask = models.BooleanField(default=False)
   det_scaledown = models.IntegerField('scaledown', default=0)
   # 0: automatic, epending on size, 1: switch off scaling
-  det_gpu_nr_cv = models.IntegerField(default=0)
+  det_gpu_nr_cv = models.IntegerField(default=-1)
   det_positive_mask = models.BooleanField('Positive Mask', default=False)
   det_mode_code = models.CharField('Detection Mode', max_length=50, default='')
 
@@ -100,7 +100,7 @@ class stream(models.Model):
   eve_event_time_gap = models.IntegerField('new event gap', default=60)
   eve_margin = models.IntegerField('frame margin', default=20)
   eve_school = models.ForeignKey(school, on_delete=models.SET_DEFAULT, default=1)
-  eve_gpu_nr_cv = models.IntegerField(default=0) 
+  eve_gpu_nr_cv = models.IntegerField(default=-1) 
   eve_webm_doit = models.BooleanField(default=False)
   eve_webm_width = models.IntegerField(default=500) 
   eve_webm_crf = models.IntegerField(default=51) 
