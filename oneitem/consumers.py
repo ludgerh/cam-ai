@@ -205,7 +205,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
               self.dbline.cam_apply_mask = params['ch_apply']
               await self.dbline.asave(update_fields=('cam_apply_mask', ))
             elif self.type == 'D':
-              self.myitem.shared_mem.write_mask(self.my_viewer.drawpad.mask) 
+              if self.my_viewer.drawpad.mask is not None:
+                self.myitem.shared_mem.write_mask(self.my_viewer.drawpad.mask) 
               self.dbline.det_apply_mask = params['ch_apply']
               await self.dbline.asave(update_fields=('det_apply_mask', ))
           if 'ch_white' in params:

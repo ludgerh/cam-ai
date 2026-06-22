@@ -734,7 +734,12 @@ class cam_worker(mp_process):
       generalparams += ['-fflags', 'genpts']
       generalparams += ['-use_wallclock_as_timestamps', '1']
     if gpuinfo():
-      generalparams += ['-hwaccel', 'cuda', '-hwaccel_output_format',  'cuda']
+      # GPU-decode only. Do NOT keep frames in CUDA memory: the output is
+      # rawvideo/bgr24 in system memory anyway, so 'hwdownload' just adds a
+      # VRAM round-trip and triggers a cuda->sw filter negotiation that
+      # ffmpeg cannot satisfy (auto_scale_0, error -38). Letting ffmpeg
+      # hand back software frames keeps the filtergraph trivial.
+      generalparams += ['-hwaccel', 'cuda']
       generalparams += ['-threads', '1']
     inparams = ['-i', source_string]
     outparams1 = []
@@ -743,8 +748,8 @@ class cam_worker(mp_process):
       outparams1 += ['-map', '0:v:0']
       outparams1 += ['-an']
     vf_filters = []
-    if gpuinfo():
-      vf_filters.append('hwdownload,format=nv12,format=bgr24')
+    # No hwdownload needed: frames are already in system memory.
+    # The bgr24 conversion is handled by '-pix_fmt bgr24' on the output below.
     if inp_frame_rate:
       vf_filters.append('fps=' + str(inp_frame_rate))
     else:
@@ -753,7 +758,7 @@ class cam_worker(mp_process):
       outparams1 += ['-vf', ','.join(vf_filters)]
     outparams1 += ['-f', 'rawvideo']
     outparams1 += ['-pix_fmt', 'bgr24']
-    outparams1 += ['unix://' + self.socket_path]
+    outparams1 += ['unix://' + self.socket_path]    
     outparams2 = []
     if filepath:
       self.ffmpeg_recording = True

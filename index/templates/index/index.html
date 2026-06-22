@@ -66,9 +66,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <script >
 
 (function() {
-let c_view_Socket;
-let trigger_Socket;
-let imagewidth = 375 // Screen width IPhone 7
+let c_view_Socket = null;
+let trigger_Socket = null;
+let imagewidth = 375; // Screen width IPhone 7
+let generation = 0;          // increases with every (re)connect cycle
+let connecting = false;      // true while initSockets() is running
+let reconnect_timer = null;  // handle of a pending reconnect timer
+let reconnect_delay = 1000;  // backoff in ms, reset after a successful init
+let loop_started = false;    // the info loop must be started only once
 const cams = [
 {% for item in camlist %}
 {% if not item.cam_pause %}
@@ -78,7 +83,7 @@ const cams = [
 ];
 
 function isInViewport(el) {
-  if (!el.length) return false;
+  if (!el.length) return(false);
   const rect = el[0].getBoundingClientRect();
   return (
     rect.top >= 0 &&
@@ -87,103 +92,217 @@ function isInViewport(el) {
 };
 
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return(new Promise(resolve => setTimeout(resolve, ms)));
 }
 
-$(document).ready(async function() {
-  const viewer_id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-  c_view_Socket = await WSAsync(
-    `${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`
-  );
-  trigger_Socket = await createWebSocket(
-    `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
-  );
-  trigger_Socket.onclose = function(e) {
-    console.log('Trigger-Socket closed');
+function socketIsOpen(sock) {
+  // accepts a raw WebSocket (trigger) or a WSAsync wrapper (c_view)
+  if (!sock) {
+    return(false);
   };
-	trigger_Socket.binaryType = 'arraybuffer';
-  trigger_Socket.onmessage = async function(e) {
-    if (typeof(e.data) === 'object') {
-      const view = new DataView(e.data);
-      const idx = view.getInt32(1, true);
-      const indicator = e.data.slice(0, 9);
-      if (isInViewport($('#imagespace' + idx))) {
-        const imageBuffer = e.data.slice(17);
-        const blob = new Blob([imageBuffer], { type: "image/jpeg" });
-        const img = $('#imagespace' + idx);
-        if (img.data('url')) {
-          URL.revokeObjectURL(img.data('url'));
-        }
-        let url = URL.createObjectURL(blob);
-        img.prop('src', url);
-        img.data('url', url);
-      } else {
-        await delay(1000);
-      };
-      trigger_Socket.send(indicator);
-    };
-  };
-  for (const cam of cams) {
-    let result = await c_view_Socket.sendandwait({
-      'command' : 'starttrigger',
-      'type' : '{{ mode }}',
-      'idx' : cam.id,
-      'width' : imagewidth,
-      'do_compress' : true,
-    });
-    cam.show_cam = result.show_cam;
-    cam.onf_nr = result.on_frame_nr; 
-    if (cam.show_cam) {
-      const buf = new ArrayBuffer(9);
-      const view = new DataView(buf);
-      view.setUint8(0, '{{ mode }}'.charCodeAt(0));
-      view.setUint32(1, cam.id, true);
-      view.setUint32(5, cam.onf_nr, true);
-      trigger_Socket.send(buf); 
-    } else {
-      $('#imagespace' + cam.id).css({'object-fit':'cover'});
-{% if emulatestatic %}
-		  $('#imagespace' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-{% else %}
-		  $('#imagespace' + cam.id).prop(
-		    'src', 
-		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-		  );
-{% endif %}
-    }; 
-  };
-  
-  async function updateCams() {
-    for (const cam of cams) {
-      if (isInViewport($('#imagespace' + cam.id))) {
-        let result = await c_view_Socket.sendandwait({
-          command: 'getcaminfo',
-          type: '{{ mode }}',
-          idx: cam.id,
-        });
-        if ('{{ mode }}' != 'C') {
-          $('#xdimtag' + cam.id).text(result.xdim);
-          $('#ydimtag' + cam.id).text(result.ydim);
-        };  
-        $('#fpstag' + cam.id).text(result.fps);
-        {% if user.is_superuser %}
-          $('#vnrtag' + cam.id).text(result.viewers);
-        {% endif %}
-      }
-    }
-  }
-  
-  async function loop() {
-    while (true) {
-      await updateCams();
-      await new Promise(r => setTimeout(r, 5000));
-    }
-  }
+  const ws = sock.socket ? sock.socket : sock;
+  return(ws.readyState === WebSocket.OPEN);
+}
 
-  loop();
+function withTimeout(promise, ms) {
+  // resolves with null if the promise does not settle within ms.
+  // needed because WSAsync.sendandwait() never rejects when the socket
+  // dies while a request is in flight - without this the caller hangs.
+  return(Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(null), ms)),
+  ]));
+}
+
+function scheduleReconnect(immediate) {
+  // immediate = true: cancel a pending (possibly long) backoff timer and
+  // reconnect right away (used when the tab becomes visible again)
+  if (reconnect_timer !== null) {
+    if (!immediate) {
+      return;
+    };
+    clearTimeout(reconnect_timer);
+  };
+  const wait = immediate ? 0 : reconnect_delay;
+  if (!immediate) {
+    reconnect_delay = Math.min(reconnect_delay * 2, 30000);
+  };
+  console.log('Websocket reconnect in ' + wait + ' ms');
+  reconnect_timer = setTimeout(function() {
+    reconnect_timer = null;
+    initSockets();
+  }, wait);
+}
+
+async function initSockets() {
+  if (connecting) {
+    return;
+  };
+  connecting = true;
+  generation += 1;
+  const my_generation = generation;
+  try {
+    // close possibly half-open leftovers from the previous generation.
+    // the server cleans up its onf registrations in disconnect().
+    if (trigger_Socket !== null) {
+      try { trigger_Socket.close(); } catch (err) {};
+    };
+    if (c_view_Socket !== null && c_view_Socket.socket) {
+      try { c_view_Socket.socket.close(); } catch (err) {};
+    };
+    // a fresh viewer_id per generation keeps the server-side viewer_dict
+    // bookkeeping of old and new connections cleanly separated
+    const viewer_id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    c_view_Socket = await WSAsync(
+      `${ws_scheme}//${window.location.host}/ws/c_view/?vid=${viewer_id}`
+    );
+    trigger_Socket = await createWebSocket(
+      `${ws_scheme}//${window.location.host}/ws/trigger/?vid=${viewer_id}`
+    );
+    // reconnect when one of the current sockets closes. closes of older,
+    // already replaced sockets are ignored via the generation check.
+    c_view_Socket.socket.onclose = function(e) {
+      console.log('c_view-Socket closed');
+      if (my_generation === generation) {
+        scheduleReconnect(false);
+      };
+    };
+    trigger_Socket.onclose = function(e) {
+      console.log('Trigger-Socket closed');
+      if (my_generation === generation) {
+        scheduleReconnect(false);
+      };
+    };
+	  trigger_Socket.binaryType = 'arraybuffer';
+    trigger_Socket.onmessage = async function(e) {
+      if (typeof(e.data) === 'object') {
+        const view = new DataView(e.data);
+        const idx = view.getInt32(1, true);
+        const indicator = e.data.slice(0, 9);
+        if (isInViewport($('#imagespace' + idx))) {
+          const imageBuffer = e.data.slice(17);
+          const blob = new Blob([imageBuffer], { type: "image/jpeg" });
+          const img = $('#imagespace' + idx);
+          if (img.data('url')) {
+            URL.revokeObjectURL(img.data('url'));
+          }
+          let url = URL.createObjectURL(blob);
+          img.prop('src', url);
+          img.data('url', url);
+        } else {
+          await delay(1000);
+        };
+        // ack on the socket the frame came from (e.target), not on the
+        // global variable: it may have been replaced by a reconnect while
+        // we were waiting in delay(). guard against a closed socket -
+        // send() on a dead socket would throw and die silently here.
+        if (e.target.readyState === WebSocket.OPEN) {
+          e.target.send(indicator);
+        };
+      };
+    };
+    for (const cam of cams) {
+      // guard every request with a timeout: if the socket dies during the
+      // setup sequence we abort and let the catch block schedule a retry
+      let result = await withTimeout(c_view_Socket.sendandwait({
+        'command' : 'starttrigger',
+        'type' : '{{ mode }}',
+        'idx' : cam.id,
+        'width' : imagewidth,
+        'do_compress' : true,
+      }), 30000);
+      if (result === null) {
+        throw(new Error('starttrigger {{ mode }}' + cam.id + ' timed out'));
+      };
+      cam.show_cam = result.show_cam;
+      cam.onf_nr = result.on_frame_nr; 
+      if (cam.show_cam) {
+        const buf = new ArrayBuffer(9);
+        const view = new DataView(buf);
+        view.setUint8(0, '{{ mode }}'.charCodeAt(0));
+        view.setUint32(1, cam.id, true);
+        view.setUint32(5, cam.onf_nr, true);
+        trigger_Socket.send(buf); 
+      } else {
+        $('#imagespace' + cam.id).css({'object-fit':'cover'});
+{% if emulatestatic %}
+		    $('#imagespace' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
+{% else %}
+		    $('#imagespace' + cam.id).prop(
+		      'src', 
+		      "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		    );
+{% endif %}
+      }; 
+    };
+    reconnect_delay = 1000; // successful init resets the backoff
+    if (!loop_started) {
+      loop_started = true;
+      loop();
+    };
+  } catch (err) {
+    console.error('Socket init failed:', err);
+    connecting = false;
+    scheduleReconnect(false);
+  } finally {
+    connecting = false;
+  };
+}
+
+async function updateCams() {
+  if (!socketIsOpen(c_view_Socket)) {
+    return; // skip this round, the reconnect logic will restore the socket
+  };
+  const sock = c_view_Socket; // use one socket object for the whole round
+  for (const cam of cams) {
+    if (isInViewport($('#imagespace' + cam.id))) {
+      let result = await withTimeout(sock.sendandwait({
+        command: 'getcaminfo',
+        type: '{{ mode }}',
+        idx: cam.id,
+      }), 10000);
+      if (result === null) {
+        return; // socket probably died mid-request, try again next round
+      };
+      if ('{{ mode }}' != 'C') {
+        $('#xdimtag' + cam.id).text(result.xdim);
+        $('#ydimtag' + cam.id).text(result.ydim);
+      };  
+      $('#fpstag' + cam.id).text(result.fps);
+      {% if user.is_superuser %}
+        $('#vnrtag' + cam.id).text(result.viewers);
+      {% endif %}
+    }
+  }
+}
+
+async function loop() {
+  while (true) {
+    try {
+      await updateCams();
+    } catch (err) {
+      // the info loop must never die, whatever happens inside one round
+      console.error('updateCams failed:', err);
+    };
+    await new Promise(r => setTimeout(r, 5000));
+  }
+}
+
+$(document).ready(function() {
+  // reconnect immediately when the user returns to the tab and the
+  // sockets were dropped in the meantime (standby, proxy timeout, ...).
+  // this also cancels a possibly long pending backoff timer.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      if (!socketIsOpen(trigger_Socket) || !socketIsOpen(c_view_Socket)) {
+        reconnect_delay = 1000;
+        scheduleReconnect(true);
+      };
+    };
+  });
+  initSockets();
 });
 })();
 	
 </script>
 {% endblock %}
-

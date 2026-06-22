@@ -631,7 +631,10 @@ class schooldbutil(AsyncWebsocketConsumer):
             pathadd = str(i) + '/'
             await aiofiles.os.makedirs(modelpath + 'frames/' + pathadd, exist_ok=True)
           eventline = await event.objects.aget(id=params['event'])
-          framelines = event_frame.objects.filter(event=eventline).order_by('time', 'id') 
+          framelines = (event_frame.objects
+            .filter(event=eventline)
+            .select_related('event__camera')  # preload FKs to avoid sync lookup in async context
+            .order_by('time', 'id'))
           i = 0
           async for item in framelines:
             pathadd = str(randint(0,99)) + '/'
@@ -651,6 +654,8 @@ class schooldbutil(AsyncWebsocketConsumer):
               await t.asave(update_fields=updatelist)
             else:
               if item.encrypted:
+                if self.crypt is None:
+                  self.crypt =  l_crypt(key = item.event.camera.crypt_key)
                 do_crypt = self.crypt
               else:
                 do_crypt = None   

@@ -1,4 +1,4 @@
-# tools/c_tools.y
+# tools/c_tools.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -150,6 +150,8 @@ def image_size(infile):
   return(xin, yin)
   
 def do_reduction(image, x, y):
+  if image is None:
+    raise ValueError('do_reduction() got None instead of an image (decode failed)')
   xin = image.shape[1]
   yin = image.shape[0]
   #print('In:', image.shape, x, y, xin, yin) 
@@ -183,6 +185,9 @@ async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
   if crypt:
     myimage = crypt.decrypt(myimage)
   myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  if myimage is None:
+    # Decode failed: missing/truncated file or crypt flag mismatch
+    raise ValueError('reduce_image_async() could not decode: ' + str(infile))
   myimage = do_reduction(myimage, x, y) 
   myimage = cv.imencode('.bmp', myimage)[1].tobytes()
   async with aiofiles.open(outfile, mode="wb") as f:
