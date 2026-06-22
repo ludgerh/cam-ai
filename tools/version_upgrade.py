@@ -37,7 +37,17 @@ proc_dict[version_flat('1.9.9')] = temp_func
 def temp_func():
   from drawpad.models import mask
   mask.objects.filter(mtype = 'D').delete()
-proc_dict[version_flat('2.1.0')] = temp_func   
+proc_dict[version_flat('2.1.0')] = temp_func  
+
+def temp_func():
+  from trainers.models import trainer
+  hw_type = safe_import('hw_type') 
+  if hw_type == 'raspi': 
+    trainer.objects.all().update(
+      inference_waitingtime = 2.0,
+      inference_brake = 1.0,
+    )
+proc_dict[version_flat('2.1.9')] = temp_func    
 
 def version_upgrade(old_str, new_str):
   oldflat = version_flat(old_str)
