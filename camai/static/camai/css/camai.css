@@ -1,0 +1,148 @@
+.menurow {
+  background-color: #F0F4F7;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.btn-primary {
+  color: #F0F4F7;
+  background-color: #597081;
+  border-color: #597081; /*set the color you want here*/
+}
+
+.box {
+  width: auto;
+  background-color: #F0F4F7;
+  margin: 1%;
+  margin-left: 0;
+  padding: 1%;
+  border-radius: 10px;
+}  
+
+.form-check-input:checked {
+    background-color: #597081;
+    border-color: #597081;
+}
+
+.btn-primary:disabled {
+    color: #fff;
+    background-color: #475B63;
+    border-color: #475B63;
+}
+
+.login {
+  margin-left:20px;
+  margin-right:20px;
+}
+.accordion {
+  padding: 15px;
+  border-radius: 10px;
+  background-color: #F0F4F7;
+}
+  
+.accordion-item {
+  background-color: #F0F4F7;
+  border: 0;
+}
+
+.accordion-button {
+  margin: 0;
+  margin-top: 10px;
+  background-color: #597081;
+  color: #F0F4F7;
+  border-radius: 5px;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: #597081;
+  color: #F0F4F7;
+  border-radius: 5px;
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active, .btn-primary.active, .open>.dropdown-toggle.btn-primary {
+  color: #F0F4F7;
+  background-color: #475B63;
+  border-color: #475B63;
+}
+.back {
+  background-color: #FFFFFF;
+  color: #597081;
+  border-color: #597081;
+}
+
+.back:hover, .back:focus, .back:active, .back.active, .open>.dropdown-toggle.back {
+  color: #597081;
+  background-color: #F0F4F7;
+  border-color: #597081; /*set the color you want here*/
+}
+
+.btn-success:hover, .btn-success:focus, .btn-success:active, .btn-success.active{
+  color: #475B63 ;
+  background-color: #51b04e;
+  border-color: #51b04e; /*set the color you want here*/
+}
+
+.rect {
+  background-color: #F0F4F7;
+  margin: 1%;
+  margin-right: 0;
+  padding: 1%;
+  border-radius: 10px;
+}
+
+.stats {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.progress {
+  border-color: #7F7F7F;
+}
+
+.bluegrey {
+	background: #B4C2C8;
+	color: #000;
+	border-radius:9px;
+	margin:auto;
+}
+
+.page-link, .page-link:hover {
+	color: #7F7F7F;
+}
+
+.noselect  {
+  user-select: none;
+}
+
+main {
+  margin-top: 1%;
+  margin-left:1%;
+  margin-right:1%;
+  color: #2E2C2F;
+}
+
+input[type="checkbox"] {
+  accent-color: #475B63;
+}
+
+button {
+	margin:20px;
+}
+
+td {
+	vertical-align: top;
+  border: 0px solid grey;
+  border-collapse: separate;
+  padding: 3px;
+}
+
+td.noline {
+  border: none;
+}
+
+.pointer {
+	cursor: pointer;
+}
+
+
+

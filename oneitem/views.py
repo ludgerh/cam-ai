@@ -22,7 +22,6 @@ from django.contrib.auth.decorators import login_required
 from django.views import View
 from django.contrib.auth import get_user
 from channels.db import database_sync_to_async
-from camai.c_settings import safe_import
 from access.c_access import access
 from streams.models import stream
 from globals.c_globals import viewables
@@ -30,8 +29,6 @@ from tools.l_tools import djconf
 from tools.tokens import checktoken
 from tf_workers.models import school
 from .forms import CamForm , DetectorForm, EventerForm
-
-emulatestatic = safe_import('emulatestatic') 
     
 async def filter_items(model, mode, user, permission):
   queryset = model.objects.filter(active=True)
@@ -65,7 +62,6 @@ class OneCamView(View):
     })
     context = {
       'version': djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic': emulatestatic,
       'debug': settings.DEBUG,
       'tf_debug' : request.user.is_superuser and djconf.agetconfigbool(
         'do_tf_debug', 
@@ -146,7 +142,6 @@ class OneDetView(View):
     })
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'tf_debug' : request.user.is_superuser and djconf.agetconfigbool(
         'do_tf_debug', 
@@ -242,7 +237,6 @@ class OneEveView(View):
     })
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'tf_debug' : request.user.is_superuser and djconf.agetconfigbool(
         'do_tf_debug', 

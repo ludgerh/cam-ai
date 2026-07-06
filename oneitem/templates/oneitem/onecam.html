@@ -16,20 +16,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
 {% block content %}
-{% if emulatestatic %}{{ emulestatic }}
-  {% load static %}
-  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
-  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
-  <script src="{% static 'camai/nogit/js/jquery.mousewheel.js' %}"></script>
-{% else %}
-  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js">
-  </script>
-  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
-  </script>
-  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery.mousewheel.js">
-  </script>
-{% endif %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+<script src="/static/camai/js/jquery.mousewheel.js">
+</script>
 
 <!-- Modal -->
 <main>
@@ -356,14 +344,10 @@ async function initSockets() {
     } else {
       $('#maskedit').addClass('d-none');
       $('#imagespace').css({'object-fit':'cover'});
-{% if emulatestatic %}
-		  $('#imagespace').prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-{% else %}
 		  $('#imagespace').prop(
 		    'src', 
-		    "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
+		    "/static/camai/img/privacy.jpg"
 		  );
-{% endif %}
     };  
 {% if may_write %}
     if (!ui_initialized) {

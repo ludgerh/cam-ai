@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,7 +22,6 @@ from .version import version
 debugpw = safe_import('debugpw') 
 debug_daphne = safe_import('debug_daphne') 
 debug_channels = safe_import('debug_channels') 
-emulatestatic = safe_import('emulatestatic') 
 data_path = safe_import('data_path') 
 db_database = safe_import('db_database') 
 db_password = safe_import('db_password') 
@@ -50,10 +49,7 @@ SECRET_KEY = security_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Don't change the settings here, got to passwords.py instead
-if emulatestatic:
-  DEBUG = True
-else:  
-  DEBUG = debugpw
+DEBUG = debugpw
 
 trusted = []
 if not httpport:
@@ -105,29 +101,22 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_tables2',
-    #'django_htmx',
     'crispy_forms',
     'crispy_bootstrap4',
     'config',
     'accounts',
     'tools',
-    #'l_buffer',
-    #'viewers',
     'streams',
     'access',
     'index',
     'oneitem',
-    #'detectors',
     'eventers',
     'tf_workers',
     'drawpad',
     'trainers',
     'schools',
     'users',
-    #'ws_predictions',
-    #'onvif',
     'cleanup',
-    #'startup',
     'core',
 ]
 
@@ -235,19 +224,13 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
-
 STATICFILES_DIRS = [
   str(BASE_DIR)+'/camai/static', 
-  str(BASE_DIR)+'/accounts/static', 
 ]
-
-if emulatestatic:
-  #Development config, needs debug
-  STATIC_URL = 'static/'
-else:  
-  #Production config
-  STATIC_URL = 'https://static.cam-ai.de/'+version+'/'
-  STATIC_ROOT = str(BASE_DIR)+'/'+data_path+'static'
+# URL prefix Nginx serves the collected tree under (matches location /static/)
+STATIC_URL = '/static/'
+# collectstatic target -- must match the Nginx alias, and must NOT be in STATICFILES_DIRS
+STATIC_ROOT = BASE_DIR / 'static'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

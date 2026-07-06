@@ -18,20 +18,16 @@ from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from camai.c_settings import safe_import
 from access.c_access import access
 from streams.models import stream
 from tf_workers.models import school
 from tools.l_tools import djconf
-
-emulatestatic = safe_import('emulatestatic') 
 
 @login_required
 def index(request, mode='C'):
   template = loader.get_template('index/index.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'mode' : mode,
     'tf_debug' : request.user.is_superuser and djconf.getconfigbool('do_tf_debug', True),
@@ -63,7 +59,6 @@ def indexgrid(request, mode='C', start=0, end=0):
   template = loader.get_template('index/indexgrid.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'mode' : mode,
     'camlist' : access.filter_items(
@@ -107,7 +102,6 @@ def landing(request, start=0):
      
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : emulatestatic,
     'debug' : settings.DEBUG,
     'tf_debug' : request.user.is_superuser and djconf.getconfigbool('do_tf_debug', True),
     'camlist' : full_cam_list,

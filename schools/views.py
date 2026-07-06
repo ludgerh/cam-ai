@@ -27,7 +27,6 @@ from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
 from django.core.files.storage import FileSystemStorage
-from camai.c_settings import safe_import
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.c_tools import c_convert
@@ -39,9 +38,6 @@ from users.models import archive
 from users.userinfo import free_quota
 from eventers.models import event, event_frame
 from trainers.models import trainframe
-
-emulatestatic = safe_import('emulatestatic') 
-
 
 datapath = djconf.getconfig('datapath', 'data/')
 schoolframespath = djconf.getconfig('schoolframespath', datapath + 'schoolframes/')
@@ -58,7 +54,6 @@ def images(request, schoolnr):
     template = loader.get_template('schools/images.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'schoolnr' : schoolnr,
       'schoolname' : myschool.name,
@@ -77,7 +72,6 @@ def classroom(request, streamnr):
     template = loader.get_template('schools/classroom.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'school' : myschool,
       'stream' : mystream,
       'debug' : settings.DEBUG,
@@ -95,7 +89,6 @@ def classroom(request, streamnr):
 def imexport(request, schoolnr):
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : emulatestatic,
     'school' : schoolnr,
   }
   if request.method == 'POST' and request.FILES['file']:
@@ -238,7 +231,6 @@ def getbigmp4(request, archivenr=0, eventnr=0, tokennr=None, token=None):
   template = loader.get_template('schools/bigmp4.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : emulatestatic,
     'is_android' : is_android,
     'os' : useragent['os']['family'],
     'browser' : useragent['user_agent']['family'],

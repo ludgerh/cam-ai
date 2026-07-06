@@ -235,7 +235,7 @@ class l_buffer():
         if self.debug:
           print(self.debug, '--- Loop:', debug_display(data_out)) 
     
-  async def put(self, data):
+  async def put(self, data, timeout = None):
     if self.debug:
       print(self.debug, '+++ Put', debug_display(data)) 
     if self.q_len is None: 
@@ -321,6 +321,13 @@ class l_buffer():
             or item.dtype != storage['dtype']):
           processed_item.update({'shape': item.shape, 'dtype': item.dtype})
           storage.update({'shape': item.shape, 'dtype': item.dtype})
+        if storage.get('resend_name'):
+          # A previous put() attempt timed out after mutating the metadata.
+          # Re-announce name and length so the get side is back in sync.
+          processed_item['name'] = storage['shm'].name
+          processed_item['len'] = data_length
+          storage['last_size'] = data_length
+          storage['resend_name'] = False
         if data_length != storage['last_size']:
           processed_item['len'] = data_length
           storage['last_size'] = data_length
@@ -334,7 +341,16 @@ class l_buffer():
             storage['shm'].buf[0] = 0 # free
             processed_item['name'] = storage['shm'].name
             storage['max_size'] = data_length
+        if timeout is not None:
+          _put_ts = time()
         while storage['shm'].buf is None or storage['shm'].buf[0] == 1:
+          if timeout is not None and (time() - _put_ts) >= timeout:
+            # Abort BEFORE setting the busy flag or sending anything.
+            # The metadata deltas of this attempt never reached the get
+            # side, so force a full re-announce on the next put():
+            storage['last_size'] = -1
+            storage['resend_name'] = True
+            return(False)
           await asyncio.sleep(0.01)
         storage['shm'].buf[0] = 1 # busy
         # For numpy: direct copy from source array into shared memory,

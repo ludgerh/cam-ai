@@ -1,6 +1,6 @@
 {% extends 'registration/base.html' %}
 {% comment %}
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,12 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% block title %}CAM-AI Login{% endblock %}
 {% block content %}
 <div class="login box" style="margin-left:20px;margin-top:20px;color:#2E2C2F;">
-  {% if emulatestatic %}
-  {% load static %}
-  <img src="{% static 'camai/git/img/5.svg' %}" style="width:170px;">
-  {% else %}
-  <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.svg" style="width:170px;">
-  {% endif %}
+  <img src="/static/camai/img/5.svg" style="width:170px;">
   <h2>Login {{ version }}</h2>
   <form method="post">
     {% csrf_token %}

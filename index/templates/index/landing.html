@@ -16,20 +16,19 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
 {% block content %}
-{% if emulatestatic %}
-  {% load static %}
-  <script src="{% static 'camai/git/js/wstools.js' %}"></script>
-  <script src="{% static 'camai/nogit/js/jquery-3.5.1.js' %}"></script>
-{% else %}
-  <script src="https://static.cam-ai.de/{{ version }}/camai/git/js/wstools.js"></script>
-  <script src="https://static.cam-ai.de/{{ version }}/camai/nogit/js/jquery-3.5.1.min.js">
-    </script>
-{% endif %}
 <main>
   {% if cam_count > cam_width %}
     <h2>
     <div>Showing {{ cam_width }} of {{ cam_count }} cameras:</div>
-    <div>{{ pos_string }}</div>
+    <div class="d-flex justify-content-start align-items-center" style="gap: 0.5rem;">
+      {% if cam_start > 0 %}
+      <a href="/landing/{{ pos_prev }}/" class="btn btn-sm btn-secondary">&lt;</a>
+      {% endif %}  
+      <span>{{ pos_string }}</span>
+      {% if cam_start|add:cam_width < cam_count %}
+      <a href="/landing/{{ pos_next }}/" class="btn btn-sm btn-secondary">&gt;</a>
+      {% endif %}  
+    </div>
     </h2>
   {% endif %}  
   <div class="container-fluid float-left">
@@ -266,14 +265,7 @@ async function initSockets() {
         trigger_Socket.send(buf);
       } else {
         $('#imagespaceC' + cam.id).css({'object-fit':'cover'});
-  {% if emulatestatic %}
-	      $('#imagespaceC' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-  {% else %}
-	      $('#imagespaceC' + cam.id).prop(
-	        'src', 
-	        "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-	      );
-  {% endif %}
+	      $('#imagespaceC' + cam.id).prop('src', '/static/camai/img/privacy.jpg');
       };
       if (cam.show_camD) {
         const buf = new ArrayBuffer(9);
@@ -284,14 +276,7 @@ async function initSockets() {
         trigger_Socket.send(buf);
       } else {
         $('#imagespaceD' + cam.id).css({'object-fit':'cover'});
-  {% if emulatestatic %}
-	      $('#imagespaceD' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-  {% else %}
-	      $('#imagespaceD' + cam.id).prop(
-	        'src', 
-	        "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-	      );
-  {% endif %}
+	      $('#imagespaceD' + cam.id).prop('src', '/static/camai/img/privacy.jpg');
       };
       if (cam.show_camE) {
         const buf = new ArrayBuffer(9);
@@ -302,14 +287,7 @@ async function initSockets() {
         trigger_Socket.send(buf);
       } else {
         $('#imagespaceE' + cam.id).css({'object-fit':'cover'});
-  {% if emulatestatic %}
-	      $('#imagespaceE' + cam.id).prop('src', "{% static 'camai/git/img/privacy.jpg' %}");
-  {% else %}
-	      $('#imagespaceE' + cam.id).prop(
-	        'src', 
-	        "https://static.cam-ai.de/{{ version }}/camai/git/img/privacy.jpg"
-	      );
-  {% endif %}
+	      $('#imagespaceE' + cam.id).prop('src', '/static/camai/img/privacy.jpg');
       }; 
     };
     reconnect_delay = 1000; // successful init resets the backoff

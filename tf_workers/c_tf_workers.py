@@ -220,6 +220,33 @@ class tf_worker(spawn_process):
     else:
       result = False  
     return(result)
+    
+  async def download_file(self, url, dest):
+    # Stream a file from url to dest in chunks.
+    # Returns True on success, False on HTTP or network errors.
+    # Downloads to a temp file first so a failed transfer
+    # never leaves a broken file at dest.
+    tmp_path = dest + '.part'
+    try:
+      async with aiohttp.ClientSession() as session:
+        async with session.get(url, allow_redirects = True) as response:
+          response.raise_for_status()
+          async with aiofiles.open(tmp_path, 'wb') as f:
+            async for chunk in response.content.iter_chunked(65536):
+              await f.write(chunk)
+      await aiofiles.os.replace(tmp_path, dest)
+      return(True)
+    except aiohttp.ClientResponseError as e:
+      self.logger.error(
+        'Download failed: ' + url + ' --> HTTP ' + str(e.status)
+      )
+    except aiohttp.ClientError as e:
+      self.logger.error(
+        'Download failed: ' + url + ' --> ' + repr(e)
+      )
+    if await aiofiles.os.path.exists(tmp_path):
+      await aiofiles.os.remove(tmp_path)
+    return(False)
 
   async def async_runner(self):
     try: 
@@ -246,37 +273,7 @@ class tf_worker(spawn_process):
         buf_size_10 = 0.0
         buf_size_list = [0]
         self.block_size_list = [0]
-        self.proc_time_list = [0.0]
-      schoolsdir = await djconf.agetconfig('schools_dir', datapath + 'schools/')
-      async for schoolline in dbschool.objects.filter(
-          active = True, 
-          tf_worker = self.dbline
-      ):
-        schooldir = schoolsdir + 'model' + str(schoolline.id) + '/'
-        if not schoolline.dir:
-          schoolline.dir = schooldir
-          await schoolline.asave(update_fields=('dir', ))
-        await aiofiles.os.makedirs(schooldir + 'model/', exist_ok=True)
-        await aiofiles.os.makedirs(schooldir + 'frames/', exist_ok=True)
-        if self.dbline.use_litert:
-          filename = schoolline.model_type + '.tflite'
-        else:
-          filename = schoolline.model_type + '.keras'
-        dl_path = schooldir + 'model/' + filename
-        if not await aiofiles.os.path.exists(dl_path):
-          if self.dbline.use_litert:
-            dl_url = ('https://static.cam-ai.de/models/standard/' 
-              + schoolline.model_type 
-              + '/litert/efficientnetv2-b0.tflite')
-          else:
-            dl_url = ('https://static.cam-ai.de/models/standard/' 
-              + schoolline.model_type 
-              + '/keras/efficientnetv2-b0.keras')
-          async with aiohttp.ClientSession() as session:
-            async with session.get(dl_url, allow_redirects=True) as response:
-              async with aiofiles.open(dl_path, 'wb') as f:
-                async for chunk in response.content.iter_chunked(65536):
-                  await f.write(chunk) 
+        self.proc_time_list = [0.0] 
       #*** Common Vars
       self.is_ready = False
       #*** Server Var
@@ -291,18 +288,38 @@ class tf_worker(spawn_process):
       self.logname = 'tf_worker #'+str(self.dbline.id)
       self.logger = getLogger(self.logname)
       await alog_ini(self.logger, self.logname)
+      schoolsdir = await djconf.agetconfig('schools_dir', datapath + 'schools/')
+      model_format = 'litert' if self.dbline.use_litert else 'keras'
+      model_ext = 'tflite' if self.dbline.use_litert else 'keras'
+      async for schoolline in dbschool.objects.filter(
+          active = True, 
+          tf_worker = self.dbline,
+      ):
+        schooldir = schoolsdir + 'model' + str(schoolline.id) + '/'
+        if not schoolline.dir:
+          schoolline.dir = schooldir
+          await schoolline.asave(update_fields = ('dir', ))
+        await aiofiles.os.makedirs(schooldir + 'model/', exist_ok = True)
+        await aiofiles.os.makedirs(schooldir + 'frames/', exist_ok = True)
+        dl_path = schooldir + 'model/' + schoolline.model_type + '.' + model_ext
+        if not await aiofiles.os.path.exists(dl_path):
+          dl_url = ('https://static.cam-ai.de/models/standard/'
+            + schoolline.model_type + '/' + model_format 
+            + '/' + schoolline.model_type + '.' + model_ext)
+          self.logger.warning(f'***** No model file, got standard from static.cam-ai.de {dl_url}')
+          if not await self.download_file(dl_url, dl_path):
+            self.logger.error(
+              'No model file for school #' + str(schoolline.id)
+              + ', skipping'
+            )
+            continue
       self.model_buffers = {}
       if self.dbline.gpu_sim >= 0: # Random values
         self.cachedict = {}
       else: #Local CPU or GPU
         if self.dbline.use_litert:
-          if self.dbline.use_coral:
-            from tflite_runtime import interpreter as tflite
-            delegates = [tflite.load_delegate('libedgetpu.so.1')]
-            self.logger.info("*** Using LiteRT for Coral TPU***")
-          else:
-            from ai_edge_litert import interpreter as tflite
-            self.logger.info("*** Using LiteRT on CPU***")
+          from ai_edge_litert import interpreter as tflite
+          self.logger.info("*** Using LiteRT on CPU***")
           self.tflite = tflite
         else:
           os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
@@ -417,12 +434,8 @@ class tf_worker(spawn_process):
       this_model['ydim'] = 50
     else: #lokal GPU
       if self.dbline.use_litert:
-        if self.dbline.use_coral:
-          model_path = (this_model['dbline'].dir 
-            + 'model/c_' + this_model['dbline'].model_type + '.tflite')
-        else:
-          model_path = (this_model['dbline'].dir 
-            + 'model/' + this_model['dbline'].model_type + '.tflite')
+        model_path = (this_model['dbline'].dir 
+          + 'model/' + this_model['dbline'].model_type + '.tflite')
       else:
         model_path = (this_model['dbline'].dir
           + 'model/' + this_model['dbline'].model_type + '.keras')
@@ -431,19 +444,10 @@ class tf_worker(spawn_process):
       this_model['path'] = model_path  
       this_model['model_type'] = this_model['dbline'].model_type
       if self.dbline.use_litert:
-        if self.dbline.use_coral:
-            print('+++++')
-            interpreter = await asyncio.to_thread(
-              self.tflite.Interpreter,
-              model_path = model_path,
-              experimental_delegates = delegates,
-            )
-            print('-----', interpreter)
-        else:
-          interpreter = await asyncio.to_thread(
-            self.tflite.Interpreter, 
-            model_path = model_path, 
-          )
+        interpreter = await asyncio.to_thread(
+          self.tflite.Interpreter, 
+          model_path = model_path, 
+        )
         await asyncio.to_thread(interpreter.allocate_tensors)
         this_model['model'] = interpreter
         this_model['int_input'] = interpreter.tensor(

@@ -1,3 +1,4 @@
+# oneitem/shared_mem.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -13,10 +14,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
-
+import sys
 import struct
 import numpy as np
 from multiprocessing import shared_memory
+from multiprocessing import resource_tracker
 
 class shared_mem():
   def __init__(self, source_dict, shape = None, shm_name = None):
@@ -44,6 +46,32 @@ class shared_mem():
     self.meta_size = struct.calcsize(self.meta_format)
     #print('*****', self.offsets)
     #print('*****', self.meta_format)
+    
+    if shm_name is None:
+      # c_cam / c_detector parent process: create and OWN the segment.
+      if self.shape is None:
+        frame_bytes = 0
+      else:
+        frame_bytes = np.prod(shape) * np.dtype(self.dtype).itemsize
+      total_size = self.meta_size + frame_bytes
+      # create shared memory
+      self.shm = shared_memory.SharedMemory(create = True, size = total_size)
+    else:
+      # cam_worker / det_worker process: only ATTACH to an existing segment.
+      # This process does NOT own the block - the parent created it and is
+      # responsible for unlink() in its stop(). Under CPython < 3.13,
+      # SharedMemory(name=...) still registers the block with THIS process's
+      # resource_tracker, which then unlink()s it when the worker exits and
+      # destroys it for the parent and every future worker. The next worker
+      # that attaches then dies with FileNotFoundError: /psm_xxxx. So we detach
+      # the block from our own tracker right after attaching.
+      if sys.version_info >= (3, 13):
+        # Python 3.13+ exposes a dedicated "attach, do not track" flag.
+        self.shm = shared_memory.SharedMemory(name = shm_name, track = False)
+      else:
+        self.shm = shared_memory.SharedMemory(name = shm_name)
+        resource_tracker.unregister(self.shm._name, 'shared_memory')
+    
     if shm_name is None:
       # c_cam process
       if self.shape is None:

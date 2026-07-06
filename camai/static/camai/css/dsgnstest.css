@@ -1,0 +1,42 @@
+.bluegrey {
+	background: #B4C2C8;
+	color: #000;
+}	
+
+
+.rows {
+  background: #597081;
+  border-radius:10px;
+}
+
+.noselect  {
+  user-select: none;
+}
+
+
+.live {
+  border:2px;
+  border-radius:20px;
+}
+
+
+button {
+  background:#597081;
+	margin:20px;
+}
+
+td {
+	vertical-align: top;
+  border: 0px solid grey;
+  border-collapse: separate;
+  padding: 3px;
+}
+
+td.noline {
+  border: none;
+}
+
+.pointer {
+	cursor: pointer;
+}
+

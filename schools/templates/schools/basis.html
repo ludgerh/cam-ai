@@ -1,5 +1,5 @@
 {% comment %}
-Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -16,21 +16,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <!doctype html>
 <html lang="en">
   <head>
-    {% if emulatestatic %}
-    {% load static %}
-      <link rel="shortcut icon" href="{% static 'camai/git/img/favicon.ico' type='image/x-icon' %}">
-    {% else %}
-      <link rel="shortcut icon" href="https://static.cam-ai.de/{{ version }}/camai/git/img/favicon.ico">
-    {% endif %}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
-    {% if emulatestatic %}
-    {% load static %}
-      <link rel="stylesheet" href="{% static 'camai/git/css/camai.css' %}">
-    {% else %}
-      <link rel="stylesheet" href="https://static.cam-ai.de/{{ version }}/camai/git/css/camai.css">
-    {% endif %}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+    <link rel="shortcut icon" href="/static/camai/img/favicon.ico">
+    <script src="/static/camai/js/jquery-3.5.1.min.js"></script>
+    <script src="/static/camai/js/wstools.js"></script>
+    <script src="/static/camai/js/jquery-3.5.1.min.js"></script>
+    <link href="/static/camai/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/camai/css/camai.css">
+    <link rel="stylesheet" href="/static/camai/bootstrap-icons-1.3.0/bootstrap-icons.css">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>CAM-AI client</title>
@@ -39,19 +31,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     {% if debug %}
     <h1 class="m-2">*** Debug-Mode ***</h1>
     {% endif %}
-    {% if emulatestatic %}
-    <h2 class="m-2">Emulating Static Server</h2>
-    {% endif %}
     <div class="container-fluid float-left">
       <div class="row menurow">
         <div class="col-sm-auto">
           <a href="/">
-            {% if emulatestatic %}
-              {% load static %}
-                <img src="{% static 'camai/git/img/5.svg' %}" style="width:170px;">
-              {% else %}
-                <img src="https://static.cam-ai.de/{{ version }}/camai/git/img/5.svg" style="width:170px;">
-              {% endif %}
+            <img src="/static/camai/img/5.svg" style="width:170px;">
           </a>
         </div>
         <div class="col-sm-auto">

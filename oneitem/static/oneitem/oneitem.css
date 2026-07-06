@@ -1,0 +1,112 @@
+.btn-primary.disabled, .btn-primary:disabled {
+    color: #000;
+    background-color: #B4C2C8;
+    border-width: 0;
+}
+
+.accordion {
+  padding: 15px;
+  border-radius: 10px;
+  background-color: #F0F4F7;
+}
+  
+.accordion-item {
+  background-color: #F0F4F7;
+  border: 0;
+}
+
+.accordion-button {
+  margin: 0;
+  margin-top: 10px;
+  background-color: #597081;
+  color: #F0F4F7;
+  border-radius: 5px;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: #597081;
+  color: #F0F4F7;
+  border-radius: 5px;
+}
+
+.accordion-body {
+  background-color: #F0F4F7;
+  color: #2E2C2F;
+}  
+
+
+.blue {
+	background: #90B0D0;
+	color: #000;
+}
+
+.urldl {
+	width:1000px;
+}
+
+.floatinp {
+	width:150px;
+}
+
+.roundframe {
+	border-style: solid;
+  border-width: medium;
+  border-color: black;
+  border-radius: 10px;
+}
+
+button {
+	margin:20px;
+}
+
+.btn-sm {
+	width: 24px;
+  height: 24px;
+}
+
+td {
+	vertical-align: top;
+  border: 0px solid grey;
+  border-collapse: separate;
+  padding: 3px;
+}
+
+td.noline {
+  border: none;
+}
+
+.pointer {
+	cursor: pointer;
+}
+
+.imageline {
+	text-align: left;
+}
+
+.images {
+  padding: 5px;
+	width: 200px;
+}
+
+.squares {
+  padding: 5px;
+	width: 500px;
+  height: 500px;
+  object-fit: cover;
+}
+
+.squares {
+  display: inline-block;
+  vertical-align: top;
+  padding: 5px;
+  width: 200px;
+  height: 200px;
+}
+
+.imagebox {
+	text-align: left;
+}
+
+.eventinput {
+	text-align: left;
+}

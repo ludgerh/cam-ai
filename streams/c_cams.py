@@ -355,33 +355,28 @@ class cam_worker(mp_process):
             aoi = None 
           if (self.dbline.cam_view 
               and streams_redis.view_from_dev('C', self.id)):
-            #if frameline[1].shape[1] > (new_xdim := self.shared_mem.read_1_meta('x_canvas')):
-            #  await self.viewer_queue.put([
-            #    frameline[0],
-            #    c_convert(frameline[1], typein=1, xout=new_xdim), 
-            #    frameline[2],
-            #  ])
-            #else:  
             await self.viewer_queue.put(frameline)
-          if (self.dbline.det_mode_flag 
-              and (streams_redis.view_from_dev('D', self.id) 
+            
+            
+          if (self.dbline.det_mode_flag
+              and (streams_redis.view_from_dev('D', self.id)
               or streams_redis.data_from_dev('D', self.id))
               and frameline):
-            try:
-              if aoi is None:
-                await asyncio.wait_for(self.mydetector_data.put(frameline), timeout=5.0)
-              else:  
-                await asyncio.wait_for(self.mydetector_data.put(aoi), timeout=5.0)
-            except asyncio.TimeoutError:
-              pass
+            payload = frameline if aoi is None else aoi
+            if await self.mydetector_data.put(payload, timeout = 5.0) is False:
+              # Frame dropped, downstream too slow - visible in the log now
+              self.logger.warning(
+                f'CA{self.id}: detector queue put timed out, frame dropped'
+              )
           if self.dbline.eve_mode_flag and streams_redis.view_from_dev('E', self.id):
-            try:
-              if aoi is None:
-                await asyncio.wait_for(self.myeventer_data.put(frameline), timeout=5.0)
-              else:  
-                await asyncio.wait_for(self.myeventer_data.put(aoi), timeout=5.0)
-            except asyncio.TimeoutError:
-              pass
+            payload = frameline if aoi is None else aoi
+            if await self.myeventer_data.put(payload, timeout = 5.0) is False:
+              self.logger.warning(
+                f'CA{self.id}: eventer queue put timed out, frame dropped'
+              )            
+              
+              
+              
         else:
           await a_break_type(BR_SHORT)
       while True:
@@ -899,38 +894,43 @@ class cam_worker(mp_process):
     self.raw_running = True
     os.set_blocking(self.fd, True)
     try:
-        while self.raw_running and not self.got_sigint:
-            buf = bytearray(self.bytes_per_frame)
-            view = memoryview(buf)
-            offset = 0
-            while offset < self.bytes_per_frame:
-                if not self.raw_running or self.got_sigint:
-                    buf = None
-                    break
-                try:
-                    n = self.sock_conn.recv_into(view[offset:])
-                except OSError as e:
-                    self.logger.warning(
-                        f'CA{self.id}: FD error mid-frame: {e}'
-                    )
-                    buf = None
-                    break
-                if n == 0:
-                    break  # EOF
-                offset += n
-            if buf is not None and offset == self.bytes_per_frame:
-                try:
-                    self.raw_queue.put(buf, block=False)
-                except queue.Full:
-                    pass
+      while self.raw_running and not self.got_sigint:
+        buf = bytearray(self.bytes_per_frame)
+        view = memoryview(buf)
+        offset = 0
+        eof = False
+        while offset < self.bytes_per_frame:
+          if not self.raw_running or self.got_sigint:
+            buf = None
+            break
+          try:
+            n = self.sock_conn.recv_into(view[offset:])
+          except OSError as e:
+            self.logger.warning(
+              f'CA{self.id}: FD error mid-frame: {e}'
+            )
+            buf = None
+            eof = True  # treat a broken fd like EOF: leave the outer loop
+            break
+          if n == 0:
+            eof = True  # peer closed the connection
+            break
+          offset += n
+        if eof:
+          self.logger.warning(
+            f'CA{self.id}: EOF on raw socket, terminating reader thread'
+          )
+          break  # leave the OUTER loop, do not spin on a dead socket
+        if buf is not None and offset == self.bytes_per_frame:
+          try:
+            self.raw_queue.put(buf, block=False)
+          except queue.Full:
+            pass
     except Exception as fatal:
-        self.logger.critical(
-            f'CA{self.id}: Rawfeed crashed: {fatal}',
-            exc_info=True
-        )
-    finally:
-      pass
-      #self.logger.info(f'CA{self.id}: ----- Stopping Reader')
+      self.logger.critical(
+        f'CA{self.id}: Rawfeed crashed: {fatal}',
+        exc_info=True
+      )
       
   async def stopprocess(self):
     #self.logger.info("#" + str(self.id) + " aaaaa")

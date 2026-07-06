@@ -62,11 +62,11 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=N
   if (xout < xin) or (yout < yin) or forcescale:
     frame = cv.resize(frame, (xout, yout)) #resize
   if typeout == 2:
-    frame = cv.imencode('.bmp', frame)[1].tostring()
+    frame = cv.imencode('.bmp', frame)[1].tobytes()
   elif typeout == 3:
     #encode_param = [int(cv.IMWRITE_JPEG_QUALITY), 100]
-    #frame = cv.imencode('.jpg', frame, encode_param)[1].tostring()
-    frame = cv.imencode('.jpg', frame)[1].tostring()
+    #frame = cv.imencode('.jpg', frame, encode_param)[1].tobytes()
+    frame = cv.imencode('.jpg', frame)[1].tobytes()
   #print('*****', len(frame))  
   return(frame)
 
@@ -244,9 +244,9 @@ class c_buffer(l_buffer):
   def __init__(self, **kwargs):
     return super().__init__(('NO'), **kwargs)
   
-  async def put(self, frame):
+  async def put(self, frame, timeout = None):
     objects = [frame[0]] + frame[2:]
-    await super().put((frame[1], objects, ))
+    await super().put((frame[1], objects, ), timeout)
     
   async def get(self, **kwargs):
     if (result := await super().get(**kwargs)):

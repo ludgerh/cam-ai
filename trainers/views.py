@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -19,15 +19,12 @@ from django.contrib.auth.decorators import login_required
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
-from camai.c_settings import safe_import
 from access.c_access import access
 from tf_workers.models import school
 from schools.c_schools import get_taglist
 from tools.l_tools import djconf
 from tools.tokens import checktoken
 from .models import model_type, fit
-
-emulatestatic = safe_import('emulatestatic') 
 
 @login_required
 def trainer(request, schoolnr):
@@ -37,7 +34,6 @@ def trainer(request, schoolnr):
     template = loader.get_template('trainers/trainer.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'schoolnr' : schoolnr,
       'schoolname' : myschool.name,
@@ -55,7 +51,6 @@ def epochs(request, schoolnr, fitnr):
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'user' : request.user,
-      'emulatestatic' : emulatestatic,
       'fitnr' : fitnr,
       'schoolnr' : schoolnr,
     }
@@ -70,7 +65,6 @@ def dashboard(request, schoolnr):
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'user' : request.user,
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'school' : myschool,
       'model_types' : model_type.objects.all(),

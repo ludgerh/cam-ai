@@ -54,7 +54,6 @@ from .models import camurl
 #from .forms import UploadFileForm
 #from pprint import pprint
 
-emulatestatic = safe_import('emulatestatic')
 db_database = safe_import('db_database')
 no_nginx = safe_import('localaccess')
 
@@ -78,7 +77,6 @@ class myTemplateView(LoginRequiredMixin, TemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'is_public' : djconf.getconfigbool('is_public_server', False),
       'debug' : settings.DEBUG,
       'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
@@ -486,7 +484,6 @@ class sendlogs(LoginRequiredMixin, TemplateView):
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
     context.update({
-      'emulatestatic' : emulatestatic,
       'version' : djconf.getconfig('version', 'X.Y.Z'),
       'smtp_server' : djconf.getconfig('smtp_server', forcedb=False),
       'smtp_account' : djconf.getconfig('smtp_account', forcedb=False),

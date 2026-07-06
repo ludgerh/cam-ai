@@ -1,21 +1,22 @@
-# Copyright (C) 2024 by the CAM-AI team, info@cam-ai.de
-# More information and complete source: https://github.com/ludgerh/cam-ai
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 3
-# of the License, or (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-# See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
+More information and complete source: https://github.com/ludgerh/cam-ai
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 3
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+"""
 
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
 from django_tables2 import SingleTableMixin
-from camai.c_settings import safe_import
 from access.c_access import access
 from tools.l_tools import djconf
 from streams.models import stream
@@ -23,8 +24,6 @@ from tools.tokens import checktoken
 from .filters import archivefilter, myFilterView
 from .models import archive as dbarchive
 from .tables import archivetable
-
-emulatestatic = safe_import('emulatestatic') 
 
 class archive(SingleTableMixin, myFilterView):
   table_class = archivetable
@@ -45,7 +44,6 @@ class archive(SingleTableMixin, myFilterView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'may_write_stream' : access.check('C', self.streamnr, self.request.user, 'W'),
       'may_write_school' : access.check('S', mystream.eve_school.id, self.request.user, 'W'),

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -18,13 +18,10 @@ from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import TemplateView
 from django.http import HttpResponse
-from camai.c_settings import safe_import
 from streams.models import stream
 from access.c_access import access
 from tf_workers.models import school
 from tools.l_tools import djconf
-
-emulatestatic = safe_import('emulatestatic') 
 
 class health(LoginRequiredMixin, TemplateView):
   template_name = 'cleanup/cleanup.html'
@@ -34,7 +31,6 @@ class health(LoginRequiredMixin, TemplateView):
     datapath = djconf.getconfig('datapath', 'data/')
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
         'do_tf_debug', 

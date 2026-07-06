@@ -27,7 +27,6 @@ from django.core.mail import send_mail
 from django.core.mail.backends.smtp import EmailBackend
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import redirect
-from camai.c_settings import safe_import
 from tools.l_tools import djconf
 from tools.l_smtp import l_smtp, l_msg
 from access.c_access import access
@@ -39,7 +38,6 @@ from schools.models import tag as dbtag
 import core.plugin_conf
 from .forms import smtp_form
 
-emulatestatic = safe_import('emulatestatic') 
 test_email = ''
 
 class myTemplateView(LoginRequiredMixin, TemplateView):
@@ -65,7 +63,6 @@ class config(myTemplateView):
     context = super().get_context_data(**kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'tf_debug' : self.request.user.is_superuser and djconf.getconfigbool(
         'do_tf_debug', 
         True,

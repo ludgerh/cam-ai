@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -23,12 +23,9 @@ from django.contrib.auth.forms import (
 )
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
-from camai.c_settings import safe_import
 from tools.l_tools import djconf
 from users.models import userinfo
 from .forms import MyRegistrationFormUniqueEmail
-
-emulatestatic = safe_import('emulatestatic') 
 
 class MyRegistrationView(RegistrationView):
   form_class = MyRegistrationFormUniqueEmail
@@ -48,7 +45,6 @@ class MyRegistrationView(RegistrationView):
     context = super().get_context_data(*args, **kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'), 
-      'emulatestatic' : emulatestatic,
       'site': settings.CLIENT_URL[:-1],
     })
     return(context)
@@ -98,7 +94,6 @@ class MyLoginView(auth_views.LoginView):
     context = super().get_context_data(*args, **kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'), 
-      'emulatestatic' : emulatestatic,
     })
     return(context)
 
@@ -142,7 +137,6 @@ class MyPasswordResetDoneView(auth_views.PasswordResetDoneView):
     context = super().get_context_data(*args, **kwargs)
     context.update({
       'version' : djconf.getconfig('version', 'X.Y.Z'), 
-      'emulatestatic' : emulatestatic,
     })
     return(context)
 

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@ from django.contrib.auth.models import User as dbuser
 from django.template import loader
 from django.conf import settings
 from django.http import HttpResponse
-from camai.c_settings import safe_import
 from access.c_access import access
 from tools.l_tools import djconf
 from tools.tokens import checktoken
@@ -29,8 +28,6 @@ from users.models import archive
 from .models import event, event_frame
 from .models import alarm as dbalarm
 from streams.models import stream
-
-emulatestatic = safe_import('emulatestatic') 
 
 datapath = djconf.getconfig('datapath', 'data/')
 archivepath = djconf.getconfig('archivepath', datapath + 'archive/')
@@ -42,7 +39,6 @@ def events(request, camnr):
     template = loader.get_template('eventers/events.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'debug' : settings.DEBUG,
       'may_write_stream' : access.check('C', camnr, request.user, 'W'),
       'may_write_school' : access.check('S', mystream.eve_school.id, request.user, 'W'),
@@ -72,7 +68,6 @@ def oneevent(request, streamnr, eventnr):
     template = loader.get_template('eventers/oneevent.html')
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
-      'emulatestatic' : emulatestatic,
       'is_android' : is_android,
       'os' : useragent['os']['family'],
       'browser' : useragent['user_agent']['family'],
@@ -94,7 +89,6 @@ def alarm(request, schoolnr):
   template = loader.get_template('eventers/alarm.html')
   context = {
     'version' : djconf.getconfig('version', 'X.Y.Z'),
-    'emulatestatic' : emulatestatic,
     'may_write' : access.check('S', schoolnr, request.user, 'W'),
     'school' : school.objects.get(id=schoolnr),
     'user' : request.user,
