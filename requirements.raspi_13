@@ -30,7 +30,7 @@ django-filter==25.2
 django-htmx==1.27.0
 django-registration==5.2.1
 django-tables2==2.8.0
-flatbuffers==20181003210633
+flatbuffers==25.2.10
 frozenlist==1.8.0
 hyperlink==21.0.0
 idna==3.11

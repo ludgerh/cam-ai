@@ -7,7 +7,6 @@ server {
   error_log /var/log/nginx/cam-ai.error.log info;
   location /protected/ {
     internal;
-    #Standard: alias /home/cam_ai/temp/;
     alias /home/ludger/temp/;
   }
   location /static/ {
