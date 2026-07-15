@@ -298,7 +298,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data =None):
     try:
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -324,6 +324,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
           }
           await self.send(json.dumps(outlist))
           return()
+        print('00000')
         schoolline = school()
         schoolline.name = params['name']
         schoolline.creator = userline
@@ -334,6 +335,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         await schoolline.asave(update_fields=('dir', ))
         await aiofiles.os.makedirs(schoolline.dir+'frames', exist_ok=True)
         await aiofiles.os.makedirs(schoolline.dir+'model', exist_ok=True)
+        print('11111', trainerline.t_type)
         if trainerline.t_type in {2, 3}:
           from aiohttp import ClientSession
           async with ClientSession() as session:
@@ -384,7 +386,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
             await aioshutil.rmtree(schoolline.dir)
           await schoolline.adelete()
         outlist['data'] = resultdict
-        #logger.info('--> ' + str(outlist))
+        logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'linkserver-c':

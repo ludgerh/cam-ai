@@ -1,4 +1,5 @@
 server {
+  client_max_body_size 100M;
   listen 8000;
   server_name _;
   sendfile off;

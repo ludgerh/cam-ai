@@ -69,22 +69,21 @@ class shared_mem():
         # Python 3.13+ exposes a dedicated "attach, do not track" flag.
         self.shm = shared_memory.SharedMemory(name = shm_name, track = False)
       else:
-        self.shm = shared_memory.SharedMemory(name = shm_name)
-        resource_tracker.unregister(self.shm._name, 'shared_memory')
-    
-    if shm_name is None:
-      # c_cam process
-      if self.shape is None:
-        frame_bytes = 0
-      else:  
-        frame_bytes = np.prod(shape) * np.dtype(self.dtype).itemsize
-      total_size = self.meta_size + frame_bytes
-      # create shared memory
-      self.shm = shared_memory.SharedMemory(create=True, size=total_size)
-    else:  
-      # cam_worker process
-      self.shm = shared_memory.SharedMemory(name=shm_name)
-    # numpy view into frame part
+        # Python < 3.13: SharedMemory(name=...) unconditionally registers the
+        # block with the resource tracker. Unregistering afterwards is NOT
+        # enough: all forked processes talk to the SAME tracker process, so
+        # our unregister() deletes the parent's legitimate entry and the
+        # parent's unlink() later raises KeyError inside resource_tracker.
+        # Instead, suppress the registration itself while attaching.
+        original_register = resource_tracker.register
+        def skip_register(name, rtype):
+          if rtype != 'shared_memory':
+            original_register(name, rtype)
+        resource_tracker.register = skip_register
+        try:
+          self.shm = shared_memory.SharedMemory(name = shm_name)
+        finally:
+          resource_tracker.register = original_register
     if self.shape is not None:
       self.frame = np.ndarray(
         shape,
@@ -119,10 +118,19 @@ class shared_mem():
   def write_1_meta(self, field, value):
     #if field == 'scaledown':
     #  print('###### write_1_meta:', field, value)
-    struct.pack_into(self.source_dict[field], self.shm.buf, self.offsets[field], value)
-    
+    buf = self.shm.buf
+    if buf is None:
+      # segment already closed (shutdown race: websocket disconnect fires
+      # after the stream teardown released the shared memory) - skip silently
+      return()
+    struct.pack_into(self.source_dict[field], buf, self.offsets[field], value)
+
   def read_1_meta(self, field):
-    result = struct.unpack_from(self.source_dict[field], self.shm.buf, self.offsets[field])[0]
+    buf = self.shm.buf
+    if buf is None:
+      # same shutdown race as in write_1_meta - deliver a harmless default
+      return(0)
+    result = struct.unpack_from(self.source_dict[field], buf, self.offsets[field])[0]
     #if field == 'scaledown':
     #  print('###### read_1_meta:', field, ', got', result)
     return(result)
