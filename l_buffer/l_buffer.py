@@ -214,7 +214,6 @@ class l_buffer():
                   storage['shape'] = data['shape']
                 if 'dtype' in data:
                   storage['dtype'] = data['dtype']
-              storage['shm'].buf[0] = 0
               if self.get_struct[storage_idx][i] == 'L':
                 in_bytes = storage['shm'].buf[1:storage['last_size'] + 1].tobytes()
                 data_out.append(pickle.loads(in_bytes))
@@ -227,13 +226,26 @@ class l_buffer():
                   dtype = storage['shape'] and np.dtype(storage['dtype']),
                 ).reshape(storage['shape']).copy()
                 data_out.append(arr)
+              # Free the busy flag only AFTER the data has been fully copied
+              # out of the segment - otherwise a waiting producer starts
+              # overwriting the buffer while we are still reading it.
+              storage['shm'].buf[0] = 0
+        if data_out: 
+          await self.put_to_shelf(data_out) 
+          if self.debug:
+            print(self.debug, '--- Loop:', debug_display(data_out)) 
       except Empty:
         await asyncio.sleep(self.brake_time) 
-        data_out = ''  
-      if data_out: 
-        await self.put_to_shelf(data_out) 
-        if self.debug:
-          print(self.debug, '--- Loop:', debug_display(data_out)) 
+      except asyncio.CancelledError:
+        # Task cancellation (stop('X')) must terminate the loop, not be
+        # swallowed by the generic guard below.
+        raise
+      except Exception:
+        # Last line of defense: one bad item must not kill the consumer
+        # loop for good - log it, drop the item, keep running.
+        print(f'l_buffer data_loop_runner ({self.struct}) survived:')
+        print(format_exc())
+        await asyncio.sleep(self.brake_time)
     
   async def put(self, data, timeout = None):
     if self.debug:
@@ -350,6 +362,8 @@ class l_buffer():
             # side, so force a full re-announce on the next put():
             storage['last_size'] = -1
             storage['resend_name'] = True
+            storage['shape'] = ()
+            storage['dtype'] = 0
             return(False)
           await asyncio.sleep(0.01)
         storage['shm'].buf[0] = 1 # busy

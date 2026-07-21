@@ -32,6 +32,7 @@ from signal import signal, SIGINT
 from statistics import mean
 from channels.db import database_sync_to_async
 from setproctitle import setproctitle
+from traceback import format_exc
 from tools.l_sysinfo import sysinfo
 from tools.l_break import (a_break_time, a_break_type, break_type, a_break_auto, 
   BR_SHORT, BR_MEDIUM, BR_LONG, )
@@ -121,7 +122,7 @@ class model_buffer():
     return(result)  
     
   def empty(self):
-    return(self.qsize == 0)
+    return(self.qsize() == 0)
 
 class tf_user(object):
   clientset = set()
@@ -144,9 +145,14 @@ class output_dist():
     self.auto_break = a_break_auto(tmin = 0.01, tmax = 0.1, rate = 0.01)
     self.tf_worker = tf_worker
     
-  async def put(self, tf_w_index, data):
+  async def put(self, tf_w_index, data, timeout = 10.0):
+    # Never wait forever for a client to pick up its result: a dead or
+    # stuck client must not freeze the whole worker. Drop instead.
+    _ts = time()
     while (not getattr(self.tf_worker, 'got_sigint', False)
         and safe_redis.exists(self.nametag + str(tf_w_index) + ':')): 
+      if time() - _ts >= timeout:
+        return(False)  # caller may log: result dropped, client not reading
       await self.auto_break.wait()
     self.auto_break.reset()
     self.used_adresses.add(tf_w_index) 
@@ -156,7 +162,6 @@ class output_dist():
     while (result := safe_redis.get(self.nametag + str(tf_w_index) + ':')) is None:
       await self.auto_break.wait()
     self.auto_break.reset()
-    data = pickle.loads(result) 
     safe_redis.delete(self.nametag + str(tf_w_index) + ':')
     return(pickle.loads(result))
     
@@ -195,6 +200,7 @@ class tf_worker(spawn_process):
     if (received[0] == 'unregister'):
       async with self.users_lock:
         del self.users[received[1]]
+      self.my_output.clean_one(received[1])
     elif (received[0] == 'get_is_ready'):
       await self.my_output.put(received[1], ('put_is_ready', self.is_ready))
     elif (received[0] == 'ask_pred'):
@@ -202,7 +208,18 @@ class tf_worker(spawn_process):
       await self.check_model(schoolnr, self.logger, True)
       if len(received) == 3: #no images
         return(True)
+      # Wait for the model dimensions, but never forever: if the model
+      # failed to load (bad download, defective file), waiting here would
+      # block the single inqueue consumer and make the worker deaf for
+      # ALL clients. Drop the request instead and log it.
+      _xdim_ts = time()
       while not 'xdim' in self.models[schoolnr]:
+        if time() - _xdim_ts >= 120.0:
+          self.logger.warning(
+            self.logname + ': model #' + str(schoolnr)
+            + ' has no dimensions after 60s, dropping ask_pred request'
+          )
+          return(True)
         await a_break_type(BR_LONG)
       self.model_buffers[schoolnr].pause = False
       async with self.users_lock:
@@ -530,7 +547,7 @@ class tf_worker(spawn_process):
               frames_ok = False  
               break
         except:
-          frame_ok = False
+          frames_ok = False
           logger.error(format_exc()) 
         if frames_ok:    
           npframelist = np.vstack(npframelist)

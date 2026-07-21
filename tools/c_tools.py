@@ -28,8 +28,8 @@ from tools.models import setting as dbsetting
 from tools.l_tools import djconf
 from streams.redis import my_redis as streams_redis
 
-def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=None, 
-  outcrypt=None):
+def c_convert(frame, typein, typeout = 0, xycontained = 0, xout = 0, yout = 0, 
+  incrypt = None, outcrypt = None, quality = 80):
 # Frame Types:
 # 1 : opencv Data
 # 2 : BMP Data
@@ -64,9 +64,8 @@ def c_convert(frame, typein, typeout=0, xycontained=0, xout=0, yout=0, incrypt=N
   if typeout == 2:
     frame = cv.imencode('.bmp', frame)[1].tobytes()
   elif typeout == 3:
-    #encode_param = [int(cv.IMWRITE_JPEG_QUALITY), 100]
-    #frame = cv.imencode('.jpg', frame, encode_param)[1].tobytes()
-    frame = cv.imencode('.jpg', frame)[1].tobytes()
+    encode_param = [int(cv.IMWRITE_JPEG_QUALITY), quality]
+    frame = cv.imencode('.jpg', frame, encode_param)[1].tobytes()
   #print('*****', len(frame))  
   return(frame)
 

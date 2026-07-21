@@ -355,9 +355,10 @@ class cam_worker(mp_process):
             aoi = None 
           if (self.dbline.cam_view 
               and streams_redis.view_from_dev('C', self.id)):
-            await self.viewer_queue.put(frameline)
-            
-            
+            if await self.viewer_queue.put(frameline, timeout = 5.0) is False:
+              self.logger.warning(
+                f'CA{self.id}: viewer queue put timed out, frame dropped'
+              )
           if (self.dbline.det_mode_flag
               and (streams_redis.view_from_dev('D', self.id)
               or streams_redis.data_from_dev('D', self.id))
@@ -373,10 +374,7 @@ class cam_worker(mp_process):
             if await self.myeventer_data.put(payload, timeout = 5.0) is False:
               self.logger.warning(
                 f'CA{self.id}: eventer queue put timed out, frame dropped'
-              )            
-              
-              
-              
+              )    
         else:
           await a_break_type(BR_SHORT)
       while True:

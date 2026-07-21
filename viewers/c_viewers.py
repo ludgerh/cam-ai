@@ -33,6 +33,7 @@ from drawpad.drawpad import drawpad
 # wire (or the ack got stuck) and freeing the busy slot, so the stream resumes
 # instead of livelocking forever. comfortably above the 1s off-screen ack delay.
 ACK_TIMEOUT = 3.0
+MAX_WS_PAYLOAD = 1000000
 
 class c_viewer():
 
@@ -57,6 +58,7 @@ class c_viewer():
     self.framebuffer = None
     self._next_client_nr = 0
     self.x_canvas_max = 0
+    self.jpeg_quality = 100
           
   async def onf(self, client_nr):
     client = None
@@ -118,12 +120,24 @@ class c_viewer():
               (rl.max_x, rl.max_y), 
               (255, 255, 0),
               4,
-            ) 
+            )  
         if client['do_compress']:
           to = 3 #jpg
         else:
           to = 2 #bmp  
-        frame = c_convert(frame, typein=1, typeout=to, xout=client['outx'])
+        while True: 
+          new_frame = c_convert(
+            frame, 
+            typein = 1, 
+            typeout = to, 
+            xout = client['outx'], 
+            quality = self.jpeg_quality,
+          ) 
+          if len(new_frame) <= MAX_WS_PAYLOAD or self.jpeg_quality <= 30:
+            frame = new_frame
+            break
+          else:
+            self.jpeg_quality -= 10 
         if not startup_redis.get_running() or streams_redis.get_killing_stream(self.id):  
           return()  
         indicator = struct.pack(
