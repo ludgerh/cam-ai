@@ -212,9 +212,11 @@ class cam_worker(mp_process):
       self.reader_thread = None
       self.got_sigint = False
       self._inq_task = None
-      self.dbline = await stream.objects.aget(id = self.id)
+      # Set up logging BEFORE the first DB access, so the exception
+      # handler at the bottom can always use self.logger:
       self.logname = 'camera #' + str(self.id)
       self.logger = getLogger(self.logname)
+      self.dbline = await stream.objects.aget(id = self.id)
       await alog_ini(self.logger, self.logname)
       setproctitle('CAM-AI-Camera #'+str(self.id))
       self.socket_path = await djconf.agetconfig(

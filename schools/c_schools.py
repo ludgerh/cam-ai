@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,13 +15,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 from multiprocessing import Lock as p_lock
-from django.db import connection
+from django.db import connections
 from django.db.utils import OperationalError
 from .models import tag
 from tf_workers.models import school as db_school
 
 def get_taglist(myschoolnr):
-  taglist = list(tag.objects.filter(school = 1))
+  try:
+    taglist = list(tag.objects.filter(school = 1))
+  finally:
+    connections.close_all()  
   count = 0
   for item in taglist:
     item.id = count

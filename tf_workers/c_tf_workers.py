@@ -30,7 +30,8 @@ from random import random
 from logging import getLogger
 from signal import signal, SIGINT
 from statistics import mean
-from channels.db import database_sync_to_async
+from django.db.utils import OperationalError
+from channels.db import database_sync_to_async, aclose_old_connections
 from setproctitle import setproctitle
 from traceback import format_exc
 from tools.l_sysinfo import sysinfo
@@ -47,6 +48,25 @@ from .redis import my_redis as tf_workers_redis
 
 def sigint_handler(signal, frame):
   pass
+  
+async def db_retry(op, logger, tries = 5, delay = 0.5):
+  # Run an async DB operation, retrying after dropped MySQL connections
+  # ('Server has gone away'). aclose_old_connections() discards the dead
+  # connection so Django opens a fresh one on the next attempt.
+  # Retries are BOUNDED on purpose: after 'tries' failures the exception
+  # propagates to the caller's guard instead of spinning forever.
+  for attempt in range(tries):
+    try:
+      return(await op())
+    except OperationalError:
+      await aclose_old_connections()
+      if attempt >= tries - 1:
+        raise
+      logger.warning(
+        'DB connection lost, retry ' + str(attempt + 1) 
+        + '/' + str(tries - 1)
+      )
+      await asyncio.sleep(delay * (attempt + 1))
 
 #***************************************************************************
 #
@@ -420,14 +440,18 @@ class tf_worker(spawn_process):
     if (first_time := schoolnr not in self.models):
       self.models[schoolnr] = {}  
       this_model = self.models[schoolnr]   
-      this_model['dbline'] = await self.dbschool.objects.aget(id = schoolnr) 
+      #this_model['dbline'] = await self.dbschool.objects.aget(id = schoolnr)   
+      this_model['dbline'] = await db_retry(
+        lambda: self.dbschool.objects.aget(id = schoolnr), self.logger,
+      )
       this_model['fit_nr'] = -2
     else: 
       this_model = self.models[schoolnr]
       if this_model['last_check'] + 60 > time():
         return() 
     this_model['last_check'] = time()
-    await this_model['dbline'].arefresh_from_db()
+    #await this_model['dbline'].arefresh_from_db()
+    await db_retry(this_model['dbline'].arefresh_from_db, self.logger)
     if this_model['dbline'].last_fit == this_model['fit_nr']:
       return()
     if schoolnr not in self.model_buffers:
@@ -501,7 +525,11 @@ class tf_worker(spawn_process):
         + this_model['model_type'])
     self.model_buffers[schoolnr].pause = False
     this_model['dbline'].last_fit_infer = this_model['fit_nr']
-    await this_model['dbline'].asave(update_fields = ('last_fit_infer', ))
+    #await this_model['dbline'].asave(update_fields = ('last_fit_infer', ))
+    await db_retry(
+      lambda: this_model['dbline'].asave(update_fields = ('last_fit_infer', )),
+      self.logger,
+    )
 
   async def process_buffer(self, schoolnr, logger, had_timeout=False):
     mybuffer = self.model_buffers[schoolnr]

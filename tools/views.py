@@ -106,11 +106,11 @@ class myTemplateView(LoginRequiredMixin, TemplateView):
     })
     return context
 
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
-      return(HttpResponse('No Access'))
+  #def get(self, request, *args, **kwargs):
+  #  if self.request.user.is_superuser:
+  #    return(super().get(request, *args, **kwargs))
+  #  else:
+  #    return(HttpResponse('No Access'))
       
 class cam_inst_view(myTemplateView):   
 
@@ -199,7 +199,7 @@ class inst_virt_cam(cam_inst_view):
     if not request.user.is_superuser:
       myaccess = access_control()
       myaccess.vtype = 'X'
-      myaccess.vid = newlineid
+      myaccess.vid = newstream.id
       myaccess.u_g_nr = request.user.id
       myaccess.r_w = 'W'
       myaccess.save()
@@ -319,28 +319,32 @@ class process_restore(myTemplateView):
   template_name = 'tools/process_restore.html'  
     
   def dispatch(self, request, *args, **kwargs):
-    if not request.user.is_superuser:
+    self.post_dict = request.POST.dict()
+    self.job_type = self.post_dict['job_type']
+    if not (request.user.is_superuser or self.job_type == 'import'):
       return HttpResponse('No Access.', status=403)
     return super().dispatch(request, *args, **kwargs)
     
   def post(self, request, *args, **kwargs):
     context = self.get_context_data()
-    post_dict = request.POST.dict()
-    #print(post_dict)
-    if post_dict['status'] != 'OK':
+    #print(self.post_dict)
+    if self.post_dict['status'] != 'OK':
       context.update({
         'code' : 5,
-        'message' : 'Remote server said: ' +  post_dict['status'],
+        'message' : 'Remote server said: ' + self.post_dict['status'],
       })
       return self.render_to_response(context)
-    job_type = post_dict['job_type']
-    if job_type == 'restore':
-      check_files = 'check_files' in post_dict and post_dict['check_files'] == 'on'
-      check_db = 'check_db' in post_dict and post_dict['check_db'] == 'on'
-    elif job_type == 'import':
-      check_models = 'check_models' in post_dict and post_dict['check_models'] == 'on'
-      check_frames = 'check_frames' in post_dict and post_dict['check_frames'] == 'on'
-    safe_name = Path(post_dict['file_name']).name
+    if self.job_type == 'restore':
+      check_files = ('check_files' in self.post_dict 
+        and self.post_dict['check_files'] == 'on')
+      check_db = ('check_db' in self.post_dict 
+        and self.post_dict['check_db'] == 'on')
+    elif self.job_type == 'import':
+      check_models = ('check_models' in self.post_dict 
+        and self.post_dict['check_models'] == 'on')
+      check_frames = ('check_frames' in self.post_dict 
+        and self.post_dict['check_frames'] == 'on')
+    safe_name = Path(self.post_dict['file_name']).name
     zip_file = DOWN_BACKUP_PATH / safe_name
     if not zip_file.exists():
       context.update({
@@ -354,8 +358,9 @@ class process_restore(myTemplateView):
       zf.extractall(unpack_dir)
     zip_file.unlink(missing_ok=True) 
     version_file = unpack_dir / 'upload.cfg' 
-    if job_type == 'import':
-      school_line = school.objects.get(name = 'temp123school456name789magic')
+    if self.job_type == 'import':
+      # Take the item with the highest id (= the most recently created one):
+      school_line = school.objects.filter(name = 'temp123school456name789magic').latest('id')
     try:
       file_meta = {}
       with version_file.open(encoding='utf-8', errors='ignore') as f:
@@ -374,7 +379,7 @@ class process_restore(myTemplateView):
         'code' : 2,
         'message' : 'Version-File missing...',
       })
-      if job_type == 'import':
+      if self.job_type == 'import':
         school_line.delete()
       return self.render_to_response(context)
     if 'version' not in file_meta:   
@@ -382,7 +387,7 @@ class process_restore(myTemplateView):
         'code' : 3,
         'message' : 'Version-File not correct...',
       })
-      if job_type == 'import':
+      if self.job_type == 'import':
         school_line.delete()
       return self.render_to_response(context)
     if (not djconf.getconfigbool('import_ignore_version', default = False) 
@@ -391,10 +396,10 @@ class process_restore(myTemplateView):
         'code' : 4,
         'message' : 'Version mismatch: (' + file_meta['version'] + ' <> ' + version +')'
       })
-      if job_type == 'import':
+      if self.job_type == 'import':
         school_line.delete()
       return self.render_to_response(context)
-    if job_type == 'restore':
+    if self.job_type == 'restore':
       for item in viewables.values():
         async_to_sync(item['stream'].stop)()
       if check_db:
@@ -408,7 +413,7 @@ class process_restore(myTemplateView):
         shutil.move(DATAPATH, backup_path)
         shutil.move(unpack_dir, DATAPATH)
         shutil.rmtree(backup_path)
-    elif job_type == 'import':
+    elif self.job_type == 'import':
       school_line.name = file_meta['schoolname']
       if 'delegation_level' in file_meta:
         school_line.delegation_level = int(file_meta['delegation_level'])
@@ -458,7 +463,7 @@ class process_restore(myTemplateView):
         )
         trainframe.objects.filter(school=0).update(school=school_line.id)
     zip_file.unlink(missing_ok=True)  
-    if job_type == 'restore':
+    if self.job_type == 'restore':
       (path_to_exchange / 'db.sql').unlink(missing_ok=True) 
       (path_to_exchange / 'db.dat').unlink(missing_ok=True)  
       (path_to_exchange / 'upload.cfg').unlink(missing_ok=True)  
@@ -467,7 +472,7 @@ class process_restore(myTemplateView):
         'code' : 0,
         'message' : 'OK, please wait one minute for restart...',
       })
-    elif job_type == 'import':  
+    elif self.job_type == 'import':  
       context.update({
         'code' : 10,
         'message' : 'Done importing school. You can continue...',

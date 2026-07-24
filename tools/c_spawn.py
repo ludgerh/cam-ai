@@ -1,3 +1,4 @@
+# tools/c_spawn.py
 """
 Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -62,25 +63,32 @@ class spawn_process(Process):
     return(result)
 
   async def in_queue_thread(self):
-    try:
-      while self.do_run:
+    while self.do_run:
+      try:
         if self.use_buffer:
-          received = await self.inqueue.get(timeout=2.0)
+          received = await self.inqueue.get(timeout = 2.0)
           if received is None:
             continue
         else:  
           received = await asyncio.to_thread(self.inqueue.get)
-        if not await self.process_received(received):
-          raise QueueUnknownKeyword(received[0])
         if received and received[0] == 'stop':
           self.got_sigint = True
           self.do_run = False  
-    except Exception as fatal:
-      self.logger.error('Error in process: ' 
-        + self.logname 
-        + ' - ' + self.type + str(self.id)
-      )
-      self.logger.critical("in_queue_thread crashed: %s", fatal, exc_info=True)
+          continue
+        if not await self.process_received(received):
+          # Unknown keyword: log and skip - one bad item must not
+          # silence the worker for good.
+          self.logger.warning(
+            self.logname + ': unknown inqueue keyword, skipping: '
+            + str(received[0])
+          )
+      except asyncio.CancelledError:
+        raise
+      except Exception:
+        self.logger.error(
+          'in_queue_thread survived: ' + self.logname, exc_info = True,
+        )
+        await asyncio.sleep(0.1)  # avoid a tight loop on repeating errors
   
   async def stop(self):
     if self.is_alive():
