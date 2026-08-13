@@ -172,36 +172,41 @@ class cam_worker(mp_process):
     # and a boolean mask from alpha for each of them
     self.ovl_list = []
     # sorted() gives a deterministic index order (alphabetical by filename)
-    for filename in sorted(os.listdir(dirpath)):
-      if not filename.lower().endswith('.png'):
-        continue
-      filepath = os.path.join(dirpath, filename)
-      ovl = cv.imread(filepath, cv.IMREAD_UNCHANGED)
-      if ovl is None or ovl.ndim != 3 or ovl.shape[2] != 4:
-        raise ValueError(f'overlay {filepath} must be a PNG with alpha channel')
-      self.ovl_list.append({
-        'name' : filename,
-        'bgr' : np.ascontiguousarray(ovl[:, :, :3]),
-        # hard contour: every pixel is either fully opaque or fully transparent
-        'mask' : ovl[:, :, 3] > 127,
-        'width' : ovl.shape[1],
-        'height' : ovl.shape[0],
-      })
+    try:
+      for filename in sorted(os.listdir(dirpath)):
+        if not filename.lower().endswith('.png'):
+          continue
+        filepath = os.path.join(dirpath, filename)
+        ovl = cv.imread(filepath, cv.IMREAD_UNCHANGED)
+        if ovl is None or ovl.ndim != 3 or ovl.shape[2] != 4:
+          raise ValueError(f'overlay {filepath} must be a PNG with alpha channel')
+        self.ovl_list.append({
+          'name' : filename,
+          'bgr' : np.ascontiguousarray(ovl[:, :, :3]),
+          # hard contour: every pixel is either fully opaque or fully transparent
+          'mask' : ovl[:, :, 3] > 127,
+          'width' : ovl.shape[1],
+          'height' : ovl.shape[0],
+        })
+    except FileNotFoundError:
+      # self.ovl_list = [] is enough
+      self.logger.warning('Directory does not exist: %s', dirpath)
     print('***** Overlays:', [(item['name'], item['width'], item['height'])
       for item in self.ovl_list])
       
   def apply_overlay(self, frame):
-    x, y = (self.shared_mem.read_1_meta('ovl_xpos'),
-      self.shared_mem.read_1_meta('ovl_ypos'))
-    # for now: always use the first overlay from the list
-    ovl = self.ovl_list[0]
-    h, w = (ovl['height'], ovl['width'])
-    # clip against frame borders so a bad position cannot crash the loop
-    if x < 0 or y < 0 or x + w > frame.shape[1] or y + h > frame.shape[0]:
-      return(frame)
-    roi = frame[y:y+h, x:x+w]
-    # boolean fancy indexing copies only the opaque pixels, no blending
-    roi[ovl['mask']] = ovl['bgr'][ovl['mask']]
+    if self.ovl_list:
+      x, y = (self.shared_mem.read_1_meta('ovl_xpos'),
+        self.shared_mem.read_1_meta('ovl_ypos'))
+      # for now: always use the first overlay from the list
+      ovl = self.ovl_list[0]
+      h, w = (ovl['height'], ovl['width'])
+      # clip against frame borders so a bad position cannot crash the loop
+      if x < 0 or y < 0 or x + w > frame.shape[1] or y + h > frame.shape[0]:
+        return(frame)
+      roi = frame[y:y+h, x:x+w]
+      # boolean fancy indexing copies only the opaque pixels, no blending
+      roi[ovl['mask']] = ovl['bgr'][ovl['mask']]
     return(frame)
 
   async def in_queue_thread(self):
