@@ -240,18 +240,11 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.my_viewer.drawpad.make_screen()
             self.my_viewer.drawpad.mask_from_polygons()
         outlist['data'] = 'OK'
-        #logger.info('--> ' + str(outlist))
         await self.safe_send(outlist)	
 
       elif params['command'] == 'mousedown':
         if self.my_viewer.drawpad.edit_active:
           if self.may_write:
-            #print(
-            #  self.my_viewer.client_dict[self.v_client_nr]['x_scaling'],
-            #  self.my_viewer.client_dict[self.v_client_nr]['y_scaling'],
-            #  round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
-            #  round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']),
-            #)
             self.my_viewer.drawpad.mousedownhandler(
               round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
               round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']), 
@@ -297,10 +290,14 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
       elif params['command'] == 'dblclick':
         if self.may_write:
-          await self.my_viewer.drawpad.dblclickhandler(
-            round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
-            round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']), 
-          )
+          cam_x = (round(params['x'] 
+            * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']))
+          cam_y = (round(params['y'] 
+            * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']))
+          if params['edit_mode']:
+            await self.my_viewer.drawpad.dblclickhandler(cam_x, cam_y)
+          else:
+            await self.myitem.dblclickhandler(cam_x, cam_y)
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	

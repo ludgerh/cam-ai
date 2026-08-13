@@ -68,6 +68,12 @@ _SH_MEM_ITEMS = {
   'apply_mask' : 'i',
   'apply_pause' : 'i',
   'x_canvas' : 'i', #x_canvas_max
+  'ovl_item' : 'i',
+  'ovl_xpos' : 'i',
+  'ovl_ypos' : 'i',
+  'ovl_rot' : 'd',
+  'ovl_scale' : 'd',
+  
 }
 
 class c_cam():
@@ -102,6 +108,7 @@ class c_cam():
     self.shared_mem.write_1_meta('fps_limit', dbline.cam_fpslimit)
     self.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
     self.shared_mem.write_1_meta('apply_pause', dbline.cam_pause)
+    self.shared_mem.write_1_meta('ovl_item', -1)
     self.viewer.drawpad.set_xy((dbline.cam_xres, dbline.cam_yres))
     self.viewer.drawpad.positive_mask = dbline.cam_positive_mask
     self.viewer.drawpad.load_ringlist()
@@ -112,6 +119,18 @@ class c_cam():
     self.cam_worker.start()
     self.viewer.inqueue.display_qinfo(info = self.type + ' ' + str(self.id) +  ' Spawn: ')
     self.viewer.inqueue.start_data_loop()
+  
+  async def dblclickhandler(self, x, y):
+    if self.shared_mem.read_1_meta('ovl_item') == -1:
+      self.shared_mem.write_1_meta('ovl_rot', 0.0)
+      self.shared_mem.write_1_meta('ovl_scale', 1.0)
+      self.shared_mem.write_1_meta('ovl_item', 0)
+      self.shared_mem.write_1_meta('ovl_xpos', x)
+      self.shared_mem.write_1_meta('ovl_ypos', y)
+      print('dblclickhandler', x, y, 'On') 
+    else: 
+      self.shared_mem.write_1_meta('ovl_item', -1) 
+      print('dblclickhandler', x, y, 'Off') 
   
   async def stop(self):
     if self.cam_worker.is_alive():
@@ -147,6 +166,43 @@ class cam_worker(mp_process):
     
   def sigint_handler(self, signal = None, frame = None ):
     self.got_sigint = True 
+    
+  def load_overlay(self, dirpath = 'data/screws/'):
+    # load all RGBA overlays from dirpath once, keep BGR as uint8
+    # and a boolean mask from alpha for each of them
+    self.ovl_list = []
+    # sorted() gives a deterministic index order (alphabetical by filename)
+    for filename in sorted(os.listdir(dirpath)):
+      if not filename.lower().endswith('.png'):
+        continue
+      filepath = os.path.join(dirpath, filename)
+      ovl = cv.imread(filepath, cv.IMREAD_UNCHANGED)
+      if ovl is None or ovl.ndim != 3 or ovl.shape[2] != 4:
+        raise ValueError(f'overlay {filepath} must be a PNG with alpha channel')
+      self.ovl_list.append({
+        'name' : filename,
+        'bgr' : np.ascontiguousarray(ovl[:, :, :3]),
+        # hard contour: every pixel is either fully opaque or fully transparent
+        'mask' : ovl[:, :, 3] > 127,
+        'width' : ovl.shape[1],
+        'height' : ovl.shape[0],
+      })
+    print('***** Overlays:', [(item['name'], item['width'], item['height'])
+      for item in self.ovl_list])
+      
+  def apply_overlay(self, frame):
+    x, y = (self.shared_mem.read_1_meta('ovl_xpos'),
+      self.shared_mem.read_1_meta('ovl_ypos'))
+    # for now: always use the first overlay from the list
+    ovl = self.ovl_list[0]
+    h, w = (ovl['height'], ovl['width'])
+    # clip against frame borders so a bad position cannot crash the loop
+    if x < 0 or y < 0 or x + w > frame.shape[1] or y + h > frame.shape[0]:
+      return(frame)
+    roi = frame[y:y+h, x:x+w]
+    # boolean fancy indexing copies only the opaque pixels, no blending
+    roi[ovl['mask']] = ovl['bgr'][ovl['mask']]
+    return(frame)
 
   async def in_queue_thread(self):
     try:
@@ -261,6 +317,7 @@ class cam_worker(mp_process):
       self.fps_limit = -1
       datapath = await djconf.agetconfig('datapath', 'data/')
       streams_redis.set_ffmpeg_running(False)
+      self.load_overlay('data/screws/')
       if self.dbline.cam_virtual_fps:
         self.virt_cam_path = await djconf.agetconfig(
           'virt_cam_path', 
@@ -335,6 +392,8 @@ class cam_worker(mp_process):
         if self.got_sigint:
           break 
         if frameline: 
+          if self.shared_mem.read_1_meta('ovl_item') > -1: 
+            self.apply_overlay(frameline[1])
           xmin = self.shared_mem.read_1_meta('aoi_xmin')
           xmax = self.shared_mem.read_1_meta('aoi_xmax')
           ymin = self.shared_mem.read_1_meta('aoi_ymin')

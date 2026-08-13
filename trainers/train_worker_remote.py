@@ -1,5 +1,6 @@
+# trainers/train_worker_remote.py
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -24,6 +25,7 @@ import aiofiles
 import aiofiles.os
 import aiohttp
 import aioshutil
+import ssl
 from time import sleep, time
 from zipfile import ZipFile, ZIP_DEFLATED
 from setproctitle import setproctitle
@@ -251,7 +253,7 @@ class train_once_remote():
       self.ws.recv()
       count = len(datalist)
       start = 0
-      step = 100
+      step = 25
       for i in range(start, len(datalist), step):
         outdict = {
           'code' : 'set_counter',
@@ -273,10 +275,22 @@ class train_once_remote():
             zip_file.writestr(item + '.json', io.BytesIO(jsondata).getvalue())
             #self.logger.info('(' + str(count) + ') Zipped for sending: ' + item)
             count -= 1  
+            # keep the connection alive with a protocol-level ping (auto-pong)
+            if time() - self.ws_ts > 10.0:
+              self.ws.ping()
+              self.ws_ts = time()
         zip_buffer.seek(0)
         zip_content = zip_buffer.read()
-        self.ws.send_binary(zip_content)
-        self.ws.recv()
+        #self.ws.send_binary(zip_content)
+        #self.ws.recv()
+        try:
+          self.ws.send_binary(zip_content)
+          self.ws.recv()
+        except (ssl.SSLError, BrokenPipeError, ConnectionResetError,
+            WebSocketConnectionClosedException):
+          self.logger.warning('Connection lost while sending zip chunk, '
+            + 'aborting sync (will be retried)')
+          return(1)
         self.send_ping()
       outdict = {
         'code' : 'checkfitdone',

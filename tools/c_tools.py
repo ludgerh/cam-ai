@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import cv2 as cv
 import numpy as np
+import asyncio
 import aiofiles
 from time import time, sleep
 from random import randint
@@ -148,13 +149,32 @@ def image_size(infile):
   yin = myimage.shape[0]
   return(xin, yin)
   
+def needs_reduction(xin, yin, x, y):
+  # Single source of truth for "is this image too big?"
+  return((xin > x or yin > y) and (x > 0 and y > 0))
+
+def bmp_header_info(data):
+  # Returns (xdim, ydim) if "data" is a plain uncompressed BMP that can be
+  # passed through unchanged, else None (then let OpenCV decode it).
+  if len(data) < 34 or data[:2] != b'BM':
+    return(None)
+  if int.from_bytes(data[14:18], 'little') < 40:  # old BITMAPCOREHEADER
+    return(None)
+  bits = int.from_bytes(data[28:30], 'little')
+  compression = int.from_bytes(data[30:34], 'little')
+  if bits not in (8, 24, 32) or compression:  # only BI_RGB is safe
+    return(None)
+  xdim = int.from_bytes(data[18:22], 'little', signed=True)
+  ydim = int.from_bytes(data[22:26], 'little', signed=True)
+  return((abs(xdim), abs(ydim)))  # negative ydim = top-down BMP
+  
 def do_reduction(image, x, y):
   if image is None:
     raise ValueError('do_reduction() got None instead of an image (decode failed)')
   xin = image.shape[1]
   yin = image.shape[0]
   #print('In:', image.shape, x, y, xin, yin) 
-  if (xin > x or yin > y) and (x > 0 and y > 0):
+  if needs_reduction(xin, yin, x, y):
     if (x / xin) > (y / yin):
       scale = x / xin
     else:
@@ -176,19 +196,79 @@ def reduce_image(infile, outfile, x=0, y=0, crypt=None):
   myimage = do_reduction(myimage, x, y) 
   cv.imwrite(outfile, myimage)
   
+BMP_PASS_DEPTHS = (8, 24, 32)
+
+def needs_reduction(xin, yin, x, y):
+  # Single source of truth for "is this image too big?"
+  return((xin > x or yin > y) and (x > 0 and y > 0))
+
+def bmp_header_info(data):
+  # Returns (xdim, ydim) if "data" is a plain uncompressed BMP that can be
+  # passed through unchanged, else None (then let OpenCV decode it).
+  if len(data) < 34 or data[:2] != b'BM':
+    return(None)
+  if int.from_bytes(data[14:18], 'little') < 40:  # old BITMAPCOREHEADER
+    return(None)
+  bits = int.from_bytes(data[28:30], 'little')
+  compression = int.from_bytes(data[30:34], 'little')
+  if bits not in BMP_PASS_DEPTHS or compression:  # only BI_RGB is safe
+    return(None)
+  xdim = int.from_bytes(data[18:22], 'little', signed=True)
+  ydim = int.from_bytes(data[22:26], 'little', signed=True)
+  return((abs(xdim), abs(ydim)))  # negative ydim = top-down BMP
+
+def do_reduction(image, x, y):
+  if image is None:
+    raise ValueError('do_reduction() got None instead of an image (decode failed)')
+  xin = image.shape[1]
+  yin = image.shape[0]
+  if needs_reduction(xin, yin, x, y):
+    if (x / xin) > (y / yin):
+      scale = x / xin
+    else:
+      scale = y / yin
+    return(cv.resize(image, (round(xin * scale), round(yin * scale))))
+  else:
+    return(image)
+
+def reduce_image(infile, outfile, x=0, y=0, crypt=None):
+  if outfile is None:
+    outfile = infile
+  if crypt:
+    with open(infile, "rb") as f:
+      myimage = f.read()
+    myimage = crypt.decrypt(myimage)
+    myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  else:
+    myimage = cv.imread(infile)
+  myimage = do_reduction(myimage, x, y)
+  cv.imwrite(outfile, myimage)
+
+def decode_reduce_encode(data, x, y, infile):
+  # Blocking part of reduce_image_async(): decode -> resize -> encode.
+  # Kept in one function so a single to_thread() hop covers all of it.
+  frame = cv.imdecode(np.frombuffer(data, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  if frame is None:
+    # Decode failed: missing/truncated file or crypt flag mismatch
+    raise ValueError('reduce_image_async() could not decode: ' + str(infile))
+  frame = do_reduction(frame, x, y)
+  return(cv.imencode('.bmp', frame)[1].tobytes())
+
 async def reduce_image_async(infile, outfile, x=0, y=0, crypt=None):
   if outfile is None:
     outfile = infile
   async with aiofiles.open(infile, mode="rb") as f:
     myimage = await f.read()
   if crypt:
-    myimage = crypt.decrypt(myimage)
-  myimage = cv.imdecode(np.frombuffer(myimage, dtype=np.uint8), cv.IMREAD_UNCHANGED)
-  if myimage is None:
-    # Decode failed: missing/truncated file or crypt flag mismatch
-    raise ValueError('reduce_image_async() could not decode: ' + str(infile))
-  myimage = do_reduction(myimage, x, y) 
-  myimage = cv.imencode('.bmp', myimage)[1].tobytes()
+    # AES over a whole image is CPU work as well -> off the event loop.
+    myimage = await asyncio.to_thread(crypt.decrypt, myimage)
+  # Fast path: input is a plain BMP and already small enough. The header
+  # parse costs microseconds, so it stays inline - no thread hop needed.
+  dims = bmp_header_info(myimage)
+  if dims is None or needs_reduction(dims[0], dims[1], x, y):
+    myimage = await asyncio.to_thread(decode_reduce_encode, myimage, x, y, infile)
+  elif outfile == infile and crypt is None:
+    return()  # source file is already the result, nothing to do
   async with aiofiles.open(outfile, mode="wb") as f:
     await f.write(myimage)
   

@@ -606,16 +606,15 @@ function initUI() {
     };  
 	});
 	$('#imagespace').dblclick((evt) => {
-		if($('#ch_edit').prop('checked')) {
-      const rect = $('#imagespace')[0].getBoundingClientRect();
-      const x = evt.clientX - rect.left;
-      const y = evt.clientY - rect.top;
-		  oneitemSocket.sendandwait({
-			  'command' : 'dblclick',
-        'x': Math.floor(x),
-        'y': Math.floor(y),
-		  })
-		};
+    const rect = $('#imagespace')[0].getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+	  oneitemSocket.sendandwait({
+		  'command' : 'dblclick',
+		  'edit_mode' : $('#ch_edit').prop('checked'),
+      'x': Math.floor(x),
+      'y': Math.floor(y),
+	  })
 	});
 	$('#collapseTwo').on('shown.bs.collapse', function () {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });

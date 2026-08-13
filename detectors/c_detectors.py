@@ -146,7 +146,7 @@ class det_worker(mp_process):
                 pass
         else:
           self.logger.warning( 
-              f'CA{self.id}: Unknown key in Inqueue: {received[0]}'
+              f'DE{self.id}: Unknown key in Inqueue: {received[0]}'
           ) 
     except Exception as fatal:
       self.logger.error('Error in process: ' 

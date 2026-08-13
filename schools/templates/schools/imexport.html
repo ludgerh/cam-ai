@@ -23,16 +23,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
             data-bs-target="#panels-collapseOne" 
             aria-expanded="false" 
             aria-controls="panels-collapseOne">
-          <h4>Import Jpegs</h4>
+          <h4>Import Frames (.BMP or .JPG)</h4>
         </button>
       </h2>
       <div id="panels-collapseOne" class="accordion-collapse collapse" 
           aria-labelledby="panels-headingOne">
         <div class="accordion-body">
           <div class="h2 m-2">
-          Please upload files in .JPG format, compressed as ZIP. 
-          If you are uploading multiple files, please compress them into a single .ZIP folder. 
-          Ensure the .ZIP contains only image files and does not include any subfolders.
+          Please upload files in .JPG  or .BMP format, compressed as ZIP. 
+          Ensure the .ZIP contains only image files.
           </div>
           <form method="post" enctype="multipart/form-data">
             {% csrf_token %}

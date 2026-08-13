@@ -17,7 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 import os
 import threading
 from time import time
-from shutil import rmtree
+from shutil import rmtree, copyfileobj
 from glob import glob
 from ua_parser import user_agent_parser
 from pathlib import Path
@@ -108,7 +108,39 @@ def classroom(request, streamnr):
     return(HttpResponse(template.render(context)))
   else:
     return(HttpResponse('No Access'))
-
+    
+def unpack_flat(zip_path, target_dir):
+  # Extracts all files of a zip archive into target_dir, ignoring the
+  # directory structure inside the archive. Directories themselves are
+  # not created. Returns the number of extracted files.
+  count = 0
+  used_names = set()
+  with ZipFile(zip_path, 'r') as zip_ref:
+    for info in zip_ref.infolist():
+      if info.is_dir():
+        continue
+      # Some packers use backslashes, normalise before taking basename:
+      basename = os.path.basename(info.filename.replace('\\', '/'))
+      if not basename:
+        continue
+      # Skip macOS resource forks and metadata:
+      if info.filename.startswith('__MACOSX/') or basename == '.DS_Store':
+        continue
+      # Files from different subdirs may share the same name,
+      # so make the target name unique:
+      stem, ext = os.path.splitext(basename)
+      outname = basename
+      counter = 1
+      while outname.lower() in used_names:
+        outname = stem + '_' + str(counter) + ext
+        counter += 1
+      used_names.add(outname.lower())
+      with zip_ref.open(info) as source, \
+          open(os.path.join(target_dir, outname), 'wb') as target:
+        copyfileobj(source, target)
+      count += 1
+  return(count)
+  
 @login_required
 def imexport(request, schoolnr):
   context = {
@@ -116,19 +148,19 @@ def imexport(request, schoolnr):
     'school' : schoolnr,
   }
   if request.method == 'POST' and request.FILES['file']:
-    
     uploaded_file = request.FILES['file']
     fs = FileSystemStorage(location='temp/upload')
     filename = fs.save(uploaded_file.name, uploaded_file)
     file_path = fs.path(filename)
-    if os.path.exists('temp/unpack/' + filename):
-      rmtree('temp/unpack/' + filename)
-    os.makedirs('temp/unpack/' + filename)
-    with ZipFile(file_path, 'r') as zip_ref:
-      zip_ref.extractall('temp/unpack/' + filename) 
-    zipresult = glob('temp/unpack/' + filename + '/*')
+    unpackdir = 'temp/unpack/' + filename
+    if os.path.exists(unpackdir):
+      rmtree(unpackdir)
+    os.makedirs(unpackdir)
+    # Flat unpacking: files from subdirectories end up in unpackdir as well,
+    # the subdirectories themselves are not created:
+    file_number = unpack_flat(file_path, unpackdir)
     os.remove(file_path)
-    context['file_number'] = len(zipresult)
+    context['file_number'] = file_number
     context['file_name'] = uploaded_file.name
     return render(request, 'schools/upload_success.html', context)
   else:

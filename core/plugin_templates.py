@@ -64,6 +64,14 @@ class det_plugin(temp_plugin):
     shared_mem.write_1_meta('scaledown', 0)
     shared_mem.write_1_meta('mode_code', dbline.det_mode_code.encode('utf-8'))
     
+  def _get_kernel(self, radius):
+    kernel = self._kernel_cache.get(radius)
+    if kernel is None:
+      size = radius * 2 + 1
+      kernel = cv.getStructuringElement(cv.MORPH_RECT, (size, size))
+      self._kernel_cache[radius] = kernel
+    return kernel
+    
   async def async_init(self, my_detector):
     self.my_detector = my_detector
     self.speed_factor = 1.0
@@ -75,6 +83,7 @@ class det_plugin(temp_plugin):
     self.div_ts = 0.0
     self.div_old = 1.0
     self.ts_background = time()
+    self._kernel_cache = {}
   
   def set_speed_factor(self, value):
     if value != self.speed_factor:
@@ -131,10 +140,8 @@ class det_plugin(temp_plugin):
         and frame.shape[:2] == mask.shape[:2]): 
       frame = cv.bitwise_and(frame, mask)
     if last_frame is None:
-      print('last_frame = frame.copy()')
       last_frame = frame.copy()
     if background is None: 
-      print('background = np.float32(last_frame)')
       background = np.float32(last_frame)   
     frame_unmodified = frame.copy() 
     total_diff = np.max(cv.absdiff(last_frame, frame), axis=2)
@@ -142,15 +149,13 @@ class det_plugin(temp_plugin):
       return((frame, last_frame, background, []))
     _, thresh = cv.threshold(total_diff, threshold, 255, cv.THRESH_BINARY)
     if erosion:
-        kernel = np.ones((erosion*2+1, erosion*2+1), np.uint8)
-        eroded = cv.erode(thresh, kernel, iterations=1)
+      eroded = cv.erode(thresh, self._get_kernel(erosion))
     else:
-        eroded = thresh
+      eroded = thresh
     if dilation:
-        kernel = np.ones((dilation*2+1, dilation*2+1), np.uint8)
-        dilated = cv.dilate(eroded, kernel, iterations=1)
+      dilated = cv.dilate(eroded, self._get_kernel(dilation))
     else:
-        dilated = eroded
+      dilated = eroded
     background_mask = cv.bitwise_not(dilated)
     zeros = np.zeros_like(thresh)
     frame_bgr = cv.merge([thresh, zeros, thresh]) 

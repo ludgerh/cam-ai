@@ -280,105 +280,121 @@ class trainer(spawn_process):
           pass
 
   async def job_queue_thread(self):
+    from globals.c_globals import trainers
+    from tf_workers.models import school
+    from .models import trainframe, fit
     try:
-      from globals.c_globals import trainers
-      from tf_workers.models import school
-      from .models import trainframe, fit
-      if self.id == 1:  
+      if self.id == 1:
         schoollines = await sync_to_async(list)(school.objects.filter(
-          active=True, 
-          delegation_level = 1, 
+          active = True,
+          delegation_level = 1,
         ))
-        for s_item in schoollines: 
+        for s_item in schoollines:
           trainers_redis.set_predict_proc_active(s_item.id, False)
           trainers_redis.set_predict_proc_started(s_item.id, False)
-        self.glob_lock.release()    
+        self.glob_lock.release()
       while not self.got_sigint:
-        schoollines = await sync_to_async(list)(school.objects.filter(active=True))
+        schoollines = await sync_to_async(list)(school.objects.filter(active = True))
         if trainers_redis.get_check_proc_started():
           await a_break_time(10.0)
         else:
           trainers_redis.set_check_proc_started(True)
-          for s_item in schoollines:
-            await s_item.arefresh_from_db()
-            if s_item.delegation_level == 1:
-              asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
-            if s_item.id in self.school_cache:
-              school_change = (
-                await sync_to_async(model_to_dict)(s_item) != self.school_cache[s_item.id]
-              )
-              self.school_cache[s_item.id] = model_to_dict(
-                s_item,
-                exclude=['trainers', ]
-              )
-              #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
-            else:
-              school_change = True
-              self.school_cache[s_item.id] = model_to_dict(
-                s_item,
-                exclude=['trainers', ]
-              )
-              #self.school_cache[s_item.id] = await sync_to_async(model_to_dict)(s_item)
-            if s_item.id in self.frames_cache:
-              frames_change = (
-                trainers_redis.get_last_frame(s_item.id) != self.frames_cache[s_item.id]
-              )
-              self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
-            else:
-              frames_change = True
-              self.frames_cache[s_item.id] = trainers_redis.get_last_frame(s_item.id)
-            if not (school_change or frames_change):
-              await a_break_type(BR_LONG)
-              continue
-            for t_item in trainers:
-              if s_item.id in trainers[t_item].getqueueinfo():
-                self.logger.warning(
-                  f'TR{self.id}: School #{s_item.id} not inserted into Trainer Queue '
-                  + 'because already in.'
-                )  
-                self.school_cache[s_item.id] = model_to_dict(s_item)
+          try:
+            for s_item in schoollines:
+              await s_item.arefresh_from_db()
+              if s_item.delegation_level == 1:
+                asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
+
+              # --- change detection -------------------------------------------------
+              # model_to_dict() with exclude=['trainers'] touches concrete fields
+              # only (attribute access, no DB query), so it is safe to call
+              # synchronously in async context and cheap enough per pass.
+              new_school_dict = model_to_dict(s_item, exclude = ['trainers', ])
+              school_change = (new_school_dict != self.school_cache.get(s_item.id))
+              self.school_cache[s_item.id] = new_school_dict
+              new_last_frame = trainers_redis.get_last_frame(s_item.id)
+              frames_change = (new_last_frame != self.frames_cache.get(s_item.id))
+              self.frames_cache[s_item.id] = new_last_frame
+
+              # A pending request in the m2m field is invisible to the dict above
+              # (it is excluded), so it must be queried explicitly BEFORE the gate.
+              has_trainer_request = await s_item.trainers.filter(id = self.id).aexists()
+
+              if not (school_change or frames_change or has_trainer_request):
+                # Nothing to do for this school: yield to the event loop and
+                # move on. No fixed sleep penalty per school.
+                await asyncio.sleep(0)
                 continue
-            filterdict = {
-              'school' : s_item.id,
-              'train_status' : 0,}
-            if not s_item.ignore_checked:
-              filterdict['checked'] = True
-            undone_qs = trainframe.objects.filter(**filterdict)
-            if await s_item.trainers.filter(id=self.id).aexists():
-              run_condition = await trainframe.objects.filter(school=s_item.id).aexists()
-              if not run_condition:
-                self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
-              await sync_to_async(s_item.trainers.remove)(self.dbline)
-            else:
-              run_condition = (
-                await undone_qs.acount() >= s_item.trigger
-                and not s_item.id in self.job_queue_list
-                and s_item.delegation_level == 1
-              )
-            if run_condition:
-              await undone_qs.aupdate(train_status=1)
-              myfit = fit(
-                made=timezone.now(), 
-                school = s_item.id, 
-                model_image_augmentation = s_item.model_image_augmentation,
-                model_gamma = s_item.model_gamma,
-                model_finetuning = s_item.model_finetuning,
-                status = 'Waiting',
-              )
-              await myfit.asave() 
-              with self.mylock:
-                self.job_queue_list.append(s_item.id)
-              trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
-              await self.job_queue.put((s_item, myfit)) 
-            #await a_break_time(10.0)
-          trainers_redis.set_check_proc_started(False)
+
+              # --- skip schools that are already queued on any trainer --------------
+              already_queued = False
+              for t_item in trainers:
+                queue_info = trainers[t_item].getqueueinfo() or []
+                if s_item.id in queue_info:
+                  already_queued = True
+                  break
+              if already_queued:
+                self.logger.warning(
+                  f'TR{self.id}: School #{s_item.id} not inserted into trainer queue '
+                  + 'because already in.'
+                )
+                continue
+
+              # --- build run condition ----------------------------------------------
+              filterdict = {
+                'school' : s_item.id,
+                'train_status' : 0,
+              }
+              if not s_item.ignore_checked:
+                filterdict['checked'] = True
+              undone_qs = trainframe.objects.filter(**filterdict)
+              if has_trainer_request:
+                run_condition = await trainframe.objects.filter(
+                  school = s_item.id,
+                ).aexists()
+                if not run_condition:
+                  self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
+                # Consume the request in any case, otherwise it would fire again
+                # on every pass.
+                await sync_to_async(s_item.trainers.remove)(self.dbline)
+              else:
+                run_condition = (
+                  await undone_qs.acount() >= s_item.trigger
+                  and s_item.id not in self.job_queue_list
+                  and s_item.delegation_level == 1
+                )
+
+              # --- insert job -------------------------------------------------------
+              if run_condition:
+                await undone_qs.aupdate(train_status = 1)
+                myfit = fit(
+                  made = timezone.now(),
+                  school = s_item.id,
+                  model_image_augmentation = s_item.model_image_augmentation,
+                  model_gamma = s_item.model_gamma,
+                  model_finetuning = s_item.model_finetuning,
+                  status = 'Waiting',
+                )
+                await myfit.asave()
+                with self.mylock:
+                  self.job_queue_list.append(s_item.id)
+                trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
+                await self.job_queue.put((s_item, myfit))
+          finally:
+            # Always release the global scan flag, even on exception or
+            # cancellation. Without this, one crash freezes ALL trainers.
+            trainers_redis.set_check_proc_started(False)
         try:
           await a_break_time(10.0)
-        except  asyncio.exceptions.CancelledError:
+        except asyncio.exceptions.CancelledError:
           return()
+    except asyncio.exceptions.CancelledError:
+      # Normal shutdown path (async_runner cancels this task in its finally
+      # block). Do not log this as a crash.
+      raise
     except Exception as fatal:
-      self.logger.error('Error in process: ' 
-        + self.logname 
+      self.logger.error('Error in process: '
+        + self.logname
         + ' - ' + str(self.id)
       )
       self.logger.critical("job_queue_thread crashed: %s", fatal, exc_info=True)

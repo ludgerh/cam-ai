@@ -1,5 +1,6 @@
 {% extends 'schools/basis.html' %}
 {% comment %}
+schools/templates/schools/upload_success.htm
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -24,6 +25,7 @@ Which label would you like to attach?
   <option value="0">None...</option>
 </select>  
 <button class="btn btn-primary m-2 import_button" type="button">Start Import</button>
+<div class="h4 m-2" id="import_status"></div>
 </main>
 
 <script>
@@ -56,14 +58,35 @@ $(document).ready(function() {
         text: item,
       }));
 		});
-	  $('.import_button').click(function() {
-	    SchoolDBUtilSocket.sendandwait({
-			  'command' : 'importimages',
-			  'school' : {{ school }},
-			  'tag' : $('#myselect').val() - 1,
-			  'filesdir' : '{{ file_name }}',
-		  })
-	  });
+		
+		
+		$('.import_button').click(function() {
+      // Keep a reference to the button, "this" is the DOM element here
+      const button = $(this);
+      // Show the yellow ring immediately after the click// Show the yellow ring immediately after the click
+      button.css({
+        'outline' : '3px solid #ffc107',
+        'outline-offset' : '2px',
+      });
+      $('#import_status').text('');    // Clear result of a previous run
+      SchoolDBUtilSocket.sendandwait({
+        'command' : 'importimages',
+        'school' : {{ school }},
+        'tag' : $('#myselect').val() - 1,
+        'filesdir' : '{{ file_name }}',
+      })
+      .then((result) => {
+        if (result === 'OK') {
+          button.css('outline', '');   // Removes the inline rule again
+          button.prop('disabled', false);
+          $('#import_status').text('Done!');   // b) Show the message
+        }
+      });
+    });
+		  
+		  
+		  
+		  
 	});
 });
 })();
