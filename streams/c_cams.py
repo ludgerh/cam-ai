@@ -28,6 +28,7 @@ import socket
 import json
 import signal
 import select
+import random
 #from pprint import pprint
 from multiprocessing import Process as mp_process, SimpleQueue as s_queue
 from aiopath import AsyncPath
@@ -68,12 +69,9 @@ _SH_MEM_ITEMS = {
   'apply_mask' : 'i',
   'apply_pause' : 'i',
   'x_canvas' : 'i', #x_canvas_max
-  'ovl_item' : 'i',
   'ovl_xpos' : 'i',
-  'ovl_ypos' : 'i',
-  'ovl_rot' : 'd',
-  'ovl_scale' : 'd',
-  
+  'ovl_ypos' : 'i',  
+  'ovl_active' : 'i',
 }
 
 class c_cam():
@@ -108,7 +106,7 @@ class c_cam():
     self.shared_mem.write_1_meta('fps_limit', dbline.cam_fpslimit)
     self.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
     self.shared_mem.write_1_meta('apply_pause', dbline.cam_pause)
-    self.shared_mem.write_1_meta('ovl_item', -1)
+    self.shared_mem.write_1_meta('ovl_active', -2)
     self.viewer.drawpad.set_xy((dbline.cam_xres, dbline.cam_yres))
     self.viewer.drawpad.positive_mask = dbline.cam_positive_mask
     self.viewer.drawpad.load_ringlist()
@@ -121,15 +119,13 @@ class c_cam():
     self.viewer.inqueue.start_data_loop()
   
   async def dblclickhandler(self, x, y):
-    if self.shared_mem.read_1_meta('ovl_item') == -1:
-      self.shared_mem.write_1_meta('ovl_rot', 0.0)
-      self.shared_mem.write_1_meta('ovl_scale', 1.0)
-      self.shared_mem.write_1_meta('ovl_item', 0)
+    if self.shared_mem.read_1_meta('ovl_active') == -2:
+      self.shared_mem.write_1_meta('ovl_active', -1)
       self.shared_mem.write_1_meta('ovl_xpos', x)
       self.shared_mem.write_1_meta('ovl_ypos', y)
       print('dblclickhandler', x, y, 'On') 
     else: 
-      self.shared_mem.write_1_meta('ovl_item', -1) 
+      self.shared_mem.write_1_meta('ovl_active', -2)
       print('dblclickhandler', x, y, 'Off') 
   
   async def stop(self):
@@ -191,23 +187,32 @@ class cam_worker(mp_process):
     except FileNotFoundError:
       # self.ovl_list = [] is enough
       self.logger.warning('Directory does not exist: %s', dirpath)
-    print('***** Overlays:', [(item['name'], item['width'], item['height'])
-      for item in self.ovl_list])
+    #print('***** Overlays:', [(item['name'], item['width'], item['height'])
+    #  for item in self.ovl_list])
       
   def apply_overlay(self, frame):
     if self.ovl_list:
+      if self.shared_mem.read_1_meta('ovl_active') == -1:
+        self.shared_mem.write_1_meta('ovl_active', random.randrange(len(self.ovl_list)))
+      # x and y denote the center of the overlay
       x, y = (self.shared_mem.read_1_meta('ovl_xpos'),
         self.shared_mem.read_1_meta('ovl_ypos'))
-      # for now: always use the first overlay from the list
-      ovl = self.ovl_list[0]
+      ovl = self.ovl_list[self.shared_mem.read_1_meta('ovl_active')]
       h, w = (ovl['height'], ovl['width'])
+      # convert center coordinates to top left corner
+      x0 = x - w // 2
+      y0 = y - h // 2
       # clip against frame borders so a bad position cannot crash the loop
-      if x < 0 or y < 0 or x + w > frame.shape[1] or y + h > frame.shape[0]:
+      if (x0 < 0 or y0 < 0
+          or x0 + w > frame.shape[1] or y0 + h > frame.shape[0]):
         return(frame)
-      roi = frame[y:y+h, x:x+w]
+      roi = frame[y0:y0+h, x0:x0+w]
       # boolean fancy indexing copies only the opaque pixels, no blending
       roi[ovl['mask']] = ovl['bgr'][ovl['mask']]
     return(frame)
+    
+  def hide_overlay(self): 
+    self.active_ovl = -1 
 
   async def in_queue_thread(self):
     try:
@@ -397,7 +402,8 @@ class cam_worker(mp_process):
         if self.got_sigint:
           break 
         if frameline: 
-          if self.shared_mem.read_1_meta('ovl_item') > -1: 
+        
+          if self.shared_mem.read_1_meta('ovl_active') > -2:
             self.apply_overlay(frameline[1])
           xmin = self.shared_mem.read_1_meta('aoi_xmin')
           xmax = self.shared_mem.read_1_meta('aoi_xmax')

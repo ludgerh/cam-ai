@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-Original path: tools/template/tools/addschool.html
+tools/templates/tools/addschool.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -96,119 +96,172 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     </main>  
     <script>
 
-    $(document).ready(function() {
-      (async () => {
-        const aadmintoolsSocket = await WSAsync(
-          ws_scheme + '//'
-          + window.location.host
-          + '/ws/aadmintools/'
-        ); 
-        const upload_socket = new WebSocket(ws_scheme + '//'
-          + window.location.host
-          + '/ws/uploads/')
-        const CHUNK_SIZE = 1024 * 1024;
-        const make_school = async (name) => {
-          const result = await aadmintoolsSocket.sendandwait({
-            'command' : 'makeschool',
-            'name' : name,
-            'delegation_level' : 1,
-          });
-          return(result);
-        };
-        $('#upload-form').on('submit', async function (e) {
-          e.preventDefault();
-          const fileInput = document.getElementById('fileselector');
-          const file = fileInput.files[0];
-          if (!file) return;
-          $('#upload-btn').prop('disabled', true);
-          $('#upload-status').text('Starting upload...');
-          upload_socket.send(JSON.stringify({
-            command: 'upload_start',
-            filename: file.name,
-            size: file.size,
-          }));
-          let result = JSON.parse(await nextMessage(upload_socket));
-          if (!result || result.status !== 'OK') {
-            $('#upload-status').text('Error during upload_start: ' 
-              + (result && result.message ? result.message : ''));
-            return;
-          } 
-          upload_socket.onmessage = async function(e) {
-            result = e.data;
-            if (result == 'Done!'){
-              upload_socket.onmessage = null;
-              upload_socket.send(JSON.stringify({
-                command: 'upload_finish',
-                filename: file.name,
-              }));
-              result = JSON.parse(await nextMessage(upload_socket));
-              if (result && result.status === 'OK') {
-                $('#import-form input[name="file_name"]').val(file.name);
-                $('#phase0').addClass('d-none');
-                $('#phase1').removeClass('d-none');
-              } else {
-                $('#upload-status').text('Error during upload_finish: ' 
-                  + (result && result.message ? result.message : ''));
-              }
-            } else {
-              $('#upload-status').text('Upload: ' + result);
-            };
-          };  
-          let offset = 0;
-          while (offset < file.size) {
-            const slice = file.slice(offset, offset + CHUNK_SIZE);
-            const buffer = await slice.arrayBuffer();
-            upload_socket.send(buffer);
-            offset += CHUNK_SIZE;
-          };
-        });
-        $('#import-form').on('submit', async function (e) {
-          e.preventDefault();
-          const form = this;
-          const $btn = $('#import-btn');
-          try {
-            $btn.prop('disabled', true);
-            $('#line2').removeClass('d-none');
-            $('#import-btn').prop('disabled', true);
-            const result = await make_school('temp123school456name789magic');
-            $('#import-form input[name="status"]').val(result.status);
-            form.submit();
-          } catch (err) {
-            console.error(err);
-          } finally {
-            $btn.prop('disabled', false);
-          }
-        });
-        $('.make-button').on('click', async function () {
-          const $btn = $(this);
-          try {
-            $btn.prop('disabled', true);
-            const result = await make_school($('#schoolname').val());
-            if (result.status == 'OK'){
-              $('#status').html('&#10003;');
-            };
-            if (result.status == 'noauth'){
-              $('#status').text(
-                'Error: No valid login on on this server: ' + result.domain);
-            };
-            if (result.status == 'nomoreschools'){
-              $('#status').text(
-                'Error: Maximum number of schools reached on this server: ' 
-                + result.domain);
-            };
-            if (result.status == 'nomorequota'){
-              $('#status').text(
-                'Error: No more volume quota on this server: ' + result.domain);
-            };
-          } catch (err) {
-            console.error(err);
-            $('#status').text('Request failed.');
-          } finally {
-            $btn.prop('disabled', false);
-          }
-        })
-      })()
+(function() {
+let aadmintoolsSocket;
+const ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let upload_socket;
+const CHUNK_SIZE = 1024 * 1024;
+
+// Create a new school on the linked CAM-AI server
+const make_school = (async (name) => {
+  const result = await aadmintoolsSocket.sendandwait({
+    'command' : 'makeschool',
+    'name' : name,
+    'delegation_level' : 1,
+  });
+  return(result);
+});
+
+// Turn the streaming progress messages of the upload consumer into a promise.
+// It resolves as soon as the consumer signals 'Done!', all other messages are
+// treated as progress information.
+const wait_for_upload = ((socket) => {
+  return(new Promise((resolve, reject) => {
+    socket.onmessage = ((e) => {
+      if (e.data == 'Done!') {
+        socket.onmessage = null;
+        resolve();
+      } else {
+        $('#upload-status').text('Upload: ' + e.data);
+      };
     });
+    socket.onerror = (() => {
+      socket.onmessage = null;
+      reject(new Error('Upload socket error'));
+    });
+  }));
+});
+
+// Promise wrapper around the jQuery ready event. Written by hand instead of
+// relying on $.ready, so it stays independent of the jQuery version.
+const document_ready = (() => {
+  return(new Promise((resolve) => {
+    $(document).ready(resolve);
+  }));
+});
+
+const main = (async () => {
+  // The sockets do not need the DOM, so connecting and waiting for the
+  // ready event can happen in parallel
+  const dom_ready = document_ready();
+  aadmintoolsSocket = await WSAsync(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/aadmintools/'
+  );
+  // Wait for the open event instead of using the socket right away
+  upload_socket = await createWebSocket(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/uploads/'
+  );
+  upload_socket.onclose = function(e) {
+    console.log('Upload-Socket closed');
+  };
+  // Everything below touches the DOM
+  await dom_ready;
+  $('#upload-form').on('submit', async function(e) {
+    e.preventDefault();
+    const file = document.getElementById('fileselector').files[0];
+    if (!file) {
+      return;
+    };
+    $('#upload-btn').prop('disabled', true);
+    $('#upload-status').text('Starting upload...');
+    try {
+      upload_socket.send(JSON.stringify({
+        command : 'upload_start',
+        filename : file.name,
+        size : file.size,
+      }));
+      let result = JSON.parse(await nextMessage(upload_socket));
+      if (!result || result.status !== 'OK') {
+        $('#upload-status').text('Error during upload_start: ' 
+          + (result && result.message ? result.message : ''));
+        return;
+      };
+      // Arm the progress handler before the first chunk leaves, so no
+      // message can get lost between sending and listening
+      const upload_done = wait_for_upload(upload_socket);
+      let offset = 0;
+      while (offset < file.size) {
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        upload_socket.send(await slice.arrayBuffer());
+        offset += CHUNK_SIZE;
+      };
+      await upload_done;
+      upload_socket.send(JSON.stringify({
+        command : 'upload_finish',
+        filename : file.name,
+      }));
+      result = JSON.parse(await nextMessage(upload_socket));
+      if (result && result.status === 'OK') {
+        $('#import-form input[name="file_name"]').val(file.name);
+        $('#phase0').addClass('d-none');
+        $('#phase1').removeClass('d-none');
+      } else {
+        $('#upload-status').text('Error during upload_finish: ' 
+          + (result && result.message ? result.message : ''));
+      };
+    } catch (err) {
+      console.error(err);
+      $('#upload-status').text('Upload failed.');
+    } finally {
+      $('#upload-btn').prop('disabled', false);
+    };
+  });
+  $('#import-form').on('submit', async function(e) {
+    e.preventDefault();
+    const form = this;
+    try {
+      $('#import-btn').prop('disabled', true);
+      $('#line2').removeClass('d-none');
+      const result = await make_school('temp123school456name789magic');
+      $('#import-form input[name="status"]').val(result.status);
+      form.submit();
+    } catch (err) {
+      console.error(err);
+      $('#line2').addClass('d-none');
+      $('#import-btn').prop('disabled', false);
+    };
+  });
+  $('.make-button').on('click', async function() {
+    const $btn = $(this);
+    try {
+      $btn.prop('disabled', true);
+      const result = await make_school($('#schoolname').val());
+      if (result.status == 'OK') {
+        $('#status').html('&#10003;');
+      };
+      if (result.status == 'noauth') {
+        $('#status').text(
+          'Error: No valid login on this server: ' + result.domain);
+      };
+      if (result.status == 'nomoreschools') {
+        $('#status').text(
+          'Error: Maximum number of schools reached on this server: ' 
+          + result.domain);
+      };
+      if (result.status == 'nomorequota') {
+        $('#status').text(
+          'Error: No more volume quota on this server: ' + result.domain);
+      };
+    } catch (err) {
+      console.error(err);
+      $('#status').text('Request failed.');
+    } finally {
+      $btn.prop('disabled', false);
+    };
+  });
+});
+
+main()
+.catch((err) => {
+  console.error(err);
+});
+
+})();
+
     </script>
   {% else %}
     <main>

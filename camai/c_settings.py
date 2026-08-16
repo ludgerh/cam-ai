@@ -69,10 +69,11 @@ def safe_import(item, default=None, logger=None):
         result = None  
     else:    
       result = default
-    if logger is None:
-      print('!!!!! Missing setting in passwords.py: ' + item + ' - Using default: ' 
-        + str(result))
-    else:
-      logger.warning('!!!!! Missing setting in passwords.py: ' + item 
-        + ' - Using default: ' + str(result))
+    if item != 'httpport':
+      if logger is None:
+        print('!!!!! Missing setting in passwords.py: ' + item + ' - Using default: ' 
+          + str(result))
+      else:
+        logger.warning('!!!!! Missing setting in passwords.py: ' + item 
+          + ' - Using default: ' + str(result))
   return(result)

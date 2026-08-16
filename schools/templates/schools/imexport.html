@@ -1,5 +1,6 @@
 {% extends 'schools/basis.html' %}
 {% comment %}
+schools/templates/schools/imexport.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -16,18 +17,42 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
 {% block content %}
 <main>
-  <div class="accordion">
+  <div class="accordion" id="phase0">
     <div class="accordion-item" id="accordionitem1">
       <h2 class="accordion-header" id="panels-headingOne">
         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
             data-bs-target="#panels-collapseOne" 
             aria-expanded="false" 
             aria-controls="panels-collapseOne">
-          <h4>Import Frames (.BMP or .JPG)</h4>
+          <h4>Import complete school from Backup</h4>
         </button>
       </h2>
       <div id="panels-collapseOne" class="accordion-collapse collapse" 
           aria-labelledby="panels-headingOne">
+        <div class="accordion-body">
+          <div class="h2 m-2">
+          Please upload a valid CAM-AI school backup.
+          </div>
+          <form class="h2" id="upload-form">
+            {% csrf_token %}
+            <input id="fileselector" type="file" name="myfile" required>
+            <button id="upload-btn" type="submit">Upload</button>
+          </form>
+          <div class="h2" id="upload-status"></div>
+        </div>
+      </div>
+    </div>
+    <div class="accordion-item" id="accordionitem2">
+      <h2 class="accordion-header" id="panels-headingTwo">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+            data-bs-target="#panels-collapseTwo" 
+            aria-expanded="false" 
+            aria-controls="panels-collapseTwo">
+          <h4>Import Frames (.BMP or .JPG)</h4>
+        </button>
+      </h2>
+      <div id="panels-collapseTwo" class="accordion-collapse collapse" 
+          aria-labelledby="panels-headingTwo">
         <div class="accordion-body">
           <div class="h2 m-2">
           Please upload files in .JPG  or .BMP format, compressed as ZIP. 
@@ -45,16 +70,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         </div>
       </div>
     </div>
-    <div class="accordion-item" id="accordionitem2">
-      <h2 class="accordion-header" id="panels-headingTwo">
+    <div class="accordion-item" id="accordionitem3">
+      <h2 class="accordion-header" id="panels-headingThree">
         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-            data-bs-target="#panels-collapseTwo" aria-expanded="false" 
-            aria-controls="panels-collapseTwo">
+            data-bs-target="#panels-collapseThree" aria-expanded="false" 
+            aria-controls="panels-collapseThree">
           <h4>Export this school</h4>
         </button>
       </h2>
-      <div id="panels-collapseTwo" class="accordion-collapse collapse" 
-          aria-labelledby="panels-headingTwo">
+      <div id="panels-collapseThree" class="accordion-collapse collapse" 
+          aria-labelledby="panels-headingThree">
         <div class="accordion-body">
           <div class="h2">
             We are going to zip your school for you. Do you want to proceed?
@@ -68,47 +93,169 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
       </div>
     </div>
   </div>
+  <div id="phase1" class="d-none">
+    <div class="h2">
+      We received the ZIP File. Select what you want to import:<BR>
+    </div> 
+    <form class="h2" action="{% url 'tools:process_restore' %}" 
+        id="import-form" method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="job_type" value="addition">
+      <input type="hidden" name="file_name" value="?">
+      <input type="hidden" name="school_nr" value={{ school }}>
+      <input type="hidden" name="status" value="OK">
+      Important: Only click import, if you know what you are doing.<BR>
+      The process will create a new school on your server!
+      <button id="import-btn" type="submit">Import</button>
+    </form>
+    <div class="h2 d-none" id="line2">
+      Processing the upload. Please wait...
+    </div>  
+  </div>  
 </main>
 
 <script>
 
 (function() {
 let tools_asyncSocket;
-let ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+const ws_scheme = window.location.protocol == "https:" ? "wss:" : "ws:";
+let upload_socket;
+const CHUNK_SIZE = 1024 * 1024;
 
-$(document).ready(function() {
-  $("#importButton").click(function() {
-    $('#please_wait').removeClass("d-none");
-  });
-  WSAsync(
+// Turn the streaming progress messages of the upload consumer into a promise.
+// It resolves as soon as the consumer signals 'Done!', all other messages are
+// treated as progress information.
+const wait_for_upload = ((socket) => {
+  return(new Promise((resolve, reject) => {
+    socket.onmessage = ((e) => {
+      if (e.data == 'Done!') {
+        socket.onmessage = null;
+        resolve();
+      } else {
+        $('#upload-status').text('Upload: ' + e.data);
+      };
+    });
+    socket.onerror = (() => {
+      socket.onmessage = null;
+      reject(new Error('Upload socket error'));
+    });
+  }));
+});
+
+// Promise wrapper around the jQuery ready event. Written by hand instead of
+// relying on $.ready, so it stays independent of the jQuery version.
+const document_ready = (() => {
+  return(new Promise((resolve) => {
+    $(document).ready(resolve);
+  }));
+});
+
+const main = (async () => {
+  // The socket does not need the DOM, so connecting and waiting for the
+  // ready event can happen in parallel
+  const dom_ready = document_ready();
+  tools_asyncSocket = await WSAsync(
     ws_scheme + '//'
     + window.location.host
     + '/ws/aadmintools/'
-  )
-  .then((result) => {
-    tools_asyncSocket = result;
-    $('#continue-button').click(function() {
-      $('#continue-button').prop('disabled', true);
-      $('#line2').removeClass("d-none");
-      $('#line3').removeClass("d-none");
-      mycallback = function (param) {
-        result = JSON.parse(param)
-        $('#line3').text(result.data);
-      }
-      tools_asyncSocket.sendandwait({
+  );
+  // Wait for the open event instead of using the socket right away
+  upload_socket = await createWebSocket(
+    ws_scheme + '//'
+    + window.location.host
+    + '/ws/uploads/'
+  );
+  upload_socket.onclose = function(e) {
+    console.log('Upload-Socket closed');
+  };
+  // Everything below touches the DOM
+  await dom_ready;
+  $('#upload-form').on('submit', async function(e) {
+    e.preventDefault();
+    const file = document.getElementById('fileselector').files[0];
+    if (!file) {
+      return;
+    };
+    $('#upload-btn').prop('disabled', true);
+    $('#upload-status').text('Starting upload...');
+    try {
+      upload_socket.send(JSON.stringify({
+        command : 'upload_start',
+        filename : file.name,
+        size : file.size,
+      }));
+      let result = JSON.parse(await nextMessage(upload_socket));
+      if (!result || result.status !== 'OK') {
+        $('#upload-status').text('Error during upload_start: ' 
+          + (result && result.message ? result.message : ''));
+        return;
+      };
+      // Arm the progress handler before the first chunk leaves, so no
+      // message can get lost between sending and listening
+      const upload_done = wait_for_upload(upload_socket);
+      let offset = 0;
+      while (offset < file.size) {
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        upload_socket.send(await slice.arrayBuffer());
+        offset += CHUNK_SIZE;
+      };
+      await upload_done;
+      upload_socket.send(JSON.stringify({
+        command : 'upload_finish',
+        filename : file.name,
+      }));
+      result = JSON.parse(await nextMessage(upload_socket));
+      if (result && result.status === 'OK') {
+        $('#import-form input[name="file_name"]').val(file.name);
+        $('#phase0').addClass('d-none');
+        $('#phase1').removeClass('d-none');
+      } else {
+        $('#upload-status').text('Error during upload_finish: ' 
+          + (result && result.message ? result.message : ''));
+      };
+    } catch (err) {
+      console.error(err);
+      $('#upload-status').text('Upload failed.');
+    } finally {
+      $('#upload-btn').prop('disabled', false);
+    };
+  });
+  $('#importButton').click(function() {
+    $('#please_wait').removeClass('d-none');
+  });
+  $('#continue-button').click(async function() {
+    const $btn = $(this);
+    try {
+      $btn.prop('disabled', true);
+      $('#line2').removeClass('d-none');
+      $('#line3').removeClass('d-none');
+      // Streaming progress messages of the running backup job
+      const progress = ((param) => {
+        const received = JSON.parse(param);
+        $('#line3').text(received.data);
+      });
+      await tools_asyncSocket.sendandwait({
         'command' : 'backup',
         'school_nr' : {{ school }},
-      }, mycallback)
-      .then((result) => {
-        $('#line3').text('Starting download. When done, find the ZIP file in your download directory...');
-        console.log(window.location.host);
-        window.location.href = window.location.protocol + '//' 
-          + window.location.host 
-          + '/tools/downbackup/backup.zip/{{ school }}/';
-      })
-    });
-  })
+      }, progress);
+      $('#line3').text('Starting download. When done, find the ZIP file '
+        + 'in your download directory...');
+      window.location.href = window.location.protocol + '//' 
+        + window.location.host 
+        + '/tools/downbackup/backup.zip/{{ school }}/';
+    } catch (err) {
+      console.error(err);
+      $('#line3').text('Backup failed.');
+      $btn.prop('disabled', false);
+    };
+  });
 });
+
+main()
+.catch((err) => {
+  console.error(err);
+});
+
 })();
 
 </script>
