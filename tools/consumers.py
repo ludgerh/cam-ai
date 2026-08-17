@@ -183,7 +183,7 @@ class health(AsyncWebsocketConsumer):
 # tools_async
 #*****************************************************************************
         
-def compress_backup(idx, school_nr):
+def compress_backup(idx, school_nr, with_models):
   setproctitle('CAM-AI-Backup-Compression')
   os.nice(19)
   save_path = PARENTPATH /'temp' / 'backup'
@@ -250,8 +250,14 @@ def compress_backup(idx, school_nr):
     path_to_upload = DATAPATH
   glob_list = []
   if school_nr:
-    for item in path_to_upload.rglob('*'):
-      glob_list.append(item)
+    if with_models:
+      for item in path_to_upload.rglob('*'):
+        glob_list.append(item)
+    else:    
+      wanted_dirs = ('coded', 'frames', )
+      for item in path_to_upload.rglob('*'):
+        if item.relative_to(path_to_upload).parts[0] in wanted_dirs:
+          glob_list.append(item)
   else:
     for item in path_to_upload.rglob('*'):
       if item == RECORDINGSPATH:
@@ -298,7 +304,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data =None):
     try:
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -510,7 +516,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
         tools_redis.purge_zip_info(idx) 
         self.backup_proc_dict[idx] = Process(
           target=compress_backup, 
-          args=[idx, params['school_nr']],
+          args=[idx, params['school_nr'], params['with_models']],
         )
         self.backup_proc_dict[idx].start()
         while self.backup_proc_dict[idx].is_alive():

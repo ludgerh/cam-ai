@@ -83,9 +83,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <div class="accordion-body">
           <div class="h2">
             We are going to zip your school for you. Do you want to proceed?
+            <div class="form-check m-2">
+              <input class="form-check-input" type="checkbox" 
+                  id="include_models" checked>
+              <label class="form-check-label" for="export-option">
+                Include model files
+              </label>
+            </div>
             <button class="btn btn-primary m-2" id="continue-button" type="button">Yes, continue!</button>
           </div> 
-          <div class="h2 d-none" id="line2">
+          <div class="h2 d-none">
             Preparing the download. Please wait...
           </div>  
           <div class="h2 d-none" id="line3">?</div>  
@@ -237,6 +244,7 @@ const main = (async () => {
       await tools_asyncSocket.sendandwait({
         'command' : 'backup',
         'school_nr' : {{ school }},
+        'with_models' : $('#include_models').prop('checked'),
       }, progress);
       $('#line3').text('Starting download. When done, find the ZIP file '
         + 'in your download directory...');

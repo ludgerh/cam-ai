@@ -49,6 +49,7 @@ $(document).ready(function() {
       }
       tools_asyncSocket.sendandwait({
         'command' : 'backup',
+        'with_models' : true,
       }, mycallback)
       .then((result) => {
         $('#line3').text('Starting download. When done, find the ZIP file in your download directory...');
