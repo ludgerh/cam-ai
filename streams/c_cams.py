@@ -72,12 +72,14 @@ _SH_MEM_ITEMS = {
   'ovl_xpos' : 'i',
   'ovl_ypos' : 'i',  
   'ovl_active' : 'i',
+  'frozen' : 'i',
 }
 
 class c_cam():
   def __init__(self, dbline, mydetector, myeventer, logger):
     self.type = 'C'
     self.id = dbline.id
+    self.logger = logger
     add_viewer((my_viewer := c_viewer(self.type, self.id, logger)))
     self.viewer = my_viewer
     streams_redis.zero_to_dev(self.type, self.id)
@@ -106,7 +108,8 @@ class c_cam():
     self.shared_mem.write_1_meta('fps_limit', dbline.cam_fpslimit)
     self.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
     self.shared_mem.write_1_meta('apply_pause', dbline.cam_pause)
-    self.shared_mem.write_1_meta('ovl_active', -2)
+    self.shared_mem.write_1_meta('ovl_active', -3)
+    self.shared_mem.write_1_meta('frozen', 0)
     self.viewer.drawpad.set_xy((dbline.cam_xres, dbline.cam_yres))
     self.viewer.drawpad.positive_mask = dbline.cam_positive_mask
     self.viewer.drawpad.load_ringlist()
@@ -119,14 +122,22 @@ class c_cam():
     self.viewer.inqueue.start_data_loop()
   
   async def dblclickhandler(self, x, y):
-    if self.shared_mem.read_1_meta('ovl_active') == -2:
+    if self.shared_mem.read_1_meta('ovl_active') <= -2:
       self.shared_mem.write_1_meta('ovl_active', -1)
       self.shared_mem.write_1_meta('ovl_xpos', x)
       self.shared_mem.write_1_meta('ovl_ypos', y)
-      print('dblclickhandler', x, y, 'On') 
     else: 
-      self.shared_mem.write_1_meta('ovl_active', -2)
-      print('dblclickhandler', x, y, 'Off') 
+      # -3 means "off, restore of the freeze buffer still pending",
+      # the cam worker turns it into -2 once the restore is done
+      self.shared_mem.write_1_meta('ovl_active', -3)
+  
+  async def rightclickhandler(self):
+    if self.shared_mem.read_1_meta('frozen'):
+      self.shared_mem.write_1_meta('frozen', 0)
+      self.logger.info(f'CA{self.id}: Cam is unfrozen')
+    else: 
+      self.shared_mem.write_1_meta('frozen', 1)
+      self.logger.info(f'CA{self.id}: Cam is frozen')
   
   async def stop(self):
     if self.cam_worker.is_alive():
@@ -193,6 +204,8 @@ class cam_worker(mp_process):
   def apply_overlay(self, frame):
     if self.ovl_list:
       if self.shared_mem.read_1_meta('ovl_active') == -1:
+        # the freeze buffer backup is created in run_one() when the still
+        # image is grabbed, there is nothing to save here
         self.shared_mem.write_1_meta('ovl_active', random.randrange(len(self.ovl_list)))
       # x and y denote the center of the overlay
       x, y = (self.shared_mem.read_1_meta('ovl_xpos'),
@@ -210,9 +223,6 @@ class cam_worker(mp_process):
       # boolean fancy indexing copies only the opaque pixels, no blending
       roi[ovl['mask']] = ovl['bgr'][ovl['mask']]
     return(frame)
-    
-  def hide_overlay(self): 
-    self.active_ovl = -1 
 
   async def in_queue_thread(self):
     try:
@@ -325,6 +335,8 @@ class cam_worker(mp_process):
       self.wd_proc = None
       self.framewait = 0.0
       self.fps_limit = -1
+      self.freeze_buffer = None
+      self.freeze_buffer_back = None
       datapath = await djconf.agetconfig('datapath', 'data/')
       streams_redis.set_ffmpeg_running(False)
       self.load_overlay('data/screws/')
@@ -402,9 +414,15 @@ class cam_worker(mp_process):
         if self.got_sigint:
           break 
         if frameline: 
-        
-          if self.shared_mem.read_1_meta('ovl_active') > -2:
+          if (temp := self.shared_mem.read_1_meta('ovl_active')) > -2:
             self.apply_overlay(frameline[1])
+          else:
+            if temp == -3:
+              if (self.shared_mem.read_1_meta('frozen') 
+                  and self.freeze_buffer_back is not None):
+                # restore the untouched still image, keep the backup intact
+                self.freeze_buffer = self.freeze_buffer_back.copy()
+              self.shared_mem.write_1_meta('ovl_active', -2)
           xmin = self.shared_mem.read_1_meta('aoi_xmin')
           xmax = self.shared_mem.read_1_meta('aoi_xmax')
           ymin = self.shared_mem.read_1_meta('aoi_ymin')
@@ -692,8 +710,23 @@ class cam_worker(mp_process):
         await a_break_type(BR_LONG)
         return(None)
       try:
-        #in_bytes = await asyncio.to_thread(self.raw_queue.get)
-        in_bytes = self.raw_queue.get_nowait()
+        if self.shared_mem.read_1_meta('frozen'):
+          if self.freeze_buffer is None:
+            if (temp := self.raw_queue.get_nowait()):
+              # grab a fresh still image and keep a pristine backup of it,
+              # apply_overlay() writes straight into the freeze buffer
+              self.freeze_buffer = temp.copy()
+              self.freeze_buffer_back = temp.copy()
+          else:
+            self.raw_queue.get_nowait()
+          in_bytes = self.freeze_buffer 
+        else:  
+          if self.freeze_buffer is not None:
+            # leaving freeze mode: drop the still image so the next freeze
+            # picks up a current frame instead of the old one
+            self.freeze_buffer = None
+            self.freeze_buffer_back = None
+          in_bytes = self.raw_queue.get_nowait()  
       except queue.Empty:
         await a_break_type(BR_SHORT)
         return(None)

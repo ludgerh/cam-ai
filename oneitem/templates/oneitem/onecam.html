@@ -605,7 +605,7 @@ function initUI() {
       })
     };  
 	});
-	$('#imagespace').dblclick((evt) => {
+  $('#imagespace').on('dblclick', (evt) => {
     const rect = $('#imagespace')[0].getBoundingClientRect();
     const x = evt.clientX - rect.left;
     const y = evt.clientY - rect.top;
@@ -615,7 +615,13 @@ function initUI() {
       'x': Math.floor(x),
       'y': Math.floor(y),
 	  })
-	});
+	});$('#imagespace').on('contextmenu', (evt) => {
+    evt.preventDefault();
+	  oneitemSocket.sendandwait({
+		  'command' : 'rightclick',
+		  'edit_mode' : $('#ch_edit').prop('checked'),
+	  })
+  });
 	$('#collapseTwo').on('shown.bs.collapse', function () {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   });

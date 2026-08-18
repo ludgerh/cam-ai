@@ -301,6 +301,14 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.safe_send(outlist)	
+        
+      elif params['command'] == 'rightclick':
+        if self.may_write:
+          if not params['edit_mode']:
+            await self.myitem.rightclickhandler()
+        outlist['data'] = 'OK'
+        logger.debug('--> ' + str(outlist))
+        await self.safe_send(outlist)	
 
       elif params['command'] == 'mousewheel':
         self.mycamitem.inqueue.put(('ptz_zoom', params['y']))
