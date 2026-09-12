@@ -26,13 +26,16 @@ from os import path
 from time import time
 from collections import OrderedDict
 from threading import Lock as t_lock
+# Imported under an alias - 'count' is used as a local variable name in
+# resolve_rules() below
+from itertools import count as it_count
 from django.conf import settings
 from django.utils import timezone
 from channels.db import database_sync_to_async
 from tools.l_tools import ts2filename, uniquename_async, np_mov_avg, djconf
 from tools.l_crypt import l_crypt
 from tools.l_smtp import l_smtp, l_msg
-from tools.c_tools import do_reduction, aget_smtp_conf
+from tools.c_tools import do_reduction, aget_smtp_conf, hasoverlap
 from tools.tokens import maketoken_async
 from schools.c_schools import get_taglist
 from .models import event, event_frame
@@ -97,6 +100,10 @@ async def resolve_rules(conditions, predictions):
 
 class c_event(list):
   smtp_lock = None
+  # Process wide key generator. Frame keys must be unique across all events
+  # of this eventer, otherwise merge_frames() silently drops frames on key
+  # collision
+  _frame_keys = it_count()
 
   def __init__(self, tf_worker, tf_w_index, frame, margin, eventer_dbl, school_nr, 
       idx, shrink_factor, logger, max_items = None, name = None):
@@ -104,6 +111,7 @@ class c_event(list):
     with self.event_lock:
       super().__init__()
       self.id = idx
+      self.logger = logger
       self.tf_worker = tf_worker
       self.eventer_id = eventer_dbl.id
       self.eventer_name = eventer_dbl.name
@@ -120,102 +128,147 @@ class c_event(list):
       self.schoolnr = school_nr
       self.dbline = event()
       self.dbline.camera = eventer_dbl
-      self.dbline.start=timezone.make_aware(datetime.fromtimestamp(time()))
+      self.dbline.start = timezone.make_aware(datetime.fromtimestamp(time()))
       self.start = frame[2]
       self.end = frame[2]
-      self.append(max(0, frame[3][0] - margin))
-      self.append(min(self.xmax, frame[3][1] + margin))
-      self.append(max(0, frame[3][2] - margin))
-      self.append(min(self.ymax, frame[3][3] + margin))
+      box = self.frame_box(frame)
+      self.append(box[0])
+      self.append(box[1])
+      self.append(box[2])
+      self.append(box[3])
       self.append([frame[5]]) #Predictions
-      self.logger = logger
-      self.frames = OrderedDict([(0, frame)])
-      self.last_frame_index = 1
+      self.frames = OrderedDict([(next(self._frame_keys), frame)])
       self.shrink_factor = shrink_factor
       self.focus_max = np.max(frame[5][1:])
       self.focus_time = frame[2]
       self.check_out_ts = None
       self.dirs_checked = False
       self.name = name
+      # self[0..3] is the lagging box - it jumps outwards at once and creeps
+      # back only with shrink_factor. That is what we want for the display
+      # and for the db record, but it is useless for deciding whether a new
+      # frame or another event belongs here. last_box holds the rectangle of
+      # the most recent frame and is the one to match against.
+      self.last_box = list(box)
+      self.last_box_ts = frame[2]
   
   @classmethod  
   async def create(cls, **kwargs):
     instance = cls(**kwargs)
-    instance.stream_creator = await database_sync_to_async(lambda: instance.dbline.camera.creator)()
+    instance.stream_creator = await database_sync_to_async(
+      lambda: instance.dbline.camera.creator
+    )()
     if instance.dbline.camera.encrypted:
       if instance.dbline.camera.crypt_key:
-        instance.crypt = l_crypt(key=instance.dbline.camera.crypt_key)
+        instance.crypt = l_crypt(key = instance.dbline.camera.crypt_key)
       else:
         instance.crypt = l_crypt()
-        instance.dbline.camera.crypt_key = self.crypt.key
-        await instance.dbline.camera.asave(update_fields=['crypt_key'])
+        instance.dbline.camera.crypt_key = instance.crypt.key
+        await instance.dbline.camera.asave(update_fields = ['crypt_key'])
       instance.do_crypt = True   
     else:
       instance.do_crypt = False    
     await instance.a_init()   
-    return instance 
+    return(instance)
     
   async def a_init(self): 
     if not self.dirs_checked:
       self.dirs_checked = True
       self.datapath = await djconf.agetconfig('datapath', 'data/')
-      self.schoolpath = await djconf.agetconfig('schoolframespath', self.datapath + 'schoolframes/')
+      self.schoolpath = await djconf.agetconfig(
+        'schoolframespath', 
+        self.datapath + 'schoolframes/',
+      )
       self.clienturl = settings.CLIENT_URL
       for i in range(100):
         pathadd = str(self.dbline.camera.id) + '/' + str(i)
-        await aiofiles.os.makedirs(self.schoolpath + pathadd, exist_ok=True)
+        await aiofiles.os.makedirs(self.schoolpath + pathadd, exist_ok = True)
       if self.max_items is None:  
         self.max_items = await djconf.agetconfigint('frames_event', 32) 
     self.tag_list = await database_sync_to_async(get_taglist)(self.schoolnr)
 
-  def add_frame(self, frame):
+  def frame_box(self, frame):
+    # Rectangle of one single frame, margin applied and clipped to the image.
+    # Caller is expected to hold event_lock where needed - this does not take
+    # it, t_lock is not reentrant.
+    box = [
+      max(0, frame[3][0] - self.margin),
+      min(self.xmax, frame[3][1] + self.margin),
+      max(0, frame[3][2] - self.margin),
+      min(self.ymax, frame[3][3] + self.margin),
+    ]
+    return(box)
+
+  def add_frame(self, frame, keep_image = True):
+    self.end = frame[2]
+    if not keep_image:
+      return()
     with self.event_lock:
       s_factor = self.shrink_factor
-      if (frame[3][0] - self.margin) <= self[0]:
-        self[0] = max(0, frame[3][0] - self.margin)
+      box = self.frame_box(frame)
+      if box[0] <= self[0]:
+        self[0] = box[0]
       else:
-        self[0] = round(((frame[3][0] - self.margin) * s_factor + self[0]) 
-          / (s_factor+1.0))
-      if (frame[3][1] + self.margin) >= self[1]:
-        self[1] = min(self.xmax, frame[3][1] + self.margin)
+        self[0] = round((box[0] * s_factor + self[0]) / (s_factor + 1.0))
+      if box[1] >= self[1]:
+        self[1] = box[1]
       else:
-        self[1] = round(((frame[3][1] + self.margin) * s_factor + self[1]) 
-          / (s_factor+1.0))
-      if (frame[3][2] - self.margin) <= self[2]:
-        self[2] = max(0, frame[3][2] - self.margin)
+        self[1] = round((box[1] * s_factor + self[1]) / (s_factor + 1.0))
+      if box[2] <= self[2]:
+        self[2] = box[2]
       else:
-        self[2] = round(((frame[3][2] - self.margin) * s_factor + self[2]) 
-          / (s_factor+1.0))
-      if (frame[3][3] + self.margin) >= self[3]:
-        self[3] = min(self.ymax, frame[3][3] + self.margin)
+        self[2] = round((box[2] * s_factor + self[2]) / (s_factor + 1.0))
+      if box[3] >= self[3]:
+        self[3] = box[3]
       else:
-        self[3] = round(((frame[3][3] + self.margin) * s_factor + self[3]) 
-          / (s_factor+1.0))
-      self.end = frame[2]
+        self[3] = round((box[3] * s_factor + self[3]) / (s_factor + 1.0))
+      self.last_box = box
+      self.last_box_ts = frame[2]
       self[4].append(frame[5]) 
-      self.frames[self.last_frame_index] = frame
-      self.last_frame_index += 1
+      self.frames[next(self._frame_keys)] = frame
       if (new_max := np.max(frame[5][1:])) > self.focus_max:
         self.focus_max = new_max
         self.focus_time = frame[2]
-
+        
   def merge_frames(self, the_other_one):
-    self.frames = {**self.frames, **the_other_one.frames}
-    self.frames = OrderedDict(sorted(self.frames.items(), key=lambda x: x[1][2]))
-    if the_other_one.focus_max > self.focus_max:
-      self.focus_max = the_other_one.focus_max
-      self.focus_time = the_other_one.focus_time
+    with self.event_lock:
+      self.frames = OrderedDict(sorted(
+        {**self.frames, **the_other_one.frames}.items(),
+        key = lambda x: x[1][2],
+      ))
+      # Rebuild the prediction list from the merged frames - merge_events()
+      # does not touch self[4], so it would otherwise keep only the
+      # predictions of the surviving event
+      self[4] = [item[5] for item in self.frames.values()]
+      if hasoverlap(self.last_box, the_other_one.last_box):
+        # Both objects are still next to each other - keep matching both of
+        # them until the next frame arrives and resets last_box
+        self.last_box = [
+          min(self.last_box[0], the_other_one.last_box[0]),
+          max(self.last_box[1], the_other_one.last_box[1]),
+          min(self.last_box[2], the_other_one.last_box[2]),
+          max(self.last_box[3], the_other_one.last_box[3]),
+        ]
+        self.last_box_ts = max(self.last_box_ts, the_other_one.last_box_ts)
+      elif the_other_one.last_box_ts > self.last_box_ts:
+        # No contact - the younger position wins, never the union, or the
+        # box would ratchet outwards over the whole scene
+        self.last_box = list(the_other_one.last_box)
+        self.last_box_ts = the_other_one.last_box_ts
+      if the_other_one.focus_max > self.focus_max:
+        self.focus_max = the_other_one.focus_max
+        self.focus_time = the_other_one.focus_time
 
-  async def pred_read(self, radius=3, max=None, ave=None, last=None):
+  async def pred_read(self, radius = 3, max = None, ave = None, last = None):
     result2 = np.zeros((len(self.tag_list)), np.float32)
     if self[4]:
       result1 = np.vstack(self[4])
       if radius > 0:
         result1 = np_mov_avg(result1, radius)
       if max is not None:
-        result2 += np.max(result1, axis=0) * max
+        result2 += np.max(result1, axis = 0) * max
       if ave is not None:
-        result2 += np.average(result1, axis=0) * ave
+        result2 += np.average(result1, axis = 0) * ave
       if last is not None:
         result2 += result1[-1] * last
       return(np.clip(result2, 0.0, 1.0))
@@ -223,43 +276,46 @@ class c_event(list):
       return(result2)
 
   async def p_string(self):
-    predictions = await self.pred_read(max=1.0)
+    predictions = await self.pred_read(max = 1.0)
     predline = '['
     for i in range(len(self.tag_list)):
       if (predictions[i] >= 0.5):
         if (predline != '['):
           predline += ', '
         predline += str(self.tag_list[i].name)[:3]
-    return(predline+']')
+    return(predline + ']')
 
   async def frames_filter(self, cond_dict):
     if cond_dict: 
       sortindex = [x for x in self.frames if (
-        await resolve_rules(cond_dict[2],  self.frames[x][5])
+        await resolve_rules(cond_dict[2], self.frames[x][5])
           or await resolve_rules(cond_dict[3], self.frames[x][5])
-          or await resolve_rules(cond_dict[4],  self.frames[x][5])
+          or await resolve_rules(cond_dict[4], self.frames[x][5])
       )] 
     else:  
       sortindex = list(self.frames.keys())
     if self.max_items and len(sortindex) > self.max_items:
-      sortindex.sort(key=lambda x: np.max(self.frames[x][5][1:]), reverse=True) #prediction
+      sortindex.sort(
+        key = lambda x: np.max(self.frames[x][5][1:]), #prediction
+        reverse = True,
+      )
       sortindex = sortindex[:self.max_items]
-      sortindex.sort(key=lambda x: self.frames[x][2]) #timestamp
+      sortindex.sort(key = lambda x: self.frames[x][2]) #timestamp
     if len(self.frames) > len(sortindex):  
       self.frames = OrderedDict([(x, self.frames[x]) for x in sortindex])
       
     
   async def process_frame(self, frame):
-    pathadd = str(self.dbline.camera.id) + '/' + str(randint(0,99))
+    pathadd = str(self.dbline.camera.id) + '/' + str(randint(0, 99))
     filename = await uniquename_async(
       self.schoolpath, 
-      pathadd + '/' + ts2filename(frame[2], noblank=True), 
+      pathadd + '/' + ts2filename(frame[2], noblank = True), 
       'bmp', 
     )
-    bmp_data =  frame[4]
+    bmp_data = frame[4]
     if self.do_crypt:
       bmp_data = self.crypt.encrypt(bmp_data)
-    async with aiofiles.open(self.schoolpath+filename, "wb") as f:
+    async with aiofiles.open(self.schoolpath + filename, "wb") as f:
       await f.write(bmp_data)
     frameline = event_frame(
       time = timezone.make_aware(datetime.fromtimestamp(frame[2])),
@@ -275,23 +331,23 @@ class c_event(list):
     frame.append(frameline.id)
 
   async def save(self, cond_dict = None):
-    print('*** Saving Event:', self.id)
+    self.logger.debug('*** Saving Event: ' + str(self.id))
     await self.frames_filter(cond_dict)
     frames_to_save = self.frames.values()
     if self.name == 'Active robot':
       frames_to_save = list(frames_to_save)[:-6]
     if self.name is None:
-      self.dbline.p_string = (self.eventer_name+'('+str(self.eventer_id)+'): '
-        + await self.p_string())
+      self.dbline.p_string = (self.eventer_name + '(' + str(self.eventer_id) 
+        + '): ' + await self.p_string())
     else:  
       self.dbline.p_string = self.name
-    self.dbline.start=timezone.make_aware(datetime.fromtimestamp(self.start))
-    self.dbline.end=timezone.make_aware(datetime.fromtimestamp(self.end))
-    self.dbline.xmin=self[0]
-    self.dbline.xmax=self[1]
-    self.dbline.ymin=self[2]
-    self.dbline.ymax=self[3]
-    self.dbline.numframes=len(frames_to_save)
+    self.dbline.start = timezone.make_aware(datetime.fromtimestamp(self.start))
+    self.dbline.end = timezone.make_aware(datetime.fromtimestamp(self.end))
+    self.dbline.xmin = self[0]
+    self.dbline.xmax = self[1]
+    self.dbline.ymin = self[2]
+    self.dbline.ymax = self[3]
+    self.dbline.numframes = len(frames_to_save)
     self.dbline.done = not self.goes_to_school
     await self.dbline.asave()
     await asyncio.gather(*(self.process_frame(frame) for frame in frames_to_save))
@@ -299,7 +355,7 @@ class c_event(list):
       self.mailimages = []
       for frame in frames_to_save:
         imagedata = cv.imdecode(
-          np.frombuffer(frame[4], dtype=np.uint8), cv.IMREAD_UNCHANGED
+          np.frombuffer(frame[4], dtype = np.uint8), cv.IMREAD_UNCHANGED
         )
         imagedata = do_reduction(imagedata, 200, 200)
         imagedata = cv.imencode('.jpg', imagedata)[1].tobytes()
@@ -334,7 +390,7 @@ class c_event(list):
         with open(filepath, "rb") as f:
           jpegdata = f.read()
         jpegdata = cv.imdecode(
-          np.frombuffer(jpegdata, dtype=np.uint8), cv.IMREAD_UNCHANGED
+          np.frombuffer(jpegdata, dtype = np.uint8), cv.IMREAD_UNCHANGED
         )
         jpegdata = do_reduction(jpegdata, 400, 400)
         jpegdata = cv.imencode('.jpg', jpegdata)[1].tobytes()
@@ -373,7 +429,7 @@ class c_event(list):
           ', '.join(receivers),    # joined string for the To: header
           subject,
           plain_text,
-          html=html_text,
+          html = html_text,
         )
         for item in self.mailimages:
           my_msg.attach_jpeg(item[2], 'image' + str(item[0]))  
@@ -393,4 +449,3 @@ class c_event(list):
         await asyncio.sleep(2.0)
     finally:
       c_event.smtp_lock.release()
-

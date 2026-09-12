@@ -174,7 +174,7 @@ class cam_worker(mp_process):
   def sigint_handler(self, signal = None, frame = None ):
     self.got_sigint = True 
     
-  def load_overlay(self, dirpath = 'data/screws/'):
+  def load_overlay(self, dirpath):
     # load all RGBA overlays from dirpath once, keep BGR as uint8
     # and a boolean mask from alpha for each of them
     self.ovl_list = []
@@ -339,7 +339,7 @@ class cam_worker(mp_process):
       self.freeze_buffer_back = None
       datapath = await djconf.agetconfig('datapath', 'data/')
       streams_redis.set_ffmpeg_running(False)
-      self.load_overlay('data/screws/')
+      self.load_overlay(datapath + 'screws/')
       if self.dbline.cam_virtual_fps:
         self.virt_cam_path = await djconf.agetconfig(
           'virt_cam_path', 

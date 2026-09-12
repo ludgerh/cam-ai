@@ -63,6 +63,7 @@ from l_buffer.l_buffer import l_buffer
 from viewers.c_viewers import c_viewer
 from tools.l_tools import djconf
 from tools.c_logger import alog_ini
+from tools.l_sysinfo import is_raspi
 from streams.models import stream
 from tf_workers.c_tf_workers import tf_worker_client
 from .models import evt_condition
@@ -265,6 +266,10 @@ class eve_worker(mp_process):
             self.event_max_time = temp
           if (temp := received[1].get('plugin_active')) is not None:
             self.plugin_active = temp
+          if (temp := received[1].get('one_image_per_event')) is not None:
+            self.one_image_per_event = temp
+          if (temp := received[1].get('event_time_gap')) is not None:
+            self.shared_mem.write_1_meta('event_time_gap', temp)
         elif (received[0] == 'stop'):
           self.got_sigint = True
           self.do_run = False  
@@ -327,6 +332,7 @@ class eve_worker(mp_process):
       self.do_run = True
       loop = asyncio.get_running_loop()
       loop.add_signal_handler(signal.SIGINT, self.sigint_handler)
+      self.one_image_per_event = False
       self._inq_task = asyncio.create_task(
         self.in_queue_thread(), 
         name = 'in_queue_thread', 
@@ -383,11 +389,6 @@ class eve_worker(mp_process):
         frameline = await self.dataqueue.get(timeout = 2.0)
         if frameline is None:
           continue
-        #if self.inferencing_status == 1:
-        #  await a_break_type(BR_LONG)
-        #  continue
-        #elif self.inferencing_status == 0:  
-        #  self.inferencing_status = 1  
         if not self.do_run:
           break  
         if (frameline[0] is not None 
@@ -485,8 +486,6 @@ class eve_worker(mp_process):
           or item.end > item.start + self.event_max_time
           or item.name != self.event_name):
         item.check_out_ts = item.end
-    #if await resolve_rules(self.cond_dict[5], predictions): #Alarm
-      #await self.plugin.action(predictions, item)
     if item.check_out_ts is None:
       return()
     predictions = await item.pred_read(max=1.0)
@@ -617,7 +616,10 @@ class eve_worker(mp_process):
   async def check_events(self):
     try:
       while self.do_run:
-        await(a_break_type(BR_LONG))
+        if is_raspi():
+          await(a_break_type(BR_LONG))
+        else:  
+          await(a_break_type(BR_MEDIUM))
         async with self.event_dict_lock:
           check_list = list(self.event_dict.items())
         for i, item in check_list:
@@ -683,21 +685,28 @@ class eve_worker(mp_process):
               predictions = await self.tf_worker.get_from_outqueue(self.tf_w_index)
             prediction = predictions[0]
             predictions = predictions[1:]
-            frame = frame + [prediction]
+            frame = frame + [prediction]            
             found = None
             margin = self.shared_mem.read_1_meta('margin')
             if not self.shared_mem.read_1_meta('one_frame_per_event'):
               async with self.event_dict_lock:
-                check_list = list(self.event_dict.items())
-                
-              for j, item in check_list:
-                if (self.plugin_active 
-                    or hasoverlap((frame[3][0] - margin, frame[3][1] + margin, 
-                    frame[3][2] - margin, frame[3][3] + margin), item)):
+                # Checked out events stay in the dict until save() is done
+                # and they get popped - they must not shadow open ones
+                check_list = [
+                  item for item in self.event_dict.values()
+                  if item.check_out_ts is None
+                ]
+              for item in check_list:
+                # Match against last_box, the rectangle of the event's most
+                # recent frame. self[0..3] lags behind by design and would
+                # collect frames from all over the scene
+                if hasoverlap((frame[3][0] - margin, frame[3][1] + margin,
+                    frame[3][2] - margin, frame[3][3] + margin),
+                    item.last_box):
                   found = item
                   break
                 await a_break_type(BR_SHORT)
-            if found is None or found.check_out_ts:
+            if found is None:
               async with self.event_dict_lock:
                 event_index = round(time() * 1000)
                 while event_index <= self.event_index_alt:
@@ -720,8 +729,12 @@ class eve_worker(mp_process):
                 await self.merge_events()
             else: 
               async with self.event_dict_lock:
-                found.add_frame(frame)
-                await self.merge_events()
+                if found.check_out_ts is None:  # may have changed while awaiting
+                  found.add_frame(
+                    frame,
+                    keep_image = not self.one_image_per_event,
+                  )
+                  await self.merge_events()
           self.last_insert_ready = frame[2]
           #self.inferencing_status = 2
           del frame
@@ -791,7 +804,7 @@ class eve_worker(mp_process):
           (item[1], item[3]),
           colorcode, 
           self.linewidth, 
-        )
+        ) 
         if item[2] < (self.dbline.cam_yres - item[3]):
           y0 = item[3] + 30 * self.textheight
         else:
@@ -815,32 +828,43 @@ class eve_worker(mp_process):
       newframe[1] = c_convert(newframe[1], typein=1, xout=new_xdim) 
     await self.viewer_queue.put(newframe)
     del newframe  
-
+    
   async def merge_events(self):
+    # Caller must hold event_dict_lock - both call sites in inserter() do.
+    # Never take it here: asyncio.Lock is not reentrant, the first real
+    # merge would deadlock the eventer
+    time_gap = self.shared_mem.read_1_meta('event_time_gap')
     while True:
       del_set = set()
       i_list = list(self.event_dict.items())
-      j_list = i_list
       for i, event_i in i_list:
-        if not event_i.check_out_ts:
-          for j, event_j in j_list:
-            if j > i:
-              if not event_j.check_out_ts:
-                if hasoverlap(event_i, event_j):
-                  event_i[0] = min(event_i[0], event_j[0])
-                  event_i[1] = max(event_i[1], event_j[1])
-                  event_i[2] = min(event_i[2], event_j[2])
-                  event_i[3] = max(event_i[3], event_j[3])
-                  event_i.start = min(event_i.start, event_j.start)
-                  event_i.end = max(event_i.end, event_j.end)
-                  event_i.merge_frames(event_j)
-                  del_set.add(j) 
-      if del_set:   
-        for i in del_set:
-          self.event_dict.pop(i, None)
-      else:
+        # An event already merged away must neither swallow others nor
+        # be swallowed twice - both silently destroy or duplicate frames
+        if i in del_set or event_i.check_out_ts:
+          continue
+        for j, event_j in i_list:
+          if j <= i or j in del_set or event_j.check_out_ts:
+            continue
+          if abs(event_i.end - event_j.end) > time_gap:
+            continue
+          # last_box is the rectangle of the most recent frame. self[0..3]
+          # lags behind by design and would merge events that are far
+          # apart in space
+          if not hasoverlap(event_i.last_box, event_j.last_box):
+            continue
+          event_i[0] = min(event_i[0], event_j[0])
+          event_i[1] = max(event_i[1], event_j[1])
+          event_i[2] = min(event_i[2], event_j[2])
+          event_i[3] = max(event_i[3], event_j[3])
+          event_i.start = min(event_i.start, event_j.start)
+          event_i.end = max(event_i.end, event_j.end)
+          event_i.merge_frames(event_j)
+          del_set.add(j)
+        await a_break_type(BR_SHORT)
+      if not del_set:
         break
-      await a_break_type(BR_SHORT)
+      for j in del_set:
+        self.event_dict.pop(j, None)
 
   async def make_webm(self):
     try:

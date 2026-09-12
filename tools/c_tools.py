@@ -135,13 +135,6 @@ def merge_rects(rect_list): # Rectangles in notation B
       break
   rect_list = [item for item in rect_list if item[0] > -1]
   return(rect_list)
-
-def hasoverlap(rect1, rect2) : # Rectangles in notation B
-	if ((rect1[1] >= rect2[0]) and (rect2[1] >= rect1[0]) 
-    and (rect1[3] >= rect2[2]) and (rect2[3] >= rect1[2])):
-		return(True)
-	else :
-		return(False)
   
 def image_size(infile):
   myimage = cv.imread(infile)

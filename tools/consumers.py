@@ -304,7 +304,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
 
   async def receive(self, text_data =None):
     try:
-      logger.info('<-- ' + text_data)
+      #logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}	
 
@@ -392,7 +392,7 @@ class admin_tools_async(AsyncWebsocketConsumer):
             await aioshutil.rmtree(schoolline.dir)
           await schoolline.adelete()
         outlist['data'] = resultdict
-        logger.info('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'linkserver-c':
