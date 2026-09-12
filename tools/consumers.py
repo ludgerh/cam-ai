@@ -1,3 +1,4 @@
+# tools/consumers.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -616,8 +617,12 @@ class admin_tools_async(AsyncWebsocketConsumer):
         dst = BASE_PATH / 'plugins'
         if src.exists():
           await merge_move(src, dst)
-        datapath_rel = DATAPATH.relative_to(BASE_PATH) #not complete if DATAPATH absolute
-        await aioshutil.move(backup_path / datapath_rel, DATAPATH)
+        # DATAPATH may be located outside BASE_PATH. In that case it was not
+        # moved into the backup and does not need to be restored.
+        if DATAPATH.is_relative_to(BASE_PATH):
+          datapath_rel = DATAPATH.relative_to(BASE_PATH)
+          with suppress(FileNotFoundError):
+            await aioshutil.move(backup_path / datapath_rel, DATAPATH)
         src = BASE_PATH / "runserver.sh"
         dst = PARENTPATH / "runserver.sh"
         try:
