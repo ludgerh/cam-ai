@@ -635,16 +635,9 @@ function initUI() {
         +'#id_eve_sync_factor, '
         +'#id_eve_school, '
         +'#id_eve_alarm_email, '
-        +'#id_eve_one_frame_per_event'
       ).change(function(evt) {
     const $el = $(evt.target);
-    let value;
-    if ($el.attr('id') === 'id_eve_one_frame_per_event') {
-      value = $el.prop('checked');   // Boolean!
-    } else {
-      value = $el.val();
-    }
-      
+    let value = $el.val();
 		oneitemSocket.sendandwait({
 			'command' : 'setonefield',
 			'pname' : $(evt.target).attr('name'),

@@ -77,7 +77,6 @@ _SH_MEM_ITEMS = {
     'shrink_factor' : 'd',
     'sync_factor' : 'd',
     'school' : 'i',
-    'one_frame_per_event' : 'i',
     'nr_of_cond_ed' : 'i',
     'last_cond_ed' : 'i',
     'aoi_xdim' : 'i',
@@ -104,7 +103,6 @@ class c_eventer():
     self.shared_mem.write_1_meta('shrink_factor', dbline.eve_shrink_factor)
     self.shared_mem.write_1_meta('sync_factor', dbline.eve_sync_factor)
     self.shared_mem.write_1_meta('school', dbline.eve_school.id)
-    self.shared_mem.write_1_meta('one_frame_per_event', dbline.eve_one_frame_per_event)
     self.shared_mem.write_1_meta('nr_of_cond_ed', 0)
     
     # Create dataqueue, detectorqueue and inqueue in the parent process,
@@ -479,13 +477,10 @@ class eve_worker(mp_process):
       async with self.event_dict_lock:
         self.event_dict.pop(i, None)
       return()
-    if self.shared_mem.read_1_meta('one_frame_per_event'):
+    if (item.end < newtime - self.shared_mem.read_1_meta('event_time_gap')
+        or item.end > item.start + self.event_max_time
+        or item.name != self.event_name):
       item.check_out_ts = item.end
-    else:  
-      if (item.end < newtime - self.shared_mem.read_1_meta('event_time_gap')
-          or item.end > item.start + self.event_max_time
-          or item.name != self.event_name):
-        item.check_out_ts = item.end
     if item.check_out_ts is None:
       return()
     predictions = await item.pred_read(max=1.0)
@@ -688,24 +683,23 @@ class eve_worker(mp_process):
             frame = frame + [prediction]            
             found = None
             margin = self.shared_mem.read_1_meta('margin')
-            if not self.shared_mem.read_1_meta('one_frame_per_event'):
-              async with self.event_dict_lock:
-                # Checked out events stay in the dict until save() is done
-                # and they get popped - they must not shadow open ones
-                check_list = [
-                  item for item in self.event_dict.values()
-                  if item.check_out_ts is None
-                ]
-              for item in check_list:
-                # Match against last_box, the rectangle of the event's most
-                # recent frame. self[0..3] lags behind by design and would
-                # collect frames from all over the scene
-                if hasoverlap((frame[3][0] - margin, frame[3][1] + margin,
-                    frame[3][2] - margin, frame[3][3] + margin),
-                    item.last_box):
-                  found = item
-                  break
-                await a_break_type(BR_SHORT)
+            async with self.event_dict_lock:
+              # Checked out events stay in the dict until save() is done
+              # and they get popped - they must not shadow open ones
+              check_list = [
+                item for item in self.event_dict.values()
+                if item.check_out_ts is None
+              ]
+            for item in check_list:
+              # Match against last_box, the rectangle of the event's most
+              # recent frame. self[0..3] lags behind by design and would
+              # collect frames from all over the scene
+              if hasoverlap((frame[3][0] - margin, frame[3][1] + margin,
+                  frame[3][2] - margin, frame[3][3] + margin),
+                  item.last_box):
+                found = item
+                break
+              await a_break_type(BR_SHORT)
             if found is None:
               async with self.event_dict_lock:
                 event_index = round(time() * 1000)

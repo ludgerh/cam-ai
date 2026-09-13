@@ -233,7 +233,6 @@ class OneEveView(View):
       'eve_sync_factor' : dbline.eve_sync_factor,
       'eve_school' :  my_school,
       'eve_alarm_email' : dbline.eve_alarm_email,
-      'eve_one_frame_per_event' : dbline.eve_one_frame_per_event,
     })
     context = {
       'version' : djconf.getconfig('version', 'X.Y.Z'),
@@ -276,7 +275,6 @@ class OneEveView(View):
     dbline.eve_sync_factor = form.cleaned_data['eve_sync_factor']
     dbline.eve_school = form.cleaned_data['eve_school']
     dbline.eve_alarm_email = form.cleaned_data['eve_alarm_email']
-    dbline.eve_one_frame_per_event = form.cleaned_data['eve_one_frame_per_event']
     await dbline.asave(update_fields=[
       'eve_fpslimit', 
       'eve_margin',
@@ -285,7 +283,6 @@ class OneEveView(View):
       'eve_sync_factor',
       'eve_school',
       'eve_alarm_email',
-      'eve_one_frame_per_event',
     ])
     return HttpResponseRedirect(myurl+str(evenr)+'/')
 
