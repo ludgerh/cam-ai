@@ -31,7 +31,7 @@ from setproctitle import setproctitle
 from streams.redis import my_redis as streams_redis
 from tf_workers.redis import my_redis as tf_workers_redis
 from tools.c_logger import alog_ini
-from globals.c_globals import add_viewer
+from globals.c_globals import add_viewer, viewables
 from tools.c_tools import rect_btoa, merge_rects, c_buffer, c_convert
 from tools.l_break import a_break_type, BR_SHORT
 from viewers.c_viewers import c_viewer
@@ -117,15 +117,10 @@ class det_worker(mp_process):
     self.tf_worker_id = worker_id
     self.shm_name = shm_name
     self.plugin_path = plugin_path
-
+    
   def run(self):
     # self._args holds the queues we passed to __init__ as args=queues
-    (dataqueue, inqueue, viewer_queue, eventer_in_queue, 
-     eventer_det_queue, worker_inqueue, worker_registerqueue) = self._args
-    asyncio.run(self.async_runner(
-      dataqueue, inqueue, viewer_queue, eventer_in_queue,
-      eventer_det_queue, worker_inqueue, worker_registerqueue,
-    )) 
+    asyncio.run(self.async_runner(*self._args))
     
   def sigint_handler(self, signal=None, frame=None):
     self.got_sigint = True 
@@ -255,7 +250,7 @@ class det_worker(mp_process):
       tf_workers_redis.get_buf_size_10(self.tf_worker_id), 
       frameline[2],
       self.logger,
-    ) 
+    ) or frameline[0] >= 4
     if self.got_sigint or not greenlight:
       return(None)
     if self.run_lock and not self.dbline.cam_virtual_fps: 
@@ -286,7 +281,8 @@ class det_worker(mp_process):
       backgr_delay = self.shared_mem.read_1_meta('backgr_delay'), 
       mode_code = self.shared_mem.read_1_meta('mode_code').decode('utf-8'), 
     )
-    if len(rect_list):  
+    # 3 : Normal, 4 : Image collection, 5 : No AOI forwarding
+    if len(rect_list) and frameline[0] != 5:
       objectmaxsize = round(max(
         self.last_frame.shape[0],
         self.last_frame.shape[1],

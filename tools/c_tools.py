@@ -19,7 +19,7 @@ import cv2 as cv
 import numpy as np
 import asyncio
 import aiofiles
-from time import time, sleep
+from time import monotonic, sleep
 from random import randint
 from collections import deque
 from django.db import connection
@@ -92,11 +92,11 @@ class speedometer:
   def __init__(self, count = 10):
     self.count = count
     self.times_deque = deque()
-    self.ts2 = time()
+    self.ts2 = monotonic()
 
   def gettime(self):
     self.ts1 = self.ts2
-    self.ts2 = time()
+    self.ts2 = monotonic()
     if len(self.times_deque) >= self.count:
       self.times_deque.popleft()
     self.times_deque.append(self.ts2 - self.ts1)

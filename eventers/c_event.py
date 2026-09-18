@@ -199,10 +199,8 @@ class c_event(list):
     ]
     return(box)
 
-  def add_frame(self, frame, keep_image = True):
+  def add_frame(self, frame):
     self.end = frame[2]
-    if not keep_image:
-      return()
     with self.event_lock:
       s_factor = self.shrink_factor
       box = self.frame_box(frame)
@@ -334,8 +332,6 @@ class c_event(list):
     self.logger.debug('*** Saving Event: ' + str(self.id))
     await self.frames_filter(cond_dict)
     frames_to_save = self.frames.values()
-    if self.name == 'Active robot':
-      frames_to_save = list(frames_to_save)[:-6]
     if self.name is None:
       self.dbline.p_string = (self.eventer_name + '(' + str(self.eventer_id) 
         + '): ' + await self.p_string())

@@ -82,6 +82,7 @@ class c_cam():
     self.logger = logger
     add_viewer((my_viewer := c_viewer(self.type, self.id, logger)))
     self.viewer = my_viewer
+    self.eventer = myeventer
     streams_redis.zero_to_dev(self.type, self.id)
     streams_redis.fps_to_dev(self.type, self.id, 0.0) 
     self.shared_mem = shared_mem(
@@ -96,6 +97,9 @@ class c_cam():
       self.id, 
       logger, 
       self.shared_mem.shm.name, 
+      # layout and name of the detector segment, read-only for the cam
+      mydetector.plugin._SH_MEM_ITEMS,
+      mydetector.shared_mem.shm.name,
       # Pass queues via args= to Process (do NOT store as self.xxx!):
       queues = (
         self.inqueue,                      # 0: inqueue
@@ -123,9 +127,11 @@ class c_cam():
   
   async def dblclickhandler(self, x, y):
     if self.shared_mem.read_1_meta('ovl_active') <= -2:
-      self.shared_mem.write_1_meta('ovl_active', -1)
+      #print('00000 DblClick', time())
       self.shared_mem.write_1_meta('ovl_xpos', x)
       self.shared_mem.write_1_meta('ovl_ypos', y)
+      self.shared_mem.write_1_meta('ovl_active', -1)
+      #print('11111 self.shared_mem.write_1_meta(ovl_active, -1)', time())
     else: 
       # -3 means "off, restore of the freeze buffer still pending",
       # the cam worker turns it into -2 once the restore is done
@@ -153,7 +159,7 @@ class c_cam():
         pass
 
 class cam_worker(mp_process):
-  def __init__(self, idx, logger, shm_name, queues):
+  def __init__(self, idx, logger, shm_name, det_shm_items, det_shm_name, queues):
     # Pass queues via args= to Process - this is the mechanism that actually
     # works with spawn (queues get pickled at handover time, while
     # multiprocessing has its special reduction mode active):
@@ -162,6 +168,8 @@ class cam_worker(mp_process):
     self.id = idx
     # Only store pickleable data as instance attributes:
     self.shm_name = shm_name
+    self.det_shm_items = det_shm_items
+    self.det_shm_name = det_shm_name
 
   def run(self):
     # self._args holds the queues we passed to __init__ as args=queues
@@ -201,8 +209,9 @@ class cam_worker(mp_process):
     #print('***** Overlays:', [(item['name'], item['width'], item['height'])
     #  for item in self.ovl_list])
       
-  def apply_overlay(self, frame):
+  def apply_overlay(self, frame, ts): #ts is debug
     if self.ovl_list:
+      #print('22222 Start apply_overlay', ts)
       if self.shared_mem.read_1_meta('ovl_active') == -1:
         # the freeze buffer backup is created in run_one() when the still
         # image is grabbed, there is nothing to save here
@@ -222,6 +231,7 @@ class cam_worker(mp_process):
       roi = frame[y0:y0+h, x0:x0+w]
       # boolean fancy indexing copies only the opaque pixels, no blending
       roi[ovl['mask']] = ovl['bgr'][ovl['mask']]
+      #print('33333 Finish apply_overlay', ts)
     return(frame)
 
   async def in_queue_thread(self):
@@ -304,6 +314,14 @@ class cam_worker(mp_process):
         shape=(self.dbline.cam_yres, self.dbline.cam_xres, 3),
         shm_name=self.shm_name, 
       )
+      # attach only, c_detector owns and unlinks this segment
+      self.det_shared_mem = shared_mem(
+        source_dict = self.det_shm_items,
+        shape = (self.dbline.cam_yres, self.dbline.cam_xres, 3),
+        shm_name = self.det_shm_name,
+      )
+      self.cam_ctrl_active = 'cam_ctrl' in self.det_shared_mem.source_dict
+      self.virt_screw_status_old = 0
       await aiofiles.os.makedirs(self.socket_path, exist_ok=True)
       self.socket_path += f'cam{self.id}.sock'
       if self.dbline.cam_virtual_fps:
@@ -382,11 +400,11 @@ class cam_worker(mp_process):
       if not self.dbline.cam_virtual_fps:
         self.mp4_proc = asyncio.create_task(self.checkmp4(), name = 'checkmp4')
       self.imagecheck = 0
-      self.online = False
       if self.dbline.cam_virtual_fps:
         self.online = True
         self.bytes_per_frame = self.dbline.cam_xres * self.dbline.cam_yres * 3
       else:
+        self.online = False
         maxcounter = 0
         while not self.got_sigint:
           await self.try_connect(maxcounter)
@@ -415,8 +433,13 @@ class cam_worker(mp_process):
           break 
         if frameline: 
           if (temp := self.shared_mem.read_1_meta('ovl_active')) > -2:
-            self.apply_overlay(frameline[1])
+            self.apply_overlay(frameline[1], frameline[2])
+            # derive the status from the very read that decided about the
+            # overlay, a second read further down would race against the
+            # two separate writes in dblclickhandler()
+            virt_screw_status = 1
           else:
+            virt_screw_status = 0
             if temp == -3:
               if (self.shared_mem.read_1_meta('frozen') 
                   and self.freeze_buffer_back is not None):
@@ -453,15 +476,30 @@ class cam_worker(mp_process):
               and (streams_redis.view_from_dev('D', self.id)
               or streams_redis.data_from_dev('D', self.id))
               and frameline):
-            payload = frameline if aoi is None else aoi
-            if await self.mydetector_data.put(payload, timeout = 5.0) is False:
+            if aoi is not None:
+              frameline = aoi  
+            if self.cam_ctrl_active:
+              cam_ctrl = self.det_shared_mem.read_1_meta('cam_ctrl')
+              if cam_ctrl == 1:
+                if virt_screw_status == self.virt_screw_status_old:
+                  frameline[0] = 5
+                else:
+                  if virt_screw_status == 0: 
+                    frameline[0] = 5
+                  else:
+                    frameline[0] = 4
+                  self.virt_screw_status_old = virt_screw_status
+              elif cam_ctrl == 2:
+                frameline[0] = 5
+            #print('44444 Put frame:', frameline[0], frameline[2])
+            if await self.mydetector_data.put(frameline, timeout = 5.0) is False:
               # Frame dropped, downstream too slow - visible in the log now
               self.logger.warning(
                 f'CA{self.id}: detector queue put timed out, frame dropped'
               )
+            frameline[0] = 3
           if self.dbline.eve_mode_flag and streams_redis.view_from_dev('E', self.id):
-            payload = frameline if aoi is None else aoi
-            if await self.myeventer_data.put(payload, timeout = 5.0) is False:
+            if await self.myeventer_data.put(frameline, timeout = 5.0) is False:
               self.logger.warning(
                 f'CA{self.id}: eventer queue put timed out, frame dropped'
               )    
@@ -761,7 +799,7 @@ class cam_worker(mp_process):
       return(None)
     self.wd_ts = in_ts
     fps = self.som.gettime()
-    if fps:
+    if fps: 
       self.dbline.cam_fpsactual = fps
       streams_redis.fps_to_dev('C', self.id, fps)
     if self.shared_mem.read_1_meta('apply_mask'):
@@ -772,7 +810,7 @@ class cam_worker(mp_process):
       )
     if self.dbline.cam_virtual_fps:
       if self.file_end:
-        in_ts = 0.0
+        #in_ts = 0.0
         self.file_end = False 
       else:
         while (new_time := time()) - self.file_brake_ts < self.virt_step:

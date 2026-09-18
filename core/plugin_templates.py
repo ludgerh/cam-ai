@@ -50,6 +50,7 @@ class det_plugin(temp_plugin):
       'scaledown' : 'i',
       'mode_code' : '50p',
       'x_canvas' : 'i', #x_canvas_max
+      'cam_ctrl' : 'i',  # control value read by the cam worker
   }
   
   def init_shared_mem(self, shared_mem, dbline):
@@ -63,6 +64,7 @@ class det_plugin(temp_plugin):
     shared_mem.write_1_meta('apply_mask', dbline.det_apply_mask)
     shared_mem.write_1_meta('scaledown', 0)
     shared_mem.write_1_meta('mode_code', dbline.det_mode_code.encode('utf-8'))
+    shared_mem.write_1_meta('cam_ctrl', 0)
     
   def _get_kernel(self, radius):
     kernel = self._kernel_cache.get(radius)

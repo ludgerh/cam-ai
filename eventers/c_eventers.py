@@ -81,7 +81,7 @@ _SH_MEM_ITEMS = {
     'last_cond_ed' : 'i',
     'aoi_xdim' : 'i',
     'aoi_ydim' : 'i',
-    'x_canvas' : 'i', #x_canvas_max
+    'x_canvas' : 'i',
 }
 
 class c_eventer():
@@ -264,8 +264,6 @@ class eve_worker(mp_process):
             self.event_max_time = temp
           if (temp := received[1].get('plugin_active')) is not None:
             self.plugin_active = temp
-          if (temp := received[1].get('one_image_per_event')) is not None:
-            self.one_image_per_event = temp
           if (temp := received[1].get('event_time_gap')) is not None:
             self.shared_mem.write_1_meta('event_time_gap', temp)
         elif (received[0] == 'stop'):
@@ -330,7 +328,6 @@ class eve_worker(mp_process):
       self.do_run = True
       loop = asyncio.get_running_loop()
       loop.add_signal_handler(signal.SIGINT, self.sigint_handler)
-      self.one_image_per_event = False
       self._inq_task = asyncio.create_task(
         self.in_queue_thread(), 
         name = 'in_queue_thread', 
@@ -379,6 +376,7 @@ class eve_worker(mp_process):
       self.fps_limit_old = -1
       self.email_address = self.dbline.eve_alarm_email
       self.event_index_alt = 0
+      self.virt_screw_status_old = 0
       #print(f'Launch: eventer #{self.id}')
       while not self.got_sigint:
         if streams_redis.check_if_counts_zero('E', self.id):
@@ -680,7 +678,7 @@ class eve_worker(mp_process):
               predictions = await self.tf_worker.get_from_outqueue(self.tf_w_index)
             prediction = predictions[0]
             predictions = predictions[1:]
-            frame = frame + [prediction]            
+            frame = frame + [prediction] 
             found = None
             margin = self.shared_mem.read_1_meta('margin')
             async with self.event_dict_lock:
@@ -699,7 +697,7 @@ class eve_worker(mp_process):
                   item.last_box):
                 found = item
                 break
-              await a_break_type(BR_SHORT)
+              await a_break_type(BR_SHORT) 
             if found is None:
               async with self.event_dict_lock:
                 event_index = round(time() * 1000)
@@ -724,10 +722,7 @@ class eve_worker(mp_process):
             else: 
               async with self.event_dict_lock:
                 if found.check_out_ts is None:  # may have changed while awaiting
-                  found.add_frame(
-                    frame,
-                    keep_image = not self.one_image_per_event,
-                  )
+                  found.add_frame(frame)
                   await self.merge_events()
           self.last_insert_ready = frame[2]
           #self.inferencing_status = 2
