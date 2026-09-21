@@ -544,14 +544,14 @@ class trainerutil(AsyncWebsocketConsumer):
           async for item in epoch.objects.filter(fit=params['fitnr']):
             result.append({
               'phase' : item.phase,
-              'loss' : item.loss, 
+              'bce' : item.bce, 
               'augmentation' : item.augmentation, 
               'gamma' : item.gamma, 
               'finetuning' : item.finetuning,
               'binacc' : item.binacc, 
               'recall' : item.recall, 
               'precision' : item.precision, 
-              'val_loss' : item.val_loss, 
+              'val_bce' : item.val_bce, 
               'val_binacc' : item.val_binacc, 
               'val_recall' : item.val_recall, 
               'val_precision' : item.val_precision, 

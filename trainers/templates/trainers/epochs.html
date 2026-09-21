@@ -50,9 +50,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
   <table class="table">
     <thead>
       <tr>
-        <th>#</th><th>Ph</th><th>Sec</th><th>LR</th><th>Loss</th>
+        <th>#</th><th>Ph</th><th>Sec</th><th>LR</th><th>BCE</th>
         <th>FT</th><th>Augm</th><th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
-        <th>val_Loss</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
+        <th>val_BCE</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
       </tr>
     </thead>
     <tbody id="tablebody"></tbody>
@@ -145,7 +145,7 @@ let graph_data = {
     pointHoverRadius: 0,
     },
     {
-    label: 'Loss',
+    label: 'BCE',
     backgroundColor: 'rgb(0, 155, 0)',
     borderColor: 'rgb(0, 155, 0)',
     yAxisID: 'D',
@@ -154,10 +154,10 @@ let graph_data = {
     pointHoverRadius: 0,
     },
     {
-    label: 'val_Loss',
+    label: 'val_BCE',
     backgroundColor: 'rgb(200, 0, 0)',
     borderColor: 'rgb(200, 0, 0)',
-    yAxisID: 'E',
+    yAxisID: 'D',
     data: [],
     pointRadius: 0,
     pointHoverRadius: 0,
@@ -187,21 +187,13 @@ let graph_config = {
       },
       C: {
         type: 'linear',
-        position: 'left',
+        position: 'right',
         ticks: { color: 'rgb(200, 155, 0)' }, 
         grid: {
           drawOnChartArea: false
         },
       },
       D: {
-        type: 'linear',
-        position: 'right',
-        ticks: { color: 'rgb(0, 155, 0)' }, 
-        grid: {
-          drawOnChartArea: false
-        }
-      },
-      E: {
         type: 'linear',
         position: 'right',
         ticks: { color: 'rgb(200, 0, 0)' }, 
@@ -240,22 +232,22 @@ function refresh_all() {
           graph_data.datasets[0].data.push(item.learning_rate);
           graph_data.datasets[1].data.push(item.augmentation);
           graph_data.datasets[2].data.push(item.gamma);
-          graph_data.datasets[3].data.push(item.loss);
-          graph_data.datasets[4].data.push(item.val_loss);
+          graph_data.datasets[3].data.push(item.bce);
+          graph_data.datasets[4].data.push(item.val_bce);
         };
         rows += '<tr>';
         rows += '<td>' + counter+'</td>';
         rows += '<td>' + item.phase+'</td>';
         rows += '<td>' + Math.round(item.seconds) + '</td>';
         rows += '<td>' + item.learning_rate.toPrecision(2) + '</td>';
-        rows += '<td>' + item.loss.toPrecision(4) + '</td>';
+        rows += '<td>' + item.bce.toPrecision(4) + '</td>';
         rows += '<td>' + item.finetuning + '</td>';
         rows += '<td>' + item.augmentation.toPrecision(4) + '</td>';
         rows += '<td>' + item.gamma.toPrecision(4) + '</td>';
         rows += '<td>' + item.binacc.toPrecision(4) + '</td>';
         rows += '<td>' + item.recall.toPrecision(4) + '</td>';
         rows += '<td>' + item.precision.toPrecision(4) + '</td>';
-        rows += '<td>' + item.val_loss.toPrecision(4) + '</td>';
+        rows += '<td>' + item.val_bce.toPrecision(4) + '</td>';
         rows += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
         rows += '<td>' + item.val_recall.toPrecision(4) + '</td>';
         rows += '<td>' + item.val_precision.toPrecision(4) + '</td>';

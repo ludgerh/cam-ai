@@ -88,8 +88,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <table class="table">
       <thead>
         <tr>
-          <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>Loss</th>
-          <th>BinAcc</th><th>Rec</th><th>Prec</th><th>val_Loss</th><th>val_BinAcc</th>
+          <th>Made</th><th>Samples</th><th>Min</th><th>Epochs</th><th>BCE</th>
+          <th>BinAcc</th><th>Rec</th><th>Prec</th><th>val_BCE</th><th>val_BinAcc</th>
           <th>val_Rec</th><th>val_Prec</th><th>Status</th>
         </tr>
       </thead>
@@ -110,7 +110,7 @@ let graph_data = {
   labels: graph_labels,
   datasets: [
     {
-    label: 'val_BinAcc',
+    label: 'val_BCE',
     backgroundColor: 'rgb(200, 0, 0)',
     borderColor: 'rgb(200, 0, 0)',
     yAxisID: 'A',
@@ -199,7 +199,7 @@ function refresh_all() {
         d = datestring.slice(8,10)+'.'+datestring.slice(5,7)+'.'+datestring.slice(0,4);
         if (item.status == 'Done') {
           graph_labels.push(d);
-          graph_data.datasets[0].data.push(item.val_binacc);
+          graph_data.datasets[0].data.push(item.val_bce);
           graph_data.datasets[1].data.push(item.val_recall);
           graph_data.datasets[2].data.push(item.val_precision);
         };
@@ -208,11 +208,11 @@ function refresh_all() {
         rows += '<td>'+(parseInt(item.nr_tr)+parseInt(item.nr_va))+'</td>';
         rows += '<td>'+Math.round(item.minutes)+'</td>';
         rows += '<td>'+item.epochs+'</td>';
-        rows += '<td>'+item.loss.toPrecision(4)+'</td>';
+        rows += '<td>'+item.bce.toPrecision(4)+'</td>';
         rows += '<td>'+item.binacc.toPrecision(4)+'</td>';
         rows += '<td>'+item.recall.toPrecision(4)+'</td>';
         rows += '<td>'+item.precision.toPrecision(4)+'</td>';
-        rows += '<td>'+item.val_loss.toPrecision(4)+'</td>';
+        rows += '<td>'+item.val_bce.toPrecision(4)+'</td>';
         rows += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
         rows += '<td>'+item.val_recall.toPrecision(4)+'</td>';
         rows += '<td>'+item.val_precision.toPrecision(4)+'</td>';

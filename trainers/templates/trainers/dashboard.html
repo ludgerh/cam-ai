@@ -32,10 +32,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <table class="table">
       <thead>
         <tr>
-          <th>Made</th><th>Sam</th><th>MTy</th><th>Aug</th><th>Gam</th><th>Fin</th>
+          <th>Made</th><th>Sam</th><th>ModelType</th><th>Aug</th><th>Gam</th><th>Fin</th>
           <th>LRMin</th><th>LRMax</th><th>LRTar</th><th>ESP</th><th>Min</th>
-          <th>Epochs</th><th>Loss</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
-          <th>val_L</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
+          <th>Epo</th><th>BCE</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
+          <th>val_BCE</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -273,11 +273,11 @@ function refresh_all() {
       newaddition += '<td>' + item.early_stop_patience.toPrecision(2) + '</td>';
       newaddition += '<td>' + Math.round(item.minutes) + '</td>';
       newaddition += '<td>' + item.epochs + '</td>';
-      newaddition += '<td>' + item.loss.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.bce.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.binacc.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.recall.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.precision.toPrecision(4) + '</td>';
-      newaddition += '<td>' + item.val_loss.toPrecision(4) + '</td>';
+      newaddition += '<td>' + item.val_bce.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.val_recall.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.val_precision.toPrecision(4) + '</td>';

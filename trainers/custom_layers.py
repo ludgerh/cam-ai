@@ -28,16 +28,20 @@ class AdaptiveFocalLoss(Loss):
 
   def __init__(self, gamma=2.0, from_logits=False, name="adaptive_focal_loss"):
     super().__init__(name=name)
-    self.gamma = gamma
+    # Variable instead of Python float: a float is baked into the traced graph
+    self.gamma = tf.Variable(float(gamma), trainable=False, dtype=tf.float32)
+    
+  def set_gamma(self, value):
+    self.gamma.assign(float(value))
 
   def call(self, y_true, y_pred):
-    # Always compute using current gamma
+    # gamma is a tf.Variable now, so changes take effect inside the traced graph
     return(tf.keras.losses.binary_focal_crossentropy(
       y_true, y_pred, gamma=self.gamma
     ))
 
   def get_config(self):
-    return({"gamma": self.gamma, "name": self.name})
+    return({'gamma': float(self.gamma.numpy()), 'name': self.name})
 
   @classmethod
   def from_config(cls, config):
