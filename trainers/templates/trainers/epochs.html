@@ -39,8 +39,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 <div class="container-fluid float-left">
   <div class="h4 m-10">
     Starting epoch #
-    <input class="h4 m-2" type="number" id="start_epoch" size="10"  min="1" max="1000" 
+    <input class="h4 m-2" type="number" id="start_epoch" size="10"  min="1" max="100000" 
       step="1" value="1">
+    Nr of epochs
+    <input class="h4 m-2" type="number" id="length_epoch" size="10"  min="2" max="2000" 
+      step="1" value="2000">
   </div>
 </div>
 <div class="container-fluid float-left">
@@ -113,7 +116,8 @@ let last_phase = 0;
 let last_ft = 0;
 let fit_length = -1;
 let graph_labels = [];
-let start_epoch = 1;
+let start_epoch = 0;
+let length_epoch = 2000;
 let graph_data = {
   labels: graph_labels,
   datasets: [
@@ -214,6 +218,8 @@ function refresh_all() {
   trainerutilSocket.sendandwait({
     'command' : 'getepochsinfo',
     'fitnr' : {{ fitnr }},
+    'start' : start_epoch,
+    'length' : length_epoch,
   })
   .then((result) => {
     if (result.length != fit_length) {
@@ -224,17 +230,15 @@ function refresh_all() {
       graph_data.datasets[3].data.length = 0;
       graph_data.datasets[4].data.length = 0;
       let rows = '';
-      counter = 0;
+      counter = start_epoch;
       result.forEach(function(item, index) {
         counter += 1;
-        if (counter >= start_epoch) {
-          graph_labels.push(counter);
-          graph_data.datasets[0].data.push(item.learning_rate);
-          graph_data.datasets[1].data.push(item.augmentation);
-          graph_data.datasets[2].data.push(item.gamma);
-          graph_data.datasets[3].data.push(item.bce);
-          graph_data.datasets[4].data.push(item.val_bce);
-        };
+        graph_labels.push(counter);
+        graph_data.datasets[0].data.push(item.learning_rate);
+        graph_data.datasets[1].data.push(item.augmentation);
+        graph_data.datasets[2].data.push(item.gamma);
+        graph_data.datasets[3].data.push(item.bce);
+        graph_data.datasets[4].data.push(item.val_bce);
         rows += '<tr>';
         rows += '<td>' + counter+'</td>';
         rows += '<td>' + item.phase+'</td>';
@@ -295,7 +299,12 @@ $(document).ready(function() {
     };
   });
   $('#start_epoch').on('change', function () {
-    start_epoch = parseInt($(this).val(), 10) || 0;
+    start_epoch = parseInt($(this).val(), 10) - 1 || 0;
+    fit_length = -1; 
+    refresh_all();
+  });
+  $('#length_epoch').on('change', function () {
+    length_epoch = parseInt($(this).val(), 10) || 0;
     fit_length = -1; 
     refresh_all();
   });

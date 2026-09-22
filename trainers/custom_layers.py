@@ -36,9 +36,20 @@ class AdaptiveFocalLoss(Loss):
 
   def call(self, y_true, y_pred):
     # gamma is a tf.Variable now, so changes take effect inside the traced graph
-    return(tf.keras.losses.binary_focal_crossentropy(
-      y_true, y_pred, gamma=self.gamma
-    ))
+    #return(tf.keras.losses.binary_focal_crossentropy(
+    #  y_true, y_pred, gamma=self.gamma
+    #))
+    # Own implementation: Keras does not clip p_t, so pow(0, gamma) yields a
+    # NaN gradient for gamma < 1 as soon as one prediction saturates
+    y_pred = tf.convert_to_tensor(y_pred)
+    y_true = tf.cast(y_true, y_pred.dtype)
+    eps = keras.backend.epsilon()
+    y_pred = tf.clip_by_value(y_pred, eps, 1.0 - eps)
+    bce = -(y_true * tf.math.log(y_pred)
+      + (1.0 - y_true) * tf.math.log(1.0 - y_pred))
+    p_t = y_true * y_pred + (1.0 - y_true) * (1.0 - y_pred)
+    focal_factor = tf.pow(tf.maximum(1.0 - p_t, eps), self.gamma)
+    return(tf.reduce_mean(focal_factor * bce, axis=-1))
 
   def get_config(self):
     return({'gamma': float(self.gamma.numpy()), 'name': self.name})
@@ -93,7 +104,7 @@ def _rotate(x, degrees):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation="BILINEAR",
-    fill_value=0.0,
+    fill_value=0.5,
   ))
 
 def _translate_x(x, pixels):
@@ -113,7 +124,7 @@ def _translate_x(x, pixels):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation="BILINEAR",
-    fill_value=0.0,
+    fill_value=0.5,
   ))
 
 def _translate_y(x, pixels):
@@ -133,7 +144,7 @@ def _translate_y(x, pixels):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation="BILINEAR",
-    fill_value=0.0,
+    fill_value=0.5,
   ))
 
 # ================================================================
@@ -210,7 +221,7 @@ def _shear_x_batch(x, mag):
   return(tf.raw_ops.ImageProjectiveTransformV3(
     images=x,
     transforms=transform,
-    fill_value=128.0,
+    fill_value=0.5,
     output_shape=tf.shape(x)[1:3],
     interpolation="BILINEAR",
   ))
@@ -227,7 +238,7 @@ def _shear_y_batch(x, mag):
   return(tf.raw_ops.ImageProjectiveTransformV3(
     images=x,
     transforms=transform,
-    fill_value=128.0,
+    fill_value=0.5,
     output_shape=tf.shape(x)[1:3],
     interpolation="BILINEAR",
   ))

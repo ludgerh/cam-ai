@@ -1,5 +1,6 @@
+# trainers/consumers.py
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -421,7 +422,7 @@ class trainerutil(AsyncWebsocketConsumer):
     try:
       if text_data == 'Ping':
         return()
-      #logger.info('<-- ' + text_data)
+      logger.info('<-- ' + text_data)
       params = json.loads(text_data)['data']	
       outlist = {'tracker' : json.loads(text_data)['tracker']}							
 
@@ -541,7 +542,9 @@ class trainerutil(AsyncWebsocketConsumer):
           outlist['data'] = json.loads(returned.data)['data']
         else:
           result = []
-          async for item in epoch.objects.filter(fit=params['fitnr']):
+          async for item in epoch.objects.filter(fit=params['fitnr']).order_by('id')[
+              params['start']:params['start'] + params['length']
+            ]:
             result.append({
               'phase' : item.phase,
               'bce' : item.bce, 
