@@ -193,6 +193,7 @@ let c_view_Socket = null;
 let trigger_Socket = null;
 {% if may_write %}
 let oneitemSocket = null;
+let screw_thrower = false;
 {% endif %}
 let wait = 0;
 let generation = 0;          // increases with every (re)connect cycle
@@ -569,53 +570,69 @@ function initUI() {
         break;
     };    
   }));
-	let overimage = false;
-	$('#imagespace').mousedown((evt) => {
-	  evt.preventDefault(); 
+	let dragging = false;
+  $('#imagespace').mousedown((evt) => {
+    evt.preventDefault();
+    const rect = $('#imagespace')[0].getBoundingClientRect();
+    oneitemSocket.sendandwait({
+      'command': 'mousedown',
+      'x': Math.floor(evt.clientX - rect.left),
+      'y': Math.floor(evt.clientY - rect.top),
+    });
+    dragging = true;
+  });
+  $(document).mouseup((evt) => {
+    // Only relevant if the drag started on the image
+    if (!dragging) {
+      return;
+    };
+    dragging = false;
+    const rect = $('#imagespace')[0].getBoundingClientRect();
+    oneitemSocket.sendandwait({
+      'command': 'mouseup',
+      'x': Math.floor(evt.clientX - rect.left),
+      'y': Math.floor(evt.clientY - rect.top),
+    });
+  });  
+  const ch_edit = $('#ch_edit')[0];
+  $(document).mousemove((evt) => {
+    const edit_mode = ch_edit.checked;
+    const drag_edit = edit_mode && dragging;
+    if (!drag_edit && !screw_thrower) {
+      return;
+    };
     const rect = $('#imagespace')[0].getBoundingClientRect();
     const x = evt.clientX - rect.left;
     const y = evt.clientY - rect.top;
+    // Screw thrower: only moves inside the image area
+    if (!drag_edit && !(x >= 0 && x < rect.width && y >= 0 && y < rect.height)) {
+      return;
+    };
     oneitemSocket.sendandwait({
-      'command': 'mousedown',
+      'command': 'mousemove',
+      'edit_mode': edit_mode,
       'x': Math.floor(x),
       'y': Math.floor(y),
     });
-		overimage = true;
-	});
-	$(document).mouseup((evt) => {
-    const rect = $('#imagespace')[0].getBoundingClientRect();
-    const x = evt.clientX - rect.left;
-    const y = evt.clientY - rect.top;
-    oneitemSocket.sendandwait({
-	    'command' : 'mouseup',
-      'x': Math.floor(x),
-      'y': Math.floor(y),
-    })
-		overimage = false;
-	});
-	$(document).mousemove((evt) => {
-    if($('#ch_edit').prop('checked')) {
-      const rect = $('#imagespace')[0].getBoundingClientRect();
-      const x = evt.clientX - rect.left;
-      const y = evt.clientY - rect.top;
-      oneitemSocket.sendandwait({
-        'command' : 'mousemove',
-        'x': Math.floor(x),
-        'y': Math.floor(y),
-      })
-    };  
-	});
+  });
   $('#imagespace').on('dblclick', (evt) => {
     const rect = $('#imagespace')[0].getBoundingClientRect();
     const x = evt.clientX - rect.left;
     const y = evt.clientY - rect.top;
+    const edit_mode = $('#ch_edit').prop('checked');
 	  oneitemSocket.sendandwait({
 		  'command' : 'dblclick',
-		  'edit_mode' : $('#ch_edit').prop('checked'),
+		  'edit_mode' : edit_mode,
       'x': Math.floor(x),
       'y': Math.floor(y),
 	  })
-	});$('#imagespace').on('contextmenu', (evt) => {
+    .then((result) => {
+      if (!edit_mode) {
+        screw_thrower = result;
+      }  
+    })
+	});
+	$('#imagespace').on('contextmenu', (evt) => {
     evt.preventDefault();
 	  oneitemSocket.sendandwait({
 		  'command' : 'rightclick',

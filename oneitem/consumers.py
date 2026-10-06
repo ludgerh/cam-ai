@@ -275,28 +275,35 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         await self.safe_send(outlist)	
 
       elif params['command'] == 'mousemove':
-        if self.my_viewer.drawpad.edit_active:
-          if self.may_write:
-            self.my_viewer.drawpad.mousemovehandler(
-              round(params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']), 
-              round(params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']), 
-            )
+        if self.may_write:
+          x = round(
+            params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']
+          )
+          y = round(
+            params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']
+          )
+          if params['edit_mode']:
+            self.my_viewer.drawpad.mousemovehandler(x, y)
+          else:    
+            await self.myitem.mousemovehandler(x, y)
         outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+        #logger.info('--> ' + str(outlist))
         await self.safe_send(outlist)	
 
       elif params['command'] == 'dblclick':
         if self.may_write:
-          cam_x = (round(params['x'] 
-            * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']))
-          cam_y = (round(params['y'] 
-            * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']))
           if params['edit_mode']:
-            await self.my_viewer.drawpad.dblclickhandler(cam_x, cam_y)
+            x = round(
+              params['x'] * self.my_viewer.client_dict[self.v_client_nr]['x_scaling']
+            )
+            y = round(
+              params['y'] * self.my_viewer.client_dict[self.v_client_nr]['y_scaling']
+            )
+            await self.my_viewer.drawpad.dblclickhandler(x, y)
+            outlist['data'] = True
           else:
-            await self.myitem.dblclickhandler(cam_x, cam_y)
-        outlist['data'] = 'OK'
-        logger.debug('--> ' + str(outlist))
+            outlist['data'] = await self.myitem.dblclickhandler()
+        #logger.info('--> ' + str(outlist))
         await self.safe_send(outlist)	
         
       elif params['command'] == 'rightclick':

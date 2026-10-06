@@ -16,8 +16,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.losses import BinaryFocalCrossentropy, Loss
+from tensorflow.keras.losses import Loss
 from tensorflow.keras.utils import register_keras_serializable
+
+BASE_MODEL_NAME = 'CAM-AI_BaseModel'
+AUG_LAYER_NAME = 'CAM-AI_Augmentation'
 
 @register_keras_serializable(package="CAMAI")
 class AdaptiveFocalLoss(Loss):
@@ -88,13 +91,18 @@ def _bernoulli_mask(batch_size, p):
 def _rotate(x, degrees):
   b, h, w = _shape(x)
   rad = degrees * PI / 180.0               # [B]
-  cos = tf.cos(rad)                        # [B]
-  sin = tf.sin(rad)                        # [B]
-  zeros = tf.zeros_like(cos)               # [B]
+  cos = tf.cos(rad)
+  sin = tf.sin(rad)
+  zeros = tf.zeros_like(cos)
+  wf = tf.cast(w, tf.float32) - 1.0
+  hf = tf.cast(h, tf.float32) - 1.0
+  # Offsets so that the rotation is centered on the image
+  x_off = (wf - (cos * wf - sin * hf)) / 2.0
+  y_off = (hf - (sin * wf + cos * hf)) / 2.0
   transforms = tf.stack(
     [
-      cos, -sin, zeros,
-      sin,  cos, zeros,
+      cos, -sin, x_off,
+      sin,  cos, y_off,
       zeros, zeros
     ],
     axis=1                                 # → [B,8]
@@ -208,39 +216,51 @@ def _equalize(x, magnitude):
   return(_autocontrast(x, magnitude))
     
 def _shear_x_batch(x, mag):
-  # mag in [0..30] → shear factor ≈ [-0.3 .. 0.3]
-  shear = (mag / 30.0) * tf.random.uniform([], -0.3, 0.3)
-  shear = tf.cast(shear, tf.float32)
-  batch = tf.shape(x)[0]
-  # Transform: [a0, a1, a2, b0, b1, b2, c0, c1]
-  transform = tf.stack([
-    1.0, shear, 0.0,
-    0.0, 1.0  , 0.0,
-    0.0, 0.0], axis=0)
-  transform = tf.tile(transform[None, :], [batch, 1])
+  # mag in [0..30] -> shear factor in [-0.3 .. 0.3], one factor per sample
+  b, h, w = _shape(x)
+  shear = (mag / 30.0) * tf.random.uniform([b], -0.03, 0.03)
+  ones = tf.ones([b])
+  zeros = tf.zeros([b])
+  # Offset keeps the image center fixed: x_in = x + shear * (y - cy)
+  cy = (tf.cast(h, tf.float32) - 1.0) / 2.0
+  transforms = tf.stack(
+    [
+      ones, shear, -shear * cy,
+      zeros, ones, zeros,
+      zeros, zeros
+    ],
+    axis=1                                 # -> [B,8]
+  )
   return(tf.raw_ops.ImageProjectiveTransformV3(
     images=x,
-    transforms=transform,
+    transforms=transforms,
+    output_shape=tf.stack([h, w]),
+    interpolation='BILINEAR',
     fill_value=0.5,
-    output_shape=tf.shape(x)[1:3],
-    interpolation="BILINEAR",
   ))
-  
+
 def _shear_y_batch(x, mag):
-  shear = (mag / 30.0) * tf.random.uniform([], -0.3, 0.3)
-  shear = tf.cast(shear, tf.float32)
-  batch = tf.shape(x)[0]
-  transform = tf.stack([
-    1.0, 0.0 , 0.0,
-    shear, 1.0, 0.0,
-    0.0 , 0.0], axis=0)
-  transform = tf.tile(transform[None, :], [batch, 1])
+  # mag in [0..30] -> shear factor in [-0.3 .. 0.3], one factor per sample
+  b, h, w = _shape(x)
+  shear = (mag / 30.0) * tf.random.uniform([b], -0.03, 0.03)
+  ones = tf.ones([b])
+  zeros = tf.zeros([b])
+  # Offset keeps the image center fixed: y_in = y + shear * (x - cx)
+  cx = (tf.cast(w, tf.float32) - 1.0) / 2.0
+  transforms = tf.stack(
+    [
+      ones, zeros, zeros,
+      shear, ones, -shear * cx,
+      zeros, zeros
+    ],
+    axis=1                                 # -> [B,8]
+  )
   return(tf.raw_ops.ImageProjectiveTransformV3(
     images=x,
-    transforms=transform,
+    transforms=transforms,
+    output_shape=tf.stack([h, w]),
+    interpolation='BILINEAR',
     fill_value=0.5,
-    output_shape=tf.shape(x)[1:3],
-    interpolation="BILINEAR",
   ))
     
 def _sharpness(x, mag):
@@ -290,19 +310,19 @@ def _color_jitter(x, mag):
 
 def _rotate_op(x, M):
   b = tf.shape(x)[0]
-  deg = tf.random.uniform([b], -M, M)          # shape [B]
+  deg = tf.random.uniform([b], -M, M) / 10.0 
   return(_rotate(x, deg))
 
 def _translate_x_op(x, M):
   b = tf.shape(x)[0]
   width = tf.cast(tf.shape(x)[2], tf.float32)
-  dx = tf.random.uniform([b], -M, M) / 30.0 * width * 0.3
+  dx = tf.random.uniform([b], -M, M) / 30.0 * width * 0.03
   return(_translate_x(x, dx))
 
 def _translate_y_op(x, M):
   b = tf.shape(x)[0]
   height = tf.cast(tf.shape(x)[1], tf.float32)
-  dy = tf.random.uniform([b], -M, M) / 30.0 * height * 0.3
+  dy = tf.random.uniform([b], -M, M) / 30.0 * height * 0.03
   return(_translate_y(x, dy))
 
 # ================================================================
@@ -470,3 +490,19 @@ class CAMAI_RandAugment(keras.layers.Layer):
   @classmethod
   def from_config(cls, config):
     return(cls(**config))
+    
+@register_keras_serializable(package='CAMAI')
+class CAMAI_AvgMaxPooling(keras.layers.Layer):
+  """
+  Concatenates global average and global max pooling.
+  Average keeps global properties (brightness, overall state),
+  max keeps strong local responses (small objects).
+  """
+
+  def call(self, x):
+    avg = tf.reduce_mean(x, axis=[1, 2])
+    mx = tf.reduce_max(x, axis=[1, 2])
+    return(tf.concat([avg, mx], axis=-1))
+
+  def compute_output_shape(self, input_shape):
+    return((input_shape[0], 2 * input_shape[-1]))

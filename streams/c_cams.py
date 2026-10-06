@@ -72,6 +72,8 @@ _SH_MEM_ITEMS = {
   'ovl_xpos' : 'i',
   'ovl_ypos' : 'i',  
   'ovl_active' : 'i',
+  'ovl_mode' : 'i',
+  'ovl_count' : 'i',
   'frozen' : 'i',
 }
 
@@ -113,6 +115,7 @@ class c_cam():
     self.shared_mem.write_1_meta('apply_mask', dbline.cam_apply_mask)
     self.shared_mem.write_1_meta('apply_pause', dbline.cam_pause)
     self.shared_mem.write_1_meta('ovl_active', -3)
+    self.shared_mem.write_1_meta('ovl_count', 0)
     self.shared_mem.write_1_meta('frozen', 0)
     self.viewer.drawpad.set_xy((dbline.cam_xres, dbline.cam_yres))
     self.viewer.drawpad.positive_mask = dbline.cam_positive_mask
@@ -125,17 +128,32 @@ class c_cam():
     self.viewer.inqueue.display_qinfo(info = self.type + ' ' + str(self.id) +  ' Spawn: ')
     self.viewer.inqueue.start_data_loop()
   
-  async def dblclickhandler(self, x, y):
-    if self.shared_mem.read_1_meta('ovl_active') <= -2:
-      #print('00000 DblClick', time())
-      self.shared_mem.write_1_meta('ovl_xpos', x)
-      self.shared_mem.write_1_meta('ovl_ypos', y)
-      self.shared_mem.write_1_meta('ovl_active', -1)
-      #print('11111 self.shared_mem.write_1_meta(ovl_active, -1)', time())
+  async def dblclickhandler(self):
+    if self.shared_mem.read_1_meta('ovl_mode'):
+      self.shared_mem.write_1_meta('ovl_mode', 0)
+      return(False)
     else: 
-      # -3 means "off, restore of the freeze buffer still pending",
-      # the cam worker turns it into -2 once the restore is done
-      self.shared_mem.write_1_meta('ovl_active', -3)
+      self.mouse_move_ts = 0.0
+      self.shared_mem.write_1_meta('ovl_count', 0)
+      self.shared_mem.write_1_meta('ovl_mode', 1) 
+      return(True)
+    
+  async def mousemovehandler(self, x ,y):
+    if (new_time := time()) > self.mouse_move_ts + 0.5:
+      self.mouse_move_ts = new_time
+      if self.shared_mem.read_1_meta('ovl_active') <= -2:
+        self.shared_mem.write_1_meta('ovl_xpos', x)
+        self.shared_mem.write_1_meta('ovl_ypos', y)
+        self.shared_mem.write_1_meta('ovl_active', -1)
+        self.shared_mem.write_1_meta(
+          'ovl_count', 
+          self.shared_mem.read_1_meta('ovl_count') + 1,
+        )
+      else: 
+        # -3 means "off, restore of the freeze buffer still pending",
+        # the cam worker turns it into -2 once the restore is done
+        self.shared_mem.write_1_meta('ovl_active', -3)
+  
   
   async def rightclickhandler(self):
     if self.shared_mem.read_1_meta('frozen'):
@@ -355,6 +373,7 @@ class cam_worker(mp_process):
       self.fps_limit = -1
       self.freeze_buffer = None
       self.freeze_buffer_back = None
+      self.screw_mode = False
       datapath = await djconf.agetconfig('datapath', 'data/')
       streams_redis.set_ffmpeg_running(False)
       self.load_overlay(datapath + 'screws/')
@@ -468,7 +487,32 @@ class cam_worker(mp_process):
             aoi = None 
           if (self.dbline.cam_view 
               and streams_redis.view_from_dev('C', self.id)):
-            if await self.viewer_queue.put(frameline, timeout = 5.0) is False:
+            add_string = ''  
+            if self.shared_mem.read_1_meta('frozen'):
+              add_string += f'Cam frozen'
+            if self.shared_mem.read_1_meta('ovl_mode'):
+              if add_string:
+                add_string += ' / '  
+              add_string += f'Throwing screws: {self.shared_mem.read_1_meta('ovl_count')}'
+            if add_string:
+              viewer_frame_line = [
+                frameline[0],
+                frameline[1].copy(),
+                frameline[2],
+              ]
+              cv.putText(
+                viewer_frame_line[1],
+                add_string,
+                (20, viewer_frame_line[1].shape[0] - 20),
+                cv.FONT_HERSHEY_SIMPLEX,
+                1.0,
+                (255, 255, 255),
+                2,
+                cv.LINE_AA,
+              )
+            else:
+              viewer_frame_line = frameline 
+            if await self.viewer_queue.put(viewer_frame_line, timeout = 5.0) is False:
               self.logger.warning(
                 f'CA{self.id}: viewer queue put timed out, frame dropped'
               )
