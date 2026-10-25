@@ -54,8 +54,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     <thead>
       <tr>
         <th>#</th><th>Ph</th><th>Sec</th><th>LR</th><th>BCE</th>
-        <th>FT</th><th>Augm</th><th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
+        <th>FT</th><th>Augm</th><th>Gamma</th><th>BinAcc</th><th>Rec</th><th>Prec</th>        
         <th>val_BCE</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
+        <th>val_Err</th>
       </tr>
     </thead>
     <tbody id="tablebody"></tbody>
@@ -255,6 +256,7 @@ function refresh_all() {
         rows += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
         rows += '<td>' + item.val_recall.toPrecision(4) + '</td>';
         rows += '<td>' + item.val_precision.toPrecision(4) + '</td>';
+        rows += '<td>' + (item.val_errors ?? '-') + '</td>';
         rows += '</tr>';
         last_phase = item.phase;
         last_ft = item.finetuning;

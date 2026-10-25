@@ -558,6 +558,7 @@ class trainerutil(AsyncWebsocketConsumer):
               'val_binacc' : item.val_binacc, 
               'val_recall' : item.val_recall, 
               'val_precision' : item.val_precision, 
+              'val_errors' : item.val_errors, 
               'seconds' : item.seconds, 
               'learning_rate' : item.learning_rate,
             })

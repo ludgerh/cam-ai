@@ -36,7 +36,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
           <th>LRMin</th><th>LRMax</th><th>LRTar</th><th>ESP</th><th>Min</th>
           <th>Epo</th><th>BCE</th><th>BinAcc</th><th>Rec</th><th>Prec</th>
           <th>val_BCE</th><th>val_BinAcc</th><th>val_Rec</th><th>val_Prec</th>
-          <th>Status</th>
+          <th>val_Err</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -281,6 +281,7 @@ function refresh_all() {
       newaddition += '<td>' + item.val_binacc.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.val_recall.toPrecision(4) + '</td>';
       newaddition += '<td>' + item.val_precision.toPrecision(4) + '</td>';
+      newaddition += '<td>' + (item.val_errors ?? '-') + '</td>';
       newaddition += '<td><a href="/trainers/epochs/{{ school.id }}/' 
         + item.id + '/" target="_blank">' + item.status + '</a></td>';
       newaddition += '</tr>';

@@ -769,8 +769,17 @@ class eve_worker(mp_process):
       await a_break_type(BR_SHORT)
       return()
     newframe = self.display_deque.popleft()
-    newframe[1] = newframe[1].copy()  # Ensure the array is writable
+    newframe[1] = newframe[1].copy()  # Ensure the array is writable    
+    sync_factor = self.shared_mem.read_1_meta('sync_factor')
+    # Boxes stay visible only shortly after their last detection. The event
+    # itself stays open for event_time_gap to bridge detection dropouts
+    hold_time = 1.0
     for item in display_list:
+      # Skip frames from before the event began or long after its last frame
+      if not (item.start + sync_factor
+          <= new_frame_time
+          <= item.end + sync_factor + hold_time):
+        continue
       predictions = await item.pred_read(max=1.0)
       if await resolve_rules(self.cond_dict[1], predictions):
         if self.shared_mem.read_1_meta('nr_of_cond_ed') <= 0:

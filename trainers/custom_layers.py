@@ -60,6 +60,42 @@ class AdaptiveFocalLoss(Loss):
   @classmethod
   def from_config(cls, config):
     return(cls(**config))
+    
+@register_keras_serializable(package='CAMAI')
+class CAMAI_SampleErrors(keras.metrics.Metric):
+  """
+  Number of samples with at least one wrong label at the given threshold.
+  Independent of the loss function and of gamma, so it can be compared
+  across finetuning stages with different gamma values.
+  Sample weights are ignored on purpose: we count images, not weights.
+  """
+
+  def __init__(self, threshold=0.5, name='errors', **kwargs):
+    super().__init__(name=name, **kwargs)
+    self.threshold = float(threshold)
+    self.count = self.add_weight(
+      name='count',
+      shape=(),
+      initializer='zeros',
+      dtype='float32',
+    )
+
+  def update_state(self, y_true, y_pred, sample_weight=None):
+    y_true = tf.cast(y_true, tf.float32) >= 0.5
+    y_hat = tf.cast(y_pred, tf.float32) >= self.threshold
+    wrong = tf.reduce_any(tf.not_equal(y_true, y_hat), axis=-1)
+    self.count.assign_add(tf.reduce_sum(tf.cast(wrong, tf.float32)))
+
+  def result(self):
+    return(tf.identity(self.count))
+
+  def reset_state(self):
+    self.count.assign(0.0)
+
+  def get_config(self):
+    config = super().get_config()
+    config.update({'threshold': self.threshold})
+    return(config)    
 
 # ================================================================
 # Utility functions
