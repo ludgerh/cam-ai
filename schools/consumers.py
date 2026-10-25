@@ -381,6 +381,7 @@ class schooldbutil(AsyncWebsocketConsumer):
           lines.append({
             'id' : line.id, 
             'name' : line.name, 
+            'code' : line.code,
             'made_by' : made_by,
             'cs' : [line.c0,line.c1,line.c2,line.c3,line.c4,line.c5,line.c6,
               line.c7,line.c8,line.c9,],

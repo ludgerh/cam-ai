@@ -216,6 +216,7 @@ function refresh_all() {
         rows += '<td>'+item.val_binacc.toPrecision(4)+'</td>';
         rows += '<td>'+item.val_recall.toPrecision(4)+'</td>';
         rows += '<td>'+item.val_precision.toPrecision(4)+'</td>';
+        rows += '<td>' + (item.val_errors ?? '-') + '</td>';
         rows+= '<td><a href="/trainers/epochs/{{ schoolnr }}/'+item.id+'/">'+item.status+'</a></td>';
         rows += '</tr>';
       });

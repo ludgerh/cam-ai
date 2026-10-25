@@ -314,6 +314,7 @@ function getimages() {
     frame_item = {};
     frame_item.idx = item.id;
     frame_item.count = item.count;
+    frame_item.code = item.code;
     frames_list.push(frame_item);
   };
   if (frames_list.length) {
@@ -333,6 +334,10 @@ function getimages() {
           newaddition += '<div class="card m-1 p-0" ';
           newaddition += 'style="border: 1; width: 212px; height: auto;" done=0>';
           newaddition += frame_item.made;
+          // code may be missing or empty for older frames
+          if (frame_item.code) {
+            newaddition += ' ' + frame_item.code[0];
+          };
           newaddition += '<a href="/schools/getbigbmp/1/' + item.idx;
           newaddition += '/" target="_blank">';
           newaddition += '<img loading="lazy" idx=' + item.idx;
@@ -341,6 +346,8 @@ function getimages() {
           newaddition += ' src="/schools/getbmp/1/' + item.idx;
           newaddition += '/3/1/210/210/"></a><br><div class="checklist h4">';
           for (let i=0; i<taglines.length; i++) {
+            // prediction is null if the image file was not found
+            let pred = (item.prediction ? item.prediction[i] : 0);
             {% if may_write %}
               newaddition += '<input type="checkbox" class="tc' + item.idx + '"';
               newaddition += ' img="' + item.idx + '" cnt="'+i+'"';
@@ -350,7 +357,7 @@ function getimages() {
                 newaddition += '>';
               };
             {% endif %}
-            if (item.prediction[i] >= 0.5) {
+            if (pred >= 0.5) {
               if (frame_item.cs[i] < 0.5) {
                 newaddition += '<span class="bluegrey">';
               } else {
@@ -364,7 +371,7 @@ function getimages() {
               };
             };
             newaddition += taglines[i].substr(0,3)+': ';
-            newaddition += Math.round(item.prediction[i]*10000)
+            newaddition += Math.round(pred * 10000)
                 /10000+'</span><br>';
             };
           newaddition += '<h6>'+frame_item.count+': Tagged by ';
