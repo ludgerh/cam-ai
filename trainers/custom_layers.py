@@ -1,3 +1,4 @@
+# trainers/custom_layers.py
 """
 Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -383,6 +384,21 @@ OP_LIST = (
   ("sharpness", _sharpness),
   ("color_jitter", _color_jitter),
 )
+
+# Default augmentation ops, used by the trainer and for models whose config
+# has no 'active_ops' (saved before op_mask was introduced)
+DEFAULT_AUG_OPS = [
+  'rotate',
+  'translate_x',
+  'translate_y',
+  'brightness',
+  'contrast',
+  'shear_x',
+  'shear_y',
+  'sharpness',
+  'color_jitter',
+]
+
 OP_NAMES = tuple(name for name, _ in OP_LIST)
 NUM_OPS = len(OP_LIST)
 ALL_OPS_MASK = (1 << NUM_OPS) - 1
@@ -522,10 +538,26 @@ class CAMAI_RandAugment(keras.layers.Layer):
       "active_ops": mask_to_ops(self._init_op_mask),
     })
     return(config)
-
+    
   @classmethod
   def from_config(cls, config):
+    # Old configs have no 'active_ops': use the trainer's default set instead
+    # of all ops
+    config = dict(config)
+    config.setdefault('active_ops', DEFAULT_AUG_OPS)
     return(cls(**config))
+    
+  def load_own_variables(self, store):    
+    # carry num_layers and magnitude (two scalars). op_mask then keeps the value
+    # built from the config (no 'active_ops' in old configs -> DEFAULT_AUG_OPS,
+    # see from_config()).
+    if (len(store.keys()) == 2
+        and store['0'].shape == ()
+        and store['1'].shape == ()):
+      self.num_layers.assign(store['0'])
+      self.magnitude.assign(store['1'])
+      return()
+    super().load_own_variables(store)
     
 @register_keras_serializable(package='CAMAI')
 class CAMAI_AvgMaxPooling(keras.layers.Layer):
