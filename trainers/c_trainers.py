@@ -34,6 +34,7 @@ from globals.c_globals import tf_workers
 from tf_workers.c_tf_workers import tf_worker_client
 from tf_workers.redis import my_redis as tf_workers_redis
 from tools.l_break import a_break_time, a_break_type, BR_LONG
+from tools.c_redis import my_redis as safe_redis
 from .redis import my_redis as trainers_redis
 
 #from threading import enumerate 
@@ -57,6 +58,11 @@ def decode_and_convert_image(myimage_bytes):
 from tools.c_spawn import spawn_process
 
 CHUNK_SIZE = 8
+SCAN_INTERVAL = 10.0   # full periodic scan of all schools
+WAKE_POLL = 1.0        # how often the wake flag is checked
+SCHOOL_LOCK_TTL = 30   # seconds, per-school insert lock in redis
+WAKE_KEY = 'trainers:wake:'
+SCHOOL_LOCK_KEY = 'trainers:schoollock:'
 
 def _chunked(seq, n):
   for i in range(0, len(seq), n):
@@ -280,9 +286,7 @@ class trainer(spawn_process):
           pass
 
   async def job_queue_thread(self):
-    from globals.c_globals import trainers
     from tf_workers.models import school
-    from .models import trainframe, fit
     try:
       if self.id == 1:
         schoollines = await sync_to_async(list)(school.objects.filter(
@@ -293,99 +297,18 @@ class trainer(spawn_process):
           trainers_redis.set_predict_proc_active(s_item.id, False)
           trainers_redis.set_predict_proc_started(s_item.id, False)
         self.glob_lock.release()
+      # A stale wake flag from a previous run must not survive a restart.
+      safe_redis.delete(WAKE_KEY + str(self.id))
+      last_scan = 0.0
       while not self.got_sigint:
-        schoollines = await sync_to_async(list)(school.objects.filter(active = True))
-        if trainers_redis.get_check_proc_started():
-          await a_break_time(10.0)
-        else:
-          trainers_redis.set_check_proc_started(True)
-          try:
-            for s_item in schoollines:
-              await s_item.arefresh_from_db()
-              if s_item.delegation_level == 1:
-                asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
-
-              # --- change detection -------------------------------------------------
-              # model_to_dict() with exclude=['trainers'] touches concrete fields
-              # only (attribute access, no DB query), so it is safe to call
-              # synchronously in async context and cheap enough per pass.
-              new_school_dict = model_to_dict(s_item, exclude = ['trainers', ])
-              school_change = (new_school_dict != self.school_cache.get(s_item.id))
-              self.school_cache[s_item.id] = new_school_dict
-              new_last_frame = trainers_redis.get_last_frame(s_item.id)
-              frames_change = (new_last_frame != self.frames_cache.get(s_item.id))
-              self.frames_cache[s_item.id] = new_last_frame
-
-              # A pending request in the m2m field is invisible to the dict above
-              # (it is excluded), so it must be queried explicitly BEFORE the gate.
-              has_trainer_request = await s_item.trainers.filter(id = self.id).aexists()
-
-              if not (school_change or frames_change or has_trainer_request):
-                # Nothing to do for this school: yield to the event loop and
-                # move on. No fixed sleep penalty per school.
-                await asyncio.sleep(0)
-                continue
-
-              # --- skip schools that are already queued on any trainer --------------
-              already_queued = False
-              for t_item in trainers:
-                queue_info = trainers[t_item].getqueueinfo() or []
-                if s_item.id in queue_info:
-                  already_queued = True
-                  break
-              if already_queued:
-                self.logger.warning(
-                  f'TR{self.id}: School #{s_item.id} not inserted into trainer queue '
-                  + 'because already in.'
-                )
-                continue
-
-              # --- build run condition ----------------------------------------------
-              filterdict = {
-                'school' : s_item.id,
-                'train_status' : 0,
-              }
-              if not s_item.ignore_checked:
-                filterdict['checked'] = True
-              undone_qs = trainframe.objects.filter(**filterdict)
-              if has_trainer_request:
-                run_condition = await trainframe.objects.filter(
-                  school = s_item.id,
-                ).aexists()
-                if not run_condition:
-                  self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
-                # Consume the request in any case, otherwise it would fire again
-                # on every pass.
-                await sync_to_async(s_item.trainers.remove)(self.dbline)
-              else:
-                run_condition = (
-                  await undone_qs.acount() >= s_item.trigger
-                  and s_item.id not in self.job_queue_list
-                  and s_item.delegation_level == 1
-                )
-
-              # --- insert job -------------------------------------------------------
-              if run_condition:
-                await undone_qs.aupdate(train_status = 1)
-                myfit = fit(
-                  made = timezone.now(),
-                  school = s_item.id,
-                  model_image_augmentation = s_item.model_image_augmentation,
-                  model_gamma = s_item.model_gamma,
-                  model_finetuning = s_item.model_finetuning,
-                  status = 'Waiting',
-                )
-                await myfit.asave()
-                with self.mylock:
-                  self.job_queue_list.append(s_item.id)
-                trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
-                await self.job_queue.put((s_item, myfit))
-          finally:
-            # Always release the global scan flag, even on exception or
-            # cancellation. Without this, one crash freezes ALL trainers.
-            trainers_redis.set_check_proc_started(False)
+        # delete() returns the number of removed keys, so this consumes the
+        # flag atomically: 1 -> somebody asked for an immediate scan.
+        woken = bool(safe_redis.delete(WAKE_KEY + str(self.id)))
+        if woken or (time() - last_scan) >= SCAN_INTERVAL:
+          last_scan = time()
+          await self.scan_schools()
         try:
-          await a_break_time(10.0)
+          await a_break_time(WAKE_POLL)
         except asyncio.exceptions.CancelledError:
           return()
     except asyncio.exceptions.CancelledError:
@@ -397,7 +320,116 @@ class trainer(spawn_process):
         + self.logname
         + ' - ' + str(self.id)
       )
-      self.logger.critical("job_queue_thread crashed: %s", fatal, exc_info=True)
+      self.logger.critical('job_queue_thread crashed: %s', fatal, exc_info=True)
+
+  async def scan_schools(self):
+    # One pass over all active schools. Runs independently per trainer, no
+    # global scan flag any more: the cross-trainer queue check plus the
+    # per-school redis lock in insert_job() prevent duplicate jobs.
+    from tf_workers.models import school
+    from .models import trainframe
+    schoollines = await sync_to_async(list)(school.objects.filter(active = True))
+    for s_item in schoollines:
+      if self.got_sigint:
+        return()
+      await s_item.arefresh_from_db()
+      if s_item.delegation_level == 1:
+        asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
+
+      # --- change detection ---------------------------------------------------
+      # model_to_dict() with exclude=['trainers'] touches concrete fields
+      # only (attribute access, no DB query), so it is safe to call
+      # synchronously in async context and cheap enough per pass.
+      new_school_dict = model_to_dict(s_item, exclude = ['trainers', ])
+      school_change = (new_school_dict != self.school_cache.get(s_item.id))
+      self.school_cache[s_item.id] = new_school_dict
+      new_last_frame = trainers_redis.get_last_frame(s_item.id)
+      frames_change = (new_last_frame != self.frames_cache.get(s_item.id))
+      self.frames_cache[s_item.id] = new_last_frame
+
+      # A pending request in the m2m field is invisible to the dict above
+      # (it is excluded), so it must be queried explicitly BEFORE the gate.
+      has_trainer_request = await s_item.trainers.filter(id = self.id).aexists()
+
+      if not (school_change or frames_change or has_trainer_request):
+        await asyncio.sleep(0)
+        continue
+
+      # --- skip schools that are already queued on any trainer ----------------
+      if self.is_queued_anywhere(s_item.id):
+        self.logger.warning(
+          f'TR{self.id}: School #{s_item.id} not inserted into trainer queue '
+          + 'because already in.'
+        )
+        if has_trainer_request:
+          await sync_to_async(s_item.trainers.remove)(self.dbline)
+        continue
+
+      # --- build run condition ------------------------------------------------
+      filterdict = {
+        'school' : s_item.id,
+        'train_status' : 0,
+      }
+      if not s_item.ignore_checked:
+        filterdict['checked'] = True
+      undone_qs = trainframe.objects.filter(**filterdict)
+      if has_trainer_request:
+        run_condition = await trainframe.objects.filter(
+          school = s_item.id,
+        ).aexists()
+        if not run_condition:
+          self.logger.warning(f'TR{self.id}: School #{s_item.id} has no images.')
+        # Consume the request in any case, otherwise it would fire again
+        # on every pass.
+        await sync_to_async(s_item.trainers.remove)(self.dbline)
+      else:
+        run_condition = (
+          await undone_qs.acount() >= s_item.trigger
+          and s_item.id not in self.job_queue_list
+          and s_item.delegation_level == 1
+        )
+
+      if run_condition:
+        await self.insert_job(s_item, undone_qs)
+
+  def is_queued_anywhere(self, school_nr):
+    from globals.c_globals import trainers
+    for t_item in trainers:
+      queue_info = trainers[t_item].getqueueinfo() or []
+      if school_nr in queue_info:
+        return(True)
+    return(False)
+
+  async def insert_job(self, s_item, undone_qs):
+    from .models import fit
+    lock_key = SCHOOL_LOCK_KEY + str(s_item.id)
+    # SET NX EX: only one trainer may insert a job for this school at a time.
+    # The TTL guarantees the lock disappears even after a hard kill.
+    if not safe_redis.set(lock_key, self.id, nx = True, ex = SCHOOL_LOCK_TTL):
+      self.logger.info(
+        f'TR{self.id}: School #{s_item.id} is being inserted by another trainer.'
+      )
+      return()
+    try:
+      # Re-check under the lock, another trainer may have won the race.
+      if self.is_queued_anywhere(s_item.id):
+        return()
+      await undone_qs.aupdate(train_status = 1)
+      myfit = fit(
+        made = timezone.now(),
+        school = s_item.id,
+        model_image_augmentation = s_item.model_image_augmentation,
+        model_gamma = s_item.model_gamma,
+        model_finetuning = s_item.model_finetuning,
+        status = 'Waiting',
+      )
+      await myfit.asave()
+      with self.mylock:
+        self.job_queue_list.append(s_item.id)
+      trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
+      await self.job_queue.put((s_item, myfit))
+    finally:
+      safe_redis.delete(lock_key)
 
 #***************************************************************************
 #
@@ -407,3 +439,8 @@ class trainer(spawn_process):
 
   def getqueueinfo(self):
     return(trainers_redis.get_trainerqueue(self.id))
+
+  def wake(self):
+    # Ask the trainer process for an immediate scan instead of waiting for
+    # the next SCAN_INTERVAL. Safe to call from any process.
+    safe_redis.set(WAKE_KEY + str(self.id), 1, ex = 60)

@@ -312,6 +312,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           await self.ws.send_str(json.dumps(indict))
         else:
           await sync_to_async(self.myschoolline.trainers.add)(self.mytrainerline)
+          trainers[self.mytrainerline.id].wake()
           
       elif indict['code'] == 'checkfitdone':
         if self.mytrainerline.t_type == 2:
@@ -611,6 +612,7 @@ class trainerutil(AsyncWebsocketConsumer):
           self.close()	
         schoolline = await school.objects.aget(id=self.schoolnr)
         await sync_to_async(schoolline.trainers.add)(self.trainerline)
+        trainers[self.trainerline.id].wake()
         outlist['data'] = 'OK' 
         #logger.info('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	

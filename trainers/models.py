@@ -1,3 +1,4 @@
+# trainers/models.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -94,7 +95,13 @@ class trainframe(models.Model):
 
   class Meta:
     indexes = [
-        models.Index(fields=["name", "school"]),
+      models.Index(fields = ['name', 'school']),
+      # scan_schools()/insert_job(): filter(school, train_status, checked)
+      # and the train_status=1 -> 2 update after a finished fit. The left
+      # prefix also covers plain filter(school) and filter(school, train_status).
+      models.Index(fields = ['school', 'train_status', 'checked']),
+      # update_predictions(): filter(school, deleted).exclude(last_fit=...)
+      models.Index(fields = ['school', 'deleted', 'last_fit']),
     ]
 
 class fit(models.Model):

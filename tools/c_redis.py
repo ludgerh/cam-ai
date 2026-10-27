@@ -1,3 +1,4 @@
+# tools/c_redis.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -44,15 +45,17 @@ class saferedis(Redis):
       except ConnectionError:
         sleep(1.0)
     
-  def set(self, key, value, ex=None):
+    
+  def set(self, key, value, ex=None, nx=False):
     if self.debug:
-      print(round(time() - self.start_ts, 5), 'SET', key, reduce(value))
+      print(round(time() - self.start_ts, 5), 'SET', key, reduce(value), 'nx' if nx else '')
     for _ in range(10):  
       try:  
-        super().set(key, value, ex)
-        break
+        # Return the redis result: True on success, None if nx=True and
+        # the key already existed.
+        return(super().set(key, value, ex=ex, nx=nx))
       except ConnectionError:
-        sleep(1.0)
+        sleep(1.0)  
     
   def incr(self, key):
     if self.debug:
@@ -67,7 +70,8 @@ class saferedis(Redis):
   def delete(self, key):
     if self.debug:
       print(round(time() - self.start_ts, 5), 'DELETE', key)
-    super().delete(key)
+    # Number of removed keys (0 or 1), needed to consume flags atomically.
+    return(super().delete(key))
     
   def pubsub(self, *args, **kwargs):
     if self.debug:
@@ -82,7 +86,7 @@ class saferedis(Redis):
           print(round(time() - self.start_ts, 5), 'EXISTS', args, kwargs)
           return(result)
         else:  
-          return(super().exists(*args, *kwargs))
+          return(super().exists(*args, **kwargs))
         break
       except (ConnectionResetError, ConnectionError):
         now = datetime.now()
