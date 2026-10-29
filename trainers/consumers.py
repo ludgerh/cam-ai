@@ -579,6 +579,8 @@ class trainerutil(AsyncWebsocketConsumer):
             'model_type' : line.model_type, 
             'model_image_augmentation' : line.model_image_augmentation, 
             'model_gamma' : line.model_gamma, 
+            'model_gamma_step' : line.model_gamma_step, 
+            'model_gamma_max' : line.model_gamma_max, 
             'model_finetuning' : line.model_finetuning, 
             'l_rate_min' : line.l_rate_min, 
             'l_rate_max' : line.l_rate_max, 

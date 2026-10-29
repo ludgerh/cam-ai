@@ -189,12 +189,14 @@ class c_viewConsumer(AsyncWebsocketConsumer):
             params['idx'], 
           )
           if params['type'] in {'D', 'E'}:
-            myitem = viewables[params['idx']][params['type']]
-            try:
-              outlist['data']['xdim'] = myitem.shared_mem.read_1_meta('aoi_xdim')
-              outlist['data']['ydim'] = myitem.shared_mem.read_1_meta('aoi_ydim')
-            except TypeError:
-              pass  
+            # Stream may not be registered yet right after server start
+            myitem = viewables.get(params['idx'], {}).get(params['type'])
+            if myitem is not None:
+              try:
+                outlist['data']['xdim'] = myitem.shared_mem.read_1_meta('aoi_xdim')
+                outlist['data']['ydim'] = myitem.shared_mem.read_1_meta('aoi_ydim')
+              except TypeError:
+                pass
           #logger.info('--> ' + str(outlist))
           try:
             await self.send(json.dumps(outlist))	
