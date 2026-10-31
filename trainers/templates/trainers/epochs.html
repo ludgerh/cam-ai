@@ -1,4 +1,5 @@
 {% comment %}
+Source: trainers/templates/trainers/epochs.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -237,7 +238,7 @@ function refresh_all() {
       graph_data.datasets[3].data.length = 0;
       graph_data.datasets[4].data.length = 0;
       let rows = '';
-      counter = start_epoch;
+      let counter = start_epoch;
       result.forEach(function(item, index) {
         counter += 1;
         graph_labels.push(counter);
@@ -246,6 +247,8 @@ function refresh_all() {
         graph_data.datasets[2].data.push(item.gamma);
         graph_data.datasets[3].data.push(item.bce);
         graph_data.datasets[4].data.push(item.val_bce);
+        const older_rows = rows;
+        rows = '';
         rows += '<tr>';
         rows += '<td>' + counter+'</td>';
         rows += '<td>' + item.phase+'</td>';
@@ -264,6 +267,7 @@ function refresh_all() {
         rows += '<td>' + item.val_precision.toPrecision(4) + '</td>';
         rows += '<td>' + (item.val_errors ?? '-') + '</td>';
         rows += '</tr>';
+        rows += older_rows;
         last_phase = item.phase;
         last_ft = item.finetuning;
       });
@@ -301,7 +305,6 @@ $(document).ready(function() {
         for (const [key, value] of Object.entries(result)) {
           $('#'+key).text(value);
         };
-        $('#params').html(result);
         refresh_all();
       })
     };
