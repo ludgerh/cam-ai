@@ -91,7 +91,8 @@ class startup_class():
       startup_redis.set_shutdown_command(0)
       trainers_redis.set_check_proc_started(False)
       await sync_to_async(version_upgrade)(old_version, software_version)
-      await clean_fits()
+      for path in await clean_fits():
+        logger.info(f'Removed stale temp model: {path}')
       for item in tf_workers:
         tf_workers[item].start()
       for item in trainers:

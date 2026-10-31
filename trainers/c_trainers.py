@@ -16,6 +16,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import asyncio
+import os
+from glob import glob
 import aiofiles
 import aiofiles.os
 import aiohttp
@@ -39,12 +41,30 @@ from .redis import my_redis as trainers_redis
 
 #from threading import enumerate 
 
+def remove_temp_models(school_dirs):
+  # Checkpoints of the GPU trainer (<model>_temp_<epoch>.keras). Normally
+  # removed when a fit ends, but left behind by killed or crashed fits.
+  removed = []
+  for school_dir in school_dirs:
+    for path in glob(os.path.join(school_dir, 'model', '*_temp_*.keras')):
+      try:
+        os.remove(path)
+        removed.append(path)
+      except FileNotFoundError:
+        pass
+  return(removed)
+
 async def clean_fits():
+  # Runs at startup before the trainers start, so no fit is using the
+  # temp files. Returns the list of removed temp files.
   from .models import fit
+  from tf_workers.models import school
   async for item in fit.objects.all():
     if item.status in {'Waiting', 'Queuing', 'Working', }:
       item.status = 'Stopped'
-      await item.asave(update_fields=['status', ])        
+      await item.asave(update_fields=['status', ])
+  school_dirs = {item async for item in school.objects.values_list('dir', flat = True)}
+  return(await asyncio.to_thread(remove_temp_models, sorted(school_dirs)))
 
 #***************************************************************************
 #
