@@ -56,6 +56,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
         <option value='100000'>100000</option>
       </select>
     </span>
+    <span style="white-space:nowrap; display: inline-block;">
+      Filter:
+      <select class=" m-2" id="tagfilterselect">
+        <option value='-1' selected>All</option>
+      </select>
+    </span>
   </h4>
   <div class="container-fluid float-left" id="gallery">
   </div>
@@ -107,6 +113,7 @@ function draw_all_lines() {
     'streamnr' : {{ stream.id }},
     'pagesize' : parseInt($('#pagesizeselect').val()),
     'showdone' : false,
+    'tagfilter' : parseInt($('#tagfilterselect').val()),
   })
   .then(() => {
     return(SchoolDBUtilSocket.sendandwait({
@@ -466,6 +473,10 @@ $(document).ready(function () {
     page_nr = 1;
     draw_all_lines();
   });
+  $('#tagfilterselect').change(function() {
+    page_nr = 1;
+    draw_all_lines();
+  });
 {% if may_write_stream %}
   $('.delbutton').click(function(evt) {
     SchoolDBUtilSocket.sendandwait({
@@ -494,6 +505,10 @@ $(document).ready(function () {
 	})
 	.then((result) => {
 		taglines = result;
+    for (let k=0; k<taglines.length; k++) {
+      $('#tagfilterselect').append('<option value="' + k + '">'
+        + taglines[k] + '</option>');
+    };
     $(window).on('resize scroll', function() {
       get_lines();
     });
