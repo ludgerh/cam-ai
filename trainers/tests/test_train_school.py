@@ -122,7 +122,7 @@ class TrainSchoolTest(TransactionTestCase):
     )
 
     datapath = self.tmpdir + '/data/'
-    config = {
+    self.config = config = {
       'version' : train_worker_gpu.version,
       'tr_epochs' : EPOCHS,
       'tr_batchsize' : 32,
@@ -209,3 +209,27 @@ class TrainSchoolTest(TransactionTestCase):
     self.assertTrue(self.myschool.load_last_model)
     if self.myschool.model_type == self.myschool.model_train_type:
       self.assertEqual(self.myschool.last_fit, old_last_fit + 1)
+
+  def test_no_best_epoch_keeps_model(self):
+    # A model is only selected after SCORE_WINDOW epochs. With fewer epochs
+    # there is no best model: the fit must end cleanly as 'Stopped' and the
+    # existing model must stay untouched.
+    self.config['tr_epochs'] = train_worker_gpu.SCORE_WINDOW - 1
+    model_name = self.myschool.model_train_type
+    modelpath = self.school_dir + 'model/'
+    with open(modelpath + model_name + '.keras', 'rb') as f:
+      old_model = f.read()
+    old_last_fit = self.myschool.last_fit
+
+    train_worker_gpu.train_once_gpu(self.myschool, self.myfit, GPU_NR, 0)
+
+    self.myfit.refresh_from_db()
+    self.assertEqual(self.myfit.status, 'Stopped')
+    self.assertEqual(self.myfit.epochs, 0)
+    self.assertEqual(epoch.objects.filter(fit = self.myfit).count(),
+      train_worker_gpu.SCORE_WINDOW - 1)
+    with open(modelpath + model_name + '.keras', 'rb') as f:
+      self.assertEqual(f.read(), old_model)
+    self.assertEqual(sorted(os.listdir(modelpath)), [model_name + '.keras'])
+    self.myschool.refresh_from_db()
+    self.assertEqual(self.myschool.last_fit, old_last_fit)
