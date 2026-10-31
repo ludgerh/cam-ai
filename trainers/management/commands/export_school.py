@@ -15,9 +15,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 # Exports a sample of a school (DB rows + files) for the training test in
-# trainers/tests/test_train_school.py. Reads only, the school is not changed.
+# trainers/tests/test_train_school.py and for tune_school. Reads only, the
+# school is not changed.
 #
 #   python manage.py export_school 8 --frames 200
+#   python manage.py export_school 8 --frames 0     # all frames
 
 import json
 import os
@@ -40,7 +42,8 @@ class Command(BaseCommand):
 
   def add_arguments(self, parser):
     parser.add_argument('school_id', type = int)
-    parser.add_argument('--frames', type = int, default = 200)
+    parser.add_argument('--frames', type = int, default = 200,
+      help = 'Number of frames, 0 = all')
     parser.add_argument('--seed', type = int, default = 1)
     parser.add_argument('--out', default = None,
       help = 'Target directory, default: ' + EXPORT_BASE + 'school<id>/')
@@ -71,19 +74,22 @@ class Command(BaseCommand):
     if len(frames) < options['frames']:
       raise CommandError(
         f'School #{myschool.id} has only {len(frames)} usable frames')
-    # Stratified by TR/VA so the validation split stays as in the school
-    rng = Random(options['seed'])
-    by_code = {}
-    for item in frames:
-      by_code.setdefault(item.code, []).append(item)
-    sample = []
-    for code, items in sorted(by_code.items()):
-      count = round(options['frames'] * len(items) / len(frames))
-      sample += rng.sample(items, min(count, len(items)))
-    rest = [item for item in frames if item not in sample]
-    while len(sample) < options['frames']:
-      sample.append(rest.pop(rng.randrange(len(rest))))
-    sample = sample[:options['frames']]
+    if options['frames'] == 0:
+      sample = frames
+    else:
+      # Stratified by TR/VA so the validation split stays as in the school
+      rng = Random(options['seed'])
+      by_code = {}
+      for item in frames:
+        by_code.setdefault(item.code, []).append(item)
+      sample = []
+      for code, items in sorted(by_code.items()):
+        count = round(options['frames'] * len(items) / len(frames))
+        sample += rng.sample(items, min(count, len(items)))
+      rest = [item for item in frames if item not in sample]
+      while len(sample) < options['frames']:
+        sample.append(rest.pop(rng.randrange(len(rest))))
+      sample = sample[:options['frames']]
 
     coded_count = 0
     frame_rows = []
