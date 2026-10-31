@@ -39,7 +39,7 @@ hyperlink==21.0.0
 idna==3.11
 incremental==24.7.2
 isodate==0.7.2
-keras==3.12.0
+keras==3.13.2
 libclang==18.1.1
 lxml==6.0.2
 Markdown==3.10
