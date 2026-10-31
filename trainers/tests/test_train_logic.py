@@ -22,7 +22,8 @@ from django.test import SimpleTestCase
 
 try:
   from plugins.train_worker_gpu.train_worker_gpu import (
-    quantize_lr, is_better_score, next_stage_gamma, train_schedule,
+    quantize_lr, is_better_score, next_stage_gamma, next_finetuning,
+    train_schedule,
     OVERFIT_BOTH_FALLING, OVERFIT_BOTH_RISING, OVERFIT_POSITIVE,
     OVERFIT_NEGATIVE, OVERFIT_SHORT,
   )
@@ -99,6 +100,25 @@ class NextStageGammaTest(SimpleTestCase):
 
   def test_never_below_min(self):
     self.assertEqual(next_stage_gamma(0.0, 1.0, 0.5, 3.0, recent_errors = 0), 1.0)
+
+@skipIf(plugin_missing, 'plugins/train_worker_gpu not installed')
+class NextFinetuningTest(SimpleTestCase):
+
+  def test_stages_efficientnetv2_b0(self):
+    stages = [0]
+    while stages[-1] < 349:
+      stages.append(next_finetuning(stages[-1], 349))
+    self.assertEqual(stages, [0, 10, 87, 349])
+
+  def test_start_between_stages(self):
+    self.assertEqual(next_finetuning(30, 349), 87)
+
+  def test_small_model(self):
+    self.assertEqual(next_finetuning(0, 10), 1)
+    self.assertEqual(next_finetuning(1, 10), 2)
+
+  def test_never_above_total(self):
+    self.assertEqual(next_finetuning(349, 349), 349)
 
 @skipIf(plugin_missing, 'plugins/train_worker_gpu not installed')
 class TrainScheduleTest(SimpleTestCase):
