@@ -92,6 +92,17 @@ class NextStageGammaTest(SimpleTestCase):
   def test_raise_on_remaining_errors(self):
     self.assertEqual(next_stage_gamma(0.0, 0.0, 0.5, 3.0, recent_errors = 1), 0.5)
 
+  def test_raise_from_current_gamma(self):
+    gamma = 0.0
+    ramp = []
+    for i in range(8):
+      gamma = next_stage_gamma(gamma, 0.0, 0.5, 3.0, recent_errors = 2)
+      ramp.append(gamma)
+    self.assertEqual(ramp, [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.0, 3.0])
+
+  def test_zero_step_keeps_gamma(self):
+    self.assertEqual(next_stage_gamma(0.0, 0.0, 0.0, 0.0, recent_errors = 5), 0.0)
+
   def test_capped_at_max(self):
     self.assertEqual(next_stage_gamma(2.5, 2.5, 1.0, 3.0, recent_errors = 4), 3.0)
 
