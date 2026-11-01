@@ -197,6 +197,23 @@ class TrainScheduleTest(SimpleTestCase):
     s = filled_schedule(val, val)
     self.assertGreater(s.check_volatility_trend(), 0.0)
 
+  def test_final_done_at_lr_min(self):
+    # At the minimum LR, width epochs without progress end the phase,
+    # even while the range check alone would still continue
+    s = train_schedule(patience = PATIENCE)
+    self.assertEqual(s.width, 2)
+    self.assertFalse(s.final_done(True, 1))
+    self.assertTrue(s.final_done(True, 2))
+
+  def test_final_done_above_lr_min(self):
+    # Above the minimum LR only the range check counts
+    s = train_schedule(patience = PATIENCE)
+    self.assertFalse(s.final_done(False, 100))
+    s = filled_schedule(falling(), falling())
+    self.assertFalse(s.final_done(False, 100))
+    s = filled_schedule(rising(), rising())
+    self.assertTrue(s.final_done(False, 0))
+
 @skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
 class MyCallbackStageTest(SimpleTestCase):
 
