@@ -18,12 +18,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # The plugin is not part of the repository, so the tests skip without it.
 
 from unittest import skipIf
+from unittest.mock import MagicMock
 from django.test import SimpleTestCase
 
 try:
   from plugins.train_worker_gpu.train_worker_gpu import (
     quantize_lr, is_better_score, next_stage_gamma, next_finetuning,
-    train_schedule,
+    train_schedule, MyCallback,
     OVERFIT_BOTH_FALLING, OVERFIT_BOTH_RISING, OVERFIT_POSITIVE,
     OVERFIT_NEGATIVE, OVERFIT_SHORT,
   )
@@ -195,3 +196,18 @@ class TrainScheduleTest(SimpleTestCase):
       val.append(val[-1] - step)
     s = filled_schedule(val, val)
     self.assertGreater(s.check_volatility_trend(), 0.0)
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackStageTest(SimpleTestCase):
+
+  def test_start_stage_keeps_global_best(self):
+    # The fit record is filled from the epoch of the global best. A stage
+    # without a new best must not lose it (fit was saved with epochs = 0
+    # and the metrics of the last epoch).
+    cb = MyCallback(MagicMock(), MagicMock(), MagicMock(), 0, patience = 12)
+    self.assertEqual(cb.nr_to_save, 0)
+    cb.nr_to_save = 266
+    cb.best_name = 'model_temp_266.keras'
+    cb.start_stage(0.0)
+    self.assertEqual(cb.nr_to_save, 266)
+    self.assertEqual(cb.best_name, 'model_temp_266.keras')
