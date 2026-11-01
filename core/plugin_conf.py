@@ -14,21 +14,16 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-import sys
-import importlib.util
 from pathlib import Path
 from streams.models import stream
+from tools.l_tools import load_plugin
 from .models import plugin as plugin_dbline
 
 def get_subdirs(path):
   return [p for p in Path(path).iterdir() if p.is_dir()]
   
 def update_db(file_path, default):
-  module_name = f'plugin_{file_path.parent.name}'
-  spec = importlib.util.spec_from_file_location(module_name, file_path)
-  module = importlib.util.module_from_spec(spec)
-  sys.modules[module_name] = module
-  spec.loader.exec_module(module)
+  module = load_plugin(file_path)
   plugin_class = getattr(module, 'plugin')
   result = plugin_dbline.objects.update_or_create(
     defaults = {

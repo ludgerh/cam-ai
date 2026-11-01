@@ -76,3 +76,71 @@ class djconfigtest(TestCase):
     self.assertIs(djconf.getconfigbool('DontUseThisOneInRealLife'), True)
     djconf.setconfig('DontUseThisOneInRealLife', 'Nein')
     self.assertIs(djconf.getconfigbool('DontUseThisOneInRealLife'), False)
+
+# load_plugin() with and without a compiled extension next to the source.
+# The compiled case needs Cython and a C compiler and skips without them.
+
+import sys
+import shutil
+import sysconfig
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import skipIf
+from django.test import SimpleTestCase
+from .l_tools import load_plugin
+
+try:
+  from Cython.Build import cythonize
+  from setuptools import Extension
+  from setuptools.dist import Distribution
+  cython_missing = shutil.which(sysconfig.get_config_var('CC').split()[0]) is None
+except ImportError:
+  cython_missing = True
+
+PLUGIN_SOURCE = 'import cython\nvalue = 42\ncompiled = cython.compiled\n'
+
+class LoadPluginTest(SimpleTestCase):
+
+  def setUp(self):
+    tmpdir = TemporaryDirectory()
+    self.addCleanup(tmpdir.cleanup)
+    self.plugin_dir = Path(tmpdir.name) / 'plugins' / 'test_load_plugin'
+    self.plugin_dir.mkdir(parents = True)
+    self.plugin_file = self.plugin_dir / 'plugin.py'
+    self.plugin_file.write_text(PLUGIN_SOURCE)
+    self.module_name = 'plugins.test_load_plugin.plugin'
+    self.addCleanup(sys.modules.pop, self.module_name, None)
+
+  def test_loads_source(self):
+    module = load_plugin(self.plugin_file)
+    self.assertEqual(module.value, 42)
+    self.assertFalse(module.compiled)
+    self.assertEqual(module.__name__, self.module_name)
+    self.assertIs(sys.modules[self.module_name], module)
+
+  def test_returns_cached_module(self):
+    module = load_plugin(self.plugin_file)
+    self.assertIs(load_plugin(self.plugin_file), module)
+
+  def test_base_package_missing(self):
+    with self.assertRaises(ValueError):
+      load_plugin(self.plugin_file, base_package = 'not_there')
+
+  @skipIf(cython_missing, 'Cython or C compiler not available')
+  def test_prefers_compiled(self):
+    dist = Distribution({'ext_modules' : cythonize(
+      [Extension(self.module_name, [str(self.plugin_file)])],
+      compiler_directives = {'language_level' : 3},
+      quiet = True,
+    )})
+    cmd = dist.get_command_obj('build_ext')
+    cmd.build_temp = str(self.plugin_dir / 'build')
+    cmd.build_lib = str(self.plugin_dir / 'lib')
+    cmd.ensure_finalized()
+    cmd.run()
+    built = Path(cmd.get_ext_fullpath(self.module_name))
+    shutil.copy(built, self.plugin_dir / built.name)
+    module = load_plugin(self.plugin_file)
+    self.assertEqual(module.value, 42)
+    self.assertTrue(module.compiled)
+    self.assertTrue(module.__file__.endswith(built.name))

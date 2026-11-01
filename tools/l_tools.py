@@ -22,6 +22,7 @@ import psutil
 import sys
 import numpy as np
 import importlib.util
+import importlib.machinery
 from pathlib import Path
 from time import sleep
 from pathlib import Path
@@ -490,6 +491,14 @@ async def merge_move(src: Path, dst: Path):
         await aiofiles.os.remove(target)
       await aioshutil.move(item, target)
 
+def compiled_plugin(p: Path) -> Optional[Path]:
+  # A C extension (e.g. built with Cython) next to the .py file
+  for suffix in importlib.machinery.EXTENSION_SUFFIXES:
+    candidate = p.with_suffix(suffix)
+    if candidate.exists():
+      return(candidate)
+  return(None)
+
 def load_plugin(plugin_path: str | Path, base_package: str = "plugins"):
   p = Path(plugin_path).resolve()
   parts = p.parts
@@ -500,6 +509,11 @@ def load_plugin(plugin_path: str | Path, base_package: str = "plugins"):
   module_name = ".".join(parts[idx:]).replace(".py", "")
   if module_name in sys.modules:
     return(sys.modules[module_name])
+  # A compiled extension takes precedence over the source, like on a
+  # normal import. It only loads under the name it was built with
+  # (here derived from the path), and only once per process.
+  if (compiled := compiled_plugin(p)) is not None:
+    p = compiled
   spec = importlib.util.spec_from_file_location(module_name, p)
   module = importlib.util.module_from_spec(spec)
   sys.modules[module_name] = module

@@ -29,8 +29,6 @@ import aiofiles
 import aiofiles.os
 import aioshutil
 import signal
-import importlib.util
-import sys
 from pathlib import Path
 from logging import getLogger
 from signal import SIGKILL
@@ -61,7 +59,7 @@ from users.userinfo import afree_quota
 from oneitem.shared_mem import shared_mem
 from l_buffer.l_buffer import l_buffer
 from viewers.c_viewers import c_viewer
-from tools.l_tools import djconf
+from tools.l_tools import djconf, load_plugin
 from tools.c_logger import alog_ini
 from tools.l_sysinfo import is_raspi
 from streams.models import stream
@@ -314,11 +312,7 @@ class eve_worker(mp_process):
       self.tag_list_active = self.shared_mem.read_1_meta('school')
       self.tag_list = await asyncio.to_thread(get_taglist, self.tag_list_active)
       p = Path(self.plugin_path)
-      plugin_name = f'alarm_plugin_{self.plugin_id}'
-      spec = importlib.util.spec_from_file_location(plugin_name, p)
-      plugin_mod = importlib.util.module_from_spec(spec)
-      sys.modules[plugin_name] = plugin_mod
-      spec.loader.exec_module(plugin_mod)
+      plugin_mod = load_plugin(p)
       self.plugin = plugin_mod.plugin(self.dbline, self.tag_list, p, self.logger)
       self.logger.info(f'**** Eventer #{self.id} running Plugin: {self.plugin.name}')
       self.got_sigint = False
