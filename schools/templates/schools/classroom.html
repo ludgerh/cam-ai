@@ -86,6 +86,7 @@ let last_visible;
 let page_nr = 1;
 let events;
 let get_lines_busy = false;
+let tagfilter = -1;
 let indices = {};
 let framelines = {};
 
@@ -113,7 +114,6 @@ function draw_all_lines() {
     'streamnr' : {{ stream.id }},
     'pagesize' : parseInt($('#pagesizeselect').val()),
     'showdone' : false,
-    'tagfilter' : parseInt($('#tagfilterselect').val()),
   })
   .then(() => {
     return(SchoolDBUtilSocket.sendandwait({
@@ -202,9 +202,24 @@ function get_lines() {
     newaddition += '</h4>';
     newaddition += '</div>';
     $('#gallery').append(newaddition);
+    if (tagfilter >= 0) {
+      $('#row' + item).hide();
+    };
     getimages(item);
   };
   get_lines_busy = false;
+};
+
+function filter_row(row) {
+  // Show an event if at least one of its images is checked for the chosen tag
+  if (tagfilter < 0) {
+    row.show();
+  } else if (row.attr('ready') 
+      && row.find('input:checkbox[data-k="' + tagfilter + '"]:checked').length) {
+    row.show();
+  } else {
+    row.hide();
+  };
 };
 
 function chunkArray(array, chunkSize) {
@@ -314,6 +329,11 @@ function getimages(count) {
         $('#s_button' + frame_count).removeClass('disabled');
 {% endif %}
         $('#del_button' + frame_count).removeClass('disabled');
+        $('#row' + frame_count).attr('ready', 1);
+        if (tagfilter >= 0) {
+          filter_row($('#row' + frame_count));
+          get_lines();
+        };
       };
 {% endif %}
     })  
@@ -474,8 +494,13 @@ $(document).ready(function () {
     draw_all_lines();
   });
   $('#tagfilterselect').change(function() {
-    page_nr = 1;
-    draw_all_lines();
+    tagfilter = parseInt($(this).val());
+    $('.eventrow').each(function() {
+      filter_row($(this));
+    });
+    if (events) {
+      get_lines();
+    };
   });
 {% if may_write_stream %}
   $('.delbutton').click(function(evt) {
