@@ -21,9 +21,6 @@ import asyncio
 import numpy as np
 import cv2 as cv
 import signal
-import importlib.util
-import sys
-from pathlib import Path
 from multiprocessing import Process as mp_process, SimpleQueue as s_queue
 from os import environ
 from logging import getLogger
@@ -31,6 +28,7 @@ from setproctitle import setproctitle
 from streams.redis import my_redis as streams_redis
 from tf_workers.redis import my_redis as tf_workers_redis
 from tools.c_logger import alog_ini
+from tools.l_tools import load_plugin
 from globals.c_globals import add_viewer, viewables
 from tools.c_tools import rect_btoa, merge_rects, c_buffer, c_convert
 from tools.l_break import a_break_type, BR_SHORT
@@ -48,11 +46,7 @@ class c_detector():
     streams_redis.zero_to_dev(self.type, self.id)
     streams_redis.fps_to_dev(self.type, self.id, 0.0)
     plugin_line = dbline.det_plugin
-    p = Path(plugin_line.path)
-    spec = importlib.util.spec_from_file_location('detector_plugin', p)
-    plugin_mod = importlib.util.module_from_spec(spec)
-    sys.modules['detector_plugin'] = plugin_mod
-    spec.loader.exec_module(plugin_mod)
+    plugin_mod = load_plugin(plugin_line.path)
     self.plugin = plugin_mod.plugin()
     self.shared_mem = shared_mem(
       source_dict = self.plugin._SH_MEM_ITEMS, 
@@ -169,11 +163,7 @@ class det_worker(mp_process):
       setproctitle('CAM-AI-Detector #' + str(self.id))
       self.dbline = await stream.objects.aget(id = self.id)
       
-      p = Path(self.plugin_path)
-      spec = importlib.util.spec_from_file_location('detector_plugin', p)
-      plugin_mod = importlib.util.module_from_spec(spec)
-      sys.modules['detector_plugin'] = plugin_mod
-      spec.loader.exec_module(plugin_mod)
+      plugin_mod = load_plugin(self.plugin_path)
       self.plugin = plugin_mod.plugin()
       self.logger.info(f'**** Detector #{self.id} running Plugin: {self.plugin.name}')
       self.shared_mem = shared_mem(
