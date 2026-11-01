@@ -4,8 +4,8 @@ Anweisungen für Claude Code in diesem Repository.
 
 ## Sprache
 
-- Code, Kommentare und Commit-Messages auf Englisch.
-- PR-Beschreibungen und Release Notes auf Deutsch.
+- Code, Kommentare, Commit-Messages und Release Notes auf Englisch.
+- PR-Beschreibungen auf Deutsch.
 
 ## Umgebung und Tests
 
@@ -48,7 +48,7 @@ Nur das Hauptrepo bekommt GitHub-Releases. Ablauf, selbständig inklusive Wahl d
 
 Zwei Arten von Versionen:
 
-- **Vollversion** `vX.Y.Z` (z. B. `v2.2.2`): normales Release, „Latest“, ausführliche deutsche
+- **Vollversion** `vX.Y.Z` (z. B. `v2.2.2`): normales Release, „Latest“, ausführliche englische
   Release Notes (Hinweise zum Update und zu Migrationen zuerst).
 - **Zwischenversion**: letzte Vollversion plus Kleinbuchstabe als Zähler (`v2.2.2a`, `v2.2.2b`, …),
   als GitHub-**Pre-release**. Die nächste Vollversion beendet die Buchstabenreihe.
