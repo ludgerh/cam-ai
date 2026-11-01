@@ -36,7 +36,6 @@ from time import time
 from django.utils import timezone
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
-from django.db.models import Q
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async, aclose_old_connections
 from django.contrib.auth.hashers import check_password
@@ -360,19 +359,6 @@ class schooldbutil(AsyncWebsocketConsumer):
             xmax__gt=-1,
             deleted=False,
           ).order_by('-id')
-        # Optional category filter (index into the school's tag list).
-        # p_string looks like "Name(nr): [nig, hum]" -> match the
-        # 3-letter abbreviation at the start of the list or after ", ".
-        tagfilter = int(params.get('tagfilter', -1))
-        if tagfilter >= 0:
-          taglist = await database_sync_to_async(get_taglist)(
-            stream_line.eve_school_id)
-          if tagfilter < len(taglist):
-            abbr = str(taglist[tagfilter].name)[:3]
-            eventlines = eventlines.filter(
-              Q(p_string__contains='[' + abbr)
-              | Q(p_string__contains=', ' + abbr)
-            )
         self.eventpage = Paginator(eventlines, params['pagesize'])
         self.stream_nr = params['streamnr']
         if stream_line.encrypted:
