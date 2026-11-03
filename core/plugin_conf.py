@@ -51,6 +51,34 @@ def update_db(file_path, default):
       )
   del module
 
+def plugin_exists(dbline):
+  return(Path(dbline.path).parent.is_dir())
+
+def remove_missing():
+  # Stream fields referencing plugins of this type, None: no references
+  stream_fields = {'D' : 'det_plugin', 'A' : 'eve_alarm_plugin', 'V' : None}
+  for dbline in plugin_dbline.objects.filter(type__in = stream_fields.keys()):
+    if plugin_exists(dbline):
+      continue
+    field = stream_fields[dbline.type]
+    if field:
+      streams = stream.objects.filter(**{field : dbline})
+      if streams.exists():
+        # Move streams to the default plugin of the same type, otherwise
+        # on_delete=SET_DEFAULT would point them to plugin #1 (any type)
+        replacement = None
+        for candidate in plugin_dbline.objects.filter(
+          type = dbline.type,
+          default = True,
+        ).exclude(id = dbline.id):
+          if plugin_exists(candidate):
+            replacement = candidate
+            break
+        if replacement is None:
+          continue
+        streams.update(**{field : replacement})
+    dbline.delete()
+
 for item in get_subdirs(Path.cwd() / 'plugins' / 'detectors'):
   plugin_file = item / 'plugin.py'
   update_db(plugin_file, item.name == 'default')
@@ -60,6 +88,7 @@ for item in get_subdirs(Path.cwd() / 'plugins' / 'alarms'):
 for item in get_subdirs(Path.cwd() / 'plugins' / 'views'):
   plugin_file = item / 'plugin.py'
   update_db(plugin_file, item.name == 'default')
+remove_missing()
     
     
     
