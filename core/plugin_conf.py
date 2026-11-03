@@ -88,9 +88,10 @@ for item in get_subdirs(Path.cwd() / 'plugins' / 'detectors'):
 for item in get_subdirs(Path.cwd() / 'plugins' / 'alarms'):
   plugin_file = item / 'plugin.py'
   update_db(plugin_file, item.name == 'default')
+# View plugins have no default
 for item in get_subdirs(Path.cwd() / 'plugins' / 'views'):
   plugin_file = item / 'plugin.py'
-  update_db(plugin_file, item.name == 'default')
+  update_db(plugin_file, False)
 remove_missing()
     
     
