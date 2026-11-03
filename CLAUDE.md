@@ -47,8 +47,9 @@ Bei jeder Änderung an einer Datei den Kopf prüfen und bei Bedarf anpassen:
 - `plugins/*` ist im Hauptrepo ignoriert. Die Plugins sind eigene Repos unter github.com/ludgerh:
   `plugins/<name>` → `ludgerh/<name>` für `train_worker_gpu`, `cam_ai_hue`, `cam_ai_shelly`,
   `cam_ai_tasmota`, `cam_ai_proxy`, `cam_ai_proxy_agent`; außerdem
-  `plugins/detectors/det_seagate_0001` → `ludgerh/det_seagate_0001` und
-  `plugins/alarms/alarm_seagate_0001` → `ludgerh/alarm_seagate_0001`.
+  `plugins/detectors/det_seagate_0001` → `ludgerh/det_seagate_0001`,
+  `plugins/alarms/alarm_seagate_0001` → `ludgerh/alarm_seagate_0001` und
+  `plugins/views/view_seagate_0001` → `ludgerh/view_seagate_0001`.
 - Für Plugin-Repos immer `git -C <plugin-pfad>` und `gh --repo ludgerh/<plugin>` verwenden,
   nie `cd plugins/... && git ...` (Gefahr, im Hauptrepo zu committen).
 - In Plugin-Verzeichnissen liegt oft uncommittete Arbeit des Benutzers. Nie mit stagen;
