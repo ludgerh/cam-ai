@@ -93,6 +93,9 @@ for item in get_subdirs(Path.cwd() / 'plugins' / 'views'):
   plugin_file = item / 'plugin.py'
   update_db(plugin_file, False)
 remove_missing()
+
+# Registered view plugins, shown in the main menu
+view_plugins = list(plugin_dbline.objects.filter(type = 'V').values('id', 'name'))
     
     
     

@@ -1,4 +1,5 @@
 {% comment %}
+camai/templates/main/basis.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -13,6 +14,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 {% endcomment %}
+{% load core_tags %}
 <!doctype html>
 <html lang="en">
   <head>
@@ -40,6 +42,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
               <img src="/static/camai/img/5.svg" style="width:170px;">
             </a>
           </div>
+          {% view_plugins as view_plugin_list %}
+          {% if view_plugin_list %}
+            <div class="col-sm-auto">
+              <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
+                  Views
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                  {% for item in view_plugin_list %}
+                    <li><span class="dropdown-item-text">{{ item.name }}</span></li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          {% endif %}
           <div class="col-sm-auto">
             <div class="dropdown">
               <button class="btn btn-primary dropdown-toggle m-2" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" style="width: 120px;">
