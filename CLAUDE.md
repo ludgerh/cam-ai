@@ -16,6 +16,24 @@ Anweisungen für Claude Code in diesem Repository.
   dafür vorher `python manage.py export_school 8 --frames 200`.
 - Code im Stil der umgebenden Dateien schreiben (2 Leerzeichen Einrückung, `return(x)`).
 
+## Dateikopf
+
+Bei jeder Änderung an einer Datei den Kopf prüfen und bei Bedarf anpassen:
+
+- **Pfad**: Ganz am Anfang des ersten Kommentars steht der Pfad der Datei relativ zum
+  Repo-Root (bei Plugins relativ zum Plugin-Repo). Fehlt er oder stimmt er nicht mehr
+  (z. B. nach Verschieben), korrigieren.
+  - Python: eigene Zeile `# pfad/datei.py` vor dem Lizenz-Docstring
+    (nach einer Shebang-Zeile, falls vorhanden).
+  - JS/CSS: erste Zeile innerhalb des `/* ... */`.
+  - Django-Templates: erste Zeile innerhalb des `{% comment %}`.
+  - Dateien ohne Kopfkommentar bekommen nur die Pfadzeile im passenden Kommentarstil.
+- **Jahreszahl**: Enthält die Copyright-Zeile (`by the CAM-AI team` oder
+  `Ludger Hellerhoff`) das aktuelle Jahr nicht, auf einen Bereich bis zum aktuellen
+  Jahr erweitern: `2024` → `2024-2026`, `2024-2025` → `2024-2026`.
+  Fremde Copyrights (z. B. in `LICENSE`) nie ändern.
+- Nur Dateien anfassen, die ohnehin geändert werden. Keine Massenaktualisierung.
+
 ## Git und Pull Requests
 
 - Jede Änderung auf einem Feature-Branch von `main`, dann PR mit `gh`.
