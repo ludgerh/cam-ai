@@ -1,3 +1,4 @@
+# core/plugin_conf.py
 """
 Copyright (C) 2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -20,6 +21,8 @@ from tools.l_tools import load_plugin
 from .models import plugin as plugin_dbline
 
 def get_subdirs(path):
+  if not Path(path).is_dir():
+    return([])
   return [p for p in Path(path).iterdir() if p.is_dir()]
   
 def update_db(file_path, default):
@@ -52,6 +55,9 @@ for item in get_subdirs(Path.cwd() / 'plugins' / 'detectors'):
   plugin_file = item / 'plugin.py'
   update_db(plugin_file, item.name == 'default')
 for item in get_subdirs(Path.cwd() / 'plugins' / 'alarms'):
+  plugin_file = item / 'plugin.py'
+  update_db(plugin_file, item.name == 'default')
+for item in get_subdirs(Path.cwd() / 'plugins' / 'views'):
   plugin_file = item / 'plugin.py'
   update_db(plugin_file, item.name == 'default')
     

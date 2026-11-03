@@ -1,3 +1,4 @@
+# core/models.py
 """
 Copyright (C) 2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -21,6 +22,7 @@ class plugin(models.Model):
     ALARM = 'A', 'Alarm'
     DETECTOR = 'D', 'Detector'
     TRAINER = 'T', 'Trainer'
+    VIEW = 'V', 'View'
   type = models.CharField(max_length=1, choices=Type.choices)
   default = models.BooleanField(default=False)
   name = models.CharField(max_length=255)
