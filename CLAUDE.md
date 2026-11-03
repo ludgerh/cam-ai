@@ -4,7 +4,7 @@ Anweisungen für Claude Code in diesem Repository.
 
 ## Sprache
 
-- Code, Kommentare, Commit-Messages und Release Notes auf Englisch.
+- Code, Kommentare, Docstrings, Commit-Messages und Release Notes auf Englisch.
 - PR-Beschreibungen auf Deutsch.
 
 ## Umgebung und Tests
@@ -14,7 +14,16 @@ Anweisungen für Claude Code in diesem Repository.
   Im Basis-Env fehlen Abhängigkeiten, die Plugin-Tests werden dann stillschweigend übersprungen.
 - Trainer-Tests: `python manage.py test trainers`. Echte Trainingsläufe mit `--tag slow`,
   dafür vorher `python manage.py export_school 8 --frames 200`.
-- Code im Stil der umgebenden Dateien schreiben (2 Leerzeichen Einrückung, `return(x)`).
+
+## Code-Stil
+
+- Code im Stil der umgebenden Dateien schreiben.
+- Einrückung mit 2 Leerzeichen, in Python und in Django-Templates. Keine Tabs.
+- Maximale Zeilenlänge: 90 Zeichen.
+- String-Konstanten in einfachen Anführungszeichen: `'text'`, nicht `"text"`.
+- `return` immer mit Klammern: `return(x)`.
+- Klassendefinitionen immer mit Klammern, auch ohne Basisklasse: `class model_buffer():`.
+- Benennung wie im umgebenden Code; Klassen meist klein geschrieben (z. B. `tf_worker`, `trainer`).
 
 ## Dateikopf
 
