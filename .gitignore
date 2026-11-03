@@ -1,3 +1,4 @@
+# .gitignore
 /data/
 /camai/static/camai/nogit/
 /temp/
@@ -20,6 +21,9 @@ plugins/*
 !plugins/
 !plugins/detectors/
 !plugins/alarms/
+
+# views komplett ignorieren
+plugins/views/
 
 # alles unter detectors ignorieren
 plugins/detectors/*
