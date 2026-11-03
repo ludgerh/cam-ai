@@ -1,3 +1,4 @@
+# index/views.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -55,6 +56,7 @@ def index(request, mode='C'):
   }
   return(HttpResponse(template.render(context)))
   
+@login_required
 def indexgrid(request, mode='C', start=0, end=0):
   template = loader.get_template('index/indexgrid.html')
   context = {
@@ -77,6 +79,7 @@ def indexgrid(request, mode='C', start=0, end=0):
   }
   return(HttpResponse(template.render(context)))
 
+@login_required
 def landing(request, start=0):
   max_num_cams = djconf.getconfigint('max_num_cams', 3)
   template = loader.get_template('index/landing.html')
