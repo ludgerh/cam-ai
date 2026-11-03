@@ -1,3 +1,4 @@
+# core/plugin_templates.py
 """
 Copyright (C) 2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -22,6 +23,9 @@ from pathlib import Path
 from tools.l_tools import load_plugin
 from tools.c_tools import speedlimit, speedometer, rect_atob
 from schools.c_schools import get_taglist
+from django.conf import settings
+from django.http import Http404, HttpResponse
+from django.template import engines
 
 class temp_plugin():
   name = 'CAM-AI Generic Plugin'
@@ -199,3 +203,48 @@ class alarm_plugin(temp_plugin):
       f'({self.eve_dbline.id}) : {self.tag_list[maxpos+1].name}')
       
 
+class view_plugin(temp_plugin):
+  type = 'V'
+  name = 'CAM-AI Generic View Plugin'
+  version = version
+  
+  def __init__(self, plugin_path):
+    self.plugin_dir = Path(plugin_path).parent
+    
+  def view(self, request):
+    # To be overridden by the plugin, returns a HttpResponse
+    raise Http404(f'{self.name} defines no view')
+    
+  def menu_context(self, request):
+    # The lists the main menu in main/basis.html needs
+    from access.c_access import access
+    from streams.models import stream
+    from tf_workers.models import school
+    from tools.l_tools import djconf
+    streams = stream.objects.filter(active = True, demo = False)
+    schools = school.objects.filter(active = True)
+    return({
+      'version' : djconf.getconfig('version', 'X.Y.Z'),
+      'debug' : settings.DEBUG,
+      'user' : request.user,
+      'camlist' : access.filter_items(
+        streams.filter(cam_mode_flag__gt = 0), 'C', request.user, 'R'
+      ),
+      'detectorlist' : access.filter_items(
+        streams.filter(det_mode_flag__gt = 0), 'D', request.user, 'R'
+      ),
+      'eventerlist' : access.filter_items(
+        streams.filter(eve_mode_flag__gt = 0), 'E', request.user, 'R'
+      ),
+      'schoollist' : access.filter_items(schools, 'S', request.user, 'R'),
+      'schoollist_write' : access.filter_items(schools, 'S', request.user, 'W'),
+    })
+    
+  def render(self, request, template_file, context = None):
+    # Renders a template from the plugin directory, it can extend main/basis.html
+    template = engines['django'].from_string(
+      (self.plugin_dir / template_file).read_text()
+    )
+    full_context = self.menu_context(request)
+    full_context.update(context or {})
+    return(HttpResponse(template.render(full_context, request)))

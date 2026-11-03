@@ -1,5 +1,6 @@
+# camai/urls.py
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,6 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 from django.contrib import admin
 from django.urls import path, include
 from sys import argv
+from core import views as core_views
 
 if (argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith('gunicorn')):
   urlpatterns = [
@@ -32,6 +34,7 @@ if (argv[0].endswith('manage.py') and 'runserver' in argv) or (argv[0].endswith(
     path('tools/', include('tools.urls')),
     path('cleanup/', include('cleanup.urls')),
     path('config/', include('config.urls')),
+    path('views/<int:plugin_id>/', core_views.plugin_view, name='plugin_view'),
     path('', include('index.urls')),
   ]
 else:
