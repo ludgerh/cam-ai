@@ -1,3 +1,4 @@
+# tools/l_tools.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -20,6 +21,7 @@ import aiofiles.os
 import os
 import psutil
 import sys
+import threading
 import numpy as np
 import importlib.util
 import importlib.machinery
@@ -499,6 +501,10 @@ def compiled_plugin(p: Path) -> Optional[Path]:
       return(candidate)
   return(None)
 
+# Serializes plugin loading: a module is in sys.modules before it is fully
+# executed, another thread must not get it half-initialized
+_plugin_lock = threading.RLock()
+
 def load_plugin(plugin_path: str | Path, base_package: str = "plugins"):
   p = Path(plugin_path).resolve()
   parts = p.parts
@@ -507,16 +513,22 @@ def load_plugin(plugin_path: str | Path, base_package: str = "plugins"):
   except ValueError:
     raise ValueError(f"{base_package} not found in path {p}")
   module_name = ".".join(parts[idx:]).replace(".py", "")
-  if module_name in sys.modules:
-    return(sys.modules[module_name])
-  # A compiled extension takes precedence over the source, like on a
-  # normal import. It only loads under the name it was built with
-  # (here derived from the path), and only once per process.
-  if (compiled := compiled_plugin(p)) is not None:
-    p = compiled
-  spec = importlib.util.spec_from_file_location(module_name, p)
-  module = importlib.util.module_from_spec(spec)
-  sys.modules[module_name] = module
-  spec.loader.exec_module(module)
-  return(module)
+  with _plugin_lock:
+    if module_name in sys.modules:
+      return(sys.modules[module_name])
+    # A compiled extension takes precedence over the source, like on a
+    # normal import. It only loads under the name it was built with
+    # (here derived from the path), and only once per process.
+    if (compiled := compiled_plugin(p)) is not None:
+      p = compiled
+    spec = importlib.util.spec_from_file_location(module_name, p)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+      spec.loader.exec_module(module)
+    except BaseException:
+      # Don't keep a broken module, a later call should retry
+      del sys.modules[module_name]
+      raise
+    return(module)
 

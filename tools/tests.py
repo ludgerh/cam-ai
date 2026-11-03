@@ -1,4 +1,5 @@
-# Copyright (C) 2022 Ludger Hellerhoff, ludger@cam-ai.de
+# tools/tests.py
+# Copyright (C) 2022-2026 Ludger Hellerhoff, ludger@cam-ai.de
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 3
@@ -83,6 +84,7 @@ class djconfigtest(TestCase):
 import sys
 import shutil
 import sysconfig
+import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import skipIf
@@ -121,6 +123,29 @@ class LoadPluginTest(SimpleTestCase):
   def test_returns_cached_module(self):
     module = load_plugin(self.plugin_file)
     self.assertIs(load_plugin(self.plugin_file), module)
+
+  def test_concurrent_load(self):
+    # The second thread must wait for the first one to finish executing
+    self.plugin_file.write_text('import time\ntime.sleep(0.5)\nvalue = 42\n')
+    results = []
+    def load():
+      results.append(getattr(load_plugin(self.plugin_file), 'value', None))
+    threads = [threading.Thread(target = load) for _ in range(2)]
+    threads[0].start()
+    while self.module_name not in sys.modules:
+      pass
+    threads[1].start()
+    for item in threads:
+      item.join()
+    self.assertEqual(results, [42, 42])
+
+  def test_failed_load_not_cached(self):
+    self.plugin_file.write_text('raise RuntimeError("broken")\n')
+    with self.assertRaises(RuntimeError):
+      load_plugin(self.plugin_file)
+    self.assertNotIn(self.module_name, sys.modules)
+    self.plugin_file.write_text(PLUGIN_SOURCE)
+    self.assertEqual(load_plugin(self.plugin_file).value, 42)
 
   def test_base_package_missing(self):
     with self.assertRaises(ValueError):
