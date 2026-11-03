@@ -17,7 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 from pathlib import Path
 from streams.models import stream
-from tools.l_tools import load_plugin
+from tools.l_tools import load_plugin, compiled_plugin
 from .models import plugin as plugin_dbline
 
 def get_subdirs(path):
@@ -26,6 +26,9 @@ def get_subdirs(path):
   return [p for p in Path(path).iterdir() if p.is_dir()]
   
 def update_db(file_path, default):
+  # Skip directories without a plugin (e.g. a new, still empty plugin repo)
+  if not file_path.exists() and compiled_plugin(file_path) is None:
+    return()
   module = load_plugin(file_path)
   plugin_class = getattr(module, 'plugin')
   result = plugin_dbline.objects.update_or_create(
