@@ -1,4 +1,5 @@
 # .gitignore
+CLAUDE.local.md
 /data/
 /camai/static/camai/nogit/
 /temp/

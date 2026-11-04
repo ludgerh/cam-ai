@@ -55,10 +55,10 @@ Bei jeder Änderung an einer Datei den Kopf prüfen und bei Bedarf anpassen:
 
 - `plugins/*` ist im Hauptrepo ignoriert. Die Plugins sind eigene Repos unter github.com/ludgerh:
   `plugins/<name>` → `ludgerh/<name>` für `train_worker_gpu`, `cam_ai_hue`, `cam_ai_shelly`,
-  `cam_ai_tasmota`, `cam_ai_proxy`, `cam_ai_proxy_agent`; außerdem
-  `plugins/detectors/det_seagate_0001` → `ludgerh/det_seagate_0001`,
-  `plugins/alarms/alarm_seagate_0001` → `ludgerh/alarm_seagate_0001` und
-  `plugins/views/view_seagate_0001` → `ludgerh/view_seagate_0001`.
+  `cam_ai_tasmota`, `cam_ai_proxy`, `cam_ai_proxy_agent`.
+- Kundenspezifische Plugins (Detector, Alarm, View) sind private Repos. Ihre Pfade und
+  Repo-Namen stehen in `CLAUDE.local.md` (per `.gitignore` nicht im Repo).
+  Kundennamen nie in Dateien, Commits, Branch-Namen oder PRs des Hauptrepos nennen.
 - Für Plugin-Repos immer `git -C <plugin-pfad>` und `gh --repo ludgerh/<plugin>` verwenden,
   nie `cd plugins/... && git ...` (Gefahr, im Hauptrepo zu committen).
 - In Plugin-Verzeichnissen liegt oft uncommittete Arbeit des Benutzers. Nie mit stagen;
@@ -71,12 +71,13 @@ Bei jeder Änderung an einer Datei den Kopf prüfen und bei Bedarf anpassen:
 
 View-Plugins (Typ `'V'`) liefern eigene Seiten, erreichbar über das Menü **Views**.
 Anders als Detector und Alarm haben sie keinen Default, und es können 0 bis beliebig
-viele gleichzeitig aktiv sein. Vorlage ist `plugins/views/view_seagate_0001`.
+viele gleichzeitig aktiv sein. Die Vorlage nennt `CLAUDE.local.md`.
 
 1. **Repo anlegen:** privates Repo `ludgerh/<name>` (`gh repo create --private`), lokal
    unter `plugins/views/<name>` mit Branch `main` und Remote `origin`. `.gitignore` wie
    bei den anderen Plugins (`__pycache__/`, `*~`, `*.c`, `*.so`). Das Repo in die
-   Plugin-Liste oben eintragen. `plugins/views/` ist im Hauptrepo komplett ignoriert.
+   Plugin-Liste oben eintragen, kundenspezifische in `CLAUDE.local.md`.
+   `plugins/views/` ist im Hauptrepo komplett ignoriert.
 2. **Dateien:** leere `__init__.py` und `plugin.py` mit der Klasse `plugin`:
 
    ```python
@@ -91,7 +92,7 @@ viele gleichzeitig aktiv sein. Vorlage ist `plugins/views/view_seagate_0001`.
 
    class plugin(view_plugin):
      type = 'V'
-     name = 'Seagate Custom View Plugin #1'
+     name = 'Custom View Plugin #1'
      version = version
      maker = 'CAM-AI Soluvis GmbH'
      copyright = 'All rights reserved'
