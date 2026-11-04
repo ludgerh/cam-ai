@@ -193,6 +193,10 @@ class eve_worker(mp_process):
     self.event_name = None
     self.event_max_items = 32
     self.event_max_time = 120.0
+    # Set by plugins: False puts every frame into the open event, no matter
+    # where it is. A value > 0 closes an event once it holds that many frames
+    self.event_match_area = True
+    self.event_close_items = 0
     self.plugin_active = False
     self.plugin_path = plugin_path
     self.plugin_id = plugin_id
@@ -264,6 +268,10 @@ class eve_worker(mp_process):
             self.plugin_active = temp
           if (temp := received[1].get('event_time_gap')) is not None:
             self.shared_mem.write_1_meta('event_time_gap', temp)
+          if (temp := received[1].get('event_match_area')) is not None:
+            self.event_match_area = temp
+          if (temp := received[1].get('event_close_items')) is not None:
+            self.event_close_items = temp
         elif (received[0] == 'stop'):
           self.got_sigint = True
           self.do_run = False  
@@ -683,6 +691,9 @@ class eve_worker(mp_process):
                 if item.check_out_ts is None
               ]
             for item in check_list:
+              if not self.event_match_area:
+                found = item
+                break
               # Match against last_box, the rectangle of the event's most
               # recent frame. self[0..3] lags behind by design and would
               # collect frames from all over the scene
@@ -842,7 +853,8 @@ class eve_worker(mp_process):
           # last_box is the rectangle of the most recent frame. self[0..3]
           # lags behind by design and would merge events that are far
           # apart in space
-          if not hasoverlap(event_i.last_box, event_j.last_box):
+          if (self.event_match_area
+              and not hasoverlap(event_i.last_box, event_j.last_box)):
             continue
           event_i[0] = min(event_i[0], event_j[0])
           event_i[1] = max(event_i[1], event_j[1])
@@ -857,6 +869,12 @@ class eve_worker(mp_process):
         break
       for j in del_set:
         self.event_dict.pop(j, None)
+    if self.event_close_items:
+      for item in self.event_dict.values():
+        if (item.check_out_ts is None
+            and len(item.frames) >= self.event_close_items):
+          # check_event() saves it, the inserter opens a new one
+          item.check_out_ts = item.end
 
   async def make_webm(self):
     try:
