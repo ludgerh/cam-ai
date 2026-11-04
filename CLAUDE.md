@@ -56,9 +56,8 @@ Bei jeder Änderung an einer Datei den Kopf prüfen und bei Bedarf anpassen:
 - `plugins/*` ist im Hauptrepo ignoriert. Die Plugins sind eigene Repos unter github.com/ludgerh:
   `plugins/<name>` → `ludgerh/<name>` für `train_worker_gpu`, `cam_ai_hue`, `cam_ai_shelly`,
   `cam_ai_tasmota`, `cam_ai_proxy`, `cam_ai_proxy_agent`.
-- Kundenspezifische Plugins (Detector, Alarm, View) sind private Repos. Ihre Pfade und
-  Repo-Namen stehen in `CLAUDE.local.md` (per `.gitignore` nicht im Repo).
-  Kundennamen nie in Dateien, Commits, Branch-Namen oder PRs des Hauptrepos nennen.
+- Weitere Plugins sind private Repos; Pfade und Repo-Namen stehen in `CLAUDE.local.md`
+  (per `.gitignore` nicht im Repo).
 - Für Plugin-Repos immer `git -C <plugin-pfad>` und `gh --repo ludgerh/<plugin>` verwenden,
   nie `cd plugins/... && git ...` (Gefahr, im Hauptrepo zu committen).
 - In Plugin-Verzeichnissen liegt oft uncommittete Arbeit des Benutzers. Nie mit stagen;
@@ -76,7 +75,7 @@ viele gleichzeitig aktiv sein. Die Vorlage nennt `CLAUDE.local.md`.
 1. **Repo anlegen:** privates Repo `ludgerh/<name>` (`gh repo create --private`), lokal
    unter `plugins/views/<name>` mit Branch `main` und Remote `origin`. `.gitignore` wie
    bei den anderen Plugins (`__pycache__/`, `*~`, `*.c`, `*.so`). Das Repo in die
-   Plugin-Liste oben eintragen, kundenspezifische in `CLAUDE.local.md`.
+   Plugin-Liste oben eintragen, private in `CLAUDE.local.md`.
    `plugins/views/` ist im Hauptrepo komplett ignoriert.
 2. **Dateien:** leere `__init__.py` und `plugin.py` mit der Klasse `plugin`:
 
