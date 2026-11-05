@@ -1,2 +1,2 @@
 # camai/version.py
-version = '2.2.2f'
+version = '2.2.2g'
