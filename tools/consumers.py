@@ -617,6 +617,12 @@ class admin_tools_async(AsyncWebsocketConsumer):
         dst = BASE_PATH / 'plugins'
         if src.exists():
           await merge_move(src, dst)
+        # temp/ is not part of the release. It holds exports, uploads and tuning
+        # results and would otherwise get lost with the next backup:
+        src = backup_path / 'temp'
+        dst = BASE_PATH / 'temp'
+        if src.exists():
+          await merge_move(src, dst)
         # DATAPATH may be located outside BASE_PATH. In that case it was not
         # moved into the backup and does not need to be restored.
         if DATAPATH.is_relative_to(BASE_PATH):
