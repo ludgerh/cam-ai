@@ -339,6 +339,7 @@ class cam_worker(mp_process):
         shm_name = self.det_shm_name,
       )
       self.cam_ctrl_active = 'cam_ctrl' in self.det_shared_mem.source_dict
+      self.virt_screw_active = 'virt_screw' in self.det_shared_mem.source_dict
       self.virt_screw_status_old = 0
       await aiofiles.os.makedirs(self.socket_path, exist_ok=True)
       self.socket_path += f'cam{self.id}.sock'
@@ -465,6 +466,10 @@ class cam_worker(mp_process):
                 # restore the untouched still image, keep the backup intact
                 self.freeze_buffer = self.freeze_buffer_back.copy()
               self.shared_mem.write_1_meta('ovl_active', -2)
+          if self.virt_screw_active:
+            # Written before the frame is queued: the detector must not take
+            # a frame with a virtual screw as its background
+            self.det_shared_mem.write_1_meta('virt_screw', virt_screw_status)
           xmin = self.shared_mem.read_1_meta('aoi_xmin')
           xmax = self.shared_mem.read_1_meta('aoi_xmax')
           ymin = self.shared_mem.read_1_meta('aoi_ymin')

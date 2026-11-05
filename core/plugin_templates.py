@@ -55,6 +55,7 @@ class det_plugin(temp_plugin):
       'mode_code' : '50p',
       'x_canvas' : 'i', #x_canvas_max
       'cam_ctrl' : 'i',  # control value read by the cam worker
+      'virt_screw' : 'i',  # 1 while the cam worker shows a virtual screw
   }
   
   def init_shared_mem(self, shared_mem, dbline):
@@ -69,6 +70,7 @@ class det_plugin(temp_plugin):
     shared_mem.write_1_meta('scaledown', 0)
     shared_mem.write_1_meta('mode_code', dbline.det_mode_code.encode('utf-8'))
     shared_mem.write_1_meta('cam_ctrl', 0)
+    shared_mem.write_1_meta('virt_screw', 0)
     
   def _get_kernel(self, radius):
     kernel = self._kernel_cache.get(radius)
