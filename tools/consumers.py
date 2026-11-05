@@ -585,7 +585,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
           await self.close()
           return()
         expand_path = PARENTPATH / 'temp' / 'expanded'  
-        backup_path = PARENTPATH / 'temp' / 'backup'  
+        # Not temp/backup: that holds the download backups and is emptied
+        # on every server start. This one is kept until the next upgrade.
+        backup_path = PARENTPATH / 'temp' / 'upgrade_backup'
         async with aiohttp.ClientSession() as session:
           async with session.get(params['url']) as result:
             response = await result.content.read()
