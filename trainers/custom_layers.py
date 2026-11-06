@@ -149,6 +149,7 @@ def _rotate(x, degrees):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation="BILINEAR",
+    fill_mode='REFLECT',
     fill_value=0.5,
   ))
 
@@ -169,6 +170,7 @@ def _translate_x(x, pixels):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation="BILINEAR",
+    fill_mode='REFLECT',
     fill_value=0.5,
   ))
 
@@ -189,6 +191,7 @@ def _translate_y(x, pixels):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation="BILINEAR",
+    fill_mode='REFLECT',
     fill_value=0.5,
   ))
 
@@ -255,7 +258,7 @@ def _equalize(x, magnitude):
 def _shear_x_batch(x, mag):
   # mag in [0..30] -> shear factor in [-0.3 .. 0.3], one factor per sample
   b, h, w = _shape(x)
-  shear = (mag / 30.0) * tf.random.uniform([b], -0.03, 0.03)
+  shear = (mag / 30.0) * tf.random.uniform([b], -0.3, 0.3)
   ones = tf.ones([b])
   zeros = tf.zeros([b])
   # Offset keeps the image center fixed: x_in = x + shear * (y - cy)
@@ -273,13 +276,14 @@ def _shear_x_batch(x, mag):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation='BILINEAR',
+    fill_mode='REFLECT',
     fill_value=0.5,
   ))
 
 def _shear_y_batch(x, mag):
   # mag in [0..30] -> shear factor in [-0.3 .. 0.3], one factor per sample
   b, h, w = _shape(x)
-  shear = (mag / 30.0) * tf.random.uniform([b], -0.03, 0.03)
+  shear = (mag / 30.0) * tf.random.uniform([b], -0.3, 0.3)
   ones = tf.ones([b])
   zeros = tf.zeros([b])
   # Offset keeps the image center fixed: y_in = y + shear * (x - cx)
@@ -297,27 +301,36 @@ def _shear_y_batch(x, mag):
     transforms=transforms,
     output_shape=tf.stack([h, w]),
     interpolation='BILINEAR',
+    fill_mode='REFLECT',
     fill_value=0.5,
   ))
     
 def _sharpness(x, mag):
-  # mag 0..30 → factor 0..1
-  factor = tf.cast(mag, tf.float32) / 30.0
+  # mag 0..30 -> blend factor in [1 - 0.9 .. 1 + 0.9] around the original,
+  # one factor per sample: below 1 blurs, above 1 sharpens (as in Google's
+  # RandAugment, which uses 0.1 .. 1.9)
+  b = tf.shape(x)[0]
+  spread = tf.cast(mag, tf.float32) / 30.0 * 0.9
+  factor = 1.0 + tf.random.uniform([b, 1, 1, 1], -1.0, 1.0) * spread
   # Simple box blur kernel (3x3)
   kernel = tf.constant([[1/9, 1/9, 1/9],
                         [1/9, 1/9, 1/9],
                         [1/9, 1/9, 1/9]], dtype=tf.float32)
   kernel = tf.reshape(kernel, [3, 3, 1, 1])
   kernel = tf.tile(kernel, [1, 1, tf.shape(x)[-1], 1])
-  blurred = tf.nn.depthwise_conv2d(x, kernel, strides=[1,1,1,1], padding="SAME")
-  return(tf.clip_by_value(x + factor * (x - blurred), 0.0, 1.0))
+  # Reflect padding: zero padding would darken the blurred border
+  padded = tf.pad(x, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
+  blurred = tf.nn.depthwise_conv2d(
+    padded, kernel, strides=[1, 1, 1, 1], padding='VALID'
+  )
+  return(tf.clip_by_value(blurred + factor * (x - blurred), 0.0, 1.0))
 
 def _saturation(x, mag):
   # mag is a tensor → normalize first (0..30 → 0..1)
   delta = (tf.cast(mag, tf.float32) / 30.0) * 0.3   # max ±30% change
-  # Random factor in [1-delta, 1+delta]
+  # Random factor in [1-delta, 1+delta], one per sample
   factor = tf.random.uniform(
-    [],
+    [tf.shape(x)[0], 1, 1, 1],
     minval=1.0 - delta,
     maxval=1.0 + delta
   )
@@ -326,14 +339,19 @@ def _saturation(x, mag):
   return(tf.clip_by_value(out, 0.0, 1.0))
   
 def _hue(x, mag):
-  max_hue = 0.2 * (tf.cast(mag, tf.float32) / 30.0)
-  # delta in [-max_hue, +max_hue]
+  # mag 0..30 -> up to +/-0.1 of the hue circle (+/-36 degrees)
+  max_hue = 0.1 * (tf.cast(mag, tf.float32) / 30.0)
+  # delta in [-max_hue, +max_hue], one per sample. tf.image.adjust_hue only
+  # takes a scalar delta, so shift the hue channel in HSV directly.
   delta = tf.random.uniform(
-    [],
+    [tf.shape(x)[0], 1, 1],
     minval=-max_hue,
     maxval=max_hue     # no unary + !
   )
-  return(tf.image.adjust_hue(x, delta))
+  hsv = tf.image.rgb_to_hsv(x)
+  hue = tf.math.floormod(hsv[..., 0] + delta, 1.0)
+  hsv = tf.stack([hue, hsv[..., 1], hsv[..., 2]], axis=-1)
+  return(tf.image.hsv_to_rgb(hsv))
 
 def _color_jitter(x, mag):
   x = _saturation(x, mag)
@@ -354,13 +372,15 @@ def _rotate_op(x, M):
 def _translate_x_op(x, M):
   b = tf.shape(x)[0]
   width = tf.cast(tf.shape(x)[2], tf.float32)
-  dx = tf.random.uniform([b], -M, M) / 30.0 * width * 0.03
+  # M = 30 (maximum) gives up to +/-30 % of the image width
+  dx = tf.random.uniform([b], -M, M) / 30.0 * width * 0.3
   return(_translate_x(x, dx))
 
 def _translate_y_op(x, M):
   b = tf.shape(x)[0]
   height = tf.cast(tf.shape(x)[1], tf.float32)
-  dy = tf.random.uniform([b], -M, M) / 30.0 * height * 0.03
+  # M = 30 (maximum) gives up to +/-30 % of the image height
+  dy = tf.random.uniform([b], -M, M) / 30.0 * height * 0.3
   return(_translate_y(x, dy))
 
 # ================================================================
