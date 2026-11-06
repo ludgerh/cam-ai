@@ -347,7 +347,8 @@ def _color_jitter(x, mag):
 
 def _rotate_op(x, M):
   b = tf.shape(x)[0]
-  deg = tf.random.uniform([b], -M, M) / 10.0 
+  # M = 30 (maximum) gives up to +/-90 degrees
+  deg = tf.random.uniform([b], -M, M) * 3.0
   return(_rotate(x, deg))
 
 def _translate_x_op(x, M):
