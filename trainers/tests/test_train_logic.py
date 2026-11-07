@@ -1,3 +1,4 @@
+# trainers/tests/test_train_logic.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -26,7 +27,7 @@ try:
     quantize_lr, is_better_score, next_stage_gamma, next_finetuning,
     train_schedule, MyCallback,
     OVERFIT_BOTH_FALLING, OVERFIT_BOTH_RISING, OVERFIT_POSITIVE,
-    OVERFIT_NEGATIVE, OVERFIT_SHORT,
+    OVERFIT_NEGATIVE, OVERFIT_SHORT, PHASE_START, PHASE_MAIN,
   )
   plugin_missing = False
 except ImportError:
@@ -158,6 +159,16 @@ class TrainScheduleTest(SimpleTestCase):
     s = filled_schedule(rising(), falling())
     self.assertEqual(s.check_overfit(), OVERFIT_NEGATIVE)
 
+  def test_check_underfit(self):
+    # Levels, not trends: training BCE at or above val BCE
+    low = [0.1] * PATIENCE
+    high = [0.2] * PATIENCE
+    self.assertTrue(filled_schedule(high, low).check_underfit())
+    self.assertTrue(filled_schedule(low, low).check_underfit())
+    self.assertFalse(filled_schedule(low, high).check_underfit())
+    s = filled_schedule(high[1:], low[1:])
+    self.assertFalse(s.check_underfit())
+
   def test_history_limited_to_patience(self):
     s = filled_schedule(falling(PATIENCE * 2), falling(PATIENCE * 2))
     self.assertEqual(len(s.val_bce_history), PATIENCE)
@@ -228,3 +239,38 @@ class MyCallbackStageTest(SimpleTestCase):
     cb.start_stage(0.0)
     self.assertEqual(cb.nr_to_save, 266)
     self.assertEqual(cb.best_name, 'model_temp_266.keras')
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackAugTest(SimpleTestCase):
+
+  def callback(self, aug, bce_list, val_bce_list, phase = PHASE_MAIN):
+    cb = MyCallback(MagicMock(), MagicMock(), MagicMock(), 0, patience = PATIENCE)
+    cb.current_aug = aug
+    cb.schedule = filled_schedule(bce_list, val_bce_list)
+    cb.schedule.set_phase(phase, reset_history = False)
+    return(cb)
+
+  def test_lower_when_underfitting(self):
+    cb = self.callback(0.6, [0.2] * PATIENCE, [0.1] * PATIENCE)
+    self.assertTrue(cb.aug_lower_possible(OVERFIT_NEGATIVE))
+    self.assertTrue(cb.aug_lower_possible(OVERFIT_BOTH_RISING))
+
+  def test_no_lower_when_overfitting(self):
+    cb = self.callback(0.6, [0.2] * PATIENCE, [0.1] * PATIENCE)
+    self.assertFalse(cb.aug_lower_possible(OVERFIT_POSITIVE))
+
+  def test_no_lower_without_underfit(self):
+    cb = self.callback(0.6, [0.1] * PATIENCE, [0.2] * PATIENCE)
+    self.assertFalse(cb.aug_lower_possible(OVERFIT_NEGATIVE))
+
+  def test_no_lower_at_minimum(self):
+    cb = self.callback(0.0, [0.2] * PATIENCE, [0.1] * PATIENCE)
+    self.assertFalse(cb.aug_lower_possible(OVERFIT_NEGATIVE))
+    # Rounding errors of repeated steps must not count as room to lower
+    cb = self.callback(1e-17, [0.2] * PATIENCE, [0.1] * PATIENCE)
+    self.assertFalse(cb.aug_lower_possible(OVERFIT_NEGATIVE))
+
+  def test_no_lower_outside_main_phase(self):
+    cb = self.callback(
+      0.6, [0.2] * PATIENCE, [0.1] * PATIENCE, phase = PHASE_START)
+    self.assertFalse(cb.aug_lower_possible(OVERFIT_NEGATIVE))
