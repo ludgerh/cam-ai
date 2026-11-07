@@ -274,3 +274,25 @@ class MyCallbackAugTest(SimpleTestCase):
     cb = self.callback(
       0.6, [0.2] * PATIENCE, [0.1] * PATIENCE, phase = PHASE_START)
     self.assertFalse(cb.aug_lower_possible(OVERFIT_NEGATIVE))
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackAugCarryOverTest(SimpleTestCase):
+
+  def test_next_stage_keeps_augmentation(self):
+    # The start value from the school only applies to the first stage,
+    # later stages continue with the augmentation the last one ended with
+    myschool = MagicMock(model_image_augmentation = 0.6, model_gamma = 0.0)
+    cb = MyCallback(MagicMock(), MagicMock(), myschool, 0, patience = PATIENCE)
+    model = MagicMock()
+    cb.set_model(model)
+    cb.set_params({'steps' : 10})
+    cb.on_epoch_begin(0)
+    self.assertAlmostEqual(cb.current_aug, 0.6)
+    self.assertAlmostEqual(cb.best_aug, 0.6)
+    cb.current_aug = 0.4
+    cb.start_stage(0.0)
+    self.assertAlmostEqual(cb.best_aug, 0.4)
+    cb.on_epoch_begin(1)
+    self.assertAlmostEqual(cb.current_aug, 0.4)
+    aug_layer = model.get_layer.return_value
+    aug_layer.magnitude.assign.assert_called_with(12.0)
