@@ -774,8 +774,11 @@ class schooldbutil(AsyncWebsocketConsumer):
       elif params['command'] == 'importimages':
         schoolline = await school.objects.aget(id=params['school'])
         modelpath = schoolline.dir
-        if await access.check_async('S', params['school'], self.scope['user'], 'W'):
-          for item in glob('temp/unpack/' + params['filesdir'] + '/*'):
+        filesdir = params['filesdir']
+        if filesdir in {'', '.', '..'} or path.basename(filesdir) != filesdir:
+          logger.warning('importimages - Illegal directory name: ' + filesdir)
+        elif await access.check_async('S', params['school'], self.scope['user'], 'W'):
+          for item in glob('temp/unpack/' + filesdir + '/*'):
             pathadd = str(randint(0,99))+'/'
             await aiofiles.os.makedirs(modelpath + 'frames/' + pathadd, exist_ok=True)
             filename = item.split('/')[-1]
@@ -803,7 +806,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               else:
                 setattr(t, tagname, 0)  
             await t.asave()
-          await aioshutil.rmtree('temp/unpack/' + params['filesdir'])
+          await aioshutil.rmtree('temp/unpack/' + filesdir)
         outlist['data'] = 'OK'
         logger.debug('--> ' + str(outlist))
         await self.send(json.dumps(outlist))	
@@ -856,11 +859,12 @@ class schoolutil(AsyncWebsocketConsumer):
             self.user = await dbuser.objects.aget(username=params['name'])
             if self.user.check_password(params['pass']):
               logger.info('Successfull login:' + params['name'] + ' - Software v' 
-                + await agetconfig('version', '?'))
+                + await djconf.agetconfig('version', '?'))
               self.authed = True
             if not self.authed:
               logger.info('Login failure: ' + params['name'])
               await self.close() 
+              return()
         if await access.check_async('S', params['schoolnr'], self.user, 'W'):
           if (count := await stream.objects.filter(
               active=True, 

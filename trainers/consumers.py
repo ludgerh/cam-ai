@@ -95,6 +95,7 @@ class remotetrainer(AsyncWebsocketConsumer):
   async def connect(self):
     try:
       self.ws_session = None
+      self.authed = False
       self.frameinfo = {}
       self.made_dirs = set()
       self.sizeline = None
@@ -114,6 +115,11 @@ class remotetrainer(AsyncWebsocketConsumer):
   async def receive(self, text_data =None, bytes_data=None):
     global counter_dict
     try:
+      if not self.authed and (bytes_data or text_data not in {'Ping', None}):
+        if bytes_data or json.loads(text_data)['code'] != 'auth':
+          logger.warning('Remotetrainer: Command without authentication')
+          await self.close()
+          return()
       if bytes_data: 
         #logger.info('<-- binary')
         if self.sizeline is None:
@@ -135,6 +141,9 @@ class remotetrainer(AsyncWebsocketConsumer):
             for item in myzip.namelist():
               #logger.info('(' +str(i)+ ') Unpacking: ' + item)
               i -= 1
+              if path.isabs(item) or '..' in item.split('/'):
+                logger.warning('Remotetrainer: Illegal file name in zip: ' + item)
+                continue
               if item.endswith(".bmp"):
                 codpath = (self.myschoolline.dir
                   + 'coded/' + str(self.cod_x) + 'x' + str(self.cod_y) 
@@ -187,6 +196,15 @@ class remotetrainer(AsyncWebsocketConsumer):
       indict = json.loads(text_data)	
       
       if indict['code'] == 'auth':
+        user = await User.objects.filter(username=indict['name']).afirst()
+        if (user is None 
+            or not await database_sync_to_async(user.check_password)(indict['pass'])
+            or not await access.check_async('S', indict['school'], user, 'W')):
+          logger.info('Login failure: ' + indict['name'])
+          await self.close() 
+          return()
+        self.user = user
+        self.client_version = indict['version']
         self.myschoolline = await school.objects.aget(id=indict['school'])
         self.mytrainerline = await dbtrainer.objects.aget(
           id = self.myschoolline.trainer_nr
@@ -202,16 +220,9 @@ class remotetrainer(AsyncWebsocketConsumer):
           indict['school'] = self.myschoolline.e_school
           await self.ws.send_str(json.dumps(indict))
           await self.ws.receive()
-        else:
-          self.user = await User.objects.aget(username=indict['name'])
-          self.client_version = indict['version']
-          if self.user.check_password(indict['pass']):
-            logger.info('Successfull login:' + indict['name'] + ' - Software v' 
-                + self.client_version)
-            self.authed = True
-          if not self.authed:
-            logger.info('Login failure: ' + indict['name'])
-            await self.close() 
+        logger.info('Successfull login:' + user.username + ' - Software v' 
+          + self.client_version)
+        self.authed = True
         await self.send(json.dumps('OK'))
           
       elif indict['code'] == 'namecheck':
@@ -229,7 +240,7 @@ class remotetrainer(AsyncWebsocketConsumer):
           )
           query_list = await database_sync_to_async(list)(
             trainframe.objects.filter(
-              school=indict['school'],
+              school=self.myschoolline.id,
               deleted=False,
             )
           )
@@ -433,10 +444,9 @@ class trainerutil(AsyncWebsocketConsumer):
           myuser = self.scope['user']
         else:
           myuser = await User.objects.aget(username=params['name'])
-          if await database_sync_to_async(myuser.check_password)(params['pass']):
-            self.authed = True
-          if not self.authed:
+          if not await database_sync_to_async(myuser.check_password)(params['pass']):
             await self.close() 
+            return()
         if await access.check_async('S', self.schoolnr, myuser, 'R'):
           self.maywrite = await access.check_async('S', self.schoolnr, myuser, 'W')
           self.schoolline = await school.objects.aget(id=self.schoolnr)
@@ -611,7 +621,8 @@ class trainerutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'trainnow': 
         if not self.maywrite:
-          self.close()	
+          await self.close()	
+          return()
         schoolline = await school.objects.aget(id=self.schoolnr)
         await sync_to_async(schoolline.trainers.add)(self.trainerline)
         trainers[self.trainerline.id].wake()
@@ -621,7 +632,8 @@ class trainerutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'dl_only': 
         if not self.maywrite:
-          self.close()	
+          await self.close()	
+          return()
         my_trainer = train_once_remote(
             myschool = await school.objects.aget(id=self.schoolnr), 
             dbline = self.trainerline,

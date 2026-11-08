@@ -430,7 +430,7 @@ class oneitemConsumer(AsyncWebsocketConsumer):
         await self.safe_send(outlist)	
 
       elif params['command'] == 'delete_cam':
-        if self.may_write:
+        if self.may_write and int(params['itemid']) == int(self.idx):
           if params['itemid'] in viewables and 'stream' in viewables[params['itemid']]:
             await viewables[params['itemid']]['stream'].stop()
           streamline = await stream.objects.aget(id=params['itemid'])

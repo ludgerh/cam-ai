@@ -1,3 +1,4 @@
+# config/views.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -42,19 +43,17 @@ test_email = ''
 
 class myTemplateView(LoginRequiredMixin, TemplateView):
 
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
+  def dispatch(self, request, *args, **kwargs):
+    if request.user.is_authenticated and not request.user.is_superuser:
       return(HttpResponse('No Access'))
+    return(super().dispatch(request, *args, **kwargs))
 
 class myFormView(LoginRequiredMixin, FormView):
 
-  def get(self, request, *args, **kwargs):
-    if self.request.user.is_superuser:
-      return(super().get(request, *args, **kwargs))
-    else:
+  def dispatch(self, request, *args, **kwargs):
+    if request.user.is_authenticated and not request.user.is_superuser:
       return(HttpResponse('No Access'))
+    return(super().dispatch(request, *args, **kwargs))
 
 class config(myTemplateView):
   template_name = 'config/config.html'
@@ -217,7 +216,7 @@ class smtp(myFormView):
         for item in changes.items():
           if line.startswith(item[0]):
             if isinstance(item[1], str):
-              line = item[0] + ' = "' + item[1] + '"\n'
+              line = item[0] + ' = ' + repr(item[1]) + '\n'
             else:  
               line = item[0] + ' = ' + str(item[1]) + '\n'
         targetfile.write(line) 
