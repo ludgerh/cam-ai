@@ -1,3 +1,4 @@
+# schools/c_schools.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -14,11 +15,20 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
+import os
 from multiprocessing import Lock as p_lock
 from django.db import connections
 from django.db.utils import OperationalError
 from .models import tag
 from tf_workers.models import school as db_school
+
+def frame_path(schoolline, name):
+  # Training servers only keep the coded copy at model input size:
+  filepath = schoolline.dir + 'frames/' + name
+  if os.path.exists(filepath):
+    return(filepath)
+  return(schoolline.dir + 'coded/' + str(schoolline.model_xin) + 'x'
+    + str(schoolline.model_yin) + '/' + name[:-4] + '.cod')
 
 def get_taglist(myschoolnr):
   try:

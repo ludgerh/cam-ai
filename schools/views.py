@@ -39,6 +39,7 @@ from tools.tokens import checktoken
 from tools.l_crypt import l_crypt
 from streams.models import stream
 from tf_workers.models import school
+from schools.c_schools import frame_path
 from users.models import archive
 from users.userinfo import free_quota
 from eventers.models import event, event_frame
@@ -197,12 +198,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y,
     #trainframe_line = trainframe.objects.get(id = framenr)
     #school_nr = trainframe_line.school
     #schoolline = school.objects.get(id = school_nr)
-    filepath_raw = schoolline.dir + '*****/' + trainframe_line.name
-    filepath = filepath_raw.replace('*****', 'frames', 1)
-    if not os.path.exists(filepath):
-      filepath = filepath_raw.split("*****/", 1)[0]
-      filepath = filepath + 'coded/' + '224x224/' + trainframe_line.name[:-3] + 'cod'
-      filepath = filepath[:-3]+'cod'
+    filepath = frame_path(schoolline, trainframe_line.name)
     crypt = False
   elif mode == 2:
     frameline = archive.objects.get(id = framenr)
