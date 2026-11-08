@@ -48,7 +48,7 @@ from tools.l_break import a_break_type, BR_MEDIUM, BR_LONG
 from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers
-from schools.c_schools import get_taglist, check_extratags_async
+from schools.c_schools import get_taglist, check_extratags_async, frame_path
 from tf_workers.models import school, worker
 from tf_workers.c_tf_workers import tf_worker_client
 from eventers.models import event, event_frame
@@ -176,7 +176,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               and my_cache_dict[item['idx']]['fit'] == school_dbline.last_fit
             )
             frameline = await trainframe.objects.aget(id=item['idx'])
-            imagepath = school_dbline.dir + 'frames/' + frameline.name 
+            imagepath = frame_path(school_dbline, frameline.name)
           frame_ids.append(frameline.id)
           if use_ram_cache:
             code_list.append('R')
