@@ -148,7 +148,7 @@ let graph_data = {
     pointHoverRadius: 0,
     },
     {
-    label: 'Gamma',
+    label: 'val_errors',
     backgroundColor: 'rgb(200, 155, 0)',
     borderColor: 'rgb(200, 155, 0)',
     yAxisID: 'C',
@@ -244,7 +244,7 @@ function refresh_all() {
         graph_labels.push(counter);
         graph_data.datasets[0].data.push(item.learning_rate);
         graph_data.datasets[1].data.push(item.augmentation);
-        graph_data.datasets[2].data.push(item.gamma);
+        graph_data.datasets[2].data.push(item.val_errors ?? null);
         graph_data.datasets[3].data.push(item.bce);
         graph_data.datasets[4].data.push(item.val_bce);
         const older_rows = rows;
