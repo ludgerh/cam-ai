@@ -1,5 +1,5 @@
+# tools/views.py
 """
-Original path: tools/views.py
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -559,6 +559,11 @@ def logout_and_redirect(request):
 
 class sendlogs(LoginRequiredMixin, TemplateView):
   template_name = 'tools/sendlogs.html'
+
+  def dispatch(self, request, *args, **kwargs):
+    if request.user.is_authenticated and not request.user.is_superuser:
+      return(HttpResponse('No Access'))
+    return(super().dispatch(request, *args, **kwargs))
 
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)

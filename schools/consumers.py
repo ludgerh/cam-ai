@@ -272,6 +272,9 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       if params['command'] == 'settrainpage':
         school_nr = params['school_nr']
+        if not await access.check_async('S', school_nr, self.user, 'R'):
+          await self.close()
+          return()
         if self.check_ts + 60.0 < time():
           await self.school_lines[school_nr].arefresh_from_db()
           self.check_ts = time()
@@ -345,6 +348,9 @@ class schooldbutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))
 
       elif params['command'] == 'seteventpage':
+        if not await access.check_async('C', params['streamnr'], self.user, 'R'):
+          await self.close()
+          return()
         stream_line = await stream.objects.aget(id=params['streamnr'])
         if params['showdone']:
           eventlines = event.objects.filter(
@@ -465,7 +471,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'deltrainframe':
         frameline = await trainframe.objects.aget(id=params['img'],)
-        if await access.check_async('S', params['school'], self.user, 'W'):
+        if await access.check_async('S', frameline.school, self.user, 'W'):
           frameline.deleted = True
           await frameline.asave(update_fields=('deleted', ))
         outlist['data'] = 'OK'
@@ -632,6 +638,9 @@ class schooldbutil(AsyncWebsocketConsumer):
             pathadd = str(i) + '/'
             await aiofiles.os.makedirs(modelpath + 'frames/' + pathadd, exist_ok=True)
           eventline = await event.objects.aget(id=params['event'])
+          if not await access.check_async('C', eventline.camera_id, self.user, 'R'):
+            await self.close()
+            return()
           framelines = (event_frame.objects
             .filter(event=eventline)
             .select_related('event__camera')  # preload FKs to avoid sync lookup in async context
@@ -706,7 +715,8 @@ class schooldbutil(AsyncWebsocketConsumer):
             eventlines = event.objects.filter(camera__id=params['streamnr'], xmax__gt=0, 
               done=True)
           else:
-            eventlines = event.objects.filter(id=params['eventnr'])
+            eventlines = event.objects.filter(
+              id=params['eventnr'], camera__id=params['streamnr'])
           streamnr =  params['streamnr']
           if await access.check_async('C', streamnr, self.scope['user'], 'W'):
             async for eventline in eventlines:
@@ -721,7 +731,7 @@ class schooldbutil(AsyncWebsocketConsumer):
       elif params['command'] == 'delitem':
         if params['dtype'] == 0:
           frameline = await event_frame.objects.aget(id=params['nr_todel'])
-          eventline = await event.objects.aget(id=params['event_nr'])
+          eventline = await event.objects.aget(id=frameline.event_id)
           streamline = await stream.objects.aget(event__id=eventline.id)
           if await access.check_async('C', streamline.id, self.scope['user'], 'W'):
             frameline.deleted = True
@@ -762,8 +772,7 @@ class schooldbutil(AsyncWebsocketConsumer):
 
       elif params['command'] == 'setonetag':
         frameline = await trainframe.objects.aget(id=params['img'],)
-        schoolline = await school.objects.aget(id=params['school'],)
-        if access.check('S', schoolline.id, self.scope['user'], 'W'):
+        if await access.check_async('S', frameline.school, self.scope['user'], 'W'):
           fieldtochange = 'c'+params['cnt']
           setattr(frameline, fieldtochange, params['value'])
           await frameline.asave(update_fields=(fieldtochange, ))

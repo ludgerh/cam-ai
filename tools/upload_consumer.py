@@ -1,5 +1,6 @@
+# tools/upload_consumer.py
 """
-Copyright (C) 2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -38,6 +39,9 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
 
   async def connect(self):
     try:
+      if not self.scope['user'].is_authenticated:
+        await self.close()
+        return()
       await self.accept()
       self.upload_uid = None
       self.filename = None
@@ -75,7 +79,10 @@ class uploads_async_consumer(AsyncWebsocketConsumer):
       #logger.info('<-- ' + text_data)
       params = json.loads(text_data)
       if params['command'] == 'upload_start':	
-        self.upload_uid = params.get('id') or str(uuid.uuid4())
+        try:
+          self.upload_uid = str(uuid.UUID(params.get('id')))
+        except (TypeError, ValueError):
+          self.upload_uid = str(uuid.uuid4())
         self.filename = Path(params['filename']).name
         self.filesize = params['size']
         self.tmp_path = UPLOAD_TMP / f"{self.upload_uid}.part"

@@ -1,3 +1,4 @@
+# oneitem/views.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -83,11 +84,9 @@ class OneCamView(View):
     return render(request, 'oneitem/onecam.html', context)
     
   async def post(self, request, camnr, tokennr=0, token=None):
-    if not await database_sync_to_async(get_user)(request):
-      return JsonResponse({"error": "unauthorized"}, status=401)
     go_on, may_write = await self.check_access(request, camnr, tokennr, token)
-    if not go_on:
-        return HttpResponse('No Access!')
+    if not (go_on and may_write):
+      return HttpResponse('No Access!')
     dbline = await stream.objects.aget(id=camnr)
     mycam = viewables[camnr]['C']
     myurl = '/oneitem/cam/'
@@ -163,11 +162,9 @@ class OneDetView(View):
     return render(request, 'oneitem/onedetector.html', context) 
     
   async def post(self, request, detnr, tokennr=0, token=None):
-    if not await database_sync_to_async(get_user)(request):
-      return JsonResponse({"error": "unauthorized"}, status=401)
     go_on, may_write = await self.check_access(request, detnr, tokennr, token)
-    if not go_on:
-        return HttpResponse('No Access!')
+    if not (go_on and may_write):
+      return HttpResponse('No Access!')
     dbline = await stream.objects.aget(id=detnr)
     await dbline.arefresh_from_db()
     mycam = viewables[detnr]['C']
@@ -203,7 +200,7 @@ class OneDetView(View):
       may_write = await access.check_async('D', detnr, request.user, 'W')
     else:
       go_on = (tokennr and token 
-        and await database_sync_to_async(checktoken)((tokennr, token), 'CAR', camnr))
+        and await database_sync_to_async(checktoken)((tokennr, token), 'CAR', detnr))
       may_write = False
     return go_on, may_write   
     
@@ -257,11 +254,9 @@ class OneEveView(View):
     return render(request, 'oneitem/oneeventer.html', context) 
     
   async def post(self, request, evenr, tokennr=0, token=None):
-    if not await database_sync_to_async(get_user)(request):
-      return JsonResponse({"error": "unauthorized"}, status=401)
     go_on, may_write = await self.check_access(request, evenr, tokennr, token)
-    if not go_on:
-        return HttpResponse('No Access!')
+    if not (go_on and may_write):
+      return HttpResponse('No Access!')
     dbline = await stream.objects.aget(id=evenr)
     mycam = viewables[evenr]['C']
     myurl = '/oneitem/eventer/'
@@ -273,6 +268,9 @@ class OneEveView(View):
     dbline.eve_event_time_gap = form.cleaned_data['eve_event_time_gap']
     dbline.eve_shrink_factor = form.cleaned_data['eve_shrink_factor']
     dbline.eve_sync_factor = form.cleaned_data['eve_sync_factor']
+    if not await access.check_async(
+        'S', form.cleaned_data['eve_school'].id, request.user, 'R'):
+      return HttpResponse('No Access!')
     dbline.eve_school = form.cleaned_data['eve_school']
     dbline.eve_alarm_email = form.cleaned_data['eve_alarm_email']
     await dbline.asave(update_fields=[
@@ -292,7 +290,7 @@ class OneEveView(View):
       may_write = await access.check_async('E', evenr, request.user, 'W')
     else:
       go_on = (tokennr and token 
-        and await database_sync_to_async(checktoken)((tokennr, token), 'CAR', camnr))
+        and await database_sync_to_async(checktoken)((tokennr, token), 'CAR', evenr))
       may_write = False
     return go_on, may_write   
 

@@ -172,6 +172,9 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             self.myitem.shared_mem.write_1_meta('sync_factor', value)
           elif params['pname'] == 'eve_school':
             value = int(params['value'])
+            if not await access.check_async('S', value, self.scope['user'], 'R'):
+              await self.close()
+              return()
             self.dbline.eve_school = await school.objects.aget(id = value)
             self.myitem.shared_mem.write_1_meta('school', value)
           elif params['pname'] == 'eve_alarm_max_nr':
@@ -339,7 +342,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
 
       elif params['command'] == 'getcondition':
         if self.may_write:
-          filterline = await evt_condition.objects.aget(id=params['c_nr'])
+          filterline = await evt_condition.objects.aget(
+            id=params['c_nr'], eventer_id=self.idx)
           outlist['data'] = model_to_dict(filterline, exclude=[])
         else:
           outlist['data'] = 'No Access'
@@ -392,7 +396,8 @@ class oneitemConsumer(AsyncWebsocketConsumer):
             float(params['y']),
           ))
           if params['save_db']:
-            dbline = await evt_condition.objects.aget(id=params['c_nr'])
+            dbline = await evt_condition.objects.aget(
+              id=params['c_nr'], eventer_id=self.idx)
             dbline.c_type = int(params['c_type'])
             dbline.x = int(params['x'])
             dbline.y = float(params['y'])

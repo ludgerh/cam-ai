@@ -60,6 +60,15 @@ default_modeltype = djconf.getconfig('default_modeltype', 'efficientnetv2-b0')
 medium_brake = djconf.getconfigfloat('medium_brake', 0.1)
 counter_dict = {}
 
+# School fields the training dashboard may change
+DASHBOARD_ITEMS = {
+  'trigger', 'ignore_checked', 'donate_pics', 'load_last_model', 'save_new_model',
+  'model_type', 'model_train_type', 'model_xin', 'model_yin',
+  'model_image_augmentation', 'model_gamma', 'model_gamma_step', 'model_gamma_max',
+  'model_finetuning', 'l_rate_min', 'l_rate_max', 'l_rate_target', 
+  'early_stop_patience',
+}
+
 async def get_trainer_nr(school_line):
   trainerlist = []
   async for item in dbtrainer.objects.filter(active = True):
@@ -487,7 +496,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))			
 
       elif params['command'] == 'getschoolinfo':
-        countlist1 = trainframe.objects.filter(school=params['school'])
+        countlist1 = trainframe.objects.filter(school=self.schoolnr)
         infolocal = {}
         infolocal['nr_total'] = await countlist1.acount()
         countlist = countlist1.filter(checked=True)
@@ -527,7 +536,7 @@ class trainerutil(AsyncWebsocketConsumer):
           datatemp = json.loads(returned.data)['data']
           outlist['data'] = datatemp 
         else:
-          query_set = fit.objects.filter(school=params['school'])
+          query_set = fit.objects.filter(school=self.schoolnr)
           i = 0
           result = [] 
           async for item in query_set:
@@ -553,7 +562,8 @@ class trainerutil(AsyncWebsocketConsumer):
           outlist['data'] = json.loads(returned.data)['data']
         else:
           result = []
-          async for item in epoch.objects.filter(fit=params['fitnr']).order_by('id')[
+          async for item in epoch.objects.filter(
+              fit=params['fitnr'], fit__school=self.schoolnr).order_by('id')[
               params['start']:params['start'] + params['length']
             ]:
             result.append({
@@ -584,7 +594,7 @@ class trainerutil(AsyncWebsocketConsumer):
           returned = await self.ws.receive()
           outlist['data'] = json.loads(returned.data)['data']
         else:
-          line = await fit.objects.aget(id=params['fitnr'])
+          line = await fit.objects.aget(id=params['fitnr'], school=self.schoolnr)
           result = {
             'model_type' : line.model_type, 
             'model_image_augmentation' : line.model_image_augmentation, 
@@ -662,12 +672,13 @@ class trainerutil(AsyncWebsocketConsumer):
           await self.ws.send_str(json.dumps(temp))
           returned = await self.ws.receive()
           answer = json.loads(returned.data)['data']
-          schoolline = await school.objects.aget(id=self.schoolnr)
-          setattr(schoolline, params['item'], answer)
-          try:
-            await schoolline.asave(update_fields=[params['item']])
-          except ValueError:
-            logger.warning('Old table version: Better update your client software') 
+          if params['item'] in DASHBOARD_ITEMS:
+            schoolline = await school.objects.aget(id=self.schoolnr)
+            setattr(schoolline, params['item'], answer)
+            try:
+              await schoolline.asave(update_fields=[params['item']])
+            except ValueError:
+              logger.warning('Old table version: Better update your client software') 
           outlist['data'] = answer
         else:  
           schoolline = await school.objects.aget(id=self.schoolnr)
@@ -679,7 +690,7 @@ class trainerutil(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))						
 
       elif params['command'] == 'set_from_dashboard':
-        if self.maywrite:
+        if self.maywrite and params['item'] in DASHBOARD_ITEMS:
           schoolline = await school.objects.aget(id = self.schoolnr)
           try:
             if params['item'] == 'model_finetuning' or params['item'] == 'early_stop_patience':
