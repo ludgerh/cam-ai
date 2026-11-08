@@ -1,3 +1,4 @@
+# tools/consumer_caminst.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -55,6 +56,8 @@ video_fps_limit = djconf.getconfigfloat('video_fps_limit', 0.0)
 class acaminst(AsyncWebsocketConsumer):
     
   async def check_create_stream_priv(self):
+    if not self.scope['user'].is_authenticated:
+      return(False)
     if self.scope['user'].is_superuser:
       return(True)
     else:
@@ -81,6 +84,7 @@ class acaminst(AsyncWebsocketConsumer):
       if params['command'] == 'installcam':
         if not await self.check_create_stream_priv():
           await self.close()
+          return()
         myschool = await school.objects.filter(active=True).afirst()
         newstream = dbstream()
         if 'name' in params:
@@ -156,6 +160,9 @@ class acaminst(AsyncWebsocketConsumer):
         await self.send(json.dumps(outlist))	
 
       elif params['command'] == 'scanips':
+        if not self.scope['user'].is_authenticated:
+          await self.close()
+          return()
         if 'network' in params:
           mynet = ip_network(params['network'])
         else:
@@ -191,11 +198,12 @@ class acaminst(AsyncWebsocketConsumer):
       elif params['command'] == 'scanoneip':
         if not await self.check_create_stream_priv():
           await self.close()
-        cmds = 'ffprobe -v fatal'
+          return()
+        cmds = ['ffprobe', '-v', 'fatal']
         if params['camurl'][:4].upper() == 'RTSP':
-          cmds += ' -rtsp_transport tcp'
-        cmds += ' -print_format json -show_streams "' + params['camurl'] + '"'
-        p = await asyncio.create_subprocess_shell(cmds, stdout=asyncio.subprocess.PIPE)
+          cmds += ['-rtsp_transport', 'tcp']
+        cmds += ['-print_format', 'json', '-show_streams', '--', params['camurl']]
+        p = await asyncio.create_subprocess_exec(*cmds, stdout=asyncio.subprocess.PIPE)
         output, _ = await p.communicate()
         outlist['data'] = json.loads(output)
         logger.debug('--> ' + str(outlist))
