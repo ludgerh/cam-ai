@@ -1,3 +1,4 @@
+# eventers/views.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -53,7 +54,7 @@ def events(request, camnr):
 def oneevent(request, streamnr, eventnr):
   mystream = stream.objects.get(id=streamnr)
   myevent = event.objects.get(id=eventnr)
-  if access.check('C', streamnr, request.user, 'R'):
+  if myevent.camera_id == streamnr and access.check('C', streamnr, request.user, 'R'):
     length_in_seconds = round(myevent.end.timestamp() - myevent.start.timestamp())
     length = str(length_in_seconds // 60)+':'
     seconds = str(length_in_seconds % 60)

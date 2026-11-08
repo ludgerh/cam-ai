@@ -646,6 +646,9 @@ class admin_tools_async(AsyncWebsocketConsumer):
           await a_break_type(BR_LONG)
           
       elif params['command'] == 'sendlogs':
+        if not self.scope['user'].is_superuser:
+          await self.close()
+          return()
         smtp_conf = await aget_smtp_conf(extended_from = False)
         smtp_conf['sender_email'] = (
           'Logfile-Sender' + '<' + smtp_conf['sender_email'] + '>')

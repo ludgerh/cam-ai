@@ -1,5 +1,6 @@
+# users/consumers.py
 """
-Copyright (C) 2024-2025 by the CAM-AI team, info@cam-ai.de
+Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,6 +23,7 @@ from django.db import close_old_connections
 from channels.generic.websocket import WebsocketConsumer #, AsyncWebsocketConsumer
 from tools.c_logger import log_ini
 from tools.tokens import maketoken
+from access.c_access import access
 from users.archive import myarchive
 from .models import archive as dbarchive
 from .userinfo import free_quota
@@ -39,6 +41,9 @@ class archiveConsumer(WebsocketConsumer):
   def connect(self):
     try:
       self.user = self.scope['user']
+      if not self.user.is_authenticated:
+        self.close()
+        return()
       close_old_connections()
       self.accept()
     except:
@@ -59,6 +64,12 @@ class archiveConsumer(WebsocketConsumer):
 
   def get_dl_url(self, mynumber):
     archiveline = dbarchive.objects.get(id=mynumber)
+    if archiveline.stream_id is None:
+      may_read = self.user.is_superuser
+    else:
+      may_read = access.check('C', archiveline.stream_id, self.user, 'W')
+    if not may_read:
+      return('No Access')
     mytoken = maketoken('ADL', mynumber, 'Download from Archive #'+str(mynumber))
     dlurl = settings.CLIENT_URL
     dlurl += 'users/downarchive/'
