@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-oneitem/templates/onecam.html
+oneitem/templates/oneitem/onecam.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -549,6 +549,18 @@ function initUI() {
         break;
       case 40 : //Arrow down
         $('#arrow-down').trigger('click');
+        break;
+      case 33 : //Page up
+        if (ptz_active) {
+          e.preventDefault();
+          $('#zoomplus').trigger('click');
+        };
+        break;
+      case 34 : //Page down
+        if (ptz_active) {
+          e.preventDefault();
+          $('#zoomminus').trigger('click');
+        };
         break;
       case 107 : //Plus
       case 171 : //The other Plus
