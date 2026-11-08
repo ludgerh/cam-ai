@@ -27,7 +27,7 @@ try:
     quantize_lr, is_better_score, next_stage_gamma, next_finetuning,
     train_schedule, MyCallback,
     OVERFIT_BOTH_FALLING, OVERFIT_BOTH_RISING, OVERFIT_POSITIVE,
-    OVERFIT_NEGATIVE, OVERFIT_SHORT, PHASE_START, PHASE_MAIN,
+    OVERFIT_NEGATIVE, OVERFIT_SHORT, PHASE_START, PHASE_MAIN, PHASE_FINAL,
   )
   plugin_missing = False
 except ImportError:
@@ -296,3 +296,56 @@ class MyCallbackAugCarryOverTest(SimpleTestCase):
     self.assertAlmostEqual(cb.current_aug, 0.4)
     aug_layer = model.get_layer.return_value
     aug_layer.magnitude.assign.assert_called_with(12.0)
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackMainPhaseTest(SimpleTestCase):
+
+  def callback(self, aug, bce_list, val_bce_list, no_improve = 0):
+    cb = MyCallback(MagicMock(), MagicMock(), MagicMock(), 0, patience = PATIENCE)
+    cb.set_model(MagicMock())
+    cb.current_aug = aug
+    cb.best_aug = aug
+    cb.schedule = filled_schedule(bce_list, val_bce_list)
+    cb.schedule.set_phase(PHASE_MAIN, reset_history = False)
+    cb.no_improve_count = no_improve
+    return(cb)
+
+  def test_lower_before_stage_end(self):
+    # Underfitting lowers the augmentation while the stage still improves
+    cb = self.callback(0.8, [0.2] * PATIENCE, [0.1] * PATIENCE)
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_NEGATIVE), 0.7)
+    self.assertEqual(cb.schedule.phase, PHASE_MAIN)
+    self.assertEqual(cb.schedule.val_bce_history, [])
+    self.assertAlmostEqual(cb.ave_before_aug_change, 0.1)
+
+  def test_no_lower_if_last_change_did_not_help(self):
+    cb = self.callback(0.8, [0.2] * PATIENCE, [0.1] * PATIENCE)
+    cb.ave_before_aug_change = 0.1
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_NEGATIVE), 0.8)
+    self.assertEqual(cb.schedule.phase, PHASE_MAIN)
+    self.assertEqual(len(cb.schedule.val_bce_history), PATIENCE)
+
+  def test_no_raise_before_stage_end(self):
+    cb = self.callback(0.4, falling(), [0.1] * PATIENCE)
+    cb.stage_best_bce = 0.1
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_POSITIVE), 0.4)
+    self.assertEqual(cb.schedule.phase, PHASE_MAIN)
+
+  def test_final_takes_augmentation_of_stage_best(self):
+    # The final phase continues from the stage best weights and must use
+    # the augmentation they were trained with, not that of the global best
+    cb = self.callback(
+      0.4, [0.05] * PATIENCE, [0.1] * PATIENCE, no_improve = PATIENCE)
+    cb.best_aug = 0.6
+    cb.stage_best_weights = ['weights']
+    cb.stage_best_aug = 0.5
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_BOTH_FALLING), 0.5)
+    self.assertEqual(cb.schedule.phase, PHASE_FINAL)
+    cb.model.set_weights.assert_called_once_with(['weights'])
+
+  def test_final_without_stage_best_keeps_augmentation(self):
+    cb = self.callback(
+      0.4, [0.05] * PATIENCE, [0.1] * PATIENCE, no_improve = PATIENCE)
+    cb.best_aug = 0.6
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_BOTH_FALLING), 0.4)
+    self.assertEqual(cb.schedule.phase, PHASE_FINAL)
