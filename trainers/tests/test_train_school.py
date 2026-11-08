@@ -1,3 +1,4 @@
+# trainers/tests/test_train_school.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -123,7 +124,6 @@ class TrainSchoolTest(TransactionTestCase):
 
     datapath = self.tmpdir + '/data/'
     self.config = config = {
-      'version' : train_worker_gpu.version,
       'tr_epochs' : EPOCHS,
       'tr_batchsize' : 32,
       'validation_split' : 0.33333333,

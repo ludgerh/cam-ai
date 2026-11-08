@@ -1,3 +1,4 @@
+# trainers/management/commands/tune_school.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -154,7 +155,6 @@ def run_training(db_name, school_id, fit_id, gpu_nr, gpu_mem_limit, config):
   from tf_workers.models import school
   from trainers.models import fit
   from plugins.train_worker_gpu import train_worker_gpu
-  config['version'] = train_worker_gpu.version
   with (
     patch('plugins.train_worker_gpu.train_worker_gpu.djconf',
       fake_djconf(config)),
