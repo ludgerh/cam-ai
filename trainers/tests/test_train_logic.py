@@ -169,6 +169,14 @@ class TrainScheduleTest(SimpleTestCase):
     s = filled_schedule(high[1:], low[1:])
     self.assertFalse(s.check_underfit())
 
+  def test_underfit_ratio_ignores_val_spikes(self):
+    val_bce = [0.1] * PATIENCE
+    val_bce[3] = 3.0
+    s = filled_schedule([0.2] * PATIENCE, val_bce)
+    self.assertAlmostEqual(s.underfit_ratio(), 2.0)
+    self.assertTrue(s.check_underfit())
+    self.assertEqual(train_schedule(patience = PATIENCE).underfit_ratio(), 0.0)
+
   def test_history_limited_to_patience(self):
     s = filled_schedule(falling(PATIENCE * 2), falling(PATIENCE * 2))
     self.assertEqual(len(s.val_bce_history), PATIENCE)
@@ -311,12 +319,26 @@ class MyCallbackMainPhaseTest(SimpleTestCase):
     return(cb)
 
   def test_lower_before_stage_end(self):
-    # Underfitting lowers the augmentation while the stage still improves
+    # Underfitting lowers the augmentation while the stage still improves.
+    # Training BCE twice the val BCE halves the augmentation.
     cb = self.callback(0.8, [0.2] * PATIENCE, [0.1] * PATIENCE)
-    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_NEGATIVE), 0.7)
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_NEGATIVE), 0.4)
     self.assertEqual(cb.schedule.phase, PHASE_MAIN)
     self.assertEqual(cb.schedule.val_bce_history, [])
     self.assertAlmostEqual(cb.ave_before_aug_change, 0.1)
+
+  def test_lower_at_least_one_step(self):
+    cb = self.callback(0.8, [0.105] * PATIENCE, [0.1] * PATIENCE)
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_NEGATIVE), 0.7)
+
+  def test_lower_on_grid(self):
+    # 0.3 / 1.8 = 0.17 is rounded down to the 0.1 grid
+    cb = self.callback(0.3, [0.18] * PATIENCE, [0.1] * PATIENCE)
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_NEGATIVE), 0.1)
+
+  def test_lower_not_below_minimum(self):
+    cb = self.callback(0.1, [0.5] * PATIENCE, [0.1] * PATIENCE)
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_NEGATIVE), 0.0)
 
   def test_no_lower_if_last_change_did_not_help(self):
     cb = self.callback(0.8, [0.2] * PATIENCE, [0.1] * PATIENCE)
