@@ -187,7 +187,9 @@ class schooldbutil(AsyncWebsocketConsumer):
               try:
                 async with aiofiles.open(imagepath, mode = "rb") as f:
                   myimage = await f.read()
-                if frameline.encrypted:
+                # School frames and coded copies are stored unencrypted,
+                # the flag may still come along from imported frames:
+                if is_tagger and frameline.encrypted:
                   if self.crypt is None:
                     self.crypt =  l_crypt(key = frameline.event.camera.crypt_key)
                   myimage = self.crypt.decrypt(myimage) 
