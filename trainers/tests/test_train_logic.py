@@ -287,13 +287,26 @@ class MyCallbackAugTest(SimpleTestCase):
     # Median of falling() is 0.65, ratio 0.65 / 2.0 = 0.33
     cb = self.callback(0.1, falling(), [2.0] * PATIENCE)
     cb.stage_best_bce = 2.0
-    self.assertTrue(cb.aug_raise_possible(OVERFIT_POSITIVE))
+    self.assertTrue(cb.aug_raise_possible())
+
+  def test_raise_with_flat_training_bce(self):
+    # Only the levels count: a flat training BCE far below the val BCE
+    # (school 42, FT 349: 0.0002 vs. 0.00115) must allow a raise
+    cb = self.callback(0.0, [0.0002] * PATIENCE, [0.00115] * PATIENCE)
+    cb.stage_best_bce = 0.00108
+    self.assertTrue(cb.aug_raise_possible())
 
   def test_no_raise_close_to_underfit(self):
     # Ratio 0.65: one more step would likely end above the val BCE
     cb = self.callback(0.1, falling(), [1.0] * PATIENCE)
     cb.stage_best_bce = 1.0
-    self.assertFalse(cb.aug_raise_possible(OVERFIT_POSITIVE))
+    self.assertFalse(cb.aug_raise_possible())
+
+  def test_no_raise_outside_main_phase(self):
+    cb = self.callback(
+      0.1, [0.0002] * PATIENCE, [0.00115] * PATIENCE, phase = PHASE_START)
+    cb.stage_best_bce = 0.00108
+    self.assertFalse(cb.aug_raise_possible())
 
 @skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
 class MyCallbackAugCarryOverTest(SimpleTestCase):
@@ -364,6 +377,15 @@ class MyCallbackMainPhaseTest(SimpleTestCase):
     cb.stage_best_bce = 0.1
     self.assertAlmostEqual(cb.main_phase_step(OVERFIT_POSITIVE), 0.4)
     self.assertEqual(cb.schedule.phase, PHASE_MAIN)
+
+  def test_raise_at_stage_end_with_flat_training_bce(self):
+    cb = self.callback(
+      0.0, [0.0002] * PATIENCE, [0.00115] * PATIENCE, no_improve = PATIENCE)
+    cb.stage_best_bce = 0.00108
+    self.assertAlmostEqual(
+      cb.main_phase_step(OVERFIT_BOTH_FALLING), 0.1)
+    self.assertEqual(cb.schedule.phase, PHASE_MAIN)
+    self.assertEqual(cb.schedule.val_bce_history, [])
 
   def test_final_takes_augmentation_of_stage_best(self):
     # The final phase continues from the stage best weights and must use
