@@ -1,3 +1,4 @@
+# tf_workers/models.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -69,7 +70,7 @@ class school(models.Model):
   model_train_type = models.CharField(max_length = 50, default = 'efficientnetv2-b0')
   model_xin = models.IntegerField(default = 224)
   model_yin = models.IntegerField(default = 224)
-  model_image_augmentation = models.FloatField(default = 0.3)
+  model_image_augmentation = models.FloatField(default = 0.0)
   model_gamma = models.FloatField(default = 0.0)
   model_gamma_step = models.FloatField(default = 0.0)
   model_gamma_max = models.FloatField(default = 0.0)
