@@ -498,7 +498,8 @@ class cam_worker(mp_process):
             if self.shared_mem.read_1_meta('ovl_mode'):
               if add_string:
                 add_string += ' / '  
-              add_string += f'Throwing screws: {self.shared_mem.read_1_meta('ovl_count')}'
+              add_string += ('Throwing screws: '
+                + str(self.shared_mem.read_1_meta('ovl_count')))
             if add_string:
               viewer_frame_line = [
                 frameline[0],
