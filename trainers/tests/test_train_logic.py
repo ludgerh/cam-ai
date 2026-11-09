@@ -283,6 +283,18 @@ class MyCallbackAugTest(SimpleTestCase):
       0.6, [0.2] * PATIENCE, [0.1] * PATIENCE, phase = PHASE_START)
     self.assertFalse(cb.aug_lower_possible(OVERFIT_NEGATIVE))
 
+  def test_raise_when_train_far_below_val(self):
+    # Median of falling() is 0.65, ratio 0.65 / 2.0 = 0.33
+    cb = self.callback(0.1, falling(), [2.0] * PATIENCE)
+    cb.stage_best_bce = 2.0
+    self.assertTrue(cb.aug_raise_possible(OVERFIT_POSITIVE))
+
+  def test_no_raise_close_to_underfit(self):
+    # Ratio 0.65: one more step would likely end above the val BCE
+    cb = self.callback(0.1, falling(), [1.0] * PATIENCE)
+    cb.stage_best_bce = 1.0
+    self.assertFalse(cb.aug_raise_possible(OVERFIT_POSITIVE))
+
 @skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
 class MyCallbackAugCarryOverTest(SimpleTestCase):
 
