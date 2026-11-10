@@ -249,6 +249,51 @@ class MyCallbackStageTest(SimpleTestCase):
     self.assertEqual(cb.best_name, 'model_temp_266.keras')
 
 @skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackStageBestTest(SimpleTestCase):
+
+  def callback(self):
+    cb = MyCallback(MagicMock(), MagicMock(), MagicMock(), 0, patience = PATIENCE)
+    cb.set_model(MagicMock())
+    cb.current_gamma = 0.0
+    return(cb)
+
+  def test_fewer_errors_beat_lower_bce(self):
+    # Fit 91 (school 43, FT 349): the final phase went back to weights with
+    # 16 errors because their val_bce was 2 % lower than at 12 errors
+    cb = self.callback()
+    cb.model.get_weights.side_effect = ['w16', 'w12', 'w14']
+    cb.current_aug = 0.0
+    cb.update_stage_best(16, 0.00105)
+    cb.current_aug = 0.1
+    cb.update_stage_best(12, 0.00108)
+    cb.current_aug = 0.0
+    cb.update_stage_best(14, 0.00104)
+    self.assertEqual(cb.stage_best_weights, 'w12')
+    self.assertAlmostEqual(cb.stage_best_aug, 0.1)
+    self.assertAlmostEqual(cb.restore_stage_best(), 0.1)
+    cb.model.set_weights.assert_called_once_with('w12')
+
+  def test_bce_breaks_tie(self):
+    cb = self.callback()
+    cb.model.get_weights.side_effect = ['a', 'b', 'c']
+    cb.update_stage_best(12, 0.00110)
+    cb.update_stage_best(12, 0.00107)
+    cb.update_stage_best(12, 0.00109)
+    self.assertEqual(cb.stage_best_weights, 'b')
+    self.assertEqual(cb.stage_score_errors, 12)
+    self.assertAlmostEqual(cb.stage_score_bce, 0.00107)
+
+  def test_start_stage_resets_stage_best(self):
+    cb = self.callback()
+    cb.model.get_weights.side_effect = ['old', 'new']
+    cb.update_stage_best(5, 0.001)
+    cb.start_stage(0.0)
+    self.assertIsNone(cb.stage_best_weights)
+    cb.current_gamma = 0.0
+    cb.update_stage_best(20, 0.01)
+    self.assertEqual(cb.stage_best_weights, 'new')
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
 class MyCallbackAugTest(SimpleTestCase):
 
   def callback(self, aug, bce_list, val_bce_list, phase = PHASE_MAIN):
