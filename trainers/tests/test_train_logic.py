@@ -28,6 +28,7 @@ try:
     train_schedule, MyCallback,
     OVERFIT_BOTH_FALLING, OVERFIT_BOTH_RISING, OVERFIT_POSITIVE,
     OVERFIT_NEGATIVE, OVERFIT_SHORT, PHASE_START, PHASE_MAIN, PHASE_FINAL,
+    AUG_TRIAL_WINDOWS,
   )
   plugin_missing = False
 except ImportError:
@@ -431,6 +432,7 @@ class MyCallbackMainPhaseTest(SimpleTestCase):
       cb.main_phase_step(OVERFIT_BOTH_FALLING), 0.1)
     self.assertEqual(cb.schedule.phase, PHASE_MAIN)
     self.assertEqual(cb.schedule.val_bce_history, [])
+    self.assertEqual(cb.aug_trial_left, AUG_TRIAL_WINDOWS * PATIENCE)
 
   def test_final_takes_augmentation_of_stage_best(self):
     # The final phase continues from the stage best weights and must use
@@ -450,3 +452,80 @@ class MyCallbackMainPhaseTest(SimpleTestCase):
     cb.best_aug = 0.6
     self.assertAlmostEqual(cb.main_phase_step(OVERFIT_BOTH_FALLING), 0.4)
     self.assertEqual(cb.schedule.phase, PHASE_FINAL)
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackAugTrialTest(SimpleTestCase):
+
+  def callback(self):
+    cb = MyCallback(MagicMock(), MagicMock(), MagicMock(), 0, patience = PATIENCE)
+    cb.set_model(MagicMock())
+    cb.myschool.l_rate_min = 1e-7
+    cb.current_lr = 1e-6
+    cb.current_aug = 0.0
+    cb.best_aug = 0.0
+    cb.schedule.set_phase(PHASE_MAIN)
+    return(cb)
+
+  def test_trial_measured_against_medians(self):
+    # A single outlier epoch (14 errors) before the raise must not be the
+    # bar for the trial, the median of the last window (16) is
+    cb = self.callback()
+    errors = [16, 17, 14, 16, 16, 17, 16, 15]
+    val_bce = [0.00113, 0.00115, 0.00105, 0.00113, 0.00112, 0.00116,
+      0.00113, 0.00111]
+    for e, v in zip(errors, val_bce):
+      cb.stage_errors.append(e)
+      cb.schedule.next_values(0.0002, v)
+      cb.update_progress(e, v)
+    self.assertEqual(cb.progress_errors, 14)
+    cb.start_aug_trial()
+    self.assertEqual(cb.progress_errors, 16)
+    self.assertAlmostEqual(cb.progress_bce, 0.00113)
+    self.assertEqual(cb.no_improve_count, 0)
+    cb.update_progress(15, 0.00118)
+    self.assertEqual(cb.no_improve_count, 0)
+    cb.update_progress(17, 0.00113)
+    self.assertEqual(cb.no_improve_count, 1)
+    cb.update_progress(17, 0.00109)
+    self.assertEqual(cb.no_improve_count, 0)
+
+  def test_no_stage_end_during_trial(self):
+    cb = self.callback()
+    for _ in range(PATIENCE):
+      cb.schedule.next_values(0.0002, 0.00115)
+    cb.stage_best_bce = 0.00100       # no further raise possible
+    cb.no_improve_count = PATIENCE
+    cb.aug_trial_left = 1
+    self.assertAlmostEqual(cb.main_phase_step(OVERFIT_BOTH_FALLING), 0.0)
+    self.assertEqual(cb.schedule.phase, PHASE_MAIN)
+    cb.aug_trial_left = 0
+    cb.main_phase_step(OVERFIT_BOTH_FALLING)
+    self.assertEqual(cb.schedule.phase, PHASE_FINAL)
+
+  def test_no_lr_lowering_during_trial(self):
+    cb = self.callback()
+    # Flat val BCE (no progress in the window) with rising volatility
+    for v in [0.00115, 0.00116, 0.00115, 0.00116, 0.00110, 0.00120,
+        0.00112, 0.00120]:
+      cb.schedule.next_values(0.0010, v)
+    cb.stage_best_bce = 0.00100
+    self.assertTrue(cb.lr_lower_possible())
+    cb.aug_trial_left = 3
+    self.assertFalse(cb.lr_lower_possible())
+
+  def test_no_lr_lowering_at_minimum(self):
+    cb = self.callback()
+    for v in [0.00115, 0.00116, 0.00115, 0.00116, 0.00110, 0.00120,
+        0.00112, 0.00120]:
+      cb.schedule.next_values(0.0010, v)
+    cb.stage_best_bce = 0.00100
+    cb.current_lr = 1e-7
+    self.assertFalse(cb.lr_lower_possible())
+
+  def test_start_stage_ends_trial(self):
+    cb = self.callback()
+    cb.aug_trial_left = 5
+    cb.progress_errors = 16
+    cb.start_stage(0.0)
+    self.assertEqual(cb.aug_trial_left, 0)
+    self.assertEqual(cb.progress_errors, float('inf'))
