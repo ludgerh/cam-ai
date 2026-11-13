@@ -588,15 +588,30 @@ class admin_tools_async(AsyncWebsocketConsumer):
         # Not temp/backup: that holds the download backups and is emptied
         # on every server start. This one is kept until the next upgrade.
         backup_path = PARENTPATH / 'temp' / 'upgrade_backup'
-        async with aiohttp.ClientSession() as session:
-          async with session.get(params['url']) as result:
-            response = await result.content.read()
-        with ZipFile(io.BytesIO(response)) as z:
-          z.extractall(expand_path)
-        if params['special']:
-          zipresult = next(expand_path.glob('cam-ai-*'), None)
+        # A ZIP file placed in temp/upgrade replaces the download. The newest
+        # one is used and removed afterwards, so it is installed only once.
+        local_zips = sorted(
+          (PARENTPATH / 'temp' / 'upgrade').glob('*.zip'),
+          key = lambda x: x.stat().st_mtime,
+        )
+        if local_zips:
+          local_zip = local_zips[-1]
+          logger.info('Upgrading from local file: ' + str(local_zip))
+          with ZipFile(local_zip) as z:
+            top_dir = z.namelist()[0].split('/')[0]
+            z.extractall(expand_path)
+          await aiofiles.os.remove(local_zip)
+          zipresult = expand_path / top_dir
         else:
-          zipresult = next(expand_path.glob('ludgerh-cam-ai-*'), None)
+          async with aiohttp.ClientSession() as session:
+            async with session.get(params['url']) as result:
+              response = await result.content.read()
+          with ZipFile(io.BytesIO(response)) as z:
+            z.extractall(expand_path)
+          if params['special']:
+            zipresult = next(expand_path.glob('cam-ai-*'), None)
+          else:
+            zipresult = next(expand_path.glob('ludgerh-cam-ai-*'), None)
         with suppress(FileNotFoundError):
           await aioshutil.rmtree(backup_path)
         await aioshutil.move(BASE_PATH, backup_path) 
