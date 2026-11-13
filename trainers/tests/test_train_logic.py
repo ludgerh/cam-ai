@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # The plugin is not part of the repository, so the tests skip without it.
 
 from unittest import skipIf
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from django.test import SimpleTestCase
 
 try:
@@ -529,3 +529,60 @@ class MyCallbackAugTrialTest(SimpleTestCase):
     cb.start_stage(0.0)
     self.assertEqual(cb.aug_trial_left, 0)
     self.assertEqual(cb.progress_errors, float('inf'))
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackStartPhaseTest(SimpleTestCase):
+
+  LOGS = {
+    'loss' : 0.001, 'val_loss' : 0.001, 'bce' : 0.0004, 'val_bce' : 0.0012,
+    'val_errors' : 18, 'binary_accuracy' : 0.99, 'recall' : 0.99,
+    'precision' : 0.99, 'val_binary_accuracy' : 0.99, 'val_recall' : 0.99,
+    'val_precision' : 0.99,
+  }
+
+  def callback(self, lr):
+    cb = MyCallback(MagicMock(), MagicMock(), MagicMock(), 0, patience = PATIENCE)
+    cb.set_model(MagicMock())
+    cb.myschool.l_rate_min = 1e-7
+    cb.myschool.l_rate_target = 1e-6
+    cb.current_lr = lr
+    cb.current_aug = 0.0
+    cb.current_gamma = 0.0
+    cb.current_finetuning = 349
+    cb.starttime = 0.0
+    cb.ave_before_aug_change = 0.0012
+    return(cb)
+
+  def epoch_end(self, cb):
+    module = 'plugins.train_worker_gpu.train_worker_gpu.'
+    with (patch(module + 'epoch'), patch(module + 'sqlconnection'),
+        patch(module + 'remove')):
+      cb.on_epoch_end(0, logs = self.LOGS)
+
+  def test_at_target(self):
+    # quantize_lr() gives 10^-6 with a rounding error
+    self.assertTrue(self.callback(quantize_lr(1e-6)).start_phase_at_target())
+    self.assertTrue(self.callback(1e-7).start_phase_at_target())
+    self.assertFalse(self.callback(10.0 ** -5.5).start_phase_at_target())
+
+  def test_only_in_start_phase(self):
+    cb = self.callback(1e-6)
+    cb.schedule.set_phase(PHASE_MAIN)
+    self.assertFalse(cb.start_phase_at_target())
+
+  def test_main_phase_at_target(self):
+    # Fit 94 (school 42, FT 349): the start phase lowered the LR to 1e-7
+    # before the augmentation could rise
+    cb = self.callback(1e-6)
+    for _ in range(PATIENCE - 1):
+      cb.schedule.next_values(0.0004, 0.0012)
+    self.epoch_end(cb)
+    self.assertEqual(cb.schedule.phase, PHASE_MAIN)
+    self.assertAlmostEqual(cb.current_lr, 1e-6)
+    self.assertEqual(len(cb.schedule.val_bce_history), PATIENCE)
+    self.assertEqual(cb.ave_before_aug_change, float('inf'))
+
+  def test_start_phase_above_target(self):
+    cb = self.callback(10.0 ** -5.5)
+    self.epoch_end(cb)
+    self.assertEqual(cb.schedule.phase, PHASE_START)
