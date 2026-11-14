@@ -1,3 +1,4 @@
+# cam-ai-server.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -52,12 +53,18 @@ def call_in_env(cmd, sys_info):
   subprocess.call(cmd_list, shell=True, executable='/bin/bash')
      
 
-if argv[1] == 'nvidia':
-  use_nvidia = True
-  call_pars = argv[1:]
-else:
-  use_nvidia = False
-  call_pars = argv   
+# Options in front of the command, in any order:
+# nvidia: use the NVIDIA requirements
+# nopip: skip updating pip and the requirements (servers without internet
+#        access would otherwise wait for long timeouts on every start)
+use_nvidia = False
+use_pip = True
+call_pars = argv[:]
+while len(call_pars) > 1 and call_pars[1] in {'nvidia', 'nopip'}:
+  if call_pars.pop(1) == 'nvidia':
+    use_nvidia = True
+  else:
+    use_pip = False
 my_sysinfo = sysinfo()
 print(my_sysinfo)
 if len(call_pars) > 1:
@@ -73,16 +80,16 @@ if len(call_pars) > 1:
   startup_redis.set_shutdown_command(0) 
   while True:
     call_pars[0] = 'python'
-    
-    
-    
-    call_in_env('pip install --upgrade pip', my_sysinfo)
-    if use_nvidia:
-      cmd = 'pip install -r requirements.nvidia_' 
+    if use_pip:
+      call_in_env('pip install --upgrade pip', my_sysinfo)
+      if use_nvidia:
+        cmd = 'pip install -r requirements.nvidia_' 
+      else:
+        cmd = 'pip install -r requirements.' + my_sysinfo['hw'] + '_' 
+      cmd += my_sysinfo['dist_version']
+      call_in_env(cmd, my_sysinfo)
     else:
-      cmd = 'pip install -r requirements.' + my_sysinfo['hw'] + '_' 
-    cmd += my_sysinfo['dist_version']
-    call_in_env(cmd, my_sysinfo)
+      print('Skipping pip updates (nopip)')
     call_in_env('python manage.py migrate', my_sysinfo)
     subprocess.call(call_pars)
     if startup_redis.get_shutdown_command() in {0, 10, 11}:
