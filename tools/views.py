@@ -22,6 +22,7 @@ import shutil
 import cv2 as cv
 from asgiref.sync import async_to_sync
 from requests import get as rget
+from requests.exceptions import RequestException
 from pathlib import Path
 from zipfile import ZipFile
 from django.conf import settings
@@ -260,14 +261,30 @@ class upgrade(myTemplateView):
   template_name = 'tools/upgrade.html'
 
   def get_context_data(self, **kwargs):
+    # Servers without internet access can upgrade from a ZIP file in
+    # temp/upgrade, so a failing GitHub request must not break the page.
+    new_version = None
+    zip_url = ''
     url = 'https://api.github.com/repos/ludgerh/cam-ai/releases/latest'
-    response = rget(url)
-    if response.status_code == 200:
-      response = json.loads(response.text)
+    try:
+      response = rget(url, timeout = 10)
+      if response.status_code == 200:
+        response = json.loads(response.text)
+        new_version = response['tag_name'][1:]
+        zip_url = response['zipball_url']
+    except RequestException:
+      pass
+    upgrade_dir = PARENTPATH / 'temp' / 'upgrade'
+    local_zips = sorted(
+      upgrade_dir.glob('*.zip'),
+      key = lambda x: x.stat().st_mtime,
+    )
     context = super().get_context_data(**kwargs)
     context.update({
-      'new_version' : response['tag_name'][1:],
-      'zip_url' : response['zipball_url']
+      'new_version' : new_version,
+      'zip_url' : zip_url,
+      'local_zip' : local_zips[-1].name if local_zips else None,
+      'upgrade_dir' : str(upgrade_dir),
     })
     return context
       
