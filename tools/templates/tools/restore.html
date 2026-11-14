@@ -1,5 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
+tools/templates/tools/restore.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -60,7 +61,6 @@ $(document).ready(function() {
   const upload_socket = new WebSocket(ws_scheme + '//'
     + window.location.host
     + '/ws/uploads/')
-  const CHUNK_SIZE = 1024 * 1024;
   $('#upload-form').on('submit', async function (e) {
     e.preventDefault();
     const fileInput = document.getElementById('fileselector');
@@ -79,34 +79,31 @@ $(document).ready(function() {
         + (result && result.message ? result.message : ''));
       return;
     } 
-    upload_socket.onmessage = async function(e) {
-      result = e.data;
-      if (result == 'Done!'){
-        upload_socket.onmessage = null;
-        upload_socket.send(JSON.stringify({
-          command: 'upload_finish',
-          filename: file.name,
-        }));
-        result = JSON.parse(await nextMessage(upload_socket));
-        if (result && result.status === 'OK') {
-          $('#import-form input[name="file_name"]').val(file.name);
-          $('#phase0').addClass('d-none');
-          $('#phase1').removeClass('d-none');
-        } else {
-          $('#upload-status').text('Error during upload_finish: ' 
-            + (result && result.message ? result.message : ''));
-        }
-      } else {
-        $('#upload-status').text('Upload: ' + result);
-      };
-    };  
-    let offset = 0;
-    while (offset < file.size) {
-      const slice = file.slice(offset, offset + CHUNK_SIZE);
-      const buffer = await slice.arrayBuffer();
-      upload_socket.send(buffer);
-      offset += CHUNK_SIZE;
-    };
+    // Sends only a few chunks ahead of the answers of the server, so large
+    // files do not pile up in the memory of the browser
+    try {
+      await sendFileChunks(upload_socket, file, function(text) {
+        $('#upload-status').text('Upload: ' + text);
+      });
+    } catch (err) {
+      console.error(err);
+      $('#upload-status').text('Upload failed.');
+      $('#upload-btn').prop('disabled', false);
+      return;
+    }
+    upload_socket.send(JSON.stringify({
+      command: 'upload_finish',
+      filename: file.name,
+    }));
+    result = JSON.parse(await nextMessage(upload_socket));
+    if (result && result.status === 'OK') {
+      $('#import-form input[name="file_name"]').val(file.name);
+      $('#phase0').addClass('d-none');
+      $('#phase1').removeClass('d-none');
+    } else {
+      $('#upload-status').text('Error during upload_finish: ' 
+        + (result && result.message ? result.message : ''));
+    }
   });
   $('#import-form').on('submit', function (e) {
     e.preventDefault();

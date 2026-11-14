@@ -1,5 +1,5 @@
 /*
-camai/static/camai/git/js/wstools.js
+camai/static/camai/js/wstools.js
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -200,3 +200,81 @@ function nextMessage(ws, { signal } = {}) {
 // Usage:
 // const data = await nextMessage(ws); // string oder Blob/ArrayBuffer
 
+
+/*
+ * Send a file in chunks over an upload socket (tools/upload_consumer.py)
+ *
+ * The consumer answers every chunk with a progress message ('42%') and the
+ * last one with 'Done!'. At most maxInFlight chunks are sent ahead of these
+ * answers. Without this limit the whole file ends up in the send buffer of
+ * the browser, which runs out of memory with large files.
+ *
+ * @param {WebSocket} ws
+ * @param {File} file
+ * @param {function(string)} [onProgress] gets the progress messages
+ * @returns {Promise<void>} resolves on 'Done!', rejects on error or close
+ */
+async function sendFileChunks(ws, file, onProgress,
+    { chunkSize = 1024 * 1024, maxInFlight = 8 } = {}) {
+  if (file.size === 0) {
+    return;
+  }
+  let sent = 0;
+  let answered = 0;
+  let done = false;
+  let failure = null;
+  let wake = null;
+  const notify = () => {
+    if (wake) {
+      const resolve = wake;
+      wake = null;
+      resolve();
+    }
+  };
+  const onMsg = (ev) => {
+    answered += 1;
+    if (ev.data === 'Done!') {
+      done = true;
+    } else if (onProgress) {
+      onProgress(ev.data);
+    }
+    notify();
+  };
+  const onErr = () => {
+    failure = new Error('WebSocket error');
+    notify();
+  };
+  const onClose = () => {
+    failure = new Error('WebSocket closed');
+    notify();
+  };
+  const waitUntil = async (condition) => {
+    while (!condition()) {
+      if (failure) {
+        throw failure;
+      }
+      await new Promise((resolve) => { wake = resolve; });
+    }
+  };
+  ws.addEventListener('message', onMsg);
+  ws.addEventListener('error', onErr);
+  ws.addEventListener('close', onClose);
+  try {
+    let offset = 0;
+    while (offset < file.size) {
+      await waitUntil(() => sent - answered < maxInFlight);
+      const slice = file.slice(offset, offset + chunkSize);
+      ws.send(await slice.arrayBuffer());
+      sent += 1;
+      offset += chunkSize;
+    }
+    await waitUntil(() => done);
+  } finally {
+    ws.removeEventListener('message', onMsg);
+    ws.removeEventListener('error', onErr);
+    ws.removeEventListener('close', onClose);
+  }
+}
+
+// Usage:
+// await sendFileChunks(ws, file, (text) => $('#status').text(text));
