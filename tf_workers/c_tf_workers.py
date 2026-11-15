@@ -377,7 +377,8 @@ class tf_worker(spawn_process):
               + ' requested, but TensorFlow found no GPU, falling back to CPU')
             self.cuda_select = '/CPU:0'
           else:
-            self.cuda_select = '/GPU:'+str(self.dbline.gpu_nr)
+            # CUDA_VISIBLE_DEVICES shows only the selected card, always as GPU:0
+            self.cuda_select = '/GPU:0'
             for gpu in gpus:
               tf.config.experimental.set_memory_growth(gpu, True)
           self.logger.info('+++++ tf_worker Selected: '+self.cuda_select)
