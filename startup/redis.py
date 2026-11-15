@@ -1,3 +1,4 @@
+# startup/redis.py
 """
 Copyright (C) 2025-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -48,7 +49,7 @@ class new_redis(saferedis):
     self.set('cam-ai.startup.shutdown:', value) 
     
   def get_start_worker_busy(self):
-    if (result := self.get('cam-ai.startup.worker_busy')) is None:
+    if (result := self.get('cam-ai.startup.worker_busy:')) is None:
       return(0)
     else:  
       return(int(result))  

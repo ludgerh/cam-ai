@@ -1,3 +1,4 @@
+# startup/startup.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -123,7 +124,7 @@ class startup_class():
         return() 
       if (item := startup_redis.get_start_trainer_busy()):
         if (item in trainers):
-          trainers[item].stop()
+          await trainers[item].stop()
         glob_lock = p_lock()
         my_worker = tf_workers[1] #may be variable in the future 
         trainers[item] = trainer(
@@ -136,7 +137,7 @@ class startup_class():
         startup_redis.set_start_trainer_busy(0)
       if (item := startup_redis.get_start_worker_busy()):
         if (item in tf_workers):
-          tf_workers[item].stop()
+          await tf_workers[item].stop()
         tf_workers[item] = tf_worker(item)
         tf_workers[item].start()
         startup_redis.set_start_worker_busy(0)
