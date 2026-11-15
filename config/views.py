@@ -20,6 +20,7 @@ import json
 import asyncio
 from socket import gaierror
 from importlib import reload
+from threading import Thread
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import TemplateView
 from django.views.generic.edit import FormView
@@ -29,6 +30,8 @@ from django.core.mail.backends.smtp import EmailBackend
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import redirect
 from tools.l_tools import djconf
+from tools.l_break import break_type, BR_LONG
+from startup.redis import my_redis as startup_redis
 from tools.l_smtp import l_smtp, l_msg
 from access.c_access import access
 from streams.models import stream
@@ -299,13 +302,28 @@ class plugins(myTemplateView):
     return context
   
   def post(self, request, *args, **kwargs):
+    changed = []
     for s_item in self.stream_list:
       if access.check('D', s_item, request.user, 'W'):
         plugin_id = request.POST.get(f'det_plugin_{s_item.id}')
-        if plugin_id:
+        if plugin_id and int(plugin_id) != s_item.det_plugin_id:
           stream.objects.filter(id=s_item.id).update(det_plugin_id=plugin_id)
+          changed.append(s_item.id)
       if access.check('E', s_item, request.user, 'W'):
         plugin_id = request.POST.get(f'alarm_plugin_{s_item.id}')
-        if plugin_id:
+        if plugin_id and int(plugin_id) != s_item.eve_alarm_plugin_id:
           stream.objects.filter(id=s_item.id).update(eve_alarm_plugin_id=plugin_id)
+          changed.append(s_item.id)
+    if changed:
+      # Plugins are loaded when the stream starts, so the changed streams are
+      # restarted. The startup process handles one stream at a time and checks
+      # every 10 s, so this runs in the background.
+      Thread(target = restart_streams, args = (sorted(set(changed)), ),
+        daemon = True).start()
     return redirect('/config/config/plugins/none/')
+
+def restart_streams(stream_ids):
+  for stream_id in stream_ids:
+    while startup_redis.get_start_stream_busy():
+      break_type(BR_LONG)
+    startup_redis.set_start_stream_busy(stream_id)
