@@ -12,6 +12,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+import os
 from django.test import TestCase
 from .l_tools import djconfig
 
@@ -169,3 +170,35 @@ class LoadPluginTest(SimpleTestCase):
     self.assertEqual(module.value, 42)
     self.assertTrue(module.compiled)
     self.assertTrue(module.__file__.endswith(built.name))
+
+class preload_cuda_libs_test(TestCase):
+
+  def test_loads_cusolver_global(self):
+    """
+    Only libcusolver is loaded, with RTLD_GLOBAL
+    """
+    import ctypes
+    from tempfile import TemporaryDirectory
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from . import l_cuda
+    with TemporaryDirectory() as nvidia_dir:
+      os.makedirs(nvidia_dir + '/cusolver/lib')
+      for name in ('libcusolver.so.11', 'libcusolverMg.so.11'):
+        open(nvidia_dir + '/cusolver/lib/' + name, 'w').close()
+      spec = SimpleNamespace(submodule_search_locations = [nvidia_dir])
+      with (patch.object(l_cuda, 'find_spec', return_value = spec),
+          patch.object(l_cuda.ctypes, 'CDLL') as cdll):
+        result = l_cuda.preload_cuda_libs()
+    lib = nvidia_dir + '/cusolver/lib/libcusolver.so.11'
+    self.assertEqual(result, [lib])
+    cdll.assert_called_once_with(lib, mode = ctypes.RTLD_GLOBAL)
+
+  def test_no_nvidia_package(self):
+    """
+    Without the pip NVIDIA packages nothing is loaded
+    """
+    from unittest.mock import patch
+    from . import l_cuda
+    with patch.object(l_cuda, 'find_spec', return_value = None):
+      self.assertEqual(l_cuda.preload_cuda_libs(), [])

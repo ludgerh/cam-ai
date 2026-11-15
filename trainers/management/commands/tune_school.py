@@ -154,6 +154,8 @@ def run_training(db_name, school_id, fit_id, gpu_nr, gpu_mem_limit, config):
   from unittest.mock import patch
   from tf_workers.models import school
   from trainers.models import fit
+  from tools.l_cuda import preload_cuda_libs
+  preload_cuda_libs()
   from plugins.train_worker_gpu import train_worker_gpu
   with (
     patch('plugins.train_worker_gpu.train_worker_gpu.djconf',

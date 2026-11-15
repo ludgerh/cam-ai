@@ -262,6 +262,8 @@ class trainer(spawn_process):
               self.job_queue.task_done()
           if self.dbline.t_type == 1:
             if train_once_gpu is None:
+              from tools.l_cuda import preload_cuda_libs
+              preload_cuda_libs()
               from plugins.train_worker_gpu.train_worker_gpu import train_once_gpu
             train_process = Process(target = train_once_gpu, args = (
               myschool, 
