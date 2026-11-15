@@ -372,7 +372,11 @@ class tf_worker(spawn_process):
           self.logger.info('+++++ tf_worker GPUs: '+str(gpus))
           if self.dbline.gpu_nr == -1:
             self.cuda_select = '/CPU:0'
-          else:  
+          elif not gpus:
+            self.logger.warning('***** tf_worker: GPU #' + str(self.dbline.gpu_nr)
+              + ' requested, but TensorFlow found no GPU, falling back to CPU')
+            self.cuda_select = '/CPU:0'
+          else:
             self.cuda_select = '/GPU:'+str(self.dbline.gpu_nr)
             for gpu in gpus:
               tf.config.experimental.set_memory_growth(gpu, True)
