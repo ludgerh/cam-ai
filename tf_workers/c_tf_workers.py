@@ -364,6 +364,9 @@ class tf_worker(spawn_process):
             os.environ["CUDA_VISIBLE_DEVICES"] = ''
           else:  
             os.environ["CUDA_VISIBLE_DEVICES"] = str(self.dbline.gpu_nr)
+          from tools.l_cuda import preload_cuda_libs
+          for lib in preload_cuda_libs():
+            self.logger.info('+++++ tf_worker preloaded: ' + lib)
           import tensorflow as tf 
           self.logger.info("TensorFlow version: "+tf.__version__)
           cpus = tf.config.list_physical_devices('CPU')
