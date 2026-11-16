@@ -467,6 +467,14 @@ class eve_worker(mp_process):
       take_record_count(self.type, self.id)
     await a_break_type(BR_SHORT)
     
+  def check_out_due(self, item):
+    # The gap is measured from the moment the last frame arrived here, not
+    # from its capture time. Otherwise a processing delay above
+    # event_time_gap closes every event before its next frame arrives
+    return(time() - item.last_add_ts > self.shared_mem.read_1_meta('event_time_gap')
+      or item.end > item.start + self.event_max_time
+      or item.name != self.event_name)
+
   async def check_event(self, i, item):
     await a_break_type(BR_SHORT)
     if self.dbline.cam_virtual_fps:
@@ -477,9 +485,7 @@ class eve_worker(mp_process):
       async with self.event_dict_lock:
         self.event_dict.pop(i, None)
       return()
-    if (item.end < newtime - self.shared_mem.read_1_meta('event_time_gap')
-        or item.end > item.start + self.event_max_time
-        or item.name != self.event_name):
+    if self.check_out_due(item):
       item.check_out_ts = item.end
     if item.check_out_ts is None:
       return()
