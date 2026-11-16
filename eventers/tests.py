@@ -16,7 +16,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
 import asyncio
+from collections import OrderedDict
+from threading import Lock as t_lock
+from time import time
 from django.test import SimpleTestCase
+from eventers.c_event import c_event
 from eventers.c_eventers import eve_worker
 
 class fake_shared_mem():
@@ -84,3 +88,51 @@ class MergeEventsTest(SimpleTestCase):
     worker.event_dict = {1 : fake_event([0, 10, 0, 10], 1.0, nr_frames = 100)}
     asyncio.run(worker.merge_events())
     self.assertIsNone(worker.event_dict[1].check_out_ts)
+
+class CheckOutDueTest(SimpleTestCase):
+
+  def make_worker(self):
+    worker = eve_worker.__new__(eve_worker)
+    worker.shared_mem = fake_shared_mem(1)
+    worker.event_max_time = 30.0
+    worker.event_name = 'Lid open'
+    return(worker)
+
+  def make_event(self, capture_age, add_age):
+    item = fake_event([0, 10, 0, 10], time() - capture_age)
+    item.name = 'Lid open'
+    item.last_add_ts = time() - add_age
+    return(item)
+
+  def test_delayed_frames_keep_the_event_open(self):
+    # Captured 3 s ago, but just arrived: the processing delay must not count
+    worker = self.make_worker()
+    self.assertFalse(worker.check_out_due(self.make_event(3.0, 0.2)))
+
+  def test_close_after_gap_without_new_frames(self):
+    worker = self.make_worker()
+    self.assertTrue(worker.check_out_due(self.make_event(3.0, 1.5)))
+
+  def test_close_on_name_change(self):
+    worker = self.make_worker()
+    item = self.make_event(0.0, 0.0)
+    item.name = 'Lid closed'
+    self.assertTrue(worker.check_out_due(item))
+
+  def test_merge_keeps_latest_add_time(self):
+    first = c_event.__new__(c_event)
+    second = c_event.__new__(c_event)
+    for item, add_ts in ((first, 10.0), (second, 20.0)):
+      item.event_lock = t_lock()
+      item.frames = OrderedDict()
+      item.last_box = [0, 10, 0, 10]
+      item.last_box_ts = 0.0
+      item.last_add_ts = add_ts
+      item.focus_max = 0.0
+      item.append(None)
+      item.append(None)
+      item.append(None)
+      item.append(None)
+      item.append([])
+    first.merge_frames(second)
+    self.assertEqual(first.last_add_ts, 20.0)

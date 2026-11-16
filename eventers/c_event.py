@@ -1,4 +1,4 @@
-# eventers.py/c_event.py
+# eventers/c_event.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -151,6 +151,9 @@ class c_event(list):
       # the most recent frame and is the one to match against.
       self.last_box = list(box)
       self.last_box_ts = frame[2]
+      # Wall clock time of the last added frame. frame[2] is the capture
+      # time, it lags behind by the whole detector and prediction delay
+      self.last_add_ts = time()
   
   @classmethod  
   async def create(cls, **kwargs):
@@ -222,6 +225,7 @@ class c_event(list):
         self[3] = round((box[3] * s_factor + self[3]) / (s_factor + 1.0))
       self.last_box = box
       self.last_box_ts = frame[2]
+      self.last_add_ts = time()
       self[4].append(frame[5]) 
       self.frames[next(self._frame_keys)] = frame
       if (new_max := np.max(frame[5][1:])) > self.focus_max:
@@ -253,6 +257,7 @@ class c_event(list):
         # box would ratchet outwards over the whole scene
         self.last_box = list(the_other_one.last_box)
         self.last_box_ts = the_other_one.last_box_ts
+      self.last_add_ts = max(self.last_add_ts, the_other_one.last_add_ts)
       if the_other_one.focus_max > self.focus_max:
         self.focus_max = the_other_one.focus_max
         self.focus_time = the_other_one.focus_time
