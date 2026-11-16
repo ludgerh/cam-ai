@@ -1,6 +1,6 @@
 {% extends 'main/basis.html' %}
 {% comment %}
-oneitem/templates/onedector.html
+oneitem/templates/oneitem/onedetector.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -404,6 +404,7 @@ function initUI() {
       const y = evt.clientY - rect.top;
       oneitemSocket.sendandwait({
         'command' : 'mousemove',
+        'edit_mode' : true,
         'x': Math.floor(x),
         'y': Math.floor(y),
       })
@@ -416,6 +417,7 @@ function initUI() {
       const y = evt.clientY - rect.top;
 		  oneitemSocket.sendandwait({
 			  'command' : 'dblclick',
+        'edit_mode' : true,
         'x': Math.floor(x),
         'y': Math.floor(y),
 		  })
