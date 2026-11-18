@@ -213,7 +213,7 @@ def getbmp(request, mode, framenr, outtype, xycontained, x, y,
   if request.user.id is None:
     if mode == 0:
       if (tokennr and token):
-        go_on = checktoken((tokennr, token), 'EVR', eventline.id)
+        go_on = checktoken((tokennr, token), 'EVR', event_frame_line.event_id)
       else:
         go_on = False
     else:
