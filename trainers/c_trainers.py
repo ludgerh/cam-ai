@@ -102,16 +102,28 @@ class trainer(spawn_process):
   async def update_predictions(self, school_nr, last_fit):
     if self.doing_reinference > 0 and self.doing_reinference != school_nr:
       return()
-    self.doing_reinference = school_nr
     with self.glob_lock:
       if trainers_redis.get_predict_proc_active(school_nr): 
         return()
       trainers_redis.set_predict_proc_active(school_nr, True)
+    self.doing_reinference = school_nr
+    # Only a partly done run (more than one batch of frames) keeps the school
+    # reserved for the next pass. Every other exit, including exceptions and
+    # sigint, must release it, or this trainer ignores all other schools.
+    keep_reserved = False
     try:  
       from .models import trainframe
       from tf_workers.models import school
       school_dbline = await school.objects.aget(id = school_nr)
       #print('%%%%% update_predictions: school_nr:', school_nr, 'last_fit:', last_fit, 'last_fit_infer:', school_dbline.last_fit_infer)
+      if school_dbline.last_fit != school_dbline.last_fit_infer:
+        # A new fit exists, but no tf_worker has loaded it yet. Only the
+        # tf_worker sets last_fit_infer (check_model()), and it does so only
+        # on an ask_pred for this school. Without live traffic for the school
+        # nobody would ask, so request a model check without images. The
+        # frames follow in a later pass, once last_fit_infer is updated.
+        await self.tf_worker.ask_pred(school_nr, [], self.tf_w_index)
+        return()
       base_qs = (trainframe.objects
         .filter(school = school_nr, deleted=False)
         .exclude(last_fit = school_dbline.last_fit_infer))
@@ -193,10 +205,11 @@ class trainer(spawn_process):
             f'TR{self.id}: Finished re-inferencing {total_count} frames '
             + f'of school #{school_nr}'
           )  
-          self.doing_reinference = 0
-      else:    
-        self.doing_reinference = 0
+        else:
+          keep_reserved = True
     finally:
+      if not keep_reserved:
+        self.doing_reinference = 0
       trainers_redis.set_predict_proc_active(school_nr, False)
               
   async def async_runner(self): 
@@ -351,11 +364,13 @@ class trainer(spawn_process):
     from tf_workers.models import school
     from .models import trainframe
     schoollines = await sync_to_async(list)(school.objects.filter(active = True))
+    reinference_ids = set()
     for s_item in schoollines:
       if self.got_sigint:
         return()
       await s_item.arefresh_from_db()
       if s_item.delegation_level == 1:
+        reinference_ids.add(s_item.id)
         asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
 
       # --- change detection ---------------------------------------------------
@@ -413,6 +428,15 @@ class trainer(spawn_process):
 
       if run_condition:
         await self.insert_job(s_item, undone_qs)
+
+    # A school that was reserved for re-inferencing but got deactivated or
+    # delegated in between is never called again and would block the others.
+    # Not while its task is still running: two runs on the same tf_worker
+    # output queue would mix up their predictions.
+    if (self.doing_reinference
+        and self.doing_reinference not in reinference_ids
+        and not trainers_redis.get_predict_proc_active(self.doing_reinference)):
+      self.doing_reinference = 0
 
   def is_queued_anywhere(self, school_nr):
     from globals.c_globals import trainers
