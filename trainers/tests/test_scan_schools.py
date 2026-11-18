@@ -1,3 +1,4 @@
+# trainers/tests/test_scan_schools.py
 """
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
@@ -188,6 +189,7 @@ class ScanSchoolsTest(TestCase):
     myschool = await school.objects.acreate(**self.school_kwargs(delegation_level = 2))
     await sync_to_async(self.make_frames)(myschool, 3)
     await self.trainer.scan_schools()
+    await self.trainer.reinference_task
     self.assertEqual(self.queued_school_ids(), [])
     # The migrations create a default school #1, so check only our school
     called_ids = [c.args[0] for c in self.trainer.update_predictions.call_args_list]

@@ -95,7 +95,7 @@ class UpdatePredictionsTest(TestCase):
     # The trainer raised last_fit, no tf_worker has loaded the model yet.
     myschool = await sync_to_async(self.make_school)(last_fit = 5, last_fit_infer = 4)
     await sync_to_async(self.make_frames)(myschool, 3, last_fit = 4)
-    await self.trainer.update_predictions(myschool.id, myschool.last_fit)
+    await self.trainer.update_predictions(myschool.id)
     self.trainer.tf_worker.ask_pred.assert_awaited_once_with(myschool.id, [], 7)
     self.assertEqual(self.trainer.doing_reinference, 0)
     self.assertFalse(self.trainers_redis.get_predict_proc_active(myschool.id))
@@ -106,13 +106,13 @@ class UpdatePredictionsTest(TestCase):
   async def test_current_model_nothing_to_do(self):
     myschool = await sync_to_async(self.make_school)(last_fit = 5, last_fit_infer = 5)
     await sync_to_async(self.make_frames)(myschool, 3, last_fit = 5)
-    await self.trainer.update_predictions(myschool.id, myschool.last_fit)
+    await self.trainer.update_predictions(myschool.id)
     self.trainer.tf_worker.ask_pred.assert_not_awaited()
     self.assertEqual(self.trainer.doing_reinference, 0)
 
   async def test_exception_releases_reservation(self):
     with self.assertRaises(school.DoesNotExist):
-      await self.trainer.update_predictions(999999, 0)
+      await self.trainer.update_predictions(999999)
     self.assertEqual(self.trainer.doing_reinference, 0)
     self.assertFalse(self.trainers_redis.get_predict_proc_active(999999))
 
@@ -120,21 +120,48 @@ class UpdatePredictionsTest(TestCase):
     # More frames than one pass handles (1000): the school stays reserved.
     myschool = await sync_to_async(self.make_school)(last_fit = 5, last_fit_infer = 5)
     await sync_to_async(self.make_frames)(myschool, 1001, last_fit = 4)
-    await self.trainer.update_predictions(myschool.id, myschool.last_fit)
+    await self.trainer.update_predictions(myschool.id)
     self.assertEqual(self.trainer.doing_reinference, myschool.id)
     self.assertFalse(self.trainers_redis.get_predict_proc_active(myschool.id))
     # Another school has to wait
     other = await sync_to_async(self.make_school)(last_fit = 2, last_fit_infer = 1)
-    await self.trainer.update_predictions(other.id, other.last_fit)
+    await self.trainer.update_predictions(other.id)
     self.trainer.tf_worker.ask_pred.assert_not_awaited()
 
   async def test_busy_school_does_not_reserve(self):
     # Another trainer is re-inferencing the school right now.
     myschool = await sync_to_async(self.make_school)(last_fit = 5, last_fit_infer = 4)
     self.trainers_redis.set_predict_proc_active(myschool.id, True)
-    await self.trainer.update_predictions(myschool.id, myschool.last_fit)
+    await self.trainer.update_predictions(myschool.id)
     self.assertEqual(self.trainer.doing_reinference, 0)
     self.trainer.tf_worker.ask_pred.assert_not_awaited()
+
+  async def test_scan_reaches_every_school(self):
+    # Regression: with one task per school, every second school lost the race
+    # for doing_reinference on each pass and never got its model checked.
+    myschools = []
+    for i in range(6):
+      myschools.append(
+        await sync_to_async(self.make_school)(last_fit = 2, last_fit_infer = 1))
+    await self.trainer.scan_schools()
+    await self.trainer.reinference_task
+    asked = [c.args[0] for c in self.trainer.tf_worker.ask_pred.await_args_list]
+    for myschool in myschools:
+      self.assertIn(myschool.id, asked)
+
+  async def test_reserved_school_first_and_alone(self):
+    self.trainer.update_predictions = AsyncMock()
+    self.trainer.doing_reinference = 3
+    await self.trainer.run_reinference([1, 2, 3])
+    # A partly done school stays reserved, nothing else runs in this pass
+    self.trainer.update_predictions.assert_awaited_once_with(3)
+
+  async def test_failing_school_does_not_stop_others(self):
+    self.trainer.update_predictions = AsyncMock(side_effect = [ValueError, None])
+    with self.assertLogs(self.trainer.logger, 'ERROR'):
+      await self.trainer.run_reinference([1, 2])
+    self.assertEqual(
+      [c.args[0] for c in self.trainer.update_predictions.await_args_list], [1, 2])
 
   async def test_scan_releases_deactivated_school(self):
     self.trainer.update_predictions = AsyncMock()

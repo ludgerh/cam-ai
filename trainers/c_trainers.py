@@ -97,9 +97,32 @@ class trainer(spawn_process):
     if self.id == 1:
       self.glob_lock.acquire()
     self.doing_reinference = 0  
+    self.reinference_task = None
     super().__init__()
+
+  async def run_reinference(self, school_ids):
+    # One task per trainer works through the schools one after the other.
+    # With one task per school they raced for doing_reinference: a school
+    # still checking its frames blocked the next one, and on every pass the
+    # same schools lost and were never re-inferenced.
+    if self.doing_reinference in school_ids:
+      school_ids = ([self.doing_reinference] 
+        + [i for i in school_ids if i != self.doing_reinference])
+    for school_nr in school_ids:
+      if self.got_sigint:
+        return()
+      try:
+        await self.update_predictions(school_nr)
+      except Exception as fatal:
+        self.logger.error(
+          f'TR{self.id}: Re-inferencing of school #{school_nr} failed: {fatal}',
+          exc_info = True,
+        )
+      if self.doing_reinference:
+        # Partly done, the next pass continues with this school
+        return()
       
-  async def update_predictions(self, school_nr, last_fit):
+  async def update_predictions(self, school_nr):
     if self.doing_reinference > 0 and self.doing_reinference != school_nr:
       return()
     with self.glob_lock:
@@ -115,7 +138,6 @@ class trainer(spawn_process):
       from .models import trainframe
       from tf_workers.models import school
       school_dbline = await school.objects.aget(id = school_nr)
-      #print('%%%%% update_predictions: school_nr:', school_nr, 'last_fit:', last_fit, 'last_fit_infer:', school_dbline.last_fit_infer)
       if school_dbline.last_fit != school_dbline.last_fit_infer:
         # A new fit exists, but no tf_worker has loaded it yet. Only the
         # tf_worker sets last_fit_infer (check_model()), and it does so only
@@ -313,6 +335,8 @@ class trainer(spawn_process):
         'Error in process: ' + self.logname)
       self.logger.critical("async_runner crashed: %s", fatal, exc_info=True)
     finally:  
+      if self.reinference_task:
+        self.reinference_task.cancel()
       if self.job_queue_task:
         self.job_queue_task.cancel()
         try:
@@ -364,14 +388,13 @@ class trainer(spawn_process):
     from tf_workers.models import school
     from .models import trainframe
     schoollines = await sync_to_async(list)(school.objects.filter(active = True))
-    reinference_ids = set()
+    reinference_ids = []
     for s_item in schoollines:
       if self.got_sigint:
         return()
       await s_item.arefresh_from_db()
       if s_item.delegation_level == 1:
-        reinference_ids.add(s_item.id)
-        asyncio.create_task(self.update_predictions(s_item.id, s_item.last_fit))
+        reinference_ids.append(s_item.id)
 
       # --- change detection ---------------------------------------------------
       # model_to_dict() with exclude=['trainers'] touches concrete fields
@@ -437,6 +460,11 @@ class trainer(spawn_process):
         and self.doing_reinference not in reinference_ids
         and not trainers_redis.get_predict_proc_active(self.doing_reinference)):
       self.doing_reinference = 0
+    if self.reinference_task is None or self.reinference_task.done():
+      self.reinference_task = asyncio.create_task(
+        self.run_reinference(reinference_ids),
+        name = 'run_reinference',
+      )
 
   def is_queued_anywhere(self, school_nr):
     from globals.c_globals import trainers
