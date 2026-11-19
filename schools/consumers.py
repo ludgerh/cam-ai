@@ -34,6 +34,7 @@ from datetime import datetime
 from collections import defaultdict
 from time import time
 from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User as dbuser
 from django.core.paginator import Paginator
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -44,7 +45,7 @@ from tools.l_tools import ts2filename, djconf, uniquename_async
 from tools.c_tools import reduce_image_async
 from tools.c_logger import log_ini
 from tools.l_crypt import l_crypt
-from tools.l_break import a_break_type, BR_MEDIUM, BR_LONG
+from tools.l_break import a_break_type, BR_MEDIUM
 from access.c_access import access
 from access.models import access_control
 from globals.c_globals import tf_workers
@@ -83,10 +84,15 @@ else:
 CHUNK_SIZE = 32
 GETFRAMES_TIMEOUT = 1.0
 GETFRAMES_MAX = 5
+PRED_TIMEOUT = 60.0
+PRED_MAX_TIMEOUTS = 3
 
 
 def decode_and_convert_image(myimage_bytes):
-  img = cv.imdecode(np.frombuffer(myimage_bytes, dtype=np.uint8), cv.IMREAD_UNCHANGED)
+  # IMREAD_COLOR: always 3 channels, also for grayscale or images with alpha
+  img = cv.imdecode(np.frombuffer(myimage_bytes, dtype=np.uint8), cv.IMREAD_COLOR)
+  if img is None:
+    raise ValueError('Image could not be decoded')
   return cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
 def _chunked(seq, n):
@@ -147,11 +153,28 @@ class schooldbutil(AsyncWebsocketConsumer):
     except:
       logger.error('Error in consumer: ' + logname + ' (schooldbutil)')
       logger.error(format_exc())
+
+  async def get_pred_results(self, school_nr):
+    # Returns None if the tf_worker does not answer, e.g. because it dropped
+    # the request when the model could not be loaded
+    for _ in range(PRED_MAX_TIMEOUTS):
+      received = await self.tf_worker.get_from_outqueue(
+        self.tf_w_index, 
+        timeout = PRED_TIMEOUT, 
+      )
+      if received is not None:
+        return(received.tolist())
+      logger.error(f'SC{school_nr}: Timeout during Getpredictions')
+    return(None)
       
   async def predictions_from_tfw(self, frames, school_nr, is_tagger):
     school_dbline = self.school_lines[school_nr]
     i_global = 0  # for periodic sleep()
     cancelled = False
+    worker_failed = False
+    # Discard late results of an earlier request that ran into a timeout
+    while not await self.tf_worker.outqueue_empty(self.tf_w_index):
+      await self.tf_worker.get_from_outqueue(self.tf_w_index)
     for chunk in _chunked(frames, CHUNK_SIZE):
       imglist = []
       code_list = []
@@ -201,9 +224,15 @@ class schooldbutil(AsyncWebsocketConsumer):
                   f'SC{school_nr}: {imagepath} not found'
                 )  
                 code_list.append('0')
-        except FileNotFoundError:
-          logger.error('*** File not found: %s', imagepath)
-          raise  # lasse den Fehler nach oben gehen
+              except Exception as e:
+                logger.warning(
+                  f'SC{school_nr}: {imagepath} not readable: {e}'
+                )  
+                code_list.append('0')
+        except ObjectDoesNotExist:
+          logger.warning(f'SC{school_nr}: Frame #{item["idx"]} not in database')
+          frame_ids.append(item['idx'])
+          code_list.append('0')
         except asyncio.CancelledError:
           cancelled = True
           raise
@@ -213,28 +242,23 @@ class schooldbutil(AsyncWebsocketConsumer):
               f'SC{school_nr}: {imagepath}: Getpredictions cancelled (client disconnect)'
             )  
           i_global += 1
-      await self.tf_worker.ask_pred(
-        school_nr, 
-        imglist, 
-        self.tf_w_index,
-      )
+      if not worker_failed:
+        await self.tf_worker.ask_pred(
+          school_nr, 
+          imglist, 
+          self.tf_w_index,
+        )
       received = []
       for code, frame_dict, frame_id in zip(code_list, chunk, frame_ids):
         if code == 'I':
-          if not received:
-            while True:
-              received = await self.tf_worker.get_from_outqueue(
-                self.tf_w_index, 
-                timeout = 60.0, 
-              )
-              if received is None:
-                logger.error(
-                  f'SC{school_nr}: Timeout during Getpredictions'
-                )  
-                await a_break_type(BR_LONG)
-              else:
-                received = received.tolist()
-                break
+          if not received and not worker_failed:
+            received = await self.get_pred_results(school_nr)
+            if received is None:
+              worker_failed = True
+          if worker_failed:
+            # No answer from the tf_worker, the remaining frames get no prediction
+            frame_dict['prediction'] = None
+            continue
           prediction = received.pop(0)  
           frame_dict['prediction'] = prediction
           cache_entry = my_cache_dict.setdefault(frame_id, {})
@@ -331,10 +355,12 @@ class schooldbutil(AsyncWebsocketConsumer):
             False, 
           )
           for item in frames_to_infer:
+            # Without prediction the frame keeps its old last_fit and is inferred again
+            if not item['prediction']:
+              continue
             item['line'].last_fit = self.school_lines[school_nr].last_fit
-            if item['prediction']:
-              for i in range(10):
-                setattr(item['line'], f"pred{i}", item['prediction'][i])
+            for i in range(10):
+              setattr(item['line'], f"pred{i}", item['prediction'][i])
             await item['line'].asave(
               update_fields=["last_fit"] + [f"pred{i}" for i in range(10)], 
             )
