@@ -1,5 +1,6 @@
 {% extends 'eventers/basis.html' %}
 {% comment %}
+schools/templates/schools/classroom.html
 Copyright (C) 2024-2026 by the CAM-AI team, info@cam-ai.de
 More information and complete source: https://github.com/ludgerh/cam-ai
 This program is free software; you can redistribute it and/or
@@ -283,18 +284,19 @@ function getimages(count) {
       for (let j=0; j < frameslist.length; j++) {
         cblines = '<div class="checklist h4">';
         for (let k=0; k<taglines.length; k++) {
+          // prediction is null if the image could not be read or the tf_worker failed
+          let pred = (frameslist[j]['prediction'] ? frameslist[j]['prediction'][k] : 0);
 {% if may_write_school %}
-	        cblines += '<input type="checkbox" class="checkboxx" data-k="' + k + '"';
-	        if (frameslist[j]['prediction'][k] >= 0.5) {
-		        cblines += ' checked>';
-	        } else {
-		        cblines += '>';
-	        };
+          cblines += '<input type="checkbox" class="checkboxx" data-k="' + k + '"';
+          if (pred >= 0.5) {
+            cblines += ' checked>';
+          } else {
+            cblines += '>';
+          };
 {% endif %}
-	        cblines += '<span pred="'+frameslist[j]['prediction'][k]+'"> ';
-	        cblines += taglines[k].substr(0,3)+': ';
-	        cblines += Math.round(frameslist[j]['prediction'][k]*10000)
-			        /10000+'</span><br>';
+          cblines += '<span pred="' + pred + '"> ';
+          cblines += taglines[k].substr(0,3) + ': ';
+          cblines += Math.round(pred * 10000) / 10000 + '</span><br>';
         };
         cblines += '</div>';
         $('#card' + frameslist[j]['idx']).append(cblines);
