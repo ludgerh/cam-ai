@@ -25,7 +25,7 @@ from django.test import SimpleTestCase
 try:
   from plugins.train_worker_gpu.train_worker_gpu import (
     quantize_lr, is_better_score, next_stage_gamma, next_finetuning,
-    train_schedule, MyCallback,
+    stage_start_lr, train_schedule, MyCallback,
     OVERFIT_BOTH_FALLING, OVERFIT_BOTH_RISING, OVERFIT_POSITIVE,
     OVERFIT_NEGATIVE, OVERFIT_SHORT, PHASE_START, PHASE_MAIN, PHASE_FINAL,
     AUG_TRIAL_WINDOWS,
@@ -133,6 +133,21 @@ class NextFinetuningTest(SimpleTestCase):
 
   def test_never_above_total(self):
     self.assertEqual(next_finetuning(349, 349), 349)
+
+@skipIf(plugin_missing, 'plugins/train_worker_gpu not installed')
+class StageStartLrTest(SimpleTestCase):
+
+  def test_falls_with_stage_count(self):
+    self.assertAlmostEqual(stage_start_lr(1e-4, 1e-6, 1), 10 ** -4.5)
+    self.assertAlmostEqual(stage_start_lr(1e-4, 1e-6, 2), 1e-5)
+
+  def test_floor(self):
+    self.assertAlmostEqual(stage_start_lr(1e-4, 1e-6, 4), 10 ** -5.5)
+
+  def test_never_above_max(self):
+    # The floor (10^-5.5) and the target must not override a lower maximum
+    self.assertAlmostEqual(stage_start_lr(1e-6, 1e-6, 1), 1e-6)
+    self.assertAlmostEqual(stage_start_lr(1e-6, 1e-5, 3), 1e-6)
 
 @skipIf(plugin_missing, 'plugins/train_worker_gpu not installed')
 class TrainScheduleTest(SimpleTestCase):
@@ -586,3 +601,37 @@ class MyCallbackStartPhaseTest(SimpleTestCase):
     cb = self.callback(10.0 ** -5.5)
     self.epoch_end(cb)
     self.assertEqual(cb.schedule.phase, PHASE_START)
+
+@skipIf(plugin_missing, 'train_worker_gpu plugin not installed')
+class MyCallbackLrRaiseTest(SimpleTestCase):
+
+  def callback(self, lr, lr_max):
+    cb = MyCallback(MagicMock(), MagicMock(), MagicMock(), 0, patience = PATIENCE)
+    cb.set_model(MagicMock())
+    cb.myschool.l_rate_min = 1e-7
+    cb.myschool.l_rate_max = lr_max
+    cb.myschool.l_rate_target = 1e-6
+    cb.current_lr = lr
+    cb.schedule.set_phase(PHASE_MAIN)
+    cb.schedule.count_since_reset = PATIENCE * 2
+    return(cb)
+
+  def test_raise_at_target(self):
+    self.assertTrue(self.callback(1e-6, 1e-4).lr_raise_possible())
+
+  def test_no_raise_too_early(self):
+    cb = self.callback(1e-6, 1e-4)
+    cb.schedule.count_since_reset = PATIENCE * 2 - 1
+    self.assertFalse(cb.lr_raise_possible())
+
+  def test_no_raise_above_target(self):
+    self.assertFalse(self.callback(10.0 ** -5.5, 1e-4).lr_raise_possible())
+
+  def test_no_raise_at_max(self):
+    # Maximum equal to the target: the LR went up to 10^-5.5 before.
+    # quantize_lr() gives 10^-6 with a rounding error.
+    self.assertFalse(self.callback(quantize_lr(1e-6), 1e-6).lr_raise_possible())
+    self.assertFalse(self.callback(1e-6, 1e-6).lr_raise_possible())
+
+  def test_raise_below_max(self):
+    self.assertTrue(self.callback(1e-7, 1e-6).lr_raise_possible())
