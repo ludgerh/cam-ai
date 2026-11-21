@@ -384,7 +384,8 @@ class admin_tools_async(AsyncWebsocketConsumer):
           else:
             resultdict['quota'] = (quota[0] + 1, quota[1])
             schoolline.model_type = MODEL_TYPE
-            await schoolline.asave(update_fields = ('model_type', ))
+            schoolline.model_train_type = MODEL_TYPE
+            await schoolline.asave(update_fields = ('model_type', 'model_train_type', ))
           if not self.scope['user'].is_superuser:
             myaccess = access_control()
             myaccess.vtype = 'S'
