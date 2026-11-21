@@ -332,7 +332,11 @@ class admin_tools_async(AsyncWebsocketConsumer):
           await self.send(json.dumps(outlist))
           return()
         if params['name'] == 'temp123school456name789magic':
-          school.objects.filter(name = params['name']).adelete()
+          # Remove leftovers of aborted imports, including their directories
+          async for old_school in school.objects.filter(name = params['name']):
+            if old_school.dir and await aiofiles.os.path.exists(old_school.dir):
+              await aioshutil.rmtree(old_school.dir)
+            await old_school.adelete()
         schoolline = school()
         schoolline.name = params['name']
         schoolline.creator = userline
