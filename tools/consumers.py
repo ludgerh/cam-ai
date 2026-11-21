@@ -322,6 +322,13 @@ class admin_tools_async(AsyncWebsocketConsumer):
             outlist['data'] = {'status' : 'noauth', 'domain' : myserver}
             await self.send(json.dumps(outlist))
             return()
+        if params['name'] == 'temp123school456name789magic':
+          # Remove leftovers of aborted imports before the quota check,
+          # so they do not count against it. Their directories go as well
+          async for old_school in school.objects.filter(name = params['name']):
+            if old_school.dir and await aiofiles.os.path.exists(old_school.dir):
+              await aioshutil.rmtree(old_school.dir)
+            await old_school.adelete()
         quota =  await self.check_create_school_priv(userline)
         if quota[0] >= quota[1]:
           outlist['data'] = {
@@ -331,12 +338,6 @@ class admin_tools_async(AsyncWebsocketConsumer):
           }
           await self.send(json.dumps(outlist))
           return()
-        if params['name'] == 'temp123school456name789magic':
-          # Remove leftovers of aborted imports, including their directories
-          async for old_school in school.objects.filter(name = params['name']):
-            if old_school.dir and await aiofiles.os.path.exists(old_school.dir):
-              await aioshutil.rmtree(old_school.dir)
-            await old_school.adelete()
         schoolline = school()
         schoolline.name = params['name']
         schoolline.creator = userline
