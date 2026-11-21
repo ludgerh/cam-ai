@@ -207,6 +207,8 @@ class TrainSchoolTest(TransactionTestCase):
     # --- school ----------------------------------------------------------------
     self.myschool.refresh_from_db()
     self.assertTrue(self.myschool.load_last_model)
+    # After a fit the next one continues with all base model layers unfrozen
+    self.assertGreater(self.myschool.model_finetuning, 0)
     if self.myschool.model_type == self.myschool.model_train_type:
       self.assertEqual(self.myschool.last_fit, old_last_fit + 1)
 
