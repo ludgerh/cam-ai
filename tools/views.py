@@ -422,7 +422,14 @@ class process_restore(myTemplateView):
         'message' : 'Zip-File missing...',
       })
       return self.render_to_response(context)
-    unpack_dir = settings.BASE_DIR / 'temp' / 'unpack' / 'data'
+    if self.job_type == 'restore':
+      unpack_dir = settings.BASE_DIR / 'temp' / 'unpack' / 'data'
+    else:
+      # Unpack on the file system of the schools, so that moving frames and
+      # coded files into the school below is a rename. Across file systems
+      # shutil.move() copies everything, which takes many minutes for big
+      # schools. A restart during that copy left a school without DB rows.
+      unpack_dir = SCHOOLSPATH / '.unpack'
     shutil.rmtree(unpack_dir, ignore_errors=True)
     unpack_dir.mkdir(parents=True, exist_ok=True)
     with ZipFile(zip_file) as zf:
@@ -549,6 +556,7 @@ class process_restore(myTemplateView):
         # The export writes school = 0, so only the freshly loaded rows are
         # touched here. Nothing existing is deleted or modified:
         trainframe.objects.filter(school=0).update(school=school_line.id)
+      shutil.rmtree(unpack_dir, ignore_errors=True)
     if self.job_type == 'restore':
       (path_to_exchange / 'db.sql').unlink(missing_ok=True) 
       (path_to_exchange / 'db.dat').unlink(missing_ok=True)  
