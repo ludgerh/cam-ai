@@ -17,7 +17,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 # Grid search over gamma_min, gamma_step, gamma_max, the start value of
 # the image augmentation and l_rate_max for one school. Without --lr-max the
-# l_rate_max of the exported school is used. Every combination is trained
+# l_rate_max of the exported school is used. model_finetuning is -2 (stages
+# from the head to all layers) unless --finetuning is given, e.g. the value of
+# the school to train all layers from the start. Every combination is trained
 # completely (all finetuning stages) and repeated, because single runs
 # differ by about +-2 validation errors by chance alone.
 #
@@ -199,6 +201,9 @@ class Command(BaseCommand):
       help = 'Start value of the image augmentation')
     parser.add_argument('--lr-max', type = float, nargs = '+', default = None,
       help = 'l_rate_max, default: the value of the exported school')
+    parser.add_argument('--finetuning', type = int, default = -2,
+      help = 'model_finetuning of the runs, -2 = all stages, '
+        '>0 = number of base model layers trained from the start')
     parser.add_argument('--repeats', type = int, default = 2)
     parser.add_argument('--from-last-model', action = 'store_true',
       help = 'Continue from the exported model instead of a new one')
@@ -257,7 +262,7 @@ class Command(BaseCommand):
     old_name = connection.creation.create_test_db(
       verbosity = 1, autoclobber = True, serialize = False)
     try:
-      school_id = self.load_export(export, workdir)
+      school_id = self.load_export(export, workdir, options['finetuning'])
       self.run_grid(runs, school_id, export_dir, workdir, outdir,
         results_file, options)
     finally:
@@ -267,7 +272,7 @@ class Command(BaseCommand):
     self.stdout.write('\n' + format_summary(summarize(
       read_results(results_file), default_lr_max)))
 
-  def load_export(self, export, workdir):
+  def load_export(self, export, workdir, finetuning):
     # Same as the setUp() of trainers/tests/test_train_school.py
     from django.contrib.auth.models import User
     from tf_workers.models import worker, school
@@ -277,7 +282,7 @@ class Command(BaseCommand):
     myworker = worker.objects.create()
     school_row = dict(export['school'])
     school_row['lastmodelfile'] = parse_datetime(school_row['lastmodelfile'])
-    school_row['model_finetuning'] = -2
+    school_row['model_finetuning'] = finetuning
     # Only the metrics are needed, this skips the TFLite export
     school_row['save_new_model'] = False
     myschool = school.objects.create(
@@ -298,7 +303,8 @@ class Command(BaseCommand):
       row['made'] = parse_datetime(row['made'])
       frames.append(trainframe(school = myschool.id, **row))
     trainframe.objects.bulk_create(frames)
-    self.stdout.write(f'Loaded school "{myschool.name}" with {len(frames)} frames')
+    self.stdout.write(f'Loaded school "{myschool.name}" with {len(frames)} frames, '
+      f'model_finetuning {finetuning}')
     return(myschool.id)
 
   def run_grid(self, runs, school_id, export_dir, workdir, outdir,
@@ -327,6 +333,9 @@ class Command(BaseCommand):
       rmtree(workdir + 'model/', True)
       if os.path.exists(export_dir + 'model/'):
         copytree(export_dir + 'model/', workdir + 'model/')
+      else:
+        # A school without a model: the trainer saves its best epochs here
+        os.makedirs(workdir + 'model/')
       school.objects.filter(id = school_id).update(
         model_gamma = gamma_min,
         model_gamma_step = gamma_step,
