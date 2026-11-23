@@ -15,8 +15,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-# Grid search over gamma_min, gamma_step, gamma_max and the start value of
-# the image augmentation for one school. Every combination is trained
+# Grid search over gamma_min, gamma_step, gamma_max, the start value of
+# the image augmentation and l_rate_max for one school. Without --lr-max the
+# l_rate_max of the exported school is used. Every combination is trained
 # completely (all finetuning stages) and repeated, because single runs
 # differ by about +-2 validation errors by chance alone.
 #
@@ -46,7 +47,7 @@ from django.utils.dateparse import parse_datetime
 TEST_DB_NAME = 'test_camai_tune'
 
 RESULT_FIELDS = [
-  'gamma_min', 'gamma_step', 'gamma_max', 'aug', 'repeat', 'status',
+  'gamma_min', 'gamma_step', 'gamma_max', 'aug', 'lr_max', 'repeat', 'status',
   'val_errors', 'val_bce', 'val_recall', 'val_precision', 'best_epoch',
   'epochs', 'minutes', 'log',
 ]
@@ -54,19 +55,19 @@ RESULT_FIELDS = [
 LOG_HEADER = ('#\tPh\tSec\tLR\tBCE \tFT\tAugm\tGamma\tBinAcc\tRec\tPrec \t'
   'val_BCE\tval_BinAcc\tval_Rec\tval_Prec \tval_Err\n')
 
-def build_grid(gamma_mins, gamma_steps, gamma_maxs, augs):
+def build_grid(gamma_mins, gamma_steps, gamma_maxs, augs, lr_maxs):
   """
   All parameter combinations without duplicates. With step 0 or
   gamma_max <= gamma_min gamma stays constant, so these collapse to
   (gamma_min, 0, gamma_min).
   """
   result = []
-  for gamma_min, gamma_step, gamma_max, aug in product(
-      gamma_mins, gamma_steps, gamma_maxs, augs):
+  for gamma_min, gamma_step, gamma_max, aug, lr_max in product(
+      gamma_mins, gamma_steps, gamma_maxs, augs, lr_maxs):
     if gamma_step <= 0.0 or gamma_max <= gamma_min:
       gamma_step = 0.0
       gamma_max = gamma_min
-    combo = (gamma_min, gamma_step, gamma_max, aug)
+    combo = (gamma_min, gamma_step, gamma_max, aug, lr_max)
     if combo not in result:
       result.append(combo)
   return(result)
@@ -74,13 +75,20 @@ def build_grid(gamma_mins, gamma_steps, gamma_maxs, augs):
 def combo_key(combo, repeat):
   return(tuple(f'{value:g}' for value in combo) + (str(repeat), ))
 
+def row_combo(row, default_lr_max):
+  # Results written before lr_max was varied have no lr_max column. These
+  # runs used the l_rate_max of the school.
+  return((float(row['gamma_min']), float(row['gamma_step']),
+    float(row['gamma_max']), float(row['aug']),
+    float(row.get('lr_max') or default_lr_max)))
+
 def read_results(filename):
   if not os.path.exists(filename):
     return([])
   with open(filename, newline = '') as f:
     return(list(csv.DictReader(f)))
 
-def summarize(rows):
+def summarize(rows, default_lr_max):
   """
   One line per combination, best first. Primary criterion is the mean
   number of validation errors, the gamma-independent val_bce breaks ties
@@ -90,9 +98,7 @@ def summarize(rows):
   for row in rows:
     if row['status'] != 'Done':
       continue
-    key = (float(row['gamma_min']), float(row['gamma_step']),
-      float(row['gamma_max']), float(row['aug']))
-    combos.setdefault(key, []).append(row)
+    combos.setdefault(row_combo(row, default_lr_max), []).append(row)
   result = []
   for key, items in combos.items():
     errors = [int(item['val_errors']) for item in items]
@@ -111,13 +117,14 @@ def summarize(rows):
 
 def format_summary(summary):
   lines = [
-    'gamma_min  gamma_step  gamma_max   aug  runs  errors (min-max)'
+    'gamma_min  gamma_step  gamma_max   aug     lr_max  runs  errors (min-max)'
     '  val_bce    minutes',
   ]
   for item in summary:
-    gamma_min, gamma_step, gamma_max, aug = item['combo']
+    gamma_min, gamma_step, gamma_max, aug, lr_max = item['combo']
     lines.append(
       f'{gamma_min:9.2f}  {gamma_step:10.2f}  {gamma_max:9.2f}  {aug:4.2f}'
+      f'  {lr_max:9.3e}'
       f'  {item["runs"]:4d}  {item["errors_mean"]:6.1f} '
       f'({item["errors_min"]}-{item["errors_max"]})'
       f'  {item["val_bce_mean"]:.6f}  {item["minutes_mean"]:7.0f}'
@@ -175,7 +182,8 @@ def link_or_copy(src, dst):
     copy2(src, dst)
 
 class Command(BaseCommand):
-  help = 'Grid search over gamma and augmentation for one exported school'
+  help = ('Grid search over gamma, augmentation and l_rate_max for one '
+    'exported school')
 
   def add_arguments(self, parser):
     parser.add_argument('export_dir',
@@ -189,6 +197,8 @@ class Command(BaseCommand):
     parser.add_argument('--aug', type = float, nargs = '+',
       default = [0.2, 0.3, 0.5],
       help = 'Start value of the image augmentation')
+    parser.add_argument('--lr-max', type = float, nargs = '+', default = None,
+      help = 'l_rate_max, default: the value of the exported school')
     parser.add_argument('--repeats', type = int, default = 2)
     parser.add_argument('--from-last-model', action = 'store_true',
       help = 'Continue from the exported model instead of a new one')
@@ -211,12 +221,14 @@ class Command(BaseCommand):
     if not outdir.endswith('/'):
       outdir += '/'
     results_file = outdir + 'results.csv'
+    with open(export_dir + 'school.json') as f:
+      export = json.load(f)
+    default_lr_max = export['school']['l_rate_max']
 
     grid = build_grid(options['gamma_min'], options['gamma_step'],
-      options['gamma_max'], options['aug'])
-    done = {combo_key(
-        (float(row['gamma_min']), float(row['gamma_step']),
-        float(row['gamma_max']), float(row['aug'])), int(row['repeat']))
+      options['gamma_max'], options['aug'],
+      options['lr_max'] or [default_lr_max])
+    done = {combo_key(row_combo(row, default_lr_max), int(row['repeat']))
       for row in read_results(results_file) if row['status'] == 'Done'}
     runs = [(combo, repeat)
       for repeat in range(1, options['repeats'] + 1)
@@ -225,12 +237,12 @@ class Command(BaseCommand):
     self.stdout.write(f'{len(grid)} combinations x {options["repeats"]} repeats, '
       f'{len(runs)} runs to do ({len(done)} already done)')
     for combo, repeat in runs:
-      self.stdout.write('  gamma %g / %g / %g, aug %g, repeat %d'
+      self.stdout.write('  gamma %g / %g / %g, aug %g, lr_max %g, repeat %d'
         % (combo + (repeat, )))
     if options['dry_run'] or not runs:
       if done:
         self.stdout.write('\n' + format_summary(summarize(
-          read_results(results_file))))
+          read_results(results_file), default_lr_max)))
       return
 
     os.makedirs(outdir + 'logs/', exist_ok = True)
@@ -239,8 +251,6 @@ class Command(BaseCommand):
       rmtree(workdir)
     self.stdout.write('Copying ' + export_dir + ' -> ' + workdir)
     copytree(export_dir, workdir, copy_function = link_or_copy)
-    with open(export_dir + 'school.json') as f:
-      export = json.load(f)
 
     test_settings = connection.settings_dict.setdefault('TEST', {})
     test_settings['NAME'] = TEST_DB_NAME
@@ -255,7 +265,7 @@ class Command(BaseCommand):
       connection.creation.destroy_test_db(old_name, verbosity = 1)
       rmtree(workdir, True)
     self.stdout.write('\n' + format_summary(summarize(
-      read_results(results_file))))
+      read_results(results_file), default_lr_max)))
 
   def load_export(self, export, workdir):
     # Same as the setUp() of trainers/tests/test_train_school.py
@@ -306,8 +316,8 @@ class Command(BaseCommand):
     }
     durations = []
     for count, (combo, repeat) in enumerate(runs, 1):
-      gamma_min, gamma_step, gamma_max, aug = combo
-      name = 'g%g-%g-%g_a%g_r%d' % (combo + (repeat, ))
+      gamma_min, gamma_step, gamma_max, aug, lr_max = combo
+      name = 'g%g-%g-%g_a%g_l%g_r%d' % (combo + (repeat, ))
       eta = ''
       if durations:
         eta = (', about %.1f h left'
@@ -322,6 +332,7 @@ class Command(BaseCommand):
         model_gamma_step = gamma_step,
         model_gamma_max = gamma_max,
         model_image_augmentation = aug,
+        l_rate_max = lr_max,
         load_last_model = options['from_last_model'],
       )
       myschool = school.objects.get(id = school_id)
@@ -355,6 +366,7 @@ class Command(BaseCommand):
         'gamma_step' : f'{gamma_step:g}',
         'gamma_max' : f'{gamma_max:g}',
         'aug' : f'{aug:g}',
+        'lr_max' : f'{lr_max:g}',
         'repeat' : repeat,
         'status' : myfit.status,
         'val_errors' : myfit.val_errors,
