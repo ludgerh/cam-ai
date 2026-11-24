@@ -156,6 +156,8 @@ class TrainSchoolTest(TransactionTestCase):
     # --- fit -------------------------------------------------------------------
     self.myfit.refresh_from_db()
     self.assertEqual(self.myfit.status, 'Done')
+    self.assertEqual(self.myfit.trainer_version,
+      'train_worker_gpu ' + train_worker_gpu.version)
     self.assertEqual(self.myfit.nr_tr + self.myfit.nr_va, nr_frames)
     self.assertGreater(self.myfit.nr_va, 0)
     self.assertGreaterEqual(self.myfit.epochs, 1)
