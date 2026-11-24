@@ -146,6 +146,8 @@ class TrainSchoolTest(TransactionTestCase):
     nr_frames = len(self.export['frames'])
     # train_once_gpu() changes myschool in place, so read it before
     old_last_fit = self.myschool.last_fit
+    with open(modelpath + model_name + '.keras', 'rb') as f:
+      old_model = f.read()
 
     train_worker_gpu.train_once_gpu(self.myschool, self.myfit, GPU_NR, 0)
 
@@ -185,6 +187,11 @@ class TrainSchoolTest(TransactionTestCase):
       self.assertTrue(os.path.exists(modelpath + filename), filename)
     leftover = [item for item in os.listdir(modelpath) if '_temp_' in item]
     self.assertEqual(leftover, [])
+    # The replaced model is kept as a reserve until the next fit
+    with open(modelpath + model_name + '.backup.keras', 'rb') as f:
+      self.assertEqual(f.read(), old_model)
+    with open(modelpath + model_name + '.keras', 'rb') as f:
+      self.assertNotEqual(f.read(), old_model)
 
     # The quantized model must run on one of the exported images
     import numpy as np
