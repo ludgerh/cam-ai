@@ -133,6 +133,8 @@ class fit(models.Model):
   l_rate_target = models.FloatField(default = 1e-6)
   early_stop_patience = models.IntegerField(default = 20)
   status = models.CharField(max_length = 10, default = 'Done')
+  # Version of the trainer that ran the fit (e.g. train_worker_gpu 1.0.0l)
+  trainer_version = models.CharField(max_length = 50, default = '')
 
   def __str__(self):
     return('Fit made ' + str(self.made))
