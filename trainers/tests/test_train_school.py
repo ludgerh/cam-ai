@@ -146,6 +146,8 @@ class TrainSchoolTest(TransactionTestCase):
     nr_frames = len(self.export['frames'])
     # train_once_gpu() changes myschool in place, so read it before
     old_last_fit = self.myschool.last_fit
+    old_load_last_model = self.myschool.load_last_model
+    old_finetuning = self.myschool.model_finetuning
     with open(modelpath + model_name + '.keras', 'rb') as f:
       old_model = f.read()
 
@@ -213,9 +215,9 @@ class TrainSchoolTest(TransactionTestCase):
 
     # --- school ----------------------------------------------------------------
     self.myschool.refresh_from_db()
-    self.assertTrue(self.myschool.load_last_model)
-    # After a fit the next one continues with all base model layers unfrozen
-    self.assertGreater(self.myschool.model_finetuning, 0)
+    # The settings from the UI are left as they are
+    self.assertEqual(self.myschool.load_last_model, old_load_last_model)
+    self.assertEqual(self.myschool.model_finetuning, old_finetuning)
     if self.myschool.model_type == self.myschool.model_train_type:
       self.assertEqual(self.myschool.last_fit, old_last_fit + 1)
 
