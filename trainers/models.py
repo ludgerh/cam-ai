@@ -133,8 +133,10 @@ class fit(models.Model):
   l_rate_target = models.FloatField(default = 1e-6)
   early_stop_patience = models.IntegerField(default = 20)
   status = models.CharField(max_length = 10, default = 'Done')
-  # Version of the trainer that ran the fit (e.g. train_worker_gpu 1.0.0l)
-  trainer_version = models.CharField(max_length = 50, default = '')
+  # Version of the trainer that ran the fit (e.g. train_worker_gpu 1.0.0l).
+  # db_default: code without the field can still insert fits after migrate.
+  trainer_version = models.CharField(max_length = 50, default = '',
+    db_default = '')
 
   def __str__(self):
     return('Fit made ' + str(self.made))
