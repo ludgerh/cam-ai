@@ -24,6 +24,7 @@ from logging import getLogger
 from threading import Lock as t_lock
 from unittest.mock import patch, AsyncMock
 from asgiref.sync import sync_to_async
+from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -258,6 +259,18 @@ class ScanSchoolsTest(TestCase):
       await trainframe.objects.filter(school = myschool.id, train_status = 0).acount(), 3)
     # The foreign lock must not be removed
     self.assertEqual(self.safe_redis.get(lock_key), b'99')
+
+  async def test_insert_job_failed_fit_keeps_frames(self):
+    # If the fit can't be saved, the frames must stay at train_status 0
+    myschool = await school.objects.acreate(**self.school_kwargs())
+    await sync_to_async(self.make_frames)(myschool, 3)
+    with patch.object(fit, 'asave', side_effect = IntegrityError('no default')):
+      with self.assertRaises(IntegrityError):
+        await self.trainer.scan_schools()
+    self.assertEqual(self.queued_school_ids(), [])
+    self.assertEqual(
+      await trainframe.objects.filter(school = myschool.id, train_status = 0).acount(), 3)
+    self.assertIsNone(self.safe_redis.get(SCHOOL_LOCK_KEY + str(myschool.id)))
 
   async def test_got_sigint_stops_scan(self):
     myschool = await school.objects.acreate(**self.school_kwargs())

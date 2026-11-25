@@ -488,7 +488,6 @@ class trainer(spawn_process):
       # Re-check under the lock, another trainer may have won the race.
       if self.is_queued_anywhere(s_item.id):
         return()
-      await undone_qs.aupdate(train_status = 1)
       myfit = fit(
         made = timezone.now(),
         school = s_item.id,
@@ -499,7 +498,14 @@ class trainer(spawn_process):
         model_finetuning = s_item.model_finetuning,
         status = 'Waiting',
       )
+      # Save the fit first: if that fails, the frames must stay at
+      # train_status 0, otherwise they no longer count for the trigger.
       await myfit.asave()
+      try:
+        await undone_qs.aupdate(train_status = 1)
+      except BaseException:
+        await myfit.adelete()
+        raise
       with self.mylock:
         self.job_queue_list.append(s_item.id)
       trainers_redis.set_trainerqueue(self.id, self.job_queue_list)
