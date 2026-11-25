@@ -17,7 +17,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 # Re-inferencing after a new fit (update_predictions) against the test
 # database. tf_worker and redis are replaced by fakes, the frame files do not
-# exist, so no image is ever sent for prediction.
+# exist, so no image is ever sent for prediction. The tf_workers redis is faked
+# too: with a local server running, its last_prio_write is always recent and
+# the inference_waitingtime loop would never end.
 
 from logging import getLogger
 from threading import Lock as t_lock
@@ -28,9 +30,14 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from trainers.models import trainer as dbtrainer, trainframe
 from tf_workers.models import worker, school
+from tf_workers.redis import new_redis as tf_workers_redis_class
 from trainers import c_trainers
 from trainers.c_trainers import trainer
-from trainers.tests.test_scan_schools import fake_trainers_redis, fake_safe_redis
+from trainers.tests.test_scan_schools import (
+  dict_redis_mixin, fake_trainers_redis, fake_safe_redis)
+
+class fake_tf_workers_redis(dict_redis_mixin, tf_workers_redis_class):
+  pass
 
 class UpdatePredictionsTest(TestCase):
 
@@ -46,6 +53,7 @@ class UpdatePredictionsTest(TestCase):
     for name, value in (
       ('trainers_redis', self.trainers_redis),
       ('safe_redis', self.safe_redis),
+      ('tf_workers_redis', fake_tf_workers_redis()),
     ):
       p = patch.object(c_trainers, name, value)
       p.start()
