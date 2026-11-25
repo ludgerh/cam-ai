@@ -707,6 +707,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               t = trainframe(
                 made=item.time,
                 school=params['school'],
+                stream=eventline.camera_id,
                 name=newname,
                 code='NE',
                 checked=0,

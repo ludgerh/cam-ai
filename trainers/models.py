@@ -60,6 +60,8 @@ class trainframe(models.Model):
   made = models.DateTimeField()
   #school = models.IntegerField(default = 0, db_default = 0)
   school = models.IntegerField(default = 0)
+  # Stream (camera) the frame was taken from, 0 = unknown (e.g. imported)
+  stream = models.IntegerField(default = 0, db_default = 0)
   encrypted = models.BooleanField(default = False)
   name = models.CharField(max_length = 256)
   code = models.CharField(max_length = 2)
