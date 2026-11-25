@@ -688,7 +688,7 @@ class schooldbutil(AsyncWebsocketConsumer):
               for j in range(10):
                 tagname = 'c'+str(j)
                 updatelist.append(tagname)
-                setattr(item, tagname, params['cblist'][i][j])
+                setattr(t, tagname, params['cblist'][i][j])
               await t.asave(update_fields=updatelist)
             else:
               if item.encrypted:
