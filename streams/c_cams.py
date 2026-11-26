@@ -991,17 +991,21 @@ class cam_worker(mp_process):
     while self.ff_proc is not None and self.ff_proc.returncode is None:
       await a_break_type(BR_LONG)
     #self.logger.info('#'+str(self.id) + ' 11111')
-    try:
-      os.unlink(self.socket_path)
-    except FileNotFoundError:
-      pass
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(self.socket_path)
-    srv.listen(1)
-    srv.setblocking(False)  # required for sock_accept
     loop = asyncio.get_running_loop()
     conn = None
     while True:
+      # Fresh listening socket for every attempt: a killed ffmpeg may have
+      # connected just after the timeout. That dead connection would wait in
+      # the backlog, the next attempt would accept it (EOF right away) and the
+      # new ffmpeg would get 'Connection refused'.
+      try:
+        os.unlink(self.socket_path)
+      except FileNotFoundError:
+        pass
+      srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+      srv.bind(self.socket_path)
+      srv.listen(1)
+      srv.setblocking(False)  # required for sock_accept
       while streams_redis.get_ffmpeg_running():
         await a_break_type(BR_LONG)
       streams_redis.set_ffmpeg_running(True)
@@ -1043,8 +1047,9 @@ class cam_worker(mp_process):
           f'{round(time() - ff_ts, 3)} seconds'
         )
         streams_redis.set_ffmpeg_running(False)
+        srv.close()
         break
-      # Either ffmpeg exited or hit the 30s safety net -> retry
+      # Either ffmpeg exited or hit the 60s safety net -> retry
       for t in pending:
         t.cancel()
       for t in pending:
@@ -1059,7 +1064,7 @@ class cam_worker(mp_process):
         )
       else:
         self.logger.warning(
-          f'#{self.id} CamProc neither connected nor died within 30s'
+          f'#{self.id} CamProc neither connected nor died within 60s'
         )
         # process still alive but mute -> kill it before next attempt
         try:
@@ -1067,6 +1072,7 @@ class cam_worker(mp_process):
           await self.ff_proc.wait()
         except ProcessLookupError:
           pass
+      srv.close()
       streams_redis.set_ffmpeg_running(False)
       await a_break_time(60.0)
     # After the loop: conn is already accepted, no second srv.accept() needed
