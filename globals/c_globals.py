@@ -21,12 +21,18 @@ trainers = {}
 tf_workers = {}
 viewables = {}
 viewers = {}
-# Cross-process lock for SMTP: ensures only one eventer worker at a time
-# opens an SMTP session. Created once in the parent process; inherited by
-# every spawned eve_worker via args= in __init__.
-_mp_ctx = get_context('spawn')
-smtp_lock = _mp_ctx.Lock()
-trainer_glob_lock = _mp_ctx.Lock()
+_mp_locks = {}
+
+def mp_lock(name):
+  # Cross-process locks, e.g. 'smtp' (only one eventer worker at a time opens
+  # an SMTP session). Created on first use in the parent process and passed to
+  # the spawned workers via args=. Not created at import time: every spawned
+  # child re-imports this module and would create its own unused named
+  # semaphores, whose finalizers fail in sem_unlink() with FileNotFoundError
+  # when the child exits.
+  if name not in _mp_locks:
+    _mp_locks[name] = get_context('spawn').Lock()
+  return(_mp_locks[name])
 
 def initialize():
   # Clean up orphaned shared-memory segments from previous runs.
@@ -63,7 +69,7 @@ def initialize():
       item.id, 
       my_worker.inqueue,
       my_worker.registerqueue,
-      trainer_glob_lock,
+      mp_lock('trainer_glob'),
     )
     #Tricky: Queues and buffers stay in this Process, even if not named
   from streams.models import stream as stream_mod

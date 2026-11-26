@@ -20,7 +20,7 @@ from logging import getLogger
 from traceback import format_exc
 from channels.db import database_sync_to_async
 from tools.c_logger import alog_ini
-from globals.c_globals import add_viewable, tf_workers, smtp_lock
+from globals.c_globals import add_viewable, tf_workers, mp_lock
 from detectors.c_detectors import c_detector
 from eventers.c_eventers import c_eventer
 from .redis import my_redis
@@ -44,7 +44,7 @@ class c_stream():
         my_worker = tf_workers[tf_worker_db.id] 
         self.myeventer =  await sync_to_async(c_eventer)(
           self.dbline, 
-          smtp_lock,
+          mp_lock('smtp'),
           my_worker,
           self.logger,
         )
